@@ -12,3 +12,4 @@
 | 2026-11-16 | 战斗站位卡显示上方生命条和下方状态栏。护盾以结算后的剩余量为准 | 玩家能从站位直接读到承伤与护盾变化 | `BuiltSceneSupportsPreparationPlaybackLootAndReset` 验证生命扣减、护盾消耗和倒下 |
 | 2026-11-16 | 角色编辑页、战斗站位和装备缩略图共用职业边框，立绘沿较小的内切角裁切 | 保留职业辨识度并展示更多立绘 | 两项 Play Mode 场景用例与 Unity 渲染检查 |
 | 2026-11-16 | 角色装备在原页弹窗中操作。4×4 背包按格显示未装备物品，长按后可拖拽并互换 | 保留队伍总览上下文，通过原背包格反馈交换结果 | `PartyEditorOpensProfileAndSharedBackpackOutsideCombat` |
+| 2026-11-17 | Buff 图标沿用策划表的编号和名称，方形原图由 Git LFS 管理，Unity 导入为 256 × 256 的单张 Sprite | 便于在策划表、Obsidian 图鉴和 Unity 之间查找同一状态，保留高分辨率原图供后续使用 | Unity 批处理验证 16 张 Sprite 的尺寸，按 SHA-256 核对 Obsidian 与 Unity 原图 |
