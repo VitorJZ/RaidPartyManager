@@ -8,12 +8,13 @@ namespace RaidPartyManager.Content
     {
         [SerializeField] private string id;
         [SerializeField] private string displayName;
+        [SerializeField, TextArea] private string description;
         [SerializeField, Min(0)] private int attackBonus;
         [SerializeField, Min(0)] private int defenseBonus;
         [SerializeField, Min(0)] private int specialDefenseBonus;
         [SerializeField, Min(0)] private int healthBonus;
 
         public EquipmentDefinition ToDefinition() =>
-            new EquipmentDefinition(id, displayName, new Stats(attackBonus, defenseBonus, specialDefenseBonus, healthBonus));
+            new EquipmentDefinition(id, displayName, new Stats(attackBonus, defenseBonus, specialDefenseBonus, healthBonus), description);
     }
 }

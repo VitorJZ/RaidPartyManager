@@ -109,8 +109,9 @@ namespace RaidPartyManager.Domain
         public string Id { get; }
         public string Name { get; }
         public Stats Bonus { get; }
+        public string Description { get; }
 
-        public EquipmentDefinition(string id, string name, Stats bonus)
+        public EquipmentDefinition(string id, string name, Stats bonus, string description = null)
         {
             if (string.IsNullOrWhiteSpace(id) || bonus.Attack < 0 || bonus.Defense < 0 ||
                 bonus.SpecialDefense < 0 || bonus.Health < 0)
@@ -118,6 +119,7 @@ namespace RaidPartyManager.Domain
             Id = id;
             Name = name;
             Bonus = bonus;
+            Description = description;
         }
     }
 

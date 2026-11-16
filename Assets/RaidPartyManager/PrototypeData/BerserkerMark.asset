@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
   id: berserker-mark
   displayName: "\u72C2\u6218\u58EB\u4E4B\u5370"
+  description: 刻有战纹的徽印。装备后，攻击增加 3 点。
   attackBonus: 3
   defenseBonus: 0
   specialDefenseBonus: 0

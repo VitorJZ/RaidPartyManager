@@ -51,13 +51,7 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(portrait, selected ? PrototypeStyle.Accent : PrototypeStyle.Edge, 4);
             Add(portrait);
 
-            if (art != null)
-            {
-                var image = new Image { image = art, scaleMode = ScaleMode.ScaleAndCrop, pickingMode = PickingMode.Ignore };
-                PrototypeStyle.Fill(image);
-                portrait.Add(image);
-            }
-            else
+            if (art == null)
             {
                 var mark = PrototypeStyle.Text(character == null ? "·" : ProfessionMark(character.Profession),
                     character == null ? 26 : 44, character == null ? PrototypeStyle.Edge : sideColor);
@@ -65,6 +59,8 @@ namespace RaidPartyManager.Presentation
                 PrototypeStyle.Middle(mark);
                 portrait.Add(mark);
             }
+
+            ProfessionFrame.AddTo(portrait, character?.Profession, art);
 
             var positionTag = PrototypeStyle.Text(position.ToString("00"), 11, side == Side.Party ? PrototypeStyle.Ally : PrototypeStyle.Enemy);
             positionTag.style.position = Position.Absolute;
@@ -75,7 +71,7 @@ namespace RaidPartyManager.Presentation
 
             var caption = new VisualElement();
             caption.style.position = Position.Absolute;
-            caption.style.left = caption.style.right = caption.style.bottom = 0;
+            caption.style.left = caption.style.right = caption.style.bottom = 5;
             caption.style.paddingLeft = caption.style.paddingRight = 5;
             caption.style.paddingTop = caption.style.paddingBottom = 4;
             caption.style.backgroundColor = new Color(0.064f, 0.069f, 0.086f, 0.88f);

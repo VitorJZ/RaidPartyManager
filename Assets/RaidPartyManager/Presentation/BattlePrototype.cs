@@ -8,6 +8,7 @@ using RaidPartyManager.Run;
 using UnityEngine;
 using UnityEngine.TextCore.Text;
 using UnityEngine.UIElements;
+using static RaidPartyManager.Presentation.PrototypeText;
 
 namespace RaidPartyManager.Presentation
 {
@@ -183,6 +184,8 @@ namespace RaidPartyManager.Presentation
                 phase == Phase.Playback ? "自动战斗" : "战斗结算", 14, PrototypeStyle.Accent);
             phaseLabel.style.marginRight = 8;
             tools.Add(phaseLabel);
+            if (phase != Phase.Playback)
+                tools.Add(PrototypeStyle.Button("角色编辑", "open-party-editor", OpenPartyEditor));
             if (phase == Phase.Preparation)
             {
                 var start = PrototypeStyle.Button("开始自动战斗", "start", StartBattle, true);
@@ -212,6 +215,24 @@ namespace RaidPartyManager.Presentation
             RenderFooter(page);
             if (phase == Phase.Settlement)
                 RenderSettlement(page);
+        }
+
+        private void OpenPartyEditor()
+        {
+            if (phase == Phase.Playback)
+                return;
+
+            root.Clear();
+            root.Add(new PartyEditorView(run, EditorPosition, content.PortraitFor, Render));
+        }
+
+        private int? EditorPosition(MemberView member)
+        {
+            if (member.Position.HasValue || phase != Phase.Settlement)
+                return member.Position;
+
+            // Settlement removes defeated members from the formation. Keep their last battle slots in the editor.
+            return request.Combatants.FirstOrDefault(unit => unit.Side == Side.Party && unit.Id == member.Id)?.Position;
         }
 
         private VisualElement BuildLine(Side side)
@@ -326,16 +347,11 @@ namespace RaidPartyManager.Presentation
             portrait.style.width = Length.Percent(39);
             portrait.style.overflow = Overflow.Hidden;
             var art = content.PortraitFor(member?.Character.Id);
-            if (art != null)
-            {
-                var thumbnail = new Image { image = art, scaleMode = ScaleMode.ScaleAndCrop, pickingMode = PickingMode.Ignore };
-                PrototypeStyle.Fill(thumbnail);
-                portrait.Add(thumbnail);
-            }
+            ProfessionFrame.AddTo(portrait, member?.Character.Profession, art);
 
             var caption = PrototypeStyle.Text(member?.Character.Name ?? $"{position} 号位", 10);
             caption.style.position = Position.Absolute;
-            caption.style.left = caption.style.right = caption.style.bottom = 0;
+            caption.style.left = caption.style.right = caption.style.bottom = 3;
             caption.style.backgroundColor = new Color(0.064f, 0.069f, 0.086f, 0.90f);
             caption.style.paddingBottom = caption.style.paddingTop = 2;
             PrototypeStyle.Middle(caption);
@@ -516,26 +532,6 @@ namespace RaidPartyManager.Presentation
                     logView.ScrollTo(label);
             });
         }
-
-        private static string HealthText(int current, int maximum) => current == 0 ? $"倒下 · 0/{maximum}" : $"{current}/{maximum}";
-        private static string StatText(int effective, int baseline) => effective == baseline ? $"{effective}" : $"{effective} (+{effective - baseline})";
-
-        private static string BonusText(Stats stats)
-        {
-            var parts = new List<string>();
-            if (stats.Attack > 0) parts.Add($"攻击 +{stats.Attack}");
-            if (stats.Defense > 0) parts.Add($"防御 +{stats.Defense}");
-            if (stats.SpecialDefense > 0) parts.Add($"特防 +{stats.SpecialDefense}");
-            if (stats.Health > 0) parts.Add($"生命上限 +{stats.Health}");
-            return string.Join(" / ", parts);
-        }
-
-        private static string PersonalityText(Personality personality) => personality switch
-        {
-            Personality.Aggressive => "激进", Personality.Cautious => "慎重", Personality.Reckless => "鲁莽",
-            Personality.Gentle => "温柔", Personality.Cooperative => "配合", Personality.Calm => "冷静",
-            _ => personality.ToString()
-        };
 
         private static string ReasonText(DecisionReason reason) => reason switch
         {

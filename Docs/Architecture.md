@@ -41,6 +41,12 @@ bool settled = run.TrySettle(result, out var reward);
 
 `BattlePrototype` 负责布阵、配装、回放和结算。`BattleUnitCard` 根据行动事件更新生命条和状态栏。立绘从内容层读取，角色和战斗数据不依赖 Unity 的渲染资源。参阅 [战斗界面与状态栏](BattleUI.md)。
 
+## 角色编辑与装备交互
+
+- `PartyEditorView` 用同一个 `PartyRun` 构建角色总览，并在其上打开 `CharacterEquipmentPopup`。弹窗记录空闲物品的格子位置。交换通过一次 `PartyRun.TryEquip` 完成，成功后才更新格子与角色面板。
+- 道具描述在 `EquipmentAsset` 配置，悬停详情从运行时定义读取。未配置描述时显示属性加成。指针离开物品、开始拖拽或关闭弹窗后，会清理物品详情和拖拽状态。
+- `ProfessionFrame` 使用同一套轮廓生成外框与立绘裁切。职业配置仍来自角色数据，装饰和缩放由表现层处理。
+
 ## 合作约定
 
 战斗程序、阵容与物品、内容配置、界面可以分别在各自目录开发。各自的测试先使用内存数据，实际场景只做装配与验收。Unity 场景和遭遇资源中的引用依赖 GUID，提交时一并提交资源和 `.meta` 文件。在同一阶段需要改演练场景时，由一条工作线统一合并场景改动。
