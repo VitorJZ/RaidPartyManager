@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 34b608caee714e458f2d043fee0e7922, type: 3}
+  m_Name: RoadsideEncounter
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EncounterAsset
+  displayName: "\u6797\u9053\u906D\u9047\u6218"
+  party:
+  - instanceId: guard
+    character: {fileID: 11400000, guid: 73f0bfd8ead23f54f89374b71ac02839, type: 2}
+    position: 1
+    startingHealth: -1
+  - instanceId: mage
+    character: {fileID: 11400000, guid: 054c5ed44ef87fc41acc5b332d6dd514, type: 2}
+    position: 2
+    startingHealth: -1
+  - instanceId: healer
+    character: {fileID: 11400000, guid: 31faa26c8eb290345b97c98c8b25c96f, type: 2}
+    position: 3
+    startingHealth: 9
+  - instanceId: archer
+    character: {fileID: 11400000, guid: 2b193597608fc774abc39903fcfdf336, type: 2}
+    position: 4
+    startingHealth: -1
+  enemies:
+  - instanceId: brute
+    character: {fileID: 11400000, guid: 6047fbcbddd202343a8c60007147f2c8, type: 2}
+    position: 1
+    startingHealth: -1
+  - instanceId: flanker
+    character: {fileID: 11400000, guid: c6c9ddce470d03345af49ea294257c49, type: 2}
+    position: 3
+    startingHealth: -1
+  startingEquipment:
+  - {fileID: 11400000, guid: 081aa91af2c9425479f445860d02712f, type: 2}
+  victoryReward: {fileID: 11400000, guid: 756e87ec389e6924f86f5145ab2e62cc, type: 2}
+  tickLimit: 200

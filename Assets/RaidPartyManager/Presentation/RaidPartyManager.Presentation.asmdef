@@ -1,0 +1,11 @@
+{
+  "name": "RaidPartyManager.Presentation",
+  "rootNamespace": "RaidPartyManager.Presentation",
+  "references": [
+    "RaidPartyManager.Domain",
+    "RaidPartyManager.Battle",
+    "RaidPartyManager.Run",
+    "RaidPartyManager.Content"
+  ],
+  "noEngineReferences": false
+}

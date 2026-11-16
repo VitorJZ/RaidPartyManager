@@ -1,0 +1,8 @@
+{
+  "name": "RaidPartyManager.Run",
+  "rootNamespace": "RaidPartyManager.Run",
+  "references": [
+    "RaidPartyManager.Domain"
+  ],
+  "noEngineReferences": true
+}

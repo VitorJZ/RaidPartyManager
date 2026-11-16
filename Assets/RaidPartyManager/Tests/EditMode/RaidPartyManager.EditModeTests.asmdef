@@ -1,0 +1,15 @@
+{
+  "name": "RaidPartyManager.EditModeTests",
+  "references": [
+    "RaidPartyManager.Domain",
+    "RaidPartyManager.Battle",
+    "RaidPartyManager.Run",
+    "RaidPartyManager.Content"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

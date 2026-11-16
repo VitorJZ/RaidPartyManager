@@ -1,0 +1,8 @@
+{
+  "name": "RaidPartyManager.Battle",
+  "rootNamespace": "RaidPartyManager.Battle",
+  "references": [
+    "RaidPartyManager.Domain"
+  ],
+  "noEngineReferences": true
+}
