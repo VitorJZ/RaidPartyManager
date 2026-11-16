@@ -5,14 +5,22 @@ using System.Linq;
 namespace RaidPartyManager.Domain
 {
     public enum Profession { Warrior, Mage, Archer, Support }
+    public enum AttackReach { Unspecified, Melee, Ranged }
+    public enum CharacterTrait
+    {
+        None, DamageLimit, GainEmberWhenHit, RepeatTargetDamage, ArcherVolley, PoisonOnHit,
+        MissingHealthDamage, EscalatingAttack, PermanentAttackOnKill, IgnoreMagicDefense, LightningChant,
+        Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, BlessAlly, RevealEnemies,
+        PiercingArrow, BorrowAllyAttack
+    }
     public enum Personality { Aggressive, Cautious, Reckless, Gentle, Cooperative, Calm }
     public enum Side { Party, Enemy }
     public enum ActionKind { Attack, Heal, Shield }
-    public enum DamageType { Physical, Magic }
+    public enum DamageType { Physical, Magic, Fire, Lightning, True, Default, Fixed }
     public enum TargetRule { AnyEnemy, FrontEnemy, RearEnemy, WoundedAlly, Self }
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
     public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth }
-    public enum BattleEventKind { Action, Defeated, Finished }
+    public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged }
 
     public static class Rules
     {
@@ -42,6 +50,22 @@ namespace RaidPartyManager.Domain
             first.SpecialDefense + second.SpecialDefense, first.Health + second.Health);
     }
 
+    public readonly struct DamageComponent
+    {
+        public DamageType Type { get; }
+        public int Power { get; }
+        public bool ScalesWithAttack { get; }
+
+        public DamageComponent(DamageType type, int power = 0, bool scalesWithAttack = true)
+        {
+            if (power < 0)
+                throw new ArgumentOutOfRangeException(nameof(power));
+            Type = type;
+            Power = power;
+            ScalesWithAttack = scalesWithAttack;
+        }
+    }
+
     public sealed class ActionDefinition
     {
         public string Id { get; }
@@ -51,9 +75,12 @@ namespace RaidPartyManager.Domain
         public int Power { get; }
         public int Cooldown { get; }
         public DamageType DamageType { get; }
+        public bool HealingScalesWithAttack { get; }
+        public IReadOnlyList<DamageComponent> AdditionalDamage { get; }
 
         public ActionDefinition(string id, string name, ActionKind kind, TargetRule target, int power,
-            int cooldown = 0, DamageType damageType = DamageType.Physical)
+            int cooldown = 0, DamageType damageType = DamageType.Default, bool healingScalesWithAttack = false,
+            IEnumerable<DamageComponent> additionalDamage = null)
         {
             if (string.IsNullOrWhiteSpace(id) || power < 0 || cooldown < 0)
                 throw new ArgumentException("An action needs an ID and nonnegative power and cooldown.");
@@ -70,6 +97,8 @@ namespace RaidPartyManager.Domain
             Power = power;
             Cooldown = cooldown;
             DamageType = damageType;
+            HealingScalesWithAttack = healingScalesWithAttack;
+            AdditionalDamage = Array.AsReadOnly(additionalDamage?.ToArray() ?? Array.Empty<DamageComponent>());
         }
     }
 
@@ -83,9 +112,20 @@ namespace RaidPartyManager.Domain
         public int ActionInterval { get; }
         public ActionDefinition BasicAttack { get; }
         public ActionDefinition Skill { get; }
+        public int RosterNumber { get; }
+        public int Stage { get; }
+        public AttackReach Reach { get; }
+        public CharacterTrait Trait { get; }
+        public int TraitPower { get; }
+        public string TraitText { get; }
+        public string BattleFormId { get; }
+        public IReadOnlyList<string> EvolutionIds { get; }
 
         public CharacterDefinition(string id, string name, Profession profession, Personality personality,
-            Stats baseStats, int actionInterval, ActionDefinition basicAttack, ActionDefinition skill = null)
+            Stats baseStats, int actionInterval, ActionDefinition basicAttack, ActionDefinition skill = null,
+            int rosterNumber = 0, int stage = 1, AttackReach reach = AttackReach.Unspecified,
+            CharacterTrait trait = CharacterTrait.None, int traitPower = 0, string traitText = null,
+            string battleFormId = null, IEnumerable<string> evolutionIds = null)
         {
             if (string.IsNullOrWhiteSpace(id) || baseStats.Health <= 0 || actionInterval <= 0)
                 throw new ArgumentException("A character needs an ID, positive health and an action interval.");
@@ -101,6 +141,14 @@ namespace RaidPartyManager.Domain
             ActionInterval = actionInterval;
             BasicAttack = basicAttack;
             Skill = skill;
+            RosterNumber = rosterNumber;
+            Stage = stage;
+            Reach = reach;
+            Trait = trait;
+            TraitPower = traitPower;
+            TraitText = traitText;
+            BattleFormId = battleFormId;
+            EvolutionIds = Array.AsReadOnly(evolutionIds?.ToArray() ?? Array.Empty<string>());
         }
     }
 
@@ -110,8 +158,13 @@ namespace RaidPartyManager.Domain
         public string Name { get; }
         public Stats Bonus { get; }
         public string Description { get; }
+        public EquipmentEffect Effect { get; }
+        public bool IsPotion => Effect is EquipmentEffect.VigorPotion or EquipmentEffect.SwiftPotion or
+            EquipmentEffect.ResolvePotion or EquipmentEffect.GreedPotion or EquipmentEffect.ThornsPotion or
+            EquipmentEffect.PurityPotion;
 
-        public EquipmentDefinition(string id, string name, Stats bonus, string description = null)
+        public EquipmentDefinition(string id, string name, Stats bonus, string description = null,
+            EquipmentEffect effect = EquipmentEffect.None)
         {
             if (string.IsNullOrWhiteSpace(id) || bonus.Attack < 0 || bonus.Defense < 0 ||
                 bonus.SpecialDefense < 0 || bonus.Health < 0)
@@ -120,6 +173,7 @@ namespace RaidPartyManager.Domain
             Name = name;
             Bonus = bonus;
             Description = description;
+            Effect = effect;
         }
     }
 
@@ -131,8 +185,14 @@ namespace RaidPartyManager.Domain
         public int Position { get; }
         public Stats Stats { get; }
         public int Health { get; }
+        // Equipment follows the owner’s slot order, with empty slots omitted.
+        public IReadOnlyList<EquipmentDefinition> Equipment { get; }
+        public IReadOnlyList<string> EquipmentSlots { get; }
+        public IReadOnlyDictionary<StatusKind, int> StartingStatuses { get; }
 
-        public Combatant(string id, CharacterDefinition character, Side side, int position, Stats stats, int health)
+        public Combatant(string id, CharacterDefinition character, Side side, int position, Stats stats, int health,
+            IEnumerable<EquipmentDefinition> equipment = null,
+            IReadOnlyDictionary<StatusKind, int> startingStatuses = null, IEnumerable<string> equipmentSlots = null)
         {
             if (string.IsNullOrWhiteSpace(id) || !Rules.IsPosition(position) ||
                 stats.Health <= 0 || health < 0 || health > stats.Health)
@@ -143,6 +203,14 @@ namespace RaidPartyManager.Domain
             Position = position;
             Stats = stats;
             Health = health;
+            Equipment = Array.AsReadOnly(equipment?.ToArray() ?? Array.Empty<EquipmentDefinition>());
+            EquipmentSlots = Array.AsReadOnly(equipmentSlots?.ToArray() ?? Array.Empty<string>());
+            if (EquipmentSlots.Count != 0 && (EquipmentSlots.Count != Rules.EquipmentSlots ||
+                EquipmentSlots.Count(slot => slot != null) != Equipment.Count))
+                throw new ArgumentException("Combat equipment slots must match the supplied equipped instances.", nameof(equipmentSlots));
+            StartingStatuses = new System.Collections.ObjectModel.ReadOnlyDictionary<StatusKind, int>(
+                startingStatuses?.Where(status => status.Value > 0).ToDictionary(status => status.Key, status => status.Value)
+                ?? new Dictionary<StatusKind, int>());
         }
     }
 
@@ -151,8 +219,11 @@ namespace RaidPartyManager.Domain
         public string Id { get; }
         public IReadOnlyList<Combatant> Combatants { get; }
         public int TickLimit { get; }
+        public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
+        public IReadOnlyDictionary<string, CharacterDefinition> CharacterCatalog { get; }
 
-        public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit)
+        public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit,
+            IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null)
         {
             if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
@@ -165,10 +236,28 @@ namespace RaidPartyManager.Domain
             Id = id;
             Combatants = Array.AsReadOnly(units);
             TickLimit = tickLimit;
+            RecruitmentPool = Array.AsReadOnly(recruitmentPool?.ToArray() ?? Array.Empty<CharacterDefinition>());
+            CharacterCatalog = new System.Collections.ObjectModel.ReadOnlyDictionary<string, CharacterDefinition>(
+                (characterCatalog ?? Enumerable.Empty<CharacterDefinition>()).Concat(RecruitmentPool)
+                    .Concat(units.Select(unit => unit.Character)).GroupBy(character => character.Id)
+                    .ToDictionary(group => group.Key, group => group.First()));
         }
     }
 
-    // An action event reports target state after resolution. A defeat event follows the action that caused it.
+    public sealed class BattleLoadout
+    {
+        public IReadOnlyDictionary<string, IReadOnlyList<string>> Slots { get; }
+        public IReadOnlyList<string> Consumed { get; }
+
+        public BattleLoadout(IEnumerable<KeyValuePair<string, IReadOnlyList<string>>> slots, IEnumerable<string> consumed)
+        {
+            Slots = new System.Collections.ObjectModel.ReadOnlyDictionary<string, IReadOnlyList<string>>(
+                slots.ToDictionary(entry => entry.Key, entry => (IReadOnlyList<string>)Array.AsReadOnly(entry.Value.ToArray())));
+            Consumed = Array.AsReadOnly(consumed.ToArray());
+        }
+    }
+
+    // Action and equipment events report target state after resolution. Defeat follows the action or effect that caused it.
     public readonly struct BattleEvent
     {
         public int Tick { get; }
@@ -181,10 +270,18 @@ namespace RaidPartyManager.Domain
         public int Amount { get; }
         public int TargetHealth { get; }
         public int TargetShield { get; }
+        public string TargetStatuses { get; }
+        public string Detail { get; }
+        public CharacterDefinition Form { get; }
+        public int MaximumHealth { get; }
+        public IReadOnlyList<StatusStack> StatusStacks { get; }
+        public BattleLoadout Loadout { get; }
 
         public BattleEvent(int tick, BattleEventKind kind, string actorId = null, string targetId = null,
             string actionName = null, ActionKind actionKind = ActionKind.Attack,
-            DecisionReason reason = DecisionReason.Default, int amount = 0, int targetHealth = 0, int targetShield = 0)
+            DecisionReason reason = DecisionReason.Default, int amount = 0, int targetHealth = 0, int targetShield = 0,
+            string targetStatuses = null, string detail = null, CharacterDefinition form = null, int maximumHealth = 0,
+            IReadOnlyList<StatusStack> statusStacks = null, BattleLoadout loadout = null)
         {
             Tick = tick;
             Kind = kind;
@@ -196,6 +293,12 @@ namespace RaidPartyManager.Domain
             Amount = amount;
             TargetHealth = targetHealth;
             TargetShield = targetShield;
+            TargetStatuses = targetStatuses;
+            Detail = detail;
+            Form = form;
+            MaximumHealth = maximumHealth;
+            StatusStacks = statusStacks;
+            Loadout = loadout;
         }
     }
 
@@ -204,16 +307,32 @@ namespace RaidPartyManager.Domain
         public string Id { get; }
         public BattleOutcome Outcome { get; }
         public IReadOnlyDictionary<string, int> HealthById { get; }
+        public IReadOnlyDictionary<string, int> PartyPositionsById { get; }
         public IReadOnlyList<BattleEvent> Events { get; }
+        public IReadOnlyList<Combatant> Recruits { get; }
+        public IReadOnlyDictionary<string, int> PermanentAttackGains { get; }
+        public int PotionsEarned { get; }
+        public BattleLoadout Loadout { get; }
 
         public BattleResult(string id, BattleOutcome outcome, IEnumerable<KeyValuePair<string, int>> health,
-            IEnumerable<BattleEvent> events)
+            IEnumerable<BattleEvent> events, IEnumerable<KeyValuePair<string, int>> partyPositions = null,
+            IEnumerable<Combatant> recruits = null, IEnumerable<KeyValuePair<string, int>> permanentAttackGains = null,
+            int potionsEarned = 0, BattleLoadout loadout = null)
         {
             Id = id;
             Outcome = outcome;
             HealthById = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
                 health.ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal));
+            PartyPositionsById = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
+                (partyPositions ?? Enumerable.Empty<KeyValuePair<string, int>>())
+                    .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal));
             Events = Array.AsReadOnly(events.ToArray());
+            Recruits = Array.AsReadOnly(recruits?.ToArray() ?? Array.Empty<Combatant>());
+            PermanentAttackGains = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
+                (permanentAttackGains ?? Enumerable.Empty<KeyValuePair<string, int>>())
+                    .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal));
+            PotionsEarned = potionsEarned;
+            Loadout = loadout;
         }
     }
 }

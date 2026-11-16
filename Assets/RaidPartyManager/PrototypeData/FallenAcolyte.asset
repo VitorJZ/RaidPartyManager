@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: FallenAcolyte
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: FallenAcolyte
+  displayName: "堕落神侍"
+  portrait: {fileID: 2800000, guid: 759d791927de4bef8ca1e66c9387775d, type: 3}
+  profession: 0
+  rosterNumber: 24
+  stage: 2
+  reach: 1
+  fixedTrait: 11
+  traitPower: 0
+  traitText: "第1次死亡时，恢复所有生命值，且攻击造成2倍伤害。"
+  personality: 2
+  attack: 6
+  defense: 1
+  specialDefense: 3
+  health: 6
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

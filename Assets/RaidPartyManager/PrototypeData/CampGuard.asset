@@ -13,14 +13,23 @@ MonoBehaviour:
   m_Name: CampGuard
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: CampGuard
-  displayName: "\u7BDD\u706B\u5B88\u591C\u4EBA"
+  displayName: "篝火守夜人"
   portrait: {fileID: 2800000, guid: da674cea513c4dfab9443f60d30fba01, type: 3}
   profession: 0
+  rosterNumber: 1
+  stage: 1
+  reach: 1
+  fixedTrait: 1
+  traitPower: 7
+  traitText: "单次受到的伤害不超过7点"
+  evolutions:
+  - {fileID: 11400000, guid: 0354e84d6544423e9577a8e0a4bf1582, type: 2}
+  - {fileID: 11400000, guid: 255038b3b0884c28aef2bd783dd27513, type: 2}
   personality: 1
   attack: 5
   defense: 3
   specialDefense: 3
-  health: 15
+  health: 10
   actionInterval: 10
   basicAttack:
     id: basic

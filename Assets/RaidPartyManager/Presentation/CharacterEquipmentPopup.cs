@@ -28,6 +28,7 @@ namespace RaidPartyManager.Presentation
         private readonly string memberId;
         private readonly Texture2D portraitArt;
         private readonly List<string> bag;
+        private readonly Func<string, Texture2D> iconFor;
         private readonly Action changed;
         private readonly Action close;
         private int page;
@@ -41,12 +42,13 @@ namespace RaidPartyManager.Presentation
         private int pointerId = -1;
         private Vector2 pointer;
 
-        public CharacterEquipmentPopup(PartyRun run, string memberId, Texture2D portraitArt, List<string> bag,
+        public CharacterEquipmentPopup(PartyRun run, string memberId, Texture2D portraitArt, Func<string, Texture2D> iconFor, List<string> bag,
             Action changed, Action close)
         {
             this.run = run;
             this.memberId = memberId;
             this.portraitArt = portraitArt;
+            this.iconFor = iconFor;
             this.bag = bag;
             this.changed = changed;
             this.close = close;
@@ -194,6 +196,14 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(health, PrototypeStyle.Edge, 4);
             details.Add(health);
             column.Add(details);
+            if (!string.IsNullOrWhiteSpace(member.Character.TraitText))
+            {
+                var trait = PrototypeStyle.Text(member.Character.TraitText, 12, PrototypeStyle.Muted);
+                trait.name = "details-fixed-trait";
+                trait.style.whiteSpace = WhiteSpace.Normal;
+                trait.style.marginTop = 6;
+                column.Add(trait);
+            }
             return column;
         }
 
@@ -219,7 +229,9 @@ namespace RaidPartyManager.Presentation
                 back.SetEnabled(page > 0);
                 next.SetEnabled(page + 1 < pages);
                 navigation.Add(back);
-                navigation.Add(PrototypeStyle.Text($"{page + 1}/{pages}", 13, PrototypeStyle.Muted));
+                var pageLabel = PrototypeStyle.Text($"{page + 1}/{pages}", 13, PrototypeStyle.Muted);
+                pageLabel.name = "equipment-page";
+                navigation.Add(pageLabel);
                 navigation.Add(next);
                 header.Add(navigation);
             }
@@ -267,7 +279,7 @@ namespace RaidPartyManager.Presentation
             RestoreCellOutline(cell);
             if (item != null)
             {
-                var art = new EquipmentIcon(item.Definition) { name = isBackpack ? $"edit-item-{item.Id}" : "equipment-icon" };
+                var art = new EquipmentIcon(item.Definition, iconFor(item.Definition.Id)) { name = isBackpack ? $"edit-item-{item.Id}" : "equipment-icon" };
                 view.Add(art);
                 view.RegisterCallback<PointerEnterEvent>(evt =>
                 {
@@ -329,7 +341,7 @@ namespace RaidPartyManager.Presentation
             if (source == null || panel == null)
                 return;
             HideTooltip();
-            ghost = new EquipmentIcon(source.Item.Definition) { name = "equipment-drag-preview" };
+            ghost = new EquipmentIcon(source.Item.Definition, iconFor(source.Item.Definition.Id)) { name = "equipment-drag-preview" };
             ghost.style.position = Position.Absolute;
             ghost.style.width = ghost.style.height = TileSize - 7;
             ghost.style.backgroundColor = PrototypeStyle.PanelColor;
@@ -451,7 +463,7 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(tooltipPanel, PrototypeStyle.Accent, 7);
 
             var item = cell.Item.Definition;
-            var art = new EquipmentIcon(item);
+            var art = new EquipmentIcon(item, iconFor(item.Id));
             art.style.height = 87;
             art.style.backgroundColor = PrototypeStyle.Inset;
             PrototypeStyle.Outline(art, PrototypeStyle.Edge, 4);

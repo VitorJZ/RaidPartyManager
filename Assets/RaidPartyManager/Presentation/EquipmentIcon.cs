@@ -6,12 +6,19 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class EquipmentIcon : VisualElement
     {
-        public EquipmentIcon(EquipmentDefinition item)
+        public EquipmentIcon(EquipmentDefinition item, Texture2D artwork = null)
         {
             name = "equipment-icon";
             pickingMode = PickingMode.Ignore;
             style.flexGrow = 1;
-            generateVisualContent += context => Paint(context.painter2D, contentRect, item);
+            if (artwork == null)
+                generateVisualContent += context => Paint(context.painter2D, contentRect, item);
+            else
+            {
+                var image = new Image { image = artwork, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
+                image.style.flexGrow = 1;
+                Add(image);
+            }
         }
 
         private static void Paint(Painter2D pen, Rect area, EquipmentDefinition item)

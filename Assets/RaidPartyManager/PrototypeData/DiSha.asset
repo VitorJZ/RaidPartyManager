@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: DiSha
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: DiSha
+  displayName: "地煞"
+  portrait: {fileID: 2800000, guid: 212714460433452184894867e9da36e5, type: 3}
+  profession: 0
+  rosterNumber: 35
+  stage: 1
+  reach: 1
+  fixedTrait: 19
+  traitPower: 0
+  traitText: "额外获取后方队友的攻击力，并使其在本回合无法行动；回合结束时，切换为天弓。"
+  battleForm: {fileID: 11400000, guid: dac678d7eeb14344a6e1c949c2424d14, type: 2}
+  personality: 2
+  attack: 5
+  defense: 2
+  specialDefense: 1
+  health: 11
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

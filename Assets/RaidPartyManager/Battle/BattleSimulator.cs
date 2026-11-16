@@ -7,99 +7,23 @@ namespace RaidPartyManager.Battle
 {
     public sealed class BattleSimulator
     {
-        private sealed class Unit
-        {
-            public Combatant Input { get; }
-            public int Health;
-            public int Shield;
-            public long NextAction;
-            public long SkillReadyAt;
-
-            public Unit(Combatant input)
-            {
-                Input = input;
-                Health = input.Health;
-                NextAction = input.Character.ActionInterval;
-            }
-        }
-
         private readonly IDecisionPolicy policy;
+        private readonly Random random;
 
-        public BattleSimulator(IDecisionPolicy policy = null)
+        public BattleSimulator(IDecisionPolicy policy = null, Random random = null)
         {
             this.policy = policy ?? new PersonalityPolicy();
+            this.random = random ?? new Random();
         }
+
+        public BattleSession Start(BattleRequest request) => new BattleSession(request, policy, random);
 
         public BattleResult Simulate(BattleRequest request)
         {
-            var units = request.Combatants.OrderBy(unit => unit.Side).ThenBy(unit => unit.Position)
-                .Select(input => new Unit(input)).ToArray();
-            var unitsById = units.ToDictionary(unit => unit.Input.Id);
-            var events = new List<BattleEvent>();
-            var attackHistory = new List<(Side Side, string Actor, string Target)>();
-
-            while (true)
-            {
-                long nextTick = units.Where(unit => unit.Health > 0).Min(unit => unit.NextAction);
-                if (nextTick > request.TickLimit)
-                    return Finish(BattleOutcome.Timeout, request.TickLimit);
-
-                int tick = (int)nextTick;
-                foreach (var actor in units)
-                {
-                    if (actor.Health == 0 || actor.NextAction != tick)
-                        continue;
-
-                    actor.NextAction += actor.Input.Character.ActionInterval;
-                    var options = new List<ActionOption>();
-                    var skill = actor.Input.Character.Skill;
-                    if (skill != null && tick >= actor.SkillReadyAt)
-                        AddLegalOptions(actor, skill, units, options);
-                    AddLegalOptions(actor, actor.Input.Character.BasicAttack, units, options);
-                    if (options.Count == 0)
-                        continue;
-
-                    string allyTarget = null;
-                    for (int i = attackHistory.Count - 1; i >= 0; i--)
-                    {
-                        var hit = attackHistory[i];
-                        if (hit.Side != actor.Input.Side || hit.Actor == actor.Input.Id ||
-                            !options.Any(option => option.Action.Kind == ActionKind.Attack && option.Target.Id == hit.Target))
-                            continue;
-                        allyTarget = hit.Target;
-                        break;
-                    }
-
-                    var decision = policy.Choose(new DecisionContext(actor.Input, tick, actor.Health, actor.Shield, allyTarget), options.AsReadOnly());
-                    if (decision.OptionIndex < 0 || decision.OptionIndex >= options.Count)
-                        throw new InvalidOperationException("The decision policy must choose a legal option.");
-
-                    var choice = options[decision.OptionIndex];
-                    var target = unitsById[choice.Target.Id];
-                    if (choice.Action == skill)
-                        actor.SkillReadyAt = (long)tick + skill.Cooldown;
-                    int amount = Apply(actor, target, choice.Action);
-                    if (choice.Action.Kind == ActionKind.Attack)
-                        attackHistory.Add((actor.Input.Side, actor.Input.Id, target.Input.Id));
-
-                    events.Add(new BattleEvent(tick, BattleEventKind.Action, actor.Input.Id, target.Input.Id,
-                        choice.Action.Name, choice.Action.Kind, decision.Reason, amount, target.Health, target.Shield));
-                    if (target.Health == 0)
-                        events.Add(new BattleEvent(tick, BattleEventKind.Defeated, targetId: target.Input.Id));
-
-                    var outcome = ResolveOutcome(units.Any(unit => unit.Input.Side == Side.Party && unit.Health > 0),
-                        units.Any(unit => unit.Input.Side == Side.Enemy && unit.Health > 0));
-                    if (outcome.HasValue)
-                        return Finish(outcome.Value, tick);
-                }
-            }
-
-            BattleResult Finish(BattleOutcome outcome, int tick)
-            {
-                events.Add(new BattleEvent(tick, BattleEventKind.Finished));
-                return new BattleResult(request.Id, outcome, units.Select(unit =>
-                    new KeyValuePair<string, int>(unit.Input.Id, unit.Health)), events);
-            }
+            var battle = Start(request);
+            while (battle.Result == null)
+                battle.AdvanceRound();
+            return battle.Result;
         }
 
         public static BattleOutcome? ResolveOutcome(bool partyAlive, bool enemiesAlive)
@@ -108,19 +32,349 @@ namespace RaidPartyManager.Battle
                 return enemiesAlive ? BattleOutcome.PartyDefeated : BattleOutcome.MutualDefeat;
             return enemiesAlive ? (BattleOutcome?)null : BattleOutcome.Victory;
         }
+    }
 
-        private static void AddLegalOptions(Unit actor, ActionDefinition action, Unit[] units, List<ActionOption> options)
+    public sealed partial class BattleSession
+    {
+        private sealed class EquippedItem
+        {
+            public string Id;
+            public EquipmentDefinition Definition;
+            public int Transfers;
+        }
+
+        private sealed class Unit
+        {
+            public Combatant Input { get; private set; }
+            public readonly Combatant Original;
+            public readonly Dictionary<StatusKind, int> Statuses;
+            public CharacterTrait? CopiedTrait;
+            public int CopiedTraitPower;
+            public int AttackGrowth;
+            public int PermanentAttack;
+            public int GrowthTriggers;
+            public int BorrowedAttack;
+            public int BlockedRound;
+            public int LastAttackRound;
+            public readonly EquippedItem[] Slots;
+            public string LastHitTarget;
+            public bool Revived;
+
+            public CharacterTrait Trait => CopiedTrait ?? Input.Character.Trait;
+            public int TraitPower => CopiedTrait.HasValue ? CopiedTraitPower : Input.Character.TraitPower;
+            public EquipmentDefinition[] Gear;
+            public Unit LinkedFront;
+            public Stats Stats;
+            public int Health;
+            public int Shield;
+            public int CharmsUsed;
+            public bool HasAttacked;
+            public long SkillReadyAt;
+
+            public Unit(Combatant input)
+            {
+                Input = Original = input;
+                Health = input.Health;
+                Stats = input.Stats;
+                Gear = input.Equipment.ToArray();
+                Slots = new EquippedItem[Math.Max(Rules.EquipmentSlots, Gear.Length)];
+                if (input.EquipmentSlots.Count == 0)
+                {
+                    for (int index = 0; index < Gear.Length; index++)
+                        Slots[index] = new EquippedItem { Definition = Gear[index] };
+                }
+                else
+                {
+                    int item = 0;
+                    for (int slot = 0; slot < input.EquipmentSlots.Count; slot++)
+                    {
+                        string id = input.EquipmentSlots[slot];
+                        if (id != null)
+                            Slots[slot] = new EquippedItem { Id = id, Definition = Gear[item++] };
+                    }
+                }
+                Statuses = input.StartingStatuses.ToDictionary(status => status.Key, status => status.Value);
+            }
+
+            public void MoveTo(int position) =>
+                Input = new Combatant(Input.Id, Input.Character, Input.Side, position, Input.Stats, Input.Health, Input.Equipment);
+
+            public void ChangeForm(CharacterDefinition form)
+            {
+                var before = Input.Character.BaseStats;
+                var next = form.BaseStats;
+                var stats = Input.Stats + new Stats(next.Attack - before.Attack, next.Defense - before.Defense,
+                    next.SpecialDefense - before.SpecialDefense, next.Health - before.Health);
+                Health = Math.Min(Health, stats.Health);
+                Input = new Combatant(Input.Id, form, Input.Side, Input.Position, stats, Health, Input.Equipment);
+                GrowthTriggers = 0;
+                SkillReadyAt = 0;
+            }
+
+            public IEnumerable<EquippedItem> Equipped => Slots.Where(item => item != null);
+
+            public void ApplySlotChanges()
+            {
+                var oldBonus = Input.Equipment.Aggregate(default(Stats), (total, item) => total + item.Bonus);
+                var equipment = Equipped.Select(item => item.Definition).ToArray();
+                var newBonus = equipment.Aggregate(default(Stats), (total, item) => total + item.Bonus);
+                var previous = Input.Stats;
+                var stats = new Stats(previous.Attack - oldBonus.Attack + newBonus.Attack,
+                    previous.Defense - oldBonus.Defense + newBonus.Defense,
+                    previous.SpecialDefense - oldBonus.SpecialDefense + newBonus.SpecialDefense,
+                    previous.Health - oldBonus.Health + newBonus.Health);
+                Health = Math.Min(Health, stats.Health);
+                Input = new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, stats, Health, equipment);
+            }
+
+            public Combatant EquipmentInput() =>
+                new Combatant(Input.Id, Input.Character, Input.Side, Input.Position,
+                    Input.Stats + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack, 0, 0, 0), Health, Input.Equipment);
+
+            public Combatant RecruitmentResult() =>
+                new Combatant(Original.Id, Original.Character, Original.Side, Input.Position, Original.Stats,
+                    Math.Min(Health, Original.Stats.Health), Original.Equipment);
+
+            public int Count(EquipmentEffect effect) => Gear.Count(item => item.Effect == effect);
+            public bool Has(EquipmentEffect effect) => Gear.Any(item => item.Effect == effect);
+            public int Layers(StatusKind status) => Statuses.GetValueOrDefault(status);
+
+            public Combatant Snapshot() =>
+                new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, Stats, Health, Input.Equipment);
+        }
+
+        private readonly BattleRequest request;
+        private readonly IDecisionPolicy policy;
+        private readonly Random random;
+        private readonly Dictionary<string, Unit> unitsById;
+        private readonly List<BattleEvent> events = new List<BattleEvent>();
+        private readonly List<Unit> recruits = new List<Unit>();
+        private readonly List<(Side Side, string Actor, string Target)> attackHistory =
+            new List<(Side Side, string Actor, string Target)>();
+        private readonly List<Unit> units;
+        private bool canSwap;
+        private readonly HashSet<string> consumedEquipment = new HashSet<string>();
+        private BattleLoadout currentLoadout;
+        public BattleLoadout OpeningLoadout { get; private set; }
+
+        public string Id => request.Id;
+        public int Round { get; private set; }
+        public int Tick { get; private set; }
+        public BattleResult Result { get; private set; }
+        public IReadOnlyList<Combatant> Formation { get; private set; }
+
+        internal BattleSession(BattleRequest request, IDecisionPolicy policy, Random random)
+        {
+            this.request = request ?? throw new ArgumentNullException(nameof(request));
+            this.policy = policy;
+            this.random = random;
+            units = request.Combatants.Select(input => new Unit(input)).ToList();
+            unitsById = units.ToDictionary(unit => unit.Input.Id);
+            UpdateFormation();
+        }
+
+        public bool TrySwapPartyPositions(int first, int second)
+        {
+            if (!canSwap || first == second)
+                return false;
+
+            var from = LivingPartyUnitAt(first);
+            var to = LivingPartyUnitAt(second);
+            if (from == null || to == null || from.Has(EquipmentEffect.TreeRoot) || to.Has(EquipmentEffect.TreeRoot))
+                return false;
+
+            from.MoveTo(second);
+            to.MoveTo(first);
+            canSwap = false;
+            UpdateFormation();
+            return true;
+        }
+
+        public bool IsPositionLocked(int position) => LivingPartyUnitAt(position)?.Has(EquipmentEffect.TreeRoot) ?? false;
+
+        public IReadOnlyList<BattleEvent> AdvanceRound()
+        {
+            if (Result != null)
+                throw new InvalidOperationException("The battle has already ended.");
+
+            canSwap = false;
+            int firstEvent = events.Count;
+            if (Round++ == 0)
+                StartBattle();
+
+            if (!FinishIfDecided() && AdvanceClock())
+            {
+                StartRound();
+                if (FinishIfDecided())
+                    return events.GetRange(firstEvent, events.Count - firstEvent);
+                ApplyRoundStartTraits();
+                foreach (var side in new[] { Side.Party, Side.Enemy })
+                {
+                    var order = units.Where(unit => unit.Input.Side == side && unit.Health > 0).ToArray();
+                    Shuffle(order);
+                    foreach (var actor in order)
+                    {
+                        if (actor.Health > 0 && actor.BlockedRound != Round && actor.Layers(StatusKind.Stunned) == 0)
+                            Act(actor);
+                        if (FinishIfDecided())
+                            return events.GetRange(firstEvent, events.Count - firstEvent);
+                    }
+                }
+
+                EndRound();
+                if (!FinishIfDecided())
+                {
+                    if ((long)Tick + RoundInterval() > request.TickLimit)
+                        Finish(BattleOutcome.Timeout, request.TickLimit);
+                    else
+                        canSwap = true;
+                }
+            }
+
+            return events.GetRange(firstEvent, events.Count - firstEvent);
+        }
+
+        private bool AdvanceClock()
+        {
+            long nextTick = (long)Tick + RoundInterval();
+            if (nextTick > request.TickLimit)
+            {
+                Finish(BattleOutcome.Timeout, request.TickLimit);
+                return false;
+            }
+
+            Tick = (int)nextTick;
+            return true;
+        }
+
+        private int RoundInterval() => units.Where(unit => unit.Health > 0)
+            .Max(unit => unit.Input.Character.ActionInterval);
+
+        private void Shuffle(Unit[] order)
+        {
+            for (int last = order.Length - 1; last > 0; last--)
+            {
+                int index = random.Next(last + 1);
+                (order[last], order[index]) = (order[index], order[last]);
+            }
+        }
+
+        private Unit LivingPartyUnitAt(int position) =>
+            units.FirstOrDefault(unit => unit.Input.Side == Side.Party && unit.Input.Position == position && unit.Health > 0);
+
+        private IEnumerable<Unit> Opponents(Unit actor) =>
+            units.Where(unit => unit.Input.Side != actor.Input.Side && unit.Health > 0);
+
+        private IEnumerable<Unit> TargetableOpponents(Unit actor)
+        {
+            var enemies = Opponents(actor).ToArray();
+            var visible = enemies.Where(unit => !unit.Has(EquipmentEffect.StealthCloak)).ToArray();
+            return visible.Length > 0 ? visible : enemies;
+        }
+
+        private BattleLoadout CaptureLoadout()
+        {
+            var tracked = units.Where(unit => unit.Input.Side == Side.Party &&
+                (unit.Original.EquipmentSlots.Count > 0 || recruits.Contains(unit)));
+            return new BattleLoadout(tracked.Select(unit => new KeyValuePair<string, IReadOnlyList<string>>(
+                unit.Input.Id, unit.Slots.Select(item => item?.Id).ToArray())), consumedEquipment);
+        }
+
+        private void UpdateFormation()
+        {
+            units.Sort((a, b) => a.Input.Side == b.Input.Side
+                ? a.Input.Position.CompareTo(b.Input.Position) : a.Input.Side.CompareTo(b.Input.Side));
+            Formation = Array.AsReadOnly(units.Select(unit => unit.Input).ToArray());
+            UpdateEquipment();
+        }
+
+        private void UpdateEquipment()
+        {
+            var living = units.Where(unit => unit.Health > 0).ToArray();
+            var current = living.Select(unit => unit.EquipmentInput()).ToArray();
+            var stats = EquipmentFormation.Resolve(current);
+            foreach (var unit in living)
+            {
+                var front = unit.Input.Equipment.Any(item => item.Effect == EquipmentEffect.RedCord)
+                    ? EquipmentFormation.FrontOf(current, unit.Input) : null;
+                unit.LinkedFront = front == null ? null : unitsById[front.Id];
+                unit.Stats = stats[unit.Input.Id];
+            }
+            foreach (var unit in living)
+                unit.Gear = GearEntries(unit).Select(entry => entry.Item.Definition).ToArray();
+        }
+
+        private IEnumerable<(Unit Owner, EquippedItem Item)> GearEntries(Unit unit) =>
+            unit.Equipped.Select(item => (unit, item)).Concat(units
+                .Where(owner => owner.Health > 0 && owner.LinkedFront == unit)
+                .SelectMany(owner => owner.Equipped.Where(item => item.Definition.Effect != EquipmentEffect.RedCord)
+                    .Select(item => (owner, item))));
+
+        private static bool UsesShortbow(Unit actor) =>
+            actor.Input.Character.Reach == AttackReach.Ranged && actor.Has(EquipmentEffect.Shortbow);
+
+        private void Act(Unit actor)
+        {
+            var options = new List<ActionOption>();
+            var skill = actor.Input.Character.Skill;
+            if (skill != null && Tick >= actor.SkillReadyAt)
+                AddLegalOptions(actor, skill, options);
+            AddLegalOptions(actor, actor.Input.Character.BasicAttack, options);
+            if (options.Count == 0)
+                return;
+
+            string allyTarget = null;
+            for (int i = attackHistory.Count - 1; i >= 0; i--)
+            {
+                var hit = attackHistory[i];
+                if (hit.Side != actor.Input.Side || hit.Actor == actor.Input.Id ||
+                    !options.Any(option => option.Kind == ActionKind.Attack && option.Target.Id == hit.Target))
+                    continue;
+                allyTarget = hit.Target;
+                break;
+            }
+
+            var context = new DecisionContext(actor.Snapshot(), Tick, actor.Health, actor.Shield, allyTarget);
+            var decision = policy.Choose(context, options.AsReadOnly());
+            if (decision.OptionIndex < 0 || decision.OptionIndex >= options.Count)
+                throw new InvalidOperationException("The decision policy must choose a legal option.");
+
+            var choice = options[decision.OptionIndex];
+            var target = unitsById[choice.Target.Id];
+            if (choice.Action == skill || skill != null && choice.Action.Id == skill.Id)
+                actor.SkillReadyAt = (long)Tick + skill.Cooldown;
+
+            switch (choice.Action.Kind)
+            {
+                case ActionKind.Attack:
+                    Attack(actor, target, choice.Action, decision.Reason);
+                    break;
+                case ActionKind.Heal:
+                    Heal(actor, target, BaseHealing(actor, choice.Action), choice.Action.Name, BattleEventKind.Action, decision.Reason);
+                    break;
+                case ActionKind.Shield:
+                    int gain = choice.Action.Power - actor.Shield;
+                    actor.Shield = choice.Action.Power;
+                    Report(BattleEventKind.Action, actor, actor, choice.Action.Name, ActionKind.Shield, gain, decision.Reason);
+                    break;
+            }
+
+            if (choice.Kind == ActionKind.Attack)
+                attackHistory.Add((actor.Input.Side, actor.Input.Id, target.Input.Id));
+        }
+
+        private void AddLegalOptions(Unit actor, ActionDefinition action, List<ActionOption> options)
         {
             if (action.Kind == ActionKind.Attack)
             {
-                var enemies = units.Where(unit => unit.Input.Side != actor.Input.Side && unit.Health > 0);
-                if (action.Target == TargetRule.FrontEnemy)
+                var enemies = TargetableOpponents(actor);
+                if (UsesShortbow(actor) || actor.Trait == CharacterTrait.PiercingArrow || action.Target == TargetRule.FrontEnemy)
                     enemies = enemies.Take(1);
                 else if (action.Target == TargetRule.RearEnemy)
                     enemies = enemies.Reverse().Take(1);
                 foreach (var target in enemies)
-                    options.Add(new ActionOption(action, target.Input, target.Health,
-                        Math.Max(0, Damage(actor, target, action) - target.Shield)));
+                    options.Add(new ActionOption(action, target.Snapshot(), target.Health,
+                        ProjectedDamage(actor, target, AttackComponents(actor, target, action), UsesShortbow(actor))));
                 return;
             }
 
@@ -128,49 +382,68 @@ namespace RaidPartyManager.Battle
             {
                 int gain = action.Power - actor.Shield;
                 if (gain > 0)
-                    options.Add(new ActionOption(action, actor.Input, actor.Health, gain));
+                    options.Add(new ActionOption(action, actor.Snapshot(), actor.Health, gain));
                 return;
             }
 
-            foreach (var ally in units)
+            int healing = BaseHealing(actor, action);
+            if (healing <= 0)
+                return;
+            if (actor.Has(EquipmentEffect.RebelEarring))
             {
-                if (ally.Input.Side != actor.Input.Side || ally.Health == 0 || ally.Health == ally.Input.Stats.Health ||
-                    (action.Target == TargetRule.Self && ally != actor))
+                int power = healing;
+                foreach (var enemy in TargetableOpponents(actor))
+                    options.Add(new ActionOption(action, enemy.Snapshot(), enemy.Health,
+                        ProjectedDamage(actor, enemy, new[] { (DamageType.Magic, power) }), ActionKind.Attack));
+                return;
+            }
+
+            foreach (var ally in units.Where(unit => unit.Input.Side == actor.Input.Side && unit.Health > 0))
+            {
+                if (action.Target == TargetRule.Self && ally != actor || ally.Layers(StatusKind.Cursed) > 0)
                     continue;
-                int gain = Math.Min(action.Power, ally.Input.Stats.Health - ally.Health);
+                int gain = Math.Min(HealingPower(ally, healing), ally.Stats.Health - ally.Health);
                 if (gain > 0)
-                    options.Add(new ActionOption(action, ally.Input, ally.Health, gain));
+                    options.Add(new ActionOption(action, ally.Snapshot(), ally.Health, gain));
             }
         }
 
-        private static int Damage(Unit actor, Unit target, ActionDefinition action)
+        private bool FinishIfDecided()
         {
-            int defense = action.DamageType == DamageType.Physical ? target.Input.Stats.Defense : target.Input.Stats.SpecialDefense;
-            return Math.Max(1, actor.Input.Stats.Attack + action.Power - defense);
+            var outcome = BattleSimulator.ResolveOutcome(
+                units.Any(unit => unit.Input.Side == Side.Party && unit.Health > 0),
+                units.Any(unit => unit.Input.Side == Side.Enemy && unit.Health > 0));
+            if (!outcome.HasValue)
+                return false;
+            Finish(outcome.Value, Tick);
+            return true;
         }
 
-        private static int Apply(Unit actor, Unit target, ActionDefinition action)
+        private void Finish(BattleOutcome outcome, int tick)
         {
-            if (action.Kind == ActionKind.Shield)
-            {
-                int gain = action.Power - actor.Shield;
-                actor.Shield = action.Power;
-                return gain;
-            }
+            Tick = tick;
+            events.Add(new BattleEvent(tick, BattleEventKind.Finished));
+            var health = units.Select(unit =>
+                new KeyValuePair<string, int>(unit.Input.Id, Math.Min(unit.Health, unit.Original.Stats.Health)));
+            var partyPositions = units.Where(unit => unit.Input.Side == Side.Party)
+                .Select(unit => new KeyValuePair<string, int>(unit.Input.Id, unit.Input.Position));
+            var party = units.Where(unit => unit.Input.Side == Side.Party).ToArray();
+            var attackGains = party.Where(unit => unit.PermanentAttack > 0)
+                .Select(unit => new KeyValuePair<string, int>(unit.Input.Id, unit.PermanentAttack));
+            var potions = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GeneratePotion);
+            Result = new BattleResult(request.Id, outcome, health, events, partyPositions,
+                recruits.Select(unit => unit.RecruitmentResult()), attackGains, potions, currentLoadout);
+        }
 
-            if (action.Kind == ActionKind.Heal)
-            {
-                int healed = Math.Min(action.Power, target.Input.Stats.Health - target.Health);
-                target.Health += healed;
-                return healed;
-            }
-
-            int damage = Damage(actor, target, action);
-            int absorbed = Math.Min(target.Shield, damage);
-            target.Shield -= absorbed;
-            int lost = Math.Min(target.Health, damage - absorbed);
-            target.Health -= lost;
-            return lost;
+        private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,
+            int amount = 0, DecisionReason reason = DecisionReason.Default, string detail = null,
+            CharacterDefinition form = null, BattleLoadout loadout = null)
+        {
+            var statuses = target.Health > 0 && target.Statuses.Count > 0
+                ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
+                    .Select(entry => new StatusStack(entry.Key, entry.Value)).ToArray()) : null;
+            events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
+                target.Health, target.Shield, StatusText(target), detail, form, form != null ? target.Stats.Health : 0, statuses, loadout));
         }
     }
 }

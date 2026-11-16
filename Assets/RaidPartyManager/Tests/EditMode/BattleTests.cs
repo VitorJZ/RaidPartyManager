@@ -85,12 +85,40 @@ namespace RaidPartyManager.Tests
         {
             var enemy = Unit("enemy", Side.Enemy, 1, Personality.Calm,
                 basic: Attack("rear", TargetRule.RearEnemy), interval: 1);
-            var first = FirstAction(Fight(enemy, Unit("guard", Side.Party, 1, interval: 2),
-                Unit("archer", Side.Party, 3, interval: 2), Unit("down", Side.Party, 4, hp: 0)), "enemy");
-            var second = FirstAction(Fight(enemy, Unit("archer", Side.Party, 1, interval: 2),
-                Unit("guard", Side.Party, 3, interval: 2), Unit("down", Side.Party, 4, hp: 0)), "enemy");
+            var first = FirstAction(Fight(new[] { enemy, Unit("guard", Side.Party, 1, interval: 2),
+                Unit("archer", Side.Party, 3, interval: 2), Unit("down", Side.Party, 4, hp: 0) }, 2), "enemy");
+            var second = FirstAction(Fight(new[] { enemy, Unit("archer", Side.Party, 1, interval: 2),
+                Unit("guard", Side.Party, 3, interval: 2), Unit("down", Side.Party, 4, hp: 0) }, 2), "enemy");
             Assert.That(first.TargetId, Is.EqualTo("archer"));
             Assert.That(second.TargetId, Is.EqualTo("guard"));
+        }
+
+        [Test]
+        public void EachLivingUnitActsOnceAndOneRoundBreakSwapChangesTheRearTarget()
+        {
+            var enemy = Unit("enemy", Side.Enemy, 1, basic: Attack("rear", TargetRule.RearEnemy), attack: 1);
+            var guard = Unit("guard", Side.Party, 1, interval: 2, attack: 1);
+            var archer = Unit("archer", Side.Party, 3, interval: 4, attack: 1);
+            var down = Unit("down", Side.Party, 4, hp: 0);
+            var session = new BattleSimulator().Start(new BattleRequest("rounds", new[] { enemy, guard, archer, down }, 12));
+
+            Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
+            var first = session.AdvanceRound().Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
+            Assert.That(first.Select(entry => entry.ActorId), Is.EquivalentTo(new[] { "enemy", "guard", "archer" }));
+            Assert.That(first.Last().ActorId, Is.EqualTo("enemy"));
+            Assert.That(first.Last().TargetId, Is.EqualTo("archer"));
+            Assert.That(session.TrySwapPartyPositions(1, 2), Is.False);
+            Assert.That(session.TrySwapPartyPositions(1, 4), Is.False);
+            Assert.That(session.TrySwapPartyPositions(1, 3), Is.True);
+            Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
+
+            var second = session.AdvanceRound().Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
+            Assert.That(second.Select(entry => entry.ActorId), Is.EquivalentTo(new[] { "enemy", "guard", "archer" }));
+            Assert.That(second.Last().ActorId, Is.EqualTo("enemy"));
+            Assert.That(second.Last().TargetId, Is.EqualTo("guard"));
+            session.AdvanceRound();
+            Assert.That(session.Result.PartyPositionsById["guard"], Is.EqualTo(3));
+            Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
         }
 
         [Test]
@@ -98,23 +126,29 @@ namespace RaidPartyManager.Tests
         {
             var healer = Unit("healer", Side.Party, 1, Personality.Gentle, basic: Front, skill: Heal, attack: 1);
             var enemy = Unit("enemy", Side.Enemy, 1, attack: 3, maxHealth: 30, interval: 2);
-            var actions = Fight(new[] { enemy, healer }, 7).Events
+            var actions = Fight(new[] { enemy, healer }, 8).Events
                 .Where(entry => entry.Kind == BattleEventKind.Action && entry.ActorId == healer.Id)
                 .Select(entry => entry.ActionName).ToArray();
-            Assert.That(actions, Is.EqualTo(new[] { "front", "front", "heal", "front", "front", "heal", "front" }));
+            Assert.That(actions, Is.EqualTo(new[] { "front", "heal", "front", "heal" }));
         }
 
         [Test]
-        public void SameInputsProduceSameEventsWithStableSideAndPositionOrdering()
+        public void SeededRoundsCanBeReplayedAndShuffleEachSideIndependently()
         {
-            var a = Unit("a", Side.Party, 1);
-            var b = Unit("b", Side.Party, 4);
-            var c = Unit("c", Side.Enemy, 4, maxHealth: 30);
-            var first = Fight(a, b, c);
-            var second = Fight(c, b, a);
+            var a = Unit("a", Side.Party, 1, maxHealth: 100);
+            var b = Unit("b", Side.Party, 4, maxHealth: 100);
+            var c = Unit("c", Side.Enemy, 1, maxHealth: 100);
+            var d = Unit("d", Side.Enemy, 4, maxHealth: 100);
+            var first = Fight(new[] { a, b, c, d }, 9);
+            var second = Fight(new[] { d, c, b, a }, 9);
             Assert.That(first.Events, Is.EqualTo(second.Events));
-            Assert.That(first.Events.Where(entry => entry.Kind == BattleEventKind.Action).Select(entry => entry.ActorId),
-                Is.EqualTo(new[] { "a", "b", "c" }));
+
+            var rounds = first.Events.Where(entry => entry.Kind == BattleEventKind.Action).GroupBy(entry => entry.Tick)
+                .Select(round => round.Select(entry => entry.ActorId).ToArray()).ToArray();
+            Assert.That(rounds.All(round => round.Take(2).All(id => id == "a" || id == "b")), Is.True);
+            Assert.That(rounds.All(round => round.Skip(2).All(id => id == "c" || id == "d")), Is.True);
+            Assert.That(rounds.Select(round => round[0]).Distinct().Count(), Is.EqualTo(2));
+            Assert.That(rounds.Select(round => round[2]).Distinct().Count(), Is.EqualTo(2));
             Assert.That(first.Outcome, Is.EqualTo(BattleOutcome.Timeout));
         }
 
@@ -129,7 +163,7 @@ namespace RaidPartyManager.Tests
             Assert.That(victory.Events.Select(entry => entry.Kind),
                 Is.EqualTo(new[] { BattleEventKind.Action, BattleEventKind.Defeated, BattleEventKind.Finished }));
 
-            var defeat = Fight(Unit("weak", Side.Party, 1, hp: 1, interval: 2), enemy);
+            var defeat = Fight(Unit("weak", Side.Party, 1, hp: 1), Unit("strong", Side.Enemy, 1));
             Assert.That(defeat.Outcome, Is.EqualTo(BattleOutcome.PartyDefeated));
             Assert.That(BattleSimulator.ResolveOutcome(false, false), Is.EqualTo(BattleOutcome.MutualDefeat));
         }
@@ -160,7 +194,7 @@ namespace RaidPartyManager.Tests
         private static BattleResult Fight(params Combatant[] units) => Fight(units, 1);
 
         private static BattleResult Fight(Combatant[] units, int ticks) =>
-            new BattleSimulator().Simulate(new BattleRequest("test", units, ticks));
+            new BattleSimulator(random: new System.Random(0)).Simulate(new BattleRequest("test", units, ticks));
 
         private static Combatant Unit(string id, Side side, int position, Personality personality = Personality.Reckless,
             ActionDefinition basic = null, ActionDefinition skill = null, int? hp = null, int maxHealth = 20,

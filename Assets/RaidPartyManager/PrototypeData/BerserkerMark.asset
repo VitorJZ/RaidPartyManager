@@ -13,8 +13,10 @@ MonoBehaviour:
   m_Name: BerserkerMark
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
   id: berserker-mark
-  displayName: "\u72C2\u6218\u58EB\u4E4B\u5370"
-  description: 刻有战纹的徽印。装备后，攻击增加 3 点。
+  displayName: "狂战士之印"
+  effect: 0
+  icon: {fileID: 2800000, guid: 989b372651ee49408369f49a36d681b7, type: 3}
+  description: "攻击力增加3点"
   attackBonus: 3
   defenseBonus: 0
   specialDefenseBonus: 0

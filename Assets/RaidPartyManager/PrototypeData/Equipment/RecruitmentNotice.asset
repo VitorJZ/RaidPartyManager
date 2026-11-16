@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e69d6322f0d4dd7a160fe2c6ff12661, type: 3}
+  m_Name: RecruitmentNotice
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
+  id: recruitment-notice
+  displayName: "寻人启事"
+  effect: 15
+  icon: {fileID: 2800000, guid: 29de7a3ff9284fafaa3196e835c2c565, type: 3}
+  description: "战斗开始时，若队伍里存在空位，随机召唤1个队友，并在战斗结束后加入队伍"
+  attackBonus: 0
+  defenseBonus: 0
+  specialDefenseBonus: 0
+  healthBonus: 0

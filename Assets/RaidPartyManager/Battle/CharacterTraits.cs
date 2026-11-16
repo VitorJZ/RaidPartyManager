@@ -1,0 +1,128 @@
+using System.Linq;
+using RaidPartyManager.Domain;
+using static RaidPartyManager.Domain.CharacterTrait;
+using static RaidPartyManager.Domain.StatusKind;
+
+namespace RaidPartyManager.Battle
+{
+    public sealed partial class BattleSession
+    {
+        private static readonly StatusKind[] BlessingStatuses = { Vigor, Swift, Resolve, Undying, Ember, Thorns };
+
+        private void ApplyBattleStartTraits()
+        {
+            foreach (var unit in units.Where(unit => unit.Health > 0 && unit.Trait == CopyAdvancedTrait))
+            {
+                var available = request.CharacterCatalog.Values.Where(form => form.Stage == 2 && form.Trait != None).ToArray();
+                if (available.Length == 0)
+                    continue;
+                var source = available[random.Next(available.Length)];
+                unit.CopiedTrait = source.Trait;
+                unit.CopiedTraitPower = source.TraitPower;
+                Report(BattleEventKind.Effect, unit, unit, "复制特性", ActionKind.Shield, detail: source.Name);
+            }
+
+            foreach (var unit in units.Where(unit => unit.Health > 0 && unit.Trait == EvolveAlly).ToArray())
+            {
+                var allies = units.Where(ally => ally != unit && ally.Input.Side == unit.Input.Side && ally.Health > 0 &&
+                    ally.Input.Character.Stage == 1 && ally.Input.Character.EvolutionIds.Any(request.CharacterCatalog.ContainsKey))
+                    .ToArray();
+                if (allies.Length == 0)
+                    continue;
+
+                var target = allies[random.Next(allies.Length)];
+                var forms = target.Input.Character.EvolutionIds.Where(request.CharacterCatalog.ContainsKey).ToArray();
+                ChangeForm(unit, target, request.CharacterCatalog[forms[random.Next(forms.Length)]], "本场进阶");
+            }
+        }
+
+        private void ApplyRoundStartTraits()
+        {
+            var living = units.Where(unit => unit.Health > 0).ToArray();
+            foreach (var unit in living)
+                unit.BorrowedAttack = 0;
+            UpdateEquipment();
+
+            foreach (var unit in living)
+            {
+                switch (unit.Trait)
+                {
+                    case PoisonOpponents:
+                        foreach (var enemy in Opponents(unit))
+                            GrantStatus(unit, enemy, Poison, unit.TraitPower);
+                        break;
+                    case BlessAlly:
+                        var allies = living.Where(ally => ally != unit && ally.Input.Side == unit.Input.Side).ToArray();
+                        if (allies.Length > 0)
+                            GrantStatus(unit, allies[random.Next(allies.Length)], BlessingStatuses[random.Next(BlessingStatuses.Length)], 1);
+                        break;
+                    case BorrowAllyAttack:
+                        var behind = living.FirstOrDefault(ally => ally.Input.Side == unit.Input.Side &&
+                            ally.Input.Position > unit.Input.Position);
+                        if (behind != null)
+                        {
+                            unit.BorrowedAttack = CurrentAttack(behind);
+                            behind.BlockedRound = Round;
+                            Report(BattleEventKind.Effect, unit, behind, "地煞借力", ActionKind.Shield,
+                                detail: $"地煞攻击 +{unit.BorrowedAttack}，队友本回合无法行动");
+                        }
+                        break;
+                }
+            }
+
+            if (living.Any(unit => unit.BorrowedAttack != 0))
+                UpdateEquipment();
+        }
+
+        private void ApplyRoundEndTraits()
+        {
+            foreach (var unit in units.Where(unit => unit.Health > 0).ToArray())
+            {
+                if (unit.Health == 0 || !Opponents(unit).Any())
+                    continue;
+
+                if (unit.Trait == EscalatingAttack)
+                {
+                    int gain = ++unit.GrowthTriggers * unit.TraitPower;
+                    unit.AttackGrowth += gain;
+                    Report(BattleEventKind.Effect, unit, unit, "星辉增长", ActionKind.Shield, detail: $"攻击 +{gain}");
+                }
+                else if (unit.Trait == LightningChant && Round % 3 == 0)
+                {
+                    foreach (var enemy in Opponents(unit).ToArray())
+                        if (enemy.Health > 0)
+                            Strike(unit, enemy, unit.TraitPower, DamageType.Lightning, "灾厄吟唱", BattleEventKind.Effect);
+                }
+
+                var formId = unit.Input.Character.BattleFormId;
+                if (unit.Health > 0 && formId != null && request.CharacterCatalog.TryGetValue(formId, out var form))
+                    ChangeForm(unit, unit, form, "切换形态");
+            }
+
+            UpdateEquipment();
+        }
+
+        private void ChangeForm(Unit source, Unit target, CharacterDefinition form, string reason)
+        {
+            target.ChangeForm(form);
+            UpdateFormation();
+            Report(BattleEventKind.FormChanged, source, target, reason, ActionKind.Shield, detail: form.Name, form: form);
+        }
+
+        private void OnLifeLost(Unit source, Unit target, int amount)
+        {
+            if (amount == 0)
+                return;
+
+            if (target.Health > 0 && target.Trait == GainEmberWhenHit)
+                GrantStatus(target, target, Ember, target.TraitPower);
+            if (target.Health == 0 && source != null && source.Input.Side != target.Input.Side &&
+                source.Trait == PermanentAttackOnKill)
+            {
+                source.PermanentAttack += source.TraitPower;
+                Report(BattleEventKind.Effect, source, source, "击杀成长", ActionKind.Shield,
+                    detail: $"攻击永久 +{source.TraitPower}");
+            }
+        }
+    }
+}

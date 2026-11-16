@@ -7,12 +7,14 @@ namespace RaidPartyManager.Battle
     {
         public ActionDefinition Action { get; }
         public Combatant Target { get; }
+        public ActionKind Kind { get; }
         public int Health { get; }
         public int ProjectedAmount { get; }
 
-        public ActionOption(ActionDefinition action, Combatant target, int health, int projectedAmount)
+        public ActionOption(ActionDefinition action, Combatant target, int health, int projectedAmount, ActionKind? kind = null)
         {
             Action = action;
+            Kind = kind ?? action.Kind;
             Target = target;
             Health = health;
             ProjectedAmount = projectedAmount;
@@ -77,7 +79,7 @@ namespace RaidPartyManager.Battle
 
         private static DecisionReason Preference(DecisionContext context, ActionOption option)
         {
-            bool attacks = option.Action.Kind == ActionKind.Attack;
+            bool attacks = option.Kind == ActionKind.Attack;
             switch (context.Actor.Character.Personality)
             {
                 case Personality.Aggressive when attacks:
@@ -86,7 +88,7 @@ namespace RaidPartyManager.Battle
                     return DecisionReason.SelfProtection;
                 case Personality.Reckless when attacks:
                     return DecisionReason.FavorAttack;
-                case Personality.Gentle when option.Action.Kind == ActionKind.Heal:
+                case Personality.Gentle when option.Kind == ActionKind.Heal:
                     return DecisionReason.WoundedAlly;
                 case Personality.Cooperative when attacks && option.Target.Id == context.AllyAttackTarget:
                     return DecisionReason.FollowAlly;

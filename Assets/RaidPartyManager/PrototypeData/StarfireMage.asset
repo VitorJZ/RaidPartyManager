@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: StarfireMage
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: StarfireMage
+  displayName: "焚星魔导师"
+  portrait: {fileID: 2800000, guid: e181e5d025e24799a9296328127e30ef, type: 3}
+  profession: 1
+  rosterNumber: 17
+  stage: 2
+  reach: 2
+  fixedTrait: 7
+  traitPower: 2
+  traitText: "回合结束时，攻击力+2，并使此效果+2"
+  personality: 0
+  attack: 6
+  defense: 2
+  specialDefense: 3
+  health: 8
+  actionInterval: 11
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

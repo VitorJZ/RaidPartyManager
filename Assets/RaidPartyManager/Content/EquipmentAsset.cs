@@ -8,6 +8,10 @@ namespace RaidPartyManager.Content
     {
         [SerializeField] private string id;
         [SerializeField] private string displayName;
+        [SerializeField] private EquipmentEffect effect;
+        [SerializeField] private Texture2D icon;
+
+        public Texture2D Icon => icon;
         [SerializeField, TextArea] private string description;
         [SerializeField, Min(0)] private int attackBonus;
         [SerializeField, Min(0)] private int defenseBonus;
@@ -15,6 +19,6 @@ namespace RaidPartyManager.Content
         [SerializeField, Min(0)] private int healthBonus;
 
         public EquipmentDefinition ToDefinition() =>
-            new EquipmentDefinition(id, displayName, new Stats(attackBonus, defenseBonus, specialDefenseBonus, healthBonus), description);
+            new EquipmentDefinition(id, displayName, new Stats(attackBonus, defenseBonus, specialDefenseBonus, healthBonus), description, effect);
     }
 }

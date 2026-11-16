@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e69d6322f0d4dd7a160fe2c6ff12661, type: 3}
+  m_Name: FireRing
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
+  id: fire-ring
+  displayName: "火焰戒指"
+  effect: 7
+  icon: {fileID: 2800000, guid: 59a45ff2c3104c8bb82b8b3577efffb2, type: 3}
+  description: "攻击造成火焰伤害"
+  attackBonus: 0
+  defenseBonus: 0
+  specialDefenseBonus: 0
+  healthBonus: 0

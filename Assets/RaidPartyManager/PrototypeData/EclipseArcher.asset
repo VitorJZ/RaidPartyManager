@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EclipseArcher
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EclipseArcher
+  displayName: "月蚀箭姬"
+  portrait: {fileID: 2800000, guid: 2bd83b1a4aa4422199dacb9f7825156b, type: 3}
+  profession: 2
+  rosterNumber: 14
+  stage: 2
+  reach: 2
+  fixedTrait: 5
+  traitPower: 2
+  traitText: "攻击造成伤害时，对目标施加2层中毒"
+  personality: 5
+  attack: 6
+  defense: 3
+  specialDefense: 2
+  health: 8
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

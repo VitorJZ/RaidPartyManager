@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e69d6322f0d4dd7a160fe2c6ff12661, type: 3}
+  m_Name: GreedyHand
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
+  id: greedy-hand
+  displayName: "贪心之手"
+  effect: 4
+  icon: {fileID: 2800000, guid: 5fad034df4a5400bafe2ebc1ccc5b047, type: 3}
+  description: "攻击、防御、特防取友方队伍角色的最高值"
+  attackBonus: 0
+  defenseBonus: 0
+  specialDefenseBonus: 0
+  healthBonus: 0

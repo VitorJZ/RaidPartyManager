@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e69d6322f0d4dd7a160fe2c6ff12661, type: 3}
+  m_Name: CounterHorn
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
+  id: counter-horn
+  displayName: "反击的号角"
+  effect: 33
+  icon: {fileID: 2800000, guid: 2858ce37964849b9933e12082ed6d9bf, type: 3}
+  description: "受到攻击时，对伤害来源方进行1次攻击"
+  attackBonus: 0
+  defenseBonus: 0
+  specialDefenseBonus: 0
+  healthBonus: 0

@@ -15,12 +15,18 @@ namespace RaidPartyManager.Presentation
     [RequireComponent(typeof(UIDocument))]
     public sealed class BattlePrototype : MonoBehaviour
     {
-        private enum Phase { Preparation, Playback, Settlement }
+        private enum Phase { Preparation, Playback, RoundBreak, Settlement }
 
         [SerializeField] private EncounterAsset encounter;
+        [SerializeField, Min(0)] private float secondsBetweenActions = 3f;
+
+        private static PartyRun playModeRun;
 
         private readonly Dictionary<string, int> health = new Dictionary<string, int>();
         private readonly Dictionary<string, int> shields = new Dictionary<string, int>();
+        private readonly Dictionary<string, IReadOnlyList<StatusStack>> statuses = new Dictionary<string, IReadOnlyList<StatusStack>>();
+        private readonly Dictionary<string, (CharacterDefinition Character, int MaximumHealth)> appearances =
+            new Dictionary<string, (CharacterDefinition, int)>();
         private readonly Dictionary<string, BattleUnitCard> unitCards = new Dictionary<string, BattleUnitCard>();
         private readonly List<string> battleLog = new List<string>();
 
@@ -32,13 +38,18 @@ namespace RaidPartyManager.Presentation
         private Phase phase;
         private string selectedMember;
         private int? selectedEquipmentSlot;
-        private BattleRequest request;
+        private BattleSession battle;
+        private BattleLoadout battleLoadout;
+        private IReadOnlyList<BattleEvent> roundEvents;
         private BattleResult result;
         private EquipmentInstance reward;
         private int eventIndex;
-        private float playbackTick;
-        private float speed;
+        private double nextActionAt;
         private ScrollView logView;
+
+        // A new Play session must start fresh even when Unity skips domain reload.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetPlaySession() => playModeRun = null;
 
         private void OnEnable()
         {
@@ -49,47 +60,34 @@ namespace RaidPartyManager.Presentation
                 return;
             }
 
-            // The prototype targets the team's Windows editor. Prefer a system CJK font when present.
-            string fontName = Font.GetOSInstalledFontNames().FirstOrDefault(name => name == "Microsoft YaHei" ||
-                name == "Microsoft YaHei UI" || name == "Noto Sans CJK SC" || name == "PingFang SC");
-            if (fontName != null)
-            {
-                localFont = Font.CreateDynamicFontFromOSFont(fontName, 16);
-                if (localFont != null)
-                    localFontAsset = FontAsset.CreateFontAsset(localFont);
-                if (localFontAsset != null)
-                    root.style.unityFontDefinition = FontDefinition.FromSDFFont(localFontAsset);
-            }
+            PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
 
             content = encounter.ToData();
+            run = playModeRun ??= new PartyRun(content.Party.Select(unit =>
+                new PartyMemberStart(unit.Id, unit.Character, unit.Position, unit.Health, unit.StartingStatuses)), content.StartingEquipment);
             ResetDemo();
         }
 
         private void OnDisable()
         {
-            if (root != null)
-            {
-                root.Clear();
-                root.style.unityFontDefinition = StyleKeyword.Null;
-            }
-            if (localFontAsset != null)
-                Destroy(localFontAsset);
-            if (localFont != null)
-                Destroy(localFont);
+            PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
         }
 
         private void ResetDemo()
         {
-            run = new PartyRun(content.Party.Select(unit =>
-                new PartyMemberStart(unit.Id, unit.Character, unit.Position, unit.Health)), content.StartingEquipment);
+            run.ResetEncounter();
             phase = Phase.Preparation;
             selectedMember = run.Members[0].Id;
             selectedEquipmentSlot = null;
-            request = null;
+            battle = null;
+            battleLoadout = null;
+            roundEvents = null;
             result = null;
             reward = null;
             health.Clear();
             shields.Clear();
+            statuses.Clear();
+            appearances.Clear();
             battleLog.Clear();
             Render();
         }
@@ -98,33 +96,69 @@ namespace RaidPartyManager.Presentation
         {
             if (phase != Phase.Preparation || !run.CanStartBattle)
                 return;
-            request = run.BeginBattle(content.Enemies, content.TickLimit, content.VictoryReward);
-            result = new BattleSimulator().Simulate(request);
-            foreach (var unit in request.Combatants)
+            var request = run.BeginBattle(content.Enemies, content.TickLimit, content.VictoryReward,
+                content.RecruitmentPool, content.CharacterCatalog);
+            battle = new BattleSimulator().Start(request);
+            foreach (var unit in battle.Formation)
+            {
                 health[unit.Id] = unit.Health;
+                appearances[unit.Id] = (unit.Character, unit.Stats.Health);
+            }
 
+            nextActionAt = 0d;
+            BeginNextRound();
+        }
+
+        private void BeginNextRound()
+        {
+            roundEvents = battle.AdvanceRound();
+            if (battle.Round == 1 && battle.OpeningLoadout != null)
+                ApplyLoadout(battle.OpeningLoadout);
+            foreach (var unit in battle.Formation)
+            {
+                health.TryAdd(unit.Id, unit.Health);
+                appearances.TryAdd(unit.Id, (unit.Character, unit.Stats.Health));
+            }
             eventIndex = 0;
-            playbackTick = 0f;
-            speed = 1f;
             phase = Phase.Playback;
+            battleLog.Add($"第 {battle.Round} 回合");
             Render();
+        }
+
+        private void ContinueRound()
+        {
+            if (phase == Phase.RoundBreak)
+                BeginNextRound();
+        }
+
+        private void SwapBetweenRounds(int from, int to)
+        {
+            if (phase == Phase.RoundBreak && battle.TrySwapPartyPositions(from, to))
+                BeginNextRound();
         }
 
         private void Update()
         {
-            if (phase != Phase.Playback)
-                return;
-            playbackTick += Time.unscaledDeltaTime * 10f * speed;
-            AdvancePlayback(playbackTick);
+            if (phase == Phase.Playback)
+                AdvancePlayback(Time.unscaledTimeAsDouble);
         }
 
-        private void AdvancePlayback(float untilTick)
+        private void AdvancePlayback(double now)
         {
-            while (eventIndex < result.Events.Count && result.Events[eventIndex].Tick <= untilTick)
+            while (eventIndex < roundEvents.Count)
             {
-                var entry = result.Events[eventIndex++];
+                var entry = roundEvents[eventIndex];
+                if (entry.Kind == BattleEventKind.Action)
+                {
+                    if (now < nextActionAt)
+                        return;
+                    nextActionAt = now + secondsBetweenActions;
+                }
+                eventIndex++;
+
                 if (entry.Kind == BattleEventKind.Finished)
                 {
+                    result = battle.Result;
                     if (!run.TrySettle(result, out reward))
                         throw new InvalidOperationException("The active replay could not be settled.");
                     phase = Phase.Settlement;
@@ -132,28 +166,56 @@ namespace RaidPartyManager.Presentation
                     return;
                 }
 
-                if (entry.Kind == BattleEventKind.Action)
+                var line = Describe(entry);
+                if (entry.Loadout != null)
+                    ApplyLoadout(entry.Loadout);
+                if (entry.Kind != BattleEventKind.Defeated)
                 {
                     health[entry.TargetId] = entry.TargetHealth;
                     shields[entry.TargetId] = entry.TargetShield;
-                    unitCards[entry.TargetId].Refresh(entry.TargetHealth, entry.TargetShield);
+                    statuses[entry.TargetId] = entry.StatusStacks;
+                    if (entry.Form != null)
+                    {
+                        appearances[entry.TargetId] = (entry.Form, entry.MaximumHealth);
+                        Render();
+                    }
+                    else if (entry.Loadout != null)
+                        Render();
+                    else
+                        unitCards[entry.TargetId].Refresh(entry.TargetHealth, entry.TargetShield, entry.StatusStacks);
                 }
 
-                var line = Describe(entry);
                 battleLog.Add(line);
-                AppendLog(line);
+                AppendLog(line, entry.Kind);
             }
+
+            phase = Phase.RoundBreak;
+            Render();
+        }
+
+        private void ApplyLoadout(BattleLoadout loadout)
+        {
+            if (!run.TryApplyBattleLoadout(battle.Id, loadout))
+                throw new InvalidOperationException("Battle equipment no longer matches the party inventory.");
+            battleLoadout = loadout;
         }
 
         private string Describe(BattleEvent entry)
         {
-            string target = request.Combatants.First(unit => unit.Id == entry.TargetId).Character.Name;
+            string target = appearances[entry.TargetId].Character.Name;
+            if (entry.Kind == BattleEventKind.FormChanged)
+                return $"[{entry.Tick:000}] {target} · {entry.ActionName} → {entry.Form.Name}";
             if (entry.Kind == BattleEventKind.Defeated)
                 return $"[{entry.Tick:000}] {target} 倒下";
-            string actor = request.Combatants.First(unit => unit.Id == entry.ActorId).Character.Name;
+            string actor = entry.ActorId != null ? appearances[entry.ActorId].Character.Name : null;
+            if (entry.Form != null)
+                target = entry.Form.Name;
+            string source = actor != null ? $"{actor} · " : "";
             string amount = entry.ActionKind == ActionKind.Heal ? $"恢复 {entry.Amount} 生命" :
                 entry.ActionKind == ActionKind.Shield ? $"获得 {entry.Amount} 护盾" : $"损失 {entry.Amount} 生命";
-            return $"[{entry.Tick:000}] {actor} · {entry.ActionName} → {target} · {amount}  {ReasonText(entry.Reason)}";
+            string detail = entry.Detail != null
+                ? entry.Amount > 0 ? $"{amount} · {entry.Detail}" : entry.Detail : amount;
+            return $"[{entry.Tick:000}] {source}{entry.ActionName} → {target} · {detail}  {ReasonText(entry.Reason)}";
         }
 
         private void Render()
@@ -180,11 +242,17 @@ namespace RaidPartyManager.Presentation
             header.Add(heading);
             var tools = PrototypeStyle.Row();
             tools.style.alignItems = Align.Center;
-            var phaseLabel = PrototypeStyle.Text(phase == Phase.Preparation ? "战前准备" :
-                phase == Phase.Playback ? "自动战斗" : "战斗结算", 14, PrototypeStyle.Accent);
+            var phaseLabel = PrototypeStyle.Text(phase switch
+            {
+                Phase.Preparation => "战前准备",
+                Phase.Playback => $"第 {battle.Round} 回合",
+                Phase.RoundBreak => $"第 {battle.Round} 回合结束",
+                _ => "战斗结算"
+            }, 14, PrototypeStyle.Accent);
+            phaseLabel.name = "battle-phase";
             phaseLabel.style.marginRight = 8;
             tools.Add(phaseLabel);
-            if (phase != Phase.Playback)
+            if (phase == Phase.Preparation || phase == Phase.Settlement)
                 tools.Add(PrototypeStyle.Button("角色编辑", "open-party-editor", OpenPartyEditor));
             if (phase == Phase.Preparation)
             {
@@ -192,15 +260,22 @@ namespace RaidPartyManager.Presentation
                 start.SetEnabled(run.CanStartBattle);
                 tools.Add(start);
             }
-            if (phase == Phase.Playback)
-                RenderPlayback(tools);
+            if (phase == Phase.RoundBreak)
+                tools.Add(PrototypeStyle.Button("下回合", "next-round", ContinueRound, true));
             if (phase == Phase.Settlement)
                 tools.Add(PrototypeStyle.Button("重置演练", "reset", ResetDemo, true));
+            tools.Add(PrototypeSceneMenu.ReturnButton());
             header.Add(tools);
             page.Add(header);
 
             var arena = PrototypeStyle.Panel();
             arena.name = "battlefield";
+            if (phase == Phase.RoundBreak)
+            {
+                var hint = PrototypeStyle.Text("长按一名队员，拖到另一名存活队员上交换站位。", 13, PrototypeStyle.Muted);
+                hint.style.marginBottom = 8;
+                arena.Add(hint);
+            }
             var opposingLines = PrototypeStyle.Row();
             opposingLines.style.alignItems = Align.Stretch;
             opposingLines.Add(BuildLine(Side.Party));
@@ -219,11 +294,11 @@ namespace RaidPartyManager.Presentation
 
         private void OpenPartyEditor()
         {
-            if (phase == Phase.Playback)
+            if (phase != Phase.Preparation && phase != Phase.Settlement)
                 return;
 
             root.Clear();
-            root.Add(new PartyEditorView(run, EditorPosition, content.PortraitFor, Render));
+            root.Add(new PartyEditorView(run, EditorPosition, content.PortraitFor, content.IconFor, Render));
         }
 
         private int? EditorPosition(MemberView member)
@@ -232,7 +307,7 @@ namespace RaidPartyManager.Presentation
                 return member.Position;
 
             // Settlement removes defeated members from the formation. Keep their last battle slots in the editor.
-            return request.Combatants.FirstOrDefault(unit => unit.Side == Side.Party && unit.Id == member.Id)?.Position;
+            return member.Health == 0 ? battle.Formation.FirstOrDefault(unit => unit.Side == Side.Party && unit.Id == member.Id)?.Position : null;
         }
 
         private VisualElement BuildLine(Side side)
@@ -242,20 +317,37 @@ namespace RaidPartyManager.Presentation
             line.style.flexGrow = 1;
             line.style.flexBasis = 0;
             line.style.minWidth = 0;
-            var title = PrototypeStyle.Text(isParty ? "己方阵列" : "敌方阵列", 13,
+            bool hideEnemies = !isParty && phase == Phase.Preparation &&
+                !run.Members.Any(member => member.Health > 0 && member.Character.Trait == CharacterTrait.RevealEnemies);
+            var title = PrototypeStyle.Text(isParty ? "己方阵列" : hideEnemies ? "敌方阵列 · 待侦察" : "敌方阵列", 13,
                 isParty ? PrototypeStyle.Ally : PrototypeStyle.Enemy);
             title.style.unityTextAlign = isParty ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight;
             title.style.marginBottom = 7;
             line.Add(title);
 
             var positions = PrototypeStyle.Row(isParty ? "party-positions" : "enemy-positions");
+            var drag = isParty && phase == Phase.RoundBreak
+                ? new FormationSwap(positions, (from, to) => SwapBetweenRounds(from.Position.Value, to.Position.Value))
+                : null;
             for (int index = 0; index < Rules.Positions; index++)
-                positions.Add(PositionCard(side, isParty ? Rules.Positions - index : index + 1));
+            {
+                int slot = isParty ? Rules.Positions - index : index + 1;
+                var card = hideEnemies
+                    ? new BattleUnitCard(side, slot, null, null, null, 0, 0, 0, null, false, hidden: true)
+                    : PositionCard(side, slot);
+                positions.Add(card);
+                if (drag != null && card.CanSwap && !battle.IsPositionLocked(card.Slot))
+                    drag.Register(new FormationSwap.Slot
+                    {
+                        View = card, Border = card.Q("combatant-portrait"), Position = card.Slot,
+                        Artwork = card.Artwork, Name = card.CharacterName, CanDrag = true, CanDrop = true
+                    });
+            }
             line.Add(positions);
             return line;
         }
 
-        private VisualElement PositionCard(Side side, int position)
+        private BattleUnitCard PositionCard(Side side, int position)
         {
             bool preparing = phase == Phase.Preparation;
             string id;
@@ -272,28 +364,26 @@ namespace RaidPartyManager.Presentation
             }
             else
             {
-                var units = preparing ? content.Enemies : request.Combatants;
+                var units = preparing ? content.Enemies : battle.Formation;
                 var unit = units.FirstOrDefault(candidate => candidate.Side == side && candidate.Position == position);
                 id = unit?.Id;
-                character = unit?.Character;
+                var appearance = id != null && !preparing ? appearances[id] : (unit?.Character, unit?.Stats.Health ?? 0);
+                character = appearance.Item1;
                 currentHealth = unit == null ? 0 : preparing ? unit.Health : health[id];
-                maximumHealth = unit?.Stats.Health ?? 0;
+                maximumHealth = appearance.Item2;
             }
 
-            bool canPlace = preparing && side == Side.Party &&
-                run.Members.Any(member => member.Id == selectedMember && member.Health > 0);
-            Action place = canPlace ? () =>
-            {
-                run.TryPlace(selectedMember, position);
-                Render();
-            } : null;
             string subtitle = character == null ? null : preparing && side == Side.Enemy && character.Skill != null
                 ? character.Skill.Name : PersonalityText(character.Personality);
-            int shield = phase == Phase.Playback && id != null ? shields.GetValueOrDefault(id) : 0;
+            int shield = !preparing && phase != Phase.Settlement && id != null ? shields.GetValueOrDefault(id) : 0;
             var card = new BattleUnitCard(side, position, id, character, content.PortraitFor(character?.Id),
-                maximumHealth, currentHealth, shield, subtitle, preparing && id != null && id == selectedMember, place);
+                maximumHealth, currentHealth, shield, subtitle, preparing && id != null && id == selectedMember,
+                statusIcon: content.StatusIcon);
             if (id != null)
+            {
+                card.Refresh(currentHealth, shield, statuses.GetValueOrDefault(id));
                 unitCards[id] = card;
+            }
             return card;
         }
 
@@ -318,8 +408,13 @@ namespace RaidPartyManager.Presentation
             {
                 string id = phase == Phase.Preparation
                     ? members.FirstOrDefault(member => member.Position == position)?.Id
-                    : request.Combatants.FirstOrDefault(unit => unit.Side == Side.Party && unit.Position == position)?.Id;
-                cards.Add(EquipmentCard(position, members.FirstOrDefault(member => member.Id == id), inventory));
+                    : battle.Formation.FirstOrDefault(unit => unit.Side == Side.Party && unit.Position == position)?.Id;
+                var member = members.FirstOrDefault(entry => entry.Id == id);
+                var character = phase != Phase.Preparation && id != null && appearances.TryGetValue(id, out var appearance)
+                    ? appearance.Character : member?.Character;
+                var equipment = id != null && battleLoadout != null && battleLoadout.Slots.TryGetValue(id, out var slots)
+                    ? slots : member?.EquipmentIds;
+                cards.Add(EquipmentCard(position, id, character, equipment, inventory));
             }
             roster.Add(cards);
             if (phase == Phase.Preparation)
@@ -329,7 +424,8 @@ namespace RaidPartyManager.Presentation
             page.Add(bottom);
         }
 
-        private VisualElement EquipmentCard(int position, MemberView member, IReadOnlyList<EquipmentInstance> inventory)
+        private VisualElement EquipmentCard(int position, string id, CharacterDefinition character,
+            IReadOnlyList<string> equipment, IReadOnlyList<EquipmentInstance> inventory)
         {
             var card = PrototypeStyle.Row($"equipment-position-{position}");
             card.style.flexGrow = 1;
@@ -339,17 +435,17 @@ namespace RaidPartyManager.Presentation
             card.style.marginRight = position == 1 ? 0 : 5;
             card.style.backgroundColor = PrototypeStyle.Inset;
             card.style.overflow = Overflow.Hidden;
-            bool editable = phase == Phase.Preparation && member != null;
-            bool selected = editable && member.Id == selectedMember;
+            bool editable = phase == Phase.Preparation && id != null;
+            bool selected = editable && id == selectedMember;
             PrototypeStyle.Outline(card, selected ? PrototypeStyle.Accent : PrototypeStyle.Edge, 3);
 
             var portrait = new VisualElement();
             portrait.style.width = Length.Percent(39);
             portrait.style.overflow = Overflow.Hidden;
-            var art = content.PortraitFor(member?.Character.Id);
-            ProfessionFrame.AddTo(portrait, member?.Character.Profession, art);
+            var art = content.PortraitFor(character?.Id);
+            ProfessionFrame.AddTo(portrait, character?.Profession, art);
 
-            var caption = PrototypeStyle.Text(member?.Character.Name ?? $"{position} 号位", 10);
+            var caption = PrototypeStyle.Text(character?.Name ?? $"{position} 号位", 10);
             caption.style.position = Position.Absolute;
             caption.style.left = caption.style.right = caption.style.bottom = 3;
             caption.style.backgroundColor = new Color(0.064f, 0.069f, 0.086f, 0.90f);
@@ -359,8 +455,8 @@ namespace RaidPartyManager.Presentation
 
             if (editable)
             {
-                var select = new Button(() => SelectMember(member.Id, null)) { name = $"member-{member.Id}",
-                    tooltip = member.Character.Name };
+                var select = new Button(() => SelectMember(id, null)) { name = $"member-{id}",
+                    tooltip = character.Name };
                 PrototypeStyle.Fill(select);
                 select.style.marginTop = select.style.marginRight = select.style.marginBottom = select.style.marginLeft = 0;
                 select.style.backgroundColor = Color.clear;
@@ -378,18 +474,18 @@ namespace RaidPartyManager.Presentation
             for (int i = 0; i < Rules.EquipmentSlots; i++)
             {
                 int slot = i;
-                var held = member != null ? inventory.FirstOrDefault(item => item.Id == member.EquipmentIds[slot]) : null;
+                var held = equipment != null ? inventory.FirstOrDefault(item => item.Id == equipment[slot]) : null;
                 string text = $"{slot + 1} · {held?.Definition.Name ?? "空槽"}";
                 if (editable)
                 {
-                    var button = PrototypeStyle.Button(text, selected ? $"slot-{slot}" : $"slot-{member.Id}-{slot}",
-                        () => SelectMember(member.Id, slot), selected && selectedEquipmentSlot == slot);
+                    var button = PrototypeStyle.Button(text, selected ? $"slot-{slot}" : $"slot-{id}-{slot}",
+                        () => SelectMember(id, slot), selected && selectedEquipmentSlot == slot);
                     button.style.fontSize = 10;
                     button.style.height = button.style.minHeight = button.style.maxHeight = 27;
                     button.style.paddingTop = button.style.paddingBottom = 0;
                     button.style.marginLeft = button.style.marginRight = 0;
                     if (held != null)
-                        button.tooltip = BonusText(held.Definition.Bonus);
+                        button.tooltip = held.Definition.Description ?? BonusText(held.Definition.Bonus);
                     slots.Add(button);
                 }
                 else
@@ -425,23 +521,20 @@ namespace RaidPartyManager.Presentation
                 $"生命上限 {StatText(stats.Health, baseline.Health)}", 12, PrototypeStyle.Muted);
             statsLabel.style.flexGrow = 1;
             summary.Add(statsLabel);
-            var unplace = PrototypeStyle.Button("移出站位", "unplace", () =>
-            {
-                run.TryPlace(selectedMember, null);
-                selectedEquipmentSlot = null;
-                Render();
-            });
-            unplace.SetEnabled(chosen.Position.HasValue);
-            summary.Add(unplace);
             roster.Add(summary);
 
             foreach (var member in members.Where(member => !member.Position.HasValue))
                 roster.Add(PrototypeStyle.Button($"未布阵 · {member.Character.Name}", $"member-{member.Id}",
                     () => SelectMember(member.Id, null), member.Id == selectedMember));
 
+            if (run.HasRecruitmentVacancy && members.Count == Rules.Positions)
+                roster.Add(PrototypeStyle.Text("寻人启事将填补空位。召唤队友存活时会替换一名倒下或未布阵的队员。", 12, PrototypeStyle.Muted));
+
             if (!selectedEquipmentSlot.HasValue)
                 return;
 
+            var trayScroll = new ScrollView { name = "quick-equipment" };
+            trayScroll.style.maxHeight = 176;
             var tray = PrototypeStyle.Row();
             tray.style.alignItems = Align.Center;
             tray.style.flexWrap = Wrap.Wrap;
@@ -450,15 +543,17 @@ namespace RaidPartyManager.Presentation
             {
                 var holder = members.FirstOrDefault(member => member.EquipmentIds.Contains(item.Id));
                 var owner = holder == null ? "背包" : holder.Character.Name;
-                var button = PrototypeStyle.Button($"{item.Definition.Name} · {BonusText(item.Definition.Bonus)} · {owner}",
+                var button = PrototypeStyle.Button($"{item.Definition.Name} · {owner}",
                     $"item-{item.Id}", () => Equip(item.Id));
+                button.tooltip = item.Definition.Description ?? BonusText(item.Definition.Bonus);
                 tray.Add(button);
             }
 
             var remove = PrototypeStyle.Button("卸下", "unequip", () => Equip(null));
             remove.SetEnabled(chosen.EquipmentIds[selectedEquipmentSlot.Value] != null);
             tray.Add(remove);
-            roster.Add(tray);
+            trayScroll.Add(tray);
+            roster.Add(trayScroll);
         }
 
         private void Equip(string itemId)
@@ -466,20 +561,6 @@ namespace RaidPartyManager.Presentation
             if (selectedEquipmentSlot.HasValue)
                 run.TryEquip(selectedMember, selectedEquipmentSlot.Value, itemId);
             Render();
-        }
-
-        private void RenderPlayback(VisualElement page)
-        {
-            var controls = PrototypeStyle.Row();
-            var speedButton = PrototypeStyle.Button($"回放速度 ×{speed:0}", "speed", null);
-            speedButton.clicked += () =>
-            {
-                speed = speed >= 4 ? 1 : speed * 2;
-                speedButton.text = $"回放速度 ×{speed:0}";
-            };
-            controls.Add(speedButton);
-            controls.Add(PrototypeStyle.Button("跳到结算", "skip", () => AdvancePlayback(float.PositiveInfinity)));
-            page.Add(controls);
         }
 
         private void RenderSettlement(VisualElement page)
@@ -519,18 +600,23 @@ namespace RaidPartyManager.Presentation
                 logView.Add(PrototypeStyle.Text("战斗开始后显示行动记录。", 12, PrototypeStyle.Muted));
             foreach (string line in battleLog)
                 logView.Add(PrototypeStyle.Text(line, 12));
+            if (battleLog.Count > 0)
+                ScrollLogTo(logView, logView.contentContainer.ElementAt(logView.contentContainer.childCount - 1));
             return panel;
         }
 
-        private void AppendLog(string line)
+        private void AppendLog(string line, BattleEventKind kind)
         {
             var label = PrototypeStyle.Text(line, 13);
+            if (kind == BattleEventKind.Action)
+                label.name = "battle-action";
             logView.Add(label);
-            label.schedule.Execute(() =>
-            {
-                if (label.panel != null)
-                    logView.ScrollTo(label);
-            });
+            ScrollLogTo(logView, label);
+        }
+
+        private static void ScrollLogTo(ScrollView log, VisualElement label)
+        {
+            label.schedule.Execute(() => log.ScrollTo(label));
         }
 
         private static string ReasonText(DecisionReason reason) => reason switch

@@ -13,20 +13,29 @@ MonoBehaviour:
   m_Name: StarMage
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: StarMage
-  displayName: "\u661F\u8F89\u672F\u5E08"
+  displayName: "星辉术师"
   portrait: {fileID: 2800000, guid: 64197e4543e748ddbf025504510ebee6, type: 3}
   profession: 1
+  rosterNumber: 16
+  stage: 1
+  reach: 2
+  fixedTrait: 7
+  traitPower: 1
+  traitText: "回合结束时，攻击力+1，并使此效果+1"
+  evolutions:
+  - {fileID: 11400000, guid: 25eac7b6d5e1413eaa93b00783845587, type: 2}
+  - {fileID: 11400000, guid: 018149b49b4745d2be95650c3382ee90, type: 2}
   personality: 0
   attack: 5
   defense: 0
   specialDefense: 3
-  health: 9
+  health: 7
   actionInterval: 11
   basicAttack:
     id: basic
     displayName: "\u666E\u653B"
     kind: 0
-    target: 1
+    target: 0
     power: 0
     cooldown: 0
     damageType: 1

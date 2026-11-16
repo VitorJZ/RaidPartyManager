@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: DivinePriest
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: DivinePriest
+  displayName: "神恩主祭"
+  portrait: {fileID: 2800000, guid: 78bd951272b54d8284d052ad911c4c50, type: 3}
+  profession: 3
+  rosterNumber: 23
+  stage: 2
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "选择友方目标，为其恢复生命值"
+  personality: 3
+  attack: 5
+  defense: 3
+  specialDefense: 4
+  health: 12
+  actionInterval: 12
+  basicAttack:
+    id: basic
+    displayName: "\u666E\u653B"
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 1
+  skill:
+    id: heal
+    displayName: "神恩治疗"
+    kind: 1
+    target: 3
+    power: 0
+    healingScalesWithAttack: 1
+    cooldown: 24
+    damageType: 0

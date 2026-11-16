@@ -14,10 +14,16 @@ namespace RaidPartyManager.Content
         public IReadOnlyList<EquipmentDefinition> StartingEquipment { get; }
         public EquipmentDefinition VictoryReward { get; }
         public int TickLimit { get; }
+        public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
+        public IReadOnlyList<CharacterDefinition> CharacterCatalog { get; }
         private readonly IReadOnlyDictionary<string, Texture2D> portraits;
+        private readonly IReadOnlyDictionary<string, Texture2D> equipmentIcons;
+        private readonly Texture2D[] statusIcons;
 
         internal EncounterData(string name, Combatant[] party, Combatant[] enemies,
-            EquipmentDefinition[] startingEquipment, EquipmentDefinition victoryReward, int tickLimit, IReadOnlyDictionary<string, Texture2D> portraits)
+            EquipmentDefinition[] startingEquipment, EquipmentDefinition victoryReward, int tickLimit,
+            IReadOnlyDictionary<string, Texture2D> portraits, IReadOnlyDictionary<string, Texture2D> equipmentIcons,
+            CharacterDefinition[] recruitmentPool, CharacterDefinition[] characterCatalog, Texture2D[] statusIcons)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
@@ -26,7 +32,17 @@ namespace RaidPartyManager.Content
             VictoryReward = victoryReward;
             TickLimit = tickLimit;
             this.portraits = portraits;
+            this.equipmentIcons = equipmentIcons;
+            this.statusIcons = statusIcons;
+            RecruitmentPool = Array.AsReadOnly(recruitmentPool);
+            CharacterCatalog = Array.AsReadOnly(characterCatalog);
         }
+
+        public Texture2D IconFor(string itemId) =>
+            itemId != null && equipmentIcons.TryGetValue(itemId, out var icon) ? icon : null;
+
+        public Texture2D StatusIcon(StatusKind kind) =>
+            (int)kind >= 0 && (int)kind < statusIcons.Length ? statusIcons[(int)kind] : null;
 
         public Texture2D PortraitFor(string definitionId) =>
             definitionId != null && portraits.TryGetValue(definitionId, out var portrait) ? portrait : null;
@@ -36,6 +52,13 @@ namespace RaidPartyManager.Content
     public sealed class EncounterAsset : ScriptableObject
     {
         [Serializable]
+        private sealed class StartingStatus
+        {
+            public StatusKind status;
+            [Min(1)] public int layers = 1;
+        }
+
+        [Serializable]
         private sealed class UnitEntry
         {
             [SerializeField] private string instanceId;
@@ -43,8 +66,9 @@ namespace RaidPartyManager.Content
             [SerializeField, Range(1, Rules.Positions)] private int position = 1;
             [Tooltip("-1 uses the character's maximum health.")]
             [SerializeField, Min(-1)] private int startingHealth = -1;
+            [SerializeField] private StartingStatus[] startingStatuses = Array.Empty<StartingStatus>();
 
-            public Texture2D Portrait => character.Portrait;
+            public CharacterAsset Character => character;
 
             public Combatant ToCombatant(Side side)
             {
@@ -52,14 +76,20 @@ namespace RaidPartyManager.Content
                     throw new InvalidOperationException($"Encounter unit '{instanceId}' needs a character asset.");
                 var definition = character.ToDefinition();
                 int health = startingHealth == -1 ? definition.BaseStats.Health : startingHealth;
-                return new Combatant(instanceId, definition, side, position, definition.BaseStats, health);
+                var statuses = startingStatuses.GroupBy(entry => entry.status)
+                    .ToDictionary(group => group.Key, group => group.Sum(entry => entry.layers));
+                return new Combatant(instanceId, definition, side, position, definition.BaseStats, health,
+                    startingStatuses: statuses);
             }
         }
 
         [SerializeField] private string displayName;
         [SerializeField] private UnitEntry[] party = Array.Empty<UnitEntry>();
         [SerializeField] private UnitEntry[] enemies = Array.Empty<UnitEntry>();
+        [SerializeField] private CharacterAsset[] additionalRecruits = Array.Empty<CharacterAsset>();
+        [SerializeField] private Texture2D[] statusIcons = Array.Empty<Texture2D>();
         [SerializeField] private EquipmentAsset[] startingEquipment = Array.Empty<EquipmentAsset>();
+        [SerializeField, Min(1)] private int startingCopies = 1;
         [SerializeField] private EquipmentAsset victoryReward;
         [SerializeField, Min(1)] private int tickLimit = 200;
 
@@ -69,14 +99,30 @@ namespace RaidPartyManager.Content
             var enemyInputs = enemies.Select(entry => entry.ToCombatant(Side.Enemy)).ToArray();
             // Fail at startup if a content author has created an invalid formation or duplicate ID.
             _ = new BattleRequest("encounter-validation", partyInputs.Concat(enemyInputs), tickLimit);
-            var portraits = party.Concat(enemies).Zip(partyInputs.Concat(enemyInputs),
-                    (entry, unit) => (unit.Character.Id, entry.Portrait))
-                .Where(entry => entry.Portrait != null)
-                .GroupBy(entry => entry.Id, StringComparer.Ordinal)
-                .ToDictionary(group => group.Key, group => group.First().Portrait, StringComparer.Ordinal);
+            var recruits = party.Select(entry => entry.Character).Concat(additionalRecruits)
+                .Where(character => character != null).Distinct().ToArray();
+            var catalog = new Dictionary<string, CharacterAsset>(StringComparer.Ordinal);
+            var pending = new Queue<CharacterAsset>(recruits.Concat(enemies.Select(entry => entry.Character)));
+            while (pending.Count > 0)
+            {
+                var character = pending.Dequeue();
+                if (!catalog.TryAdd(character.Id, character))
+                    continue;
+                foreach (var form in character.RelatedForms)
+                    pending.Enqueue(form);
+            }
+
+            var portraits = catalog.Values.Where(character => character.Portrait != null)
+                .ToDictionary(character => character.Id, character => character.Portrait, StringComparer.Ordinal);
+            var equipmentIcons = startingEquipment.Append(victoryReward)
+                .Where(item => item != null && item.Icon != null)
+                .GroupBy(item => item.ToDefinition().Id, StringComparer.Ordinal)
+                .ToDictionary(group => group.Key, group => group.First().Icon, StringComparer.Ordinal);
             return new EncounterData(displayName, partyInputs, enemyInputs,
-                startingEquipment.Select(item => item.ToDefinition()).ToArray(),
-                victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits);
+                startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies)).ToArray(),
+                victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits, equipmentIcons,
+                recruits.Select(character => character.ToDefinition()).ToArray(),
+                catalog.Values.Select(character => character.ToDefinition()).ToArray(), statusIcons);
         }
     }
 }

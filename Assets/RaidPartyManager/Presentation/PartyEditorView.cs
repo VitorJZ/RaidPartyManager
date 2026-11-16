@@ -14,17 +14,19 @@ namespace RaidPartyManager.Presentation
         private readonly PartyRun run;
         private readonly Func<MemberView, int?> positionOf;
         private readonly Func<string, Texture2D> portraitFor;
+        private readonly Func<string, Texture2D> iconFor;
         private readonly VisualElement overview;
         private readonly VisualElement modalLayer;
         private string memberId;
         private readonly List<string> backpackCells = new List<string>();
 
         public PartyEditorView(PartyRun run, Func<MemberView, int?> positionOf,
-            Func<string, Texture2D> portraitFor, Action back)
+            Func<string, Texture2D> portraitFor, Func<string, Texture2D> iconFor, Action back)
         {
             this.run = run;
             this.positionOf = positionOf;
             this.portraitFor = portraitFor;
+            this.iconFor = iconFor;
             name = "party-editor";
             style.flexGrow = 1;
             style.backgroundColor = PrototypeStyle.Background;
@@ -44,9 +46,9 @@ namespace RaidPartyManager.Presentation
             title.style.flexGrow = 1;
             PrototypeStyle.Middle(title);
             header.Add(title);
-            var balance = new VisualElement();
-            balance.style.width = 100;
-            header.Add(balance);
+            var mainMenuButton = PrototypeSceneMenu.ReturnButton();
+            mainMenuButton.style.width = 100;
+            header.Add(mainMenuButton);
             overview.Add(header);
 
             modalLayer = new VisualElement { name = "character-details-layer" };
@@ -77,30 +79,53 @@ namespace RaidPartyManager.Presentation
             var layout = new VisualElement { name = "editor-roster" };
             layout.style.marginTop = 28;
 
+            var drag = new FormationSwap(layout, (from, to) =>
+            {
+                if (run.TryPlace(from.MemberId, to.Position))
+                    RenderRoster();
+            }, slot => OpenDetails(slot.MemberId));
+            layout.Add(PrototypeStyle.Text("长按立绘可换位，点按打开装备。", 13, PrototypeStyle.Muted));
             var row = PrototypeStyle.Row("editor-positions");
             row.style.justifyContent = Justify.SpaceAround;
             var members = run.Members;
+            var displayed = new HashSet<string>();
             for (int position = Rules.Positions; position >= 1; position--)
-                row.Add(BuildCard(position, members.FirstOrDefault(member => positionOf(member) == position)));
+            {
+                var member = members.FirstOrDefault(entry => entry.Position == position)
+                    ?? members.FirstOrDefault(entry => positionOf(entry) == position);
+                if (member != null)
+                    displayed.Add(member.Id);
+                row.Add(BuildCard(position, member, drag));
+            }
             layout.Add(row);
 
-            var unplaced = members.Where(member => !positionOf(member).HasValue).ToArray();
-            if (unplaced.Length > 0)
+            var bench = PrototypeStyle.Row();
+            bench.style.alignItems = Align.Center;
+            bench.style.flexWrap = Wrap.Wrap;
+            bench.style.marginTop = 16;
+            var benchTarget = PrototypeStyle.Text("拖到此处移出站位", 13, PrototypeStyle.Muted);
+            benchTarget.name = "editor-bench";
+            benchTarget.style.paddingLeft = benchTarget.style.paddingRight = 10;
+            benchTarget.style.paddingTop = benchTarget.style.paddingBottom = 6;
+            PrototypeStyle.Outline(benchTarget, PrototypeStyle.Edge, 4);
+            bench.Add(benchTarget);
+            drag.Register(new FormationSwap.Slot { View = benchTarget, Border = benchTarget, CanDrop = true });
+            foreach (var member in members.Where(entry => !displayed.Contains(entry.Id)))
             {
-                var bench = PrototypeStyle.Row();
-                bench.style.alignItems = Align.Center;
-                bench.style.flexWrap = Wrap.Wrap;
-                bench.style.marginTop = 16;
-                bench.Add(PrototypeStyle.Text("未布阵", 13, PrototypeStyle.Muted));
-                foreach (var member in unplaced)
-                    bench.Add(PrototypeStyle.Button(member.Character.Name, $"edit-member-{member.Id}",
-                        () => OpenDetails(member.Id)));
-                layout.Add(bench);
+                var button = PrototypeStyle.Button(member.Character.Name, $"edit-member-{member.Id}",
+                    () => OpenDetails(member.Id));
+                bench.Add(button);
+                drag.Register(new FormationSwap.Slot
+                {
+                    View = button, Border = button, MemberId = member.Id, Name = member.Character.Name,
+                    Artwork = portraitFor(member.Character.Id), CanDrag = member.Health > 0
+                });
             }
+            layout.Add(bench);
             overview.Add(layout);
         }
 
-        private VisualElement BuildCard(int position, MemberView member)
+        private VisualElement BuildCard(int position, MemberView member, FormationSwap drag)
         {
             var card = new VisualElement { name = $"edit-position-{position}" };
             card.style.width = Length.Percent(17);
@@ -176,6 +201,11 @@ namespace RaidPartyManager.Presentation
                 open.RegisterCallback<PointerEnterEvent>(_ => PrototypeStyle.Outline(namePlate, PrototypeStyle.Accent, 4));
                 open.RegisterCallback<PointerLeaveEvent>(_ => PrototypeStyle.Outline(namePlate, PrototypeStyle.Edge, 4));
             }
+            drag.Register(new FormationSwap.Slot
+            {
+                View = card, Border = portrait, Position = position, MemberId = member?.Id, Name = member?.Character.Name,
+                Artwork = art, CanDrag = member != null && member.Health > 0, CanDrop = true
+            });
             return card;
         }
 
@@ -185,7 +215,7 @@ namespace RaidPartyManager.Presentation
             overview.SetEnabled(false);
             modalLayer.style.display = DisplayStyle.Flex;
             var member = run.Members.Single(candidate => candidate.Id == id);
-            modalLayer.Add(new CharacterEquipmentPopup(run, id, portraitFor(member.Character.Id), backpackCells,
+            modalLayer.Add(new CharacterEquipmentPopup(run, id, portraitFor(member.Character.Id), iconFor, backpackCells,
                 RenderRoster, CloseDetails));
             modalLayer.Q<Button>("close-character-details").Focus();
         }

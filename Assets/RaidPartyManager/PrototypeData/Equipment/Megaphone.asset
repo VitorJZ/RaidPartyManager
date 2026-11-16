@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e69d6322f0d4dd7a160fe2c6ff12661, type: 3}
+  m_Name: Megaphone
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
+  id: megaphone
+  displayName: "传话筒"
+  effect: 35
+  icon: {fileID: 2800000, guid: 66210ded81844821b21c5c421823a613, type: 3}
+  description: "回合结束时，随机传递到装备栏有空位的队友身上；本局对战每传递1次，回合开始时，装备者攻击力+1，且恢复1点生命值"
+  attackBonus: 0
+  defenseBonus: 0
+  specialDefenseBonus: 0
+  healthBonus: 0

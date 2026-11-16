@@ -13,8 +13,10 @@ MonoBehaviour:
   m_Name: SteelBulwark
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
   id: steel-bulwark
-  displayName: "\u7CBE\u94A2\u58C1\u5792"
-  description: 精钢护具。装备后，防御和特防各增加 1 点。
+  displayName: "精钢壁垒"
+  effect: 0
+  icon: {fileID: 2800000, guid: ab4aa854a84a4bd1af3a24eb13660c86, type: 3}
+  description: "防御和特防增加1点"
   attackBonus: 0
   defenseBonus: 1
   specialDefenseBonus: 1

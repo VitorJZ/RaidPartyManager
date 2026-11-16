@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.TextCore.Text;
 using UnityEngine.UIElements;
 
 namespace RaidPartyManager.Presentation
@@ -16,6 +17,29 @@ namespace RaidPartyManager.Presentation
         public static readonly Color Inset = new Color32(20, 22, 27, 255);
         public static readonly Color Edge = new Color32(65, 62, 61, 255);
         private static readonly Color ButtonColor = new Color32(48, 45, 43, 255);
+
+        public static void ApplySystemFont(VisualElement root, out Font font, out FontAsset fontAsset)
+        {
+            string fontName = Array.Find(Font.GetOSInstalledFontNames(), name => name == "Microsoft YaHei" ||
+                name == "Microsoft YaHei UI" || name == "Noto Sans CJK SC" || name == "PingFang SC");
+            font = fontName == null ? null : Font.CreateDynamicFontFromOSFont(fontName, 16);
+            fontAsset = font == null ? null : FontAsset.CreateFontAsset(font);
+            if (fontAsset != null)
+                root.style.unityFontDefinition = FontDefinition.FromSDFFont(fontAsset);
+        }
+
+        public static void ClearDocument(VisualElement root, Font font, FontAsset fontAsset)
+        {
+            if (root != null)
+            {
+                root.Clear();
+                root.style.unityFontDefinition = StyleKeyword.Null;
+            }
+            if (fontAsset != null)
+                UnityEngine.Object.Destroy(fontAsset);
+            if (font != null)
+                UnityEngine.Object.Destroy(font);
+        }
 
         public static VisualElement Row(string name = null)
         {

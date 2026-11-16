@@ -70,6 +70,24 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void RoundBreakSwapPersistsIntoTheNextBattle()
+        {
+            var run = MakeRun();
+            var simulator = new BattleSimulator();
+            var session = simulator.Start(run.BeginBattle(Enemies(), 10, Loot));
+            session.AdvanceRound();
+            Assert.That(session.TrySwapPartyPositions(1, 2), Is.True);
+            session.AdvanceRound();
+
+            Assert.That(session.Result.Outcome, Is.EqualTo(BattleOutcome.Victory));
+            Assert.That(run.TrySettle(session.Result, out _), Is.True);
+            Assert.That(run.Members.Select(member => member.Position), Is.EqualTo(new[] { 2, 1 }));
+
+            var next = run.BeginBattle(Enemies(), 10, Loot);
+            Assert.That(next.Combatants.Single(unit => unit.Id == "b").Position, Is.EqualTo(1));
+        }
+
+        [Test]
         public void InvalidSettlementDoesNotConsumeTheBattleAndDefeatGrantsNothing()
         {
             var run = MakeRun();
