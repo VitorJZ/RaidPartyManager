@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyOathlineGuard
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyOathlineGuard
+  displayName: "誓线护卫"
+  portrait: {fileID: 2800000, guid: 2a6e99b524f046cc9f4e0e05a5f1c884, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: c1fe7312fab54c80b1dd5c2dd92c97fa, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: d7465c10cabf45178fe80c95abe9d758, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 5605c85ac269493fb43c50380d70d912, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: f0b0d71072244d4ba1690db7b90cf6d5, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: dd1c5e0f932e4ea88a18ef6402bee92f, type: 3}
+  profession: 0
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 32
+  traitPower: 0
+  traitText: "给自己叠加1层坚毅"
+  personality: 1
+  attack: 3
+  defense: 3
+  specialDefense: 1
+  health: 18
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

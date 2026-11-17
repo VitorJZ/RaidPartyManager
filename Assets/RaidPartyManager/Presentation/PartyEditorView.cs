@@ -12,6 +12,8 @@ namespace RaidPartyManager.Presentation
     internal sealed class PartyEditorView : VisualElement
     {
         private readonly PartyRun run;
+        private readonly Side side;
+        private readonly Action edited;
         private readonly IReadOnlyList<CharacterDefinition> roster;
         private readonly Func<MemberView, int?> positionOf;
         private readonly Func<string, Texture2D> portraitFor;
@@ -22,10 +24,15 @@ namespace RaidPartyManager.Presentation
         private readonly List<string> backpackCells = new List<string>();
 
         public PartyEditorView(PartyRun run, IReadOnlyList<CharacterDefinition> catalog, Func<MemberView, int?> positionOf,
-            Func<string, Texture2D> portraitFor, Func<string, Texture2D> iconFor, Action back)
+            Func<string, Texture2D> portraitFor, Func<string, Texture2D> iconFor, Action back, Side side = Side.Party,
+            Action edited = null)
         {
             this.run = run;
-            roster = catalog.Where(character => character.RosterNumber > 0).OrderBy(character => character.RosterNumber).ToArray();
+            this.side = side;
+            this.edited = edited;
+            roster = side == Side.Party
+                ? catalog.Where(character => character.RosterNumber > 0).OrderBy(character => character.RosterNumber).ToArray()
+                : catalog;
             this.positionOf = positionOf;
             this.portraitFor = portraitFor;
             this.iconFor = iconFor;
@@ -44,7 +51,7 @@ namespace RaidPartyManager.Presentation
             var backButton = PrototypeStyle.Button("返回", "back-party-editor", back);
             backButton.style.width = 100;
             header.Add(backButton);
-            var title = PrototypeStyle.Text("角色编辑", 27);
+            var title = PrototypeStyle.Text(side == Side.Party ? "角色编辑" : "敌方编辑", 27);
             title.style.flexGrow = 1;
             PrototypeStyle.Middle(title);
             header.Add(title);
@@ -84,15 +91,17 @@ namespace RaidPartyManager.Presentation
             var drag = new FormationSwap(layout, (from, to) =>
             {
                 if (run.TryPlace(from.MemberId, to.Position))
-                    RenderRoster();
-            }, slot => OpenDetails(slot.MemberId));
-            layout.Add(PrototypeStyle.Text("长按立绘换位，左键查看装备，右键替换队员。", 13, PrototypeStyle.Muted));
+                    RenderEditedRoster();
+            }, slot => OpenMember(slot.MemberId));
+            layout.Add(PrototypeStyle.Text(side == Side.Party ? "长按立绘换位，左键查看装备，右键替换队员。"
+                : "长按立绘换位，点击立绘可替换敌人。", 13, PrototypeStyle.Muted));
             var row = PrototypeStyle.Row("editor-positions");
             row.style.justifyContent = Justify.SpaceAround;
             var members = run.Members;
             var displayed = new HashSet<string>();
-            for (int position = Rules.Positions; position >= 1; position--)
+            for (int index = 0; index < Rules.Positions; index++)
             {
+                int position = side == Side.Party ? Rules.Positions - index : index + 1;
                 var member = members.FirstOrDefault(entry => entry.Position == position)
                     ?? members.FirstOrDefault(entry => positionOf(entry) == position);
                 if (member != null)
@@ -100,6 +109,11 @@ namespace RaidPartyManager.Presentation
                 row.Add(BuildCard(position, member, drag));
             }
             layout.Add(row);
+            if (side == Side.Enemy)
+            {
+                overview.Add(layout);
+                return;
+            }
 
             var bench = PrototypeStyle.Row();
             bench.style.alignItems = Align.Center;
@@ -191,10 +205,10 @@ namespace RaidPartyManager.Presentation
 
             if (member != null)
             {
-                var open = new Button(() => OpenDetails(member.Id))
+                var open = new Button(() => OpenMember(member.Id))
                 {
                     name = $"edit-member-{member.Id}",
-                    tooltip = $"打开{member.Character.Name}的面板和背包"
+                    tooltip = side == Side.Party ? $"打开{member.Character.Name}的面板和背包" : $"替换{member.Character.Name}"
                 };
                 PrototypeStyle.Fill(open);
                 open.style.marginTop = open.style.marginRight = open.style.marginBottom = open.style.marginLeft = 0;
@@ -217,7 +231,15 @@ namespace RaidPartyManager.Presentation
         {
             var member = run.Members.Single(candidate => candidate.Id == id);
             OpenModal(id, new CharacterEquipmentPopup(run, id, portraitFor(member.Character.Id), iconFor, backpackCells,
-                RenderRoster, CloseModal), "close-character-details");
+                RenderEditedRoster, CloseModal), "close-character-details");
+        }
+
+        private void OpenMember(string id)
+        {
+            if (side == Side.Party)
+                OpenDetails(id);
+            else
+                OpenReplacement(run.Members.Single(member => member.Id == id));
         }
 
         private void RegisterReplacement(VisualElement target, MemberView member)
@@ -226,18 +248,29 @@ namespace RaidPartyManager.Presentation
             {
                 if (evt.button != 1 || memberId != null)
                     return;
-                var inParty = new HashSet<string>(run.Members.Select(entry => entry.Character.Id));
-                var popup = new PartyReplacementPopup(member.Character, roster, inParty, portraitFor, replacement =>
-                {
-                    if (run.TryReplaceMember(member.Id, replacement, positionOf(member)))
-                    {
-                        RenderRoster();
-                        CloseModal();
-                    }
-                }, CloseModal);
-                OpenModal(member.Id, popup, "close-party-replacement");
+                OpenReplacement(member);
                 evt.StopPropagation();
             });
+        }
+
+        private void OpenReplacement(MemberView member)
+        {
+            var inParty = new HashSet<string>(run.Members.Select(entry => entry.Character.Id));
+            var popup = new PartyReplacementPopup(member.Character, roster, inParty, portraitFor, replacement =>
+            {
+                if (run.TryReplaceMember(member.Id, replacement, positionOf(member)))
+                {
+                    RenderEditedRoster();
+                    CloseModal();
+                }
+            }, CloseModal, side);
+            OpenModal(member.Id, popup, "close-party-replacement");
+        }
+
+        private void RenderEditedRoster()
+        {
+            edited?.Invoke();
+            RenderRoster();
         }
 
         private void OpenModal(string id, VisualElement popup, string closeButton)

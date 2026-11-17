@@ -48,6 +48,59 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void DefaultDraftsUseFourDistinctUnitsFromEachIllustratedRoster()
+        {
+            var encounter = LoadEncounter();
+            Assert.That(encounter.EnemyRoster.Select(unit => unit.Name), Is.EquivalentTo(new[]
+            {
+                "拨线枪手", "灰灯术徒", "拦路蛮兵", "裂陶术士", "敲钟判官", "绕后猎手", "誓线护卫", "收尸弩手", "铜铃庸医"
+            }));
+
+            foreach (var side in new[] { Side.Party, Side.Enemy })
+            {
+                var random = new Random(917);
+                var draws = Enumerable.Range(0, 6).Select(_ => encounter.Draft(side, random)).ToArray();
+                foreach (var lineup in draws)
+                {
+                    Assert.That(lineup.Select(unit => unit.Position), Is.EqualTo(new[] { 1, 2, 3, 4 }));
+                    Assert.That(lineup.Select(unit => unit.Character.Id).Distinct().Count(), Is.EqualTo(4));
+                    Assert.That(lineup.All(unit => unit.Side == side && unit.Health == unit.Stats.Health), Is.True);
+                }
+                Assert.That(draws.Select(lineup => string.Join(",", lineup.Select(unit => unit.Character.Id)))
+                    .Distinct().Count(), Is.GreaterThan(1));
+            }
+
+            foreach (var enemy in encounter.EnemyRoster)
+            {
+                Assert.That(encounter.PortraitFor(enemy.Id), Is.Not.Null, enemy.Name);
+                Assert.That(encounter.BattleSpriteFor(enemy.Id), Is.Not.Null, enemy.Name);
+                Assert.That(encounter.BattleAttackFor(enemy.Id), Is.Not.Null, enemy.Name);
+                if (enemy.Reach == AttackReach.Melee)
+                    Assert.That(encounter.BattleWalkFor(enemy.Id), Is.Not.Null, enemy.Name);
+            }
+        }
+
+        [Test]
+        public void ThirdBellRingUsesMissingHealthAndHasWaveArtForEveryTarget()
+        {
+            var encounter = LoadEncounter();
+            var bell = encounter.EnemyRoster.Single(unit => unit.Id == "EnemyBellMagistrate");
+            Assert.That(encounter.BattleSpecialFor(bell.Id, BattleVisualCue.BellRing), Is.Not.Null);
+            Assert.That(encounter.BattleEffectFor(bell.Id, BattleVisualCue.BellWave), Is.Not.Null);
+            var enemy = new Combatant("bell", bell, Side.Enemy, 1, bell.BaseStats, bell.BaseStats.Health);
+            var front = Fighter("front", Side.Party, 1);
+            var rear = Fighter("rear", Side.Party, 4);
+            var result = new BattleSimulator(random: new FixedOrder())
+                .Simulate(new BattleRequest("bells", new[] { front, rear, enemy }, bell.ActionInterval * 4));
+
+            Assert.That(result.Events.Count(entry => entry.VisualCue == BattleVisualCue.BellRing), Is.EqualTo(3));
+            var wave = result.Events.Where(entry => entry.VisualCue == BattleVisualCue.BellWave).ToArray();
+            Assert.That(wave.Select(entry => entry.TargetId), Is.EqualTo(new[] { front.Id, rear.Id }));
+            Assert.That(wave.Select(entry => entry.Amount), Is.EqualTo(new[] { 6, 6 }));
+            Assert.That(wave.All(entry => entry.Tick == bell.ActionInterval * 3), Is.True);
+        }
+
+        [Test]
         public void StarterFamiliesAddFirstHitDamageAndDrawSingleTargetAttacks()
         {
             var soldier = Unit(Load("ValiantSoldier"), "soldier", 1);
@@ -149,6 +202,9 @@ namespace RaidPartyManager.Tests
             Assert.That(original.EffectiveStats.Attack, Is.EqualTo(ally.BaseStats.Attack + 2));
         }
 
+        private static EncounterData LoadEncounter() => AssetDatabase.LoadAssetAtPath<EncounterAsset>(
+            "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
+
         private static CharacterDefinition Load(string asset) => AssetDatabase.LoadAssetAtPath<CharacterAsset>(
             $"Assets/RaidPartyManager/PrototypeData/{asset}.asset").ToDefinition();
 
@@ -166,6 +222,7 @@ namespace RaidPartyManager.Tests
         private sealed class FixedOrder : Random
         {
             public override int Next(int maxValue) => maxValue - 1;
+            public override double NextDouble() => 0.1;
         }
     }
 }

@@ -45,6 +45,11 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D battleAttackSheet;
         [Tooltip("Six walking frames in three columns and two rows.")]
         [SerializeField] private Texture2D battleWalkSheet;
+        [SerializeField] private Texture2D battleSpecialSheet;
+        [SerializeField] private Texture2D battleSpecialEffect;
+        [SerializeField] private Texture2D battleFinaleEffect;
+        [SerializeField] private Texture2D battleStrikeEffect;
+        [SerializeField] private Texture2D battleProjectile;
         [SerializeField] private Profession profession;
         [SerializeField, Min(0)] private int rosterNumber;
         [SerializeField, Min(1)] private int stage = 1;
@@ -68,6 +73,9 @@ namespace RaidPartyManager.Content
         internal Texture2D BattleSpriteSheet => battleSpriteSheet;
         internal Texture2D BattleAttackSheet => battleAttackSheet;
         internal Texture2D BattleWalkSheet => battleWalkSheet;
+        internal (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike) BattleExtras =>
+            (battleSpecialSheet, battleSpecialEffect, battleFinaleEffect, battleStrikeEffect);
+        internal Texture2D BattleProjectile => battleProjectile;
         internal string Id => id;
         internal System.Collections.Generic.IEnumerable<CharacterAsset> RelatedForms =>
             evolutions.Append(battleForm).Where(form => form != null);

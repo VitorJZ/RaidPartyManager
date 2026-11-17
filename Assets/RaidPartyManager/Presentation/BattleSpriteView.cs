@@ -22,6 +22,7 @@ namespace RaidPartyManager.Presentation
         private VisualElement overhead;
         private readonly Profession profession;
         private readonly Texture2D attackSheet;
+        private Texture2D specialSheet;
         private readonly float idleOffset;
         private readonly float[] actionEnds;
         private readonly float impactTime;
@@ -37,14 +38,16 @@ namespace RaidPartyManager.Presentation
         public Texture2D Sheet { get; }
         public Image Figure => figure;
         public bool IsAlive => alive == true;
-        public bool HasWideAttack => attackSheet != null;
+        public bool HasWideAttack => attackSheet != null || specialSheet != null;
+        public bool FacesLeft { get; }
 
-        public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position)
+        public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position, bool facesLeft)
         {
             name = "profession-portrait-art";
             Sheet = sheet;
             this.attackSheet = attackSheet;
             this.profession = profession;
+            FacesLeft = facesLeft;
             idleOffset = position * 0.17f;
             var (ends, contactFrame) = profession switch
             {
@@ -54,7 +57,7 @@ namespace RaidPartyManager.Presentation
                 _ => (new[] { 0.07f, 0.15f, 0.27f, 0.42f, 0.57f, 0.68f, 0.77f, 0.88f }, 4)
             };
             actionEnds = ends;
-            impactTime = ends[contactFrame - 1];
+            impactTime = ends[(facesLeft ? 4 : contactFrame) - 1];
             pickingMode = PickingMode.Ignore;
             style.position = Position.Absolute;
             style.top = 26;
@@ -107,15 +110,18 @@ namespace RaidPartyManager.Presentation
             }
         }
 
-        public float ActionLength(ActionKind kind) => kind == ActionKind.Shield ? 0.48f : actionEnds[^1];
+        private bool SimpleGuard => action == ActionKind.Shield && specialSheet == null;
+        public float ActionLength => SimpleGuard ? 0.48f : actionEnds[^1];
 
-        public float PlayAction(ActionKind kind, double now, float scale, bool usesExternalEffect)
+        public float PlayAction(ActionKind kind, double now, float scale, bool usesExternalEffect, Texture2D special)
         {
             action = kind;
+            specialSheet = special;
+            displayedFrame = -1;
             actionScale = scale;
             this.usesExternalEffect = usesExternalEffect;
             SetMotion(Motion.Action, now);
-            return (action == ActionKind.Shield ? 0.16f : impactTime) * scale;
+            return (SimpleGuard ? 0.16f : impactTime) * scale;
         }
 
         public void SetBodyVisible(bool visible, bool keepLocalEffects = false)
@@ -160,7 +166,7 @@ namespace RaidPartyManager.Presentation
         public void UpdateFrame(double now)
         {
             float elapsed = Mathf.Max(0f, (float)(now - motionStart));
-            float actionLength = ActionLength(action);
+            float actionLength = ActionLength;
             if ((motion == Motion.Hit && elapsed >= HitEnds[^1]) ||
                 (motion == Motion.Action && elapsed >= actionLength * actionScale))
             {
@@ -185,7 +191,7 @@ namespace RaidPartyManager.Presentation
                     break;
                 case Motion.Action:
                     elapsed /= actionScale;
-                    bool guarding = action == ActionKind.Shield;
+                    bool guarding = SimpleGuard;
                     frame = guarding ? 2 * Columns + (elapsed < 0.12f ? 0 : elapsed < 0.36f ? 1 : 3)
                         : Columns + FrameAt(actionEnds, elapsed);
                     if (profession == Profession.Warrior && action == ActionKind.Attack)
@@ -202,7 +208,7 @@ namespace RaidPartyManager.Presentation
             }
             ShowFrame(frame);
             figure.tintColor = tint;
-            figure.style.translate = new Translate(offset, lift, 0f);
+            figure.style.translate = new Translate(FacesLeft ? -offset : offset, lift, 0f);
             if (effectProgress >= 0f || light >= 0f)
             {
                 effectProgress = light;
@@ -223,8 +229,9 @@ namespace RaidPartyManager.Presentation
             if (displayedFrame == frame)
                 return;
             displayedFrame = frame;
-            bool usingAttack = attackSheet != null && frame >= Columns && frame < 2 * Columns;
-            var texture = usingAttack ? attackSheet : Sheet;
+            var actionTexture = specialSheet ?? attackSheet;
+            bool usingAttack = actionTexture != null && frame >= Columns && frame < 2 * Columns;
+            var texture = usingAttack ? actionTexture : Sheet;
             int columns = usingAttack ? AttackColumns : Columns;
             int rows = usingAttack ? AttackRows : Rows;
             int index = usingAttack ? frame - Columns : frame;
@@ -244,7 +251,7 @@ namespace RaidPartyManager.Presentation
             float progress = effectProgress;
             float fade = Mathf.Sin(Mathf.Clamp01(progress * 1.2f + 0.12f) * Mathf.PI);
             var pen = context.painter2D;
-            var center = new Vector2(effects.contentRect.width * 0.72f, effects.contentRect.height * 0.52f);
+            var center = new Vector2(effects.contentRect.width * (FacesLeft ? 0.28f : 0.72f), effects.contentRect.height * 0.52f);
             pen.lineWidth = 1.65f;
             if (action == ActionKind.Shield)
             {
@@ -286,10 +293,12 @@ namespace RaidPartyManager.Presentation
             void Curve(Vector2 origin, Vector2 start, Vector2 handle, Vector2 end)
             {
                 pen.BeginPath();
-                pen.MoveTo(origin + start);
-                pen.QuadraticCurveTo(origin + handle, origin + end);
+                pen.MoveTo(origin + Facing(start));
+                pen.QuadraticCurveTo(origin + Facing(handle), origin + Facing(end));
                 pen.Stroke();
             }
+
+            Vector2 Facing(Vector2 point) => FacesLeft ? new Vector2(-point.x, point.y) : point;
 
             void Spark(Vector2 point, float radius)
             {

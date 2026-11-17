@@ -20,9 +20,15 @@ namespace RaidPartyManager.Presentation
 
         [SerializeField] private EncounterAsset encounter;
         [SerializeField] private Texture2D backpackIcon;
+        [SerializeField] private bool randomizeLineups = true;
         [SerializeField, Min(0.05f)] private float attackAnimationTimeScale = 1f;
 
         private static PartyRun playModeRun;
+        private static PartyRun playModeEnemies;
+        private static bool partyEdited;
+        private static bool enemiesEdited;
+        private readonly System.Random draftRandom = new System.Random();
+        private bool initialized;
 
         private readonly Dictionary<string, int> health = new Dictionary<string, int>();
         private readonly Dictionary<string, int> shields = new Dictionary<string, int>();
@@ -35,12 +41,15 @@ namespace RaidPartyManager.Presentation
             new Dictionary<string, (Label Attack, Label Defense, Label SpecialDefense)>();
         private readonly Dictionary<string, BattleSpriteView> battleSprites = new Dictionary<string, BattleSpriteView>();
         private readonly List<string> battleLog = new List<string>();
+        private readonly List<BattleEffectPlayback> impactEffects = new List<BattleEffectPlayback>();
 
         private VisualElement root;
         private Font localFont;
         private FontAsset localFontAsset;
         private EncounterData content;
         private PartyRun run;
+        private PartyRun enemyRun;
+        private IReadOnlyList<Combatant> preparedEnemies;
         private Phase phase;
         private BattleSession battle;
         private BattleLoadout battleLoadout;
@@ -63,9 +72,25 @@ namespace RaidPartyManager.Presentation
 
         // A new Play session must start fresh even when Unity skips domain reload.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetPlaySession() => playModeRun = null;
+        private static void ResetPlaySession()
+        {
+            playModeRun = playModeEnemies = null;
+            partyEdited = enemiesEdited = false;
+        }
 
         private void OnEnable()
+        {
+            if (initialized)
+                Initialize();
+        }
+
+        private void Start()
+        {
+            initialized = true;
+            Initialize();
+        }
+
+        private void Initialize()
         {
             root = GetComponent<UIDocument>().rootVisualElement;
             if (encounter == null)
@@ -78,23 +103,38 @@ namespace RaidPartyManager.Presentation
             statusTooltip = new BattleStatusTooltip(root);
 
             content = encounter.ToData();
-            run = playModeRun ??= new PartyRun(content.Party.Select(unit =>
-                new PartyMemberStart(unit.Id, unit.Character, unit.Position, unit.Health, unit.StartingStatuses)), content.StartingEquipment);
+            run = playModeRun ??= new PartyRun(RosterStart(Side.Party), content.StartingEquipment);
+            enemyRun = playModeEnemies ??= new PartyRun(RosterStart(Side.Enemy), Array.Empty<EquipmentDefinition>());
             ResetDemo();
+        }
+
+        private IEnumerable<PartyMemberStart> RosterStart(Side side)
+        {
+            var formation = randomizeLineups ? content.Draft(side, draftRandom) : side == Side.Party ? content.Party : content.Enemies;
+            return formation.Select(unit => new PartyMemberStart(
+                unit.Id, unit.Character, unit.Position, unit.Health, unit.StartingStatuses));
         }
 
         private void OnDisable()
         {
             ClearAction();
+            ClearImpactEffects();
             statusTooltip?.Hide();
             HideEquipmentTooltip();
             PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
         }
 
-        private void ResetDemo()
+        private void ResetDemo(bool reroll = false)
         {
             ClearAction();
-            run.ResetEncounter();
+            ClearImpactEffects();
+            if (reroll && randomizeLineups && !partyEdited)
+                run.ResetRoster(RosterStart(Side.Party));
+            else
+                run.ResetEncounter();
+            if (reroll && randomizeLineups && !enemiesEdited)
+                enemyRun.ResetRoster(RosterStart(Side.Enemy));
+            preparedEnemies = enemyRun.CaptureFormation(Side.Enemy);
             phase = Phase.Preparation;
             battle = null;
             battleLoadout = null;
@@ -115,7 +155,7 @@ namespace RaidPartyManager.Presentation
         {
             if (phase != Phase.Preparation || !run.CanStartBattle)
                 return;
-            var request = run.BeginBattle(content.Enemies, content.TickLimit, content.VictoryReward,
+            var request = run.BeginBattle(preparedEnemies, content.TickLimit, content.VictoryReward,
                 content.RecruitmentPool, content.CharacterCatalog);
             battle = new BattleSimulator().Start(request);
             ReadPartyStats();
@@ -176,6 +216,17 @@ namespace RaidPartyManager.Presentation
             if (actionPlayback != null)
                 actionPlayback.Draw(now, actionLayer, unitCards.GetValueOrDefault(visualAction.ActorId),
                     unitCards.GetValueOrDefault(visualAction.TargetId));
+            for (int i = impactEffects.Count - 1; i >= 0; i--)
+            {
+                var effect = impactEffects[i];
+                if (effect.ActiveAt(now))
+                    effect.Draw(actionLayer, unitCards.GetValueOrDefault(effect.TargetId), now);
+                else
+                {
+                    effect.Clear();
+                    impactEffects.RemoveAt(i);
+                }
+            }
         }
 
         private void AdvancePlayback(double now)
@@ -252,6 +303,8 @@ namespace RaidPartyManager.Presentation
                         Render();
                     else
                         unitCards[entry.TargetId].Refresh(entry.TargetHealth, entry.TargetShield, entry.StatusStacks);
+                    if (entry.Detail != "未命中" && EffectArt(entry) is Texture2D effect)
+                        impactEffects.Add(new BattleEffectPlayback(entry.TargetId, effect, now, AnimationScale));
                 }
 
                 if (!actionLogged)
@@ -269,7 +322,14 @@ namespace RaidPartyManager.Presentation
         }
 
         private bool HasActiveAnimation(double now) => actionPlayback != null ||
+            impactEffects.Any(effect => effect.ActiveAt(now)) ||
             battleSprites.Values.Any(sprite => sprite.panel != null && sprite.IsReactingAt(now));
+
+        private float AnimationScale => Mathf.Max(0.05f, attackAnimationTimeScale);
+
+        private Texture2D EffectArt(BattleEvent entry) =>
+            entry.VisualCue != BattleVisualCue.None && entry.ActorId != null && appearances.TryGetValue(entry.ActorId, out var actor)
+                ? content.BattleEffectFor(actor.Character.Id, entry.VisualCue) : null;
 
         private bool BeginAction(BattleEvent entry, double now)
         {
@@ -287,14 +347,15 @@ namespace RaidPartyManager.Presentation
                 if (entry.AttackReach == AttackReach.Melee)
                     walking = sprite != null ? content.BattleWalkFor(character.Id) : null;
                 else
-                    projectile = content.ProjectileFor(character.Profession);
+                    projectile = content.ProjectileFor(character);
             }
             if (sprite == null && projectile == null)
                 return false;
 
-            float scale = Mathf.Max(0.05f, attackAnimationTimeScale);
             actionPlayback = new BattleActionPlayback(sprite, entry.ActionKind, walking, projectile,
-                character.Profession == Profession.Archer, entry.Detail == "未命中", now, scale);
+                character.Profession == Profession.Archer, entry.Detail == "未命中", now, AnimationScale,
+                content.BattleSpecialFor(character.Id, entry.VisualCue), EffectArt(entry) != null,
+                entry.VisualCue == BattleVisualCue.CrossbowCritical);
             visualAction = entry;
             waitingForImpact = true;
             return true;
@@ -305,6 +366,13 @@ namespace RaidPartyManager.Presentation
             actionPlayback?.Clear();
             actionPlayback = null;
             waitingForImpact = false;
+        }
+
+        private void ClearImpactEffects()
+        {
+            foreach (var effect in impactEffects)
+                effect.Clear();
+            impactEffects.Clear();
         }
 
         private void RecordBattleLine(string line, BattleEventKind kind)
@@ -380,7 +448,11 @@ namespace RaidPartyManager.Presentation
             phaseLabel.style.marginRight = 8;
             tools.Add(phaseLabel);
             if (phase == Phase.Preparation || phase == Phase.Settlement)
+            {
                 tools.Add(PrototypeStyle.Button("角色编辑", "open-party-editor", OpenPartyEditor));
+                if (content.EnemyRoster.Count > 0)
+                    tools.Add(PrototypeStyle.Button("敌方编辑", "open-enemy-editor", OpenEnemyEditor));
+            }
             if (phase == Phase.Preparation)
             {
                 var start = PrototypeStyle.Button("开始自动战斗", "start", StartBattle, true);
@@ -390,7 +462,7 @@ namespace RaidPartyManager.Presentation
             if (phase == Phase.RoundBreak)
                 tools.Add(PrototypeStyle.Button("下回合", "next-round", ContinueRound, true));
             if (phase == Phase.Settlement)
-                tools.Add(PrototypeStyle.Button("重置演练", "reset", ResetDemo, true));
+                tools.Add(PrototypeStyle.Button("重置演练", "reset", () => ResetDemo(reroll: true), true));
             tools.Add(PrototypeSceneMenu.ReturnButton());
             header.Add(tools);
             page.Add(header);
@@ -430,7 +502,24 @@ namespace RaidPartyManager.Presentation
             statusTooltip.Hide();
             HideEquipmentTooltip();
             root.Clear();
-            root.Add(new PartyEditorView(run, content.CharacterCatalog, EditorPosition, content.PortraitFor, content.IconFor, Render));
+            root.Add(new PartyEditorView(run, content.CharacterCatalog, EditorPosition, content.PortraitFor, content.IconFor,
+                Render, edited: () => partyEdited = true));
+        }
+
+        private void OpenEnemyEditor()
+        {
+            if (phase != Phase.Preparation && phase != Phase.Settlement)
+                return;
+
+            statusTooltip.Hide();
+            HideEquipmentTooltip();
+            root.Clear();
+            root.Add(new PartyEditorView(enemyRun, content.EnemyRoster, member => member.Position, content.PortraitFor,
+                content.IconFor, () =>
+                {
+                    preparedEnemies = enemyRun.CaptureFormation(Side.Enemy);
+                    Render();
+                }, Side.Enemy, () => enemiesEdited = true));
         }
 
         private int? EditorPosition(MemberView member)
@@ -497,7 +586,7 @@ namespace RaidPartyManager.Presentation
             }
             else
             {
-                var units = preparing ? content.Enemies : battle.Formation;
+                var units = preparing ? preparedEnemies : battle.Formation;
                 var unit = units.FirstOrDefault(candidate => candidate.Side == side && candidate.Position == position);
                 id = unit?.Id;
                 var appearance = id != null && !preparing ? appearances[id] : (unit?.Character, unit?.Stats.Health ?? 0);
@@ -510,12 +599,12 @@ namespace RaidPartyManager.Presentation
                 ? character.Skill.Name : PersonalityText(character.Personality);
             int shield = !preparing && phase != Phase.Settlement && id != null ? shields.GetValueOrDefault(id) : 0;
             BattleSpriteView sprite = null;
-            var sheet = side == Side.Party ? content.BattleSpriteFor(character?.Id) : null;
+            var sheet = content.BattleSpriteFor(character?.Id);
             if (sheet != null)
             {
                 if (!battleSprites.TryGetValue(id, out sprite) || sprite.Sheet != sheet)
                     battleSprites[id] = sprite = new BattleSpriteView(sheet, content.BattleAttackFor(character.Id),
-                        character.Profession, position);
+                        character.Profession, position, side == Side.Enemy);
                 sprite.RemoveFromHierarchy();
             }
             var card = new BattleUnitCard(side, position, id, character, content.PortraitFor(character?.Id),

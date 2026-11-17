@@ -15,6 +15,7 @@ namespace RaidPartyManager.Presentation
         private readonly Texture2D projectile;
         private readonly bool isArrow;
         private readonly bool missed;
+        private readonly bool critical;
         private readonly double startedAt;
         private readonly double poseStart;
         private readonly double releaseAt;
@@ -26,26 +27,29 @@ namespace RaidPartyManager.Presentation
         public double FinishAt { get; }
 
         public BattleActionPlayback(BattleSpriteView sprite, ActionKind kind, Texture2D walkSheet,
-            Texture2D projectile, bool isArrow, bool missed, double now, float scale)
+            Texture2D projectile, bool isArrow, bool missed, double now, float scale,
+            Texture2D special, bool hasImpactEffect, bool critical)
         {
             this.sprite = sprite;
             this.walkSheet = walkSheet;
             this.projectile = projectile;
             this.isArrow = isArrow;
             this.missed = missed;
+            this.critical = critical;
             startedAt = now;
             float travel = walkSheet != null ? WalkTime * scale : 0f;
             float poseScale = scale * PosePace;
             poseStart = now + travel;
-            float windup = sprite?.PlayAction(kind, poseStart, poseScale, projectile != null || walkSheet != null)
+            float windup = sprite?.PlayAction(kind, poseStart, poseScale,
+                projectile != null || walkSheet != null || hasImpactEffect, special)
                 ?? 0.20f * scale;
             releaseAt = poseStart + windup;
             ImpactAt = releaseAt + (projectile == null ? 0f : (isArrow ? ArrowFlightTime : OrbFlightTime) * scale);
-            returnAt = sprite == null ? ImpactAt : poseStart + sprite.ActionLength(kind) * poseScale;
+            returnAt = sprite == null ? ImpactAt : poseStart + sprite.ActionLength * poseScale;
             FinishAt = System.Math.Max(returnAt + travel, ImpactAt);
             if (projectile != null || walkSheet != null)
                 movingImage = MakeImage(projectile != null ? "battle-projectile" : "battle-moving-character");
-            if (walkSheet == null && sprite?.HasWideAttack == true && kind != ActionKind.Shield)
+            if (walkSheet == null && sprite?.HasWideAttack == true && (kind != ActionKind.Shield || special != null))
             {
                 standingPose = MakeImage("battle-attack-pose");
                 sprite.SetBodyVisible(false, keepLocalEffects: true);
@@ -130,6 +134,7 @@ namespace RaidPartyManager.Presentation
                 end -= direction * width * 0.43f;
             var center = Vector2.Lerp(start, end, progress);
             SetImage(movingImage, projectile, new Rect(0, 0, projectile.width, projectile.height));
+            movingImage.tintColor = critical ? new Color(1f, 0.34f, 0.28f) : Color.white;
             movingImage.style.rotate = new Rotate(new Angle(isArrow ? Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg : 0f));
             SetBounds(movingImage, new Rect(center - new Vector2(width, height) * 0.5f, new Vector2(width, height)));
         }
@@ -158,7 +163,7 @@ namespace RaidPartyManager.Presentation
                 movingImage.tintColor = sprite.Figure.tintColor;
                 size = sprite.PoseSize(source.size);
             }
-            float orientation = now >= returnAt ? -direction : direction;
+            float orientation = (now >= returnAt ? -direction : direction) * (sprite.FacesLeft ? -1f : 1f);
             movingImage.style.scale = new Scale(new Vector3(orientation, 1f, 1f));
             SetBounds(movingImage, new Rect(x - size.x * 0.5f, source.yMax - size.y, size.x, size.y));
         }

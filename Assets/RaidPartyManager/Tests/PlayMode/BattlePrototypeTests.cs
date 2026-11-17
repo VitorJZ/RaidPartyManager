@@ -13,10 +13,88 @@ namespace RaidPartyManager.Tests
 {
     public sealed class BattlePrototypeTests
     {
+        private const BindingFlags PrivateInstance = BindingFlags.NonPublic | BindingFlags.Instance;
+        private bool useAuthoredFixture;
+
         [SetUp]
-        public void StartWithFreshPlaySession() =>
+        public void StartWithFreshPlaySession()
+        {
+            useAuthoredFixture = true;
+            ResetRun();
+            SceneManager.sceneLoaded += ConfigureLineups;
+        }
+
+        [TearDown]
+        public void RemoveLineupFixture() => SceneManager.sceneLoaded -= ConfigureLineups;
+
+        private static void ResetRun() =>
             typeof(BattlePrototype).GetMethod("ResetPlaySession", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, null);
+
+        private void ConfigureLineups(Scene scene, LoadSceneMode mode)
+        {
+            if (useAuthoredFixture && scene.name == "BattlePrototype")
+                typeof(BattlePrototype).GetField("randomizeLineups", PrivateInstance)
+                    .SetValue(Object.FindAnyObjectByType<BattlePrototype>(), false);
+        }
+
+        [UnityTest]
+        public IEnumerator DefaultDraftsAndManualSelectionsReachTheAnimatedBattle()
+        {
+            useAuthoredFixture = false;
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            UseFastAttacks(scene);
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var defaultParty = RosterNames(root, "party-positions", "combatant-name");
+            Assert.That(defaultParty.Distinct().Count(), Is.EqualTo(4));
+
+            Press(root, "open-enemy-editor");
+            var defaultEnemies = RosterNames(root, "editor-positions", "character-name");
+            Assert.That(defaultEnemies.Distinct().Count(), Is.EqualTo(4));
+            Press(root, "edit-member-enemy-1");
+            var enemyCandidates = root.Q("replacement-candidates").Query<Button>().ToList();
+            Assert.That(enemyCandidates.Count, Is.EqualTo(9));
+            var enemy = enemyCandidates.First(button => button.enabledInHierarchy);
+            string chosenEnemy = enemy.Query<Label>().First().text;
+            Press(root, enemy.name);
+            Press(root, "back-party-editor");
+
+            Press(root, "open-party-editor");
+            var front = root.Q("edit-member-ally-1");
+            yield return null;
+            using (var right = PointerUpEvent.GetPooled(new Event
+                   { type = EventType.MouseUp, button = 1, mousePosition = front.worldBound.center }))
+                Send(front, right);
+            var ally = root.Q("replacement-candidates").Query<Button>().ToList().First(button => button.enabledInHierarchy);
+            string chosenAlly = ally.Query<Label>().First().text;
+            Press(root, ally.name);
+            Press(root, "back-party-editor");
+
+            Press(root, "start");
+            Assert.That(root.Q("party-position-1").Q<Label>("combatant-name").text, Is.EqualTo(chosenAlly));
+            Assert.That(root.Q("enemy-position-1").Q<Label>("combatant-name").text, Is.EqualTo(chosenEnemy));
+            Assert.That(RosterNames(root, "enemy-positions", "combatant-name").Distinct().Count(), Is.EqualTo(4));
+            var enemySprites = root.Q("enemy-positions").Query<Image>("battle-sprite").ToList();
+            Assert.That(enemySprites.Count, Is.EqualTo(4));
+            Assert.That(enemySprites.Select(image => image.image.name), Is.All.EndsWith("-Combat"));
+
+            var models = enemySprites.Select(image => image.image.name.Replace("-Combat", "-")).ToArray();
+            bool enemyPlayed = false;
+            float deadline = Time.realtimeSinceStartup + 7f;
+            while (!enemyPlayed && Time.realtimeSinceStartup < deadline)
+            {
+                foreach (var overlay in root.Q("battle-action-layer").Query<Image>().ToList())
+                    if (overlay.image != null && models.Any(prefix => overlay.image.name.StartsWith(prefix)))
+                        enemyPlayed = true;
+                yield return null;
+            }
+            Assert.That(enemyPlayed, Is.True);
+        }
+
+        private static string[] RosterNames(VisualElement root, string row, string label) =>
+            root.Q(row).Query<Label>(label).ToList().Select(entry => entry.text).ToArray();
 
         [UnityTest]
         public IEnumerator EquipmentPersistsAcrossMainMenuTemplateAndLeavingABattle()
@@ -428,7 +506,7 @@ namespace RaidPartyManager.Tests
             character.SetValue(starters[0], recruits.Single(asset => asset.name == "TianGong"));
             character.SetValue(starters[1], recruits.Single(asset => asset.name == "IntelligenceOfficer"));
             scene.enabled = false;
-            StartWithFreshPlaySession();
+            ResetRun();
             encounterField.SetValue(scene, encounter);
             scene.enabled = true;
 
@@ -537,7 +615,7 @@ namespace RaidPartyManager.Tests
             hunter.GetType().GetField("health", fields).SetValue(hunter, 100);
             hunterCharacter.SetValue(enemies[1], hunter);
             scene.enabled = false;
-            StartWithFreshPlaySession();
+            ResetRun();
             encounterField.SetValue(scene, encounter);
             scene.enabled = true;
 
@@ -705,7 +783,7 @@ namespace RaidPartyManager.Tests
             enemiesField.SetValue(encounter, singleEnemy);
 
             scene.enabled = false;
-            StartWithFreshPlaySession();
+            ResetRun();
             encounterField.SetValue(scene, encounter);
             scene.enabled = true;
             var root = scene.GetComponent<UIDocument>().rootVisualElement;

@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyRoadBrute
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyRoadBrute
+  displayName: "拦路蛮兵"
+  portrait: {fileID: 2800000, guid: 112b466a48544a338300177e393064c2, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: da3c943544204b888b0c376640dcc784, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 2bdbc462d82741afbfdac3e03b8524b3, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 4353bec336f04d9da0ff5bd040c9179c, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 8fe453fb8a8247f591b97a0330237709, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 29364e46e2dc4e95b4db47cd49c89c51, type: 3}
+  profession: 0
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 28
+  traitPower: 0
+  traitText: "给自己叠加3层盛气"
+  personality: 2
+  attack: 4
+  defense: 2
+  specialDefense: 1
+  health: 15
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

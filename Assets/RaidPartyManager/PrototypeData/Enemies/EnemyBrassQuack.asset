@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyBrassQuack
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyBrassQuack
+  displayName: "铜铃庸医"
+  portrait: {fileID: 2800000, guid: bb77dbc2540a476881499482f72bda82, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: d250a3ec58eb4f56a8a022e44f7c1635, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 8b9a69c793064e1d8124d0784a341cc5, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 64a475d394b045a1a0b4a9c8f55df0c1, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 8f8a08eaff2f48d49a646db59d144321, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 65edce65a82d4d66a0e200bbc1751ede, type: 3}
+  battleStrikeEffect: {fileID: 2800000, guid: 23ea98ac8aa345109f2e1a500e4b8923, type: 3}
+  profession: 3
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 34
+  traitPower: 4
+  traitText: "攻击造成真实伤害"
+  personality: 3
+  attack: 2
+  defense: 1
+  specialDefense: 2
+  health: 11
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 4
+  hasSkill: 0

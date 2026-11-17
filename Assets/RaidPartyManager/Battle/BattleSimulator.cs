@@ -61,6 +61,7 @@ namespace RaidPartyManager.Battle
             public readonly HashSet<string> DamagedTargets = new HashSet<string>();
             public bool Revived;
             public bool ResolvingDamageHeal;
+            public int BellRings;
 
             public CharacterTrait Trait => CopiedTrait ?? Input.Character.Trait;
             public int TraitPower => CopiedTrait.HasValue ? CopiedTraitPower : Input.Character.TraitPower;
@@ -350,6 +351,8 @@ namespace RaidPartyManager.Battle
 
         private void Act(Unit actor)
         {
+            if (actor.Input.Side == Side.Enemy && TryEnemyTurn(actor))
+                return;
             var options = new List<ActionOption>();
             var skill = actor.Input.Character.Skill;
             if (skill != null && Tick >= actor.SkillReadyAt)
@@ -477,7 +480,8 @@ namespace RaidPartyManager.Battle
 
         private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,
             int amount = 0, DecisionReason reason = DecisionReason.Default, string detail = null,
-            CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false)
+            CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false,
+            BattleVisualCue visual = BattleVisualCue.None)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
@@ -486,7 +490,7 @@ namespace RaidPartyManager.Battle
                 ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
                 target.Health, target.Shield, StatusText(target), detail, form, form != null ? target.Stats.Health : 0, statuses,
-                loadout, RecordPartyStatChanges(), reach));
+                loadout, RecordPartyStatChanges(), reach, visual));
         }
     }
 }

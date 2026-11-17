@@ -16,10 +16,14 @@ namespace RaidPartyManager.Content
         public int TickLimit { get; }
         public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
         public IReadOnlyList<CharacterDefinition> CharacterCatalog { get; }
+        public IReadOnlyList<CharacterDefinition> EnemyRoster { get; }
+        private readonly CharacterDefinition[] partyRoster;
         private readonly IReadOnlyDictionary<string, Texture2D> portraits;
         private readonly IReadOnlyDictionary<string, Texture2D> battleSpriteSheets;
         private readonly IReadOnlyDictionary<string, Texture2D> battleAttackSheets;
         private readonly IReadOnlyDictionary<string, Texture2D> battleWalkSheets;
+        private readonly IReadOnlyDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)> battleExtras;
+        private readonly IReadOnlyDictionary<string, Texture2D> battleProjectiles;
         private readonly IReadOnlyDictionary<string, Texture2D> equipmentIcons;
         private readonly Texture2D[] statusIcons;
         private readonly Texture2D arrowProjectile;
@@ -30,7 +34,10 @@ namespace RaidPartyManager.Content
             IReadOnlyDictionary<string, Texture2D> portraits, IReadOnlyDictionary<string, Texture2D> equipmentIcons,
             CharacterDefinition[] recruitmentPool, CharacterDefinition[] characterCatalog, Texture2D[] statusIcons,
             IReadOnlyDictionary<string, Texture2D> battleSpriteSheets, IReadOnlyDictionary<string, Texture2D> battleAttackSheets,
-            IReadOnlyDictionary<string, Texture2D> battleWalkSheets, Texture2D arrowProjectile, Texture2D magicProjectile)
+            IReadOnlyDictionary<string, Texture2D> battleWalkSheets, Texture2D arrowProjectile, Texture2D magicProjectile,
+            CharacterDefinition[] enemyRoster,
+            IReadOnlyDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)> battleExtras,
+            IReadOnlyDictionary<string, Texture2D> battleProjectiles)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
@@ -42,12 +49,34 @@ namespace RaidPartyManager.Content
             this.battleSpriteSheets = battleSpriteSheets;
             this.battleAttackSheets = battleAttackSheets;
             this.battleWalkSheets = battleWalkSheets;
+            this.battleExtras = battleExtras;
+            this.battleProjectiles = battleProjectiles;
             this.equipmentIcons = equipmentIcons;
             this.statusIcons = statusIcons;
             this.arrowProjectile = arrowProjectile;
             this.magicProjectile = magicProjectile;
             RecruitmentPool = Array.AsReadOnly(recruitmentPool);
             CharacterCatalog = Array.AsReadOnly(characterCatalog);
+            EnemyRoster = Array.AsReadOnly(enemyRoster);
+            partyRoster = characterCatalog.Where(character => character.RosterNumber > 0).ToArray();
+        }
+
+        public IReadOnlyList<Combatant> Draft(Side side, System.Random random)
+        {
+            var candidates = (side == Side.Party ? partyRoster : EnemyRoster).ToArray();
+            if (candidates.Length < Rules.Positions)
+                return side == Side.Party ? Party : Enemies;
+
+            var lineup = new Combatant[Rules.Positions];
+            for (int i = 0; i < lineup.Length; i++)
+            {
+                int pick = random.Next(i, candidates.Length);
+                (candidates[i], candidates[pick]) = (candidates[pick], candidates[i]);
+                var character = candidates[i];
+                string id = $"{(side == Side.Party ? "ally" : "enemy")}-{i + 1}";
+                lineup[i] = new Combatant(id, character, side, i + 1, character.BaseStats, character.BaseStats.Health);
+            }
+            return lineup;
         }
 
         public Texture2D IconFor(string itemId) =>
@@ -68,12 +97,34 @@ namespace RaidPartyManager.Content
         public Texture2D BattleWalkFor(string definitionId) =>
             definitionId != null && battleWalkSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
 
-        public Texture2D ProjectileFor(Profession profession) => profession switch
+        public Texture2D BattleSpecialFor(string definitionId, BattleVisualCue cue) =>
+            cue != BattleVisualCue.None && cue != BattleVisualCue.QuackStrike &&
+            battleExtras.TryGetValue(definitionId, out var art) ? art.Body : null;
+
+        public Texture2D BattleEffectFor(string definitionId, BattleVisualCue cue)
         {
-            Profession.Archer => arrowProjectile,
-            Profession.Mage => magicProjectile,
-            _ => null
-        };
+            if (!battleExtras.TryGetValue(definitionId, out var art))
+                return null;
+            return cue switch
+            {
+                BattleVisualCue.None or BattleVisualCue.CeramicPierce => null,
+                BattleVisualCue.BellWave => art.Finale,
+                BattleVisualCue.QuackStrike => art.Strike,
+                _ => art.Effect
+            };
+        }
+
+        public Texture2D ProjectileFor(CharacterDefinition character)
+        {
+            if (battleProjectiles.TryGetValue(character.Id, out var projectile))
+                return projectile;
+            return character.Profession switch
+            {
+                Profession.Archer => arrowProjectile,
+                Profession.Mage => magicProjectile,
+                _ => null
+            };
+        }
     }
 
     [CreateAssetMenu(menuName = "Raid Party Manager/Encounter")]
@@ -115,6 +166,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private UnitEntry[] party = Array.Empty<UnitEntry>();
         [SerializeField] private UnitEntry[] enemies = Array.Empty<UnitEntry>();
         [SerializeField] private CharacterAsset[] additionalRecruits = Array.Empty<CharacterAsset>();
+        [SerializeField] private CharacterAsset[] enemyRoster = Array.Empty<CharacterAsset>();
         [SerializeField] private Texture2D[] statusIcons = Array.Empty<Texture2D>();
         [SerializeField] private Texture2D arrowProjectile;
         [SerializeField] private Texture2D magicProjectile;
@@ -131,8 +183,9 @@ namespace RaidPartyManager.Content
             _ = new BattleRequest("encounter-validation", partyInputs.Concat(enemyInputs), tickLimit);
             var recruits = party.Select(entry => entry.Character).Concat(additionalRecruits)
                 .Where(character => character != null).Distinct().ToArray();
+            var enemyChoices = enemyRoster.Where(character => character != null).Distinct().ToArray();
             var catalog = new Dictionary<string, CharacterAsset>(StringComparer.Ordinal);
-            var pending = new Queue<CharacterAsset>(recruits.Concat(enemies.Select(entry => entry.Character)));
+            var pending = new Queue<CharacterAsset>(recruits.Concat(enemies.Select(entry => entry.Character)).Concat(enemyChoices));
             while (pending.Count > 0)
             {
                 var character = pending.Dequeue();
@@ -159,7 +212,11 @@ namespace RaidPartyManager.Content
                 victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits, equipmentIcons,
                 recruits.Select(character => character.ToDefinition()).ToArray(),
                 catalog.Values.Select(character => character.ToDefinition()).ToArray(), statusIcons, battleSpriteSheets,
-                battleAttackSheets, battleWalkSheets, arrowProjectile, magicProjectile);
+                battleAttackSheets, battleWalkSheets, arrowProjectile, magicProjectile,
+                enemyChoices.Select(character => character.ToDefinition()).ToArray(),
+                catalog.Values.ToDictionary(character => character.Id, character => character.BattleExtras, StringComparer.Ordinal),
+                catalog.Values.Where(character => character.BattleProjectile != null)
+                    .ToDictionary(character => character.Id, character => character.BattleProjectile, StringComparer.Ordinal));
         }
     }
 }

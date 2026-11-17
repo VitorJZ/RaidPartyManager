@@ -51,6 +51,16 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e9883a6899f84fb98ba85e36096bdff9, type: 2}
   - {fileID: 11400000, guid: 00b94dc802544dc3895cf647ebc0884c, type: 2}
   - {fileID: 11400000, guid: 57dfd33b56844fbea294cf01807fc0a6, type: 2}
+  enemyRoster:
+  - {fileID: 11400000, guid: 94588175931f4c14a7340144b069c146, type: 2}
+  - {fileID: 11400000, guid: b588a08f656249bab3111e6a0b15744c, type: 2}
+  - {fileID: 11400000, guid: 288d9fcc36c14eefa780971085b1f3ff, type: 2}
+  - {fileID: 11400000, guid: ee7fad7ba4774fafa1e7ffb940220c87, type: 2}
+  - {fileID: 11400000, guid: 273965c8b6634d9694e4c24aa85d4038, type: 2}
+  - {fileID: 11400000, guid: 843d01eb3d3c48c5a4f7bb71e93d70dc, type: 2}
+  - {fileID: 11400000, guid: 284998e0007c44de9cbd13c2915fa46e, type: 2}
+  - {fileID: 11400000, guid: 6f475524c43844328a80a1a822adbf11, type: 2}
+  - {fileID: 11400000, guid: 4012770c566048028c627e396970c3cf, type: 2}
   statusIcons:
   - {fileID: 2800000, guid: a82a7b25f01b1bc4d8f57719079638c0, type: 3}
   - {fileID: 2800000, guid: c3db1f960c157b24c81aaaa99c08e2e3, type: 3}

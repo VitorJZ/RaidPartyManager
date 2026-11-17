@@ -9,7 +9,8 @@ namespace RaidPartyManager.Presentation
     internal sealed class PartyReplacementPopup : VisualElement
     {
         public PartyReplacementPopup(CharacterDefinition outgoing, IReadOnlyList<CharacterDefinition> roster,
-            HashSet<string> inParty, Func<string, Texture2D> portraitFor, Action<CharacterDefinition> select, Action close)
+            HashSet<string> inParty, Func<string, Texture2D> portraitFor, Action<CharacterDefinition> select, Action close,
+            Side side = Side.Party)
         {
             name = "party-replacement";
             style.width = Length.Percent(90);
@@ -27,7 +28,8 @@ namespace RaidPartyManager.Presentation
             heading.Add(PrototypeStyle.Text($"替换 {outgoing.Name}", 22));
             heading.Add(PrototypeStyle.Button("关闭", "close-party-replacement", close));
             Add(heading);
-            var instructions = PrototypeStyle.Text("选择一名未入队的角色。原队员的装备会放回共享背包。", 12, PrototypeStyle.Muted);
+            var instructions = PrototypeStyle.Text(side == Side.Party ? "选择一名未入队的角色。原队员的装备会放回共享背包。"
+                : "选择一名当前未上阵的敌人。", 12, PrototypeStyle.Muted);
             instructions.style.marginTop = 2;
             instructions.style.marginBottom = 8;
             Add(instructions);
@@ -40,11 +42,11 @@ namespace RaidPartyManager.Presentation
             cards.style.flexWrap = Wrap.Wrap;
             list.Add(cards);
             foreach (var character in roster)
-                cards.Add(Candidate(character, inParty.Contains(character.Id), portraitFor(character.Id), select));
+                cards.Add(Candidate(character, inParty.Contains(character.Id), portraitFor(character.Id), select, side));
         }
 
         private static Button Candidate(CharacterDefinition character, bool inParty, Texture2D portrait,
-            Action<CharacterDefinition> select)
+            Action<CharacterDefinition> select, Side side)
         {
             var button = PrototypeStyle.Button("", $"replace-with-{character.Id}", () => select(character));
             button.style.width = Length.Percent(18.7f);
@@ -66,7 +68,7 @@ namespace RaidPartyManager.Presentation
             title.style.marginTop = 2;
             PrototypeStyle.Middle(title);
             button.Add(title);
-            var state = PrototypeStyle.Text(inParty ? "已入队" : $"{character.Stage} 阶", 11,
+            var state = PrototypeStyle.Text(inParty ? "已上阵" : side == Side.Party ? $"{character.Stage} 阶" : "", 11,
                 inParty ? PrototypeStyle.Muted : PrototypeStyle.Accent);
             state.pickingMode = PickingMode.Ignore;
             PrototypeStyle.Middle(state);

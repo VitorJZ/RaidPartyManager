@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyRearHunter
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyRearHunter
+  displayName: "绕后猎手"
+  portrait: {fileID: 2800000, guid: dc9b7a505ed54ec6af12cd84843300df, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 94556d8212164ee9bc9e95abf2f39fe2, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 5c4341e4955343ab8527a4ced32d3e54, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 89b25b33730845fa838e7bb9e3d33c9c, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 7023c7131cb04345a8237cf1695c30fd, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 2e879b916c144f3a8622e4f85b6df973, type: 3}
+  profession: 0
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 31
+  traitPower: 0
+  traitText: "有70%概率攻击玩家队伍最后的角色"
+  personality: 4
+  attack: 4
+  defense: 1
+  specialDefense: 1
+  health: 18
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

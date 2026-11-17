@@ -12,7 +12,8 @@ namespace RaidPartyManager.Domain
         MissingHealthDamage, EscalatingAttack, PermanentAttackOnKill, IgnoreMagicDefense, LightningChant,
         Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, BlessAlly, RevealEnemies,
         PiercingArrow, BorrowAllyAttack, HealAlly, FirstDamageToTarget, HealOnDamage, DrawAttacks,
-        ExposeMeleeAttacker, GoldOnSurvival, AccessoryOnSurvival, ShopDiscount
+        ExposeMeleeAttacker, GoldOnSurvival, AccessoryOnSurvival, ShopDiscount,
+        EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack
     }
     public enum Personality { Aggressive, Cautious, Reckless, Gentle, Cooperative, Calm }
     public enum Side { Party, Enemy }
@@ -22,6 +23,11 @@ namespace RaidPartyManager.Domain
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
     public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth }
     public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged }
+    public enum BattleVisualCue
+    {
+        None, WarCry, CeramicPierce, CeramicSplash, BellRing, BellWave, RearAmbush,
+        ResolveGuard, CrossbowCritical, QuackHeal, QuackStrike
+    }
 
     public static class Rules
     {
@@ -279,13 +285,15 @@ namespace RaidPartyManager.Domain
         public BattleLoadout Loadout { get; }
         public IReadOnlyList<KeyValuePair<string, Stats>> PartyStatChanges { get; }
         public AttackReach AttackReach { get; }
+        public BattleVisualCue VisualCue { get; }
 
         public BattleEvent(int tick, BattleEventKind kind, string actorId = null, string targetId = null,
             string actionName = null, ActionKind actionKind = ActionKind.Attack,
             DecisionReason reason = DecisionReason.Default, int amount = 0, int targetHealth = 0, int targetShield = 0,
             string targetStatuses = null, string detail = null, CharacterDefinition form = null, int maximumHealth = 0,
             IReadOnlyList<StatusStack> statusStacks = null, BattleLoadout loadout = null,
-            IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified)
+            IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified,
+            BattleVisualCue visualCue = BattleVisualCue.None)
         {
             Tick = tick;
             Kind = kind;
@@ -305,6 +313,7 @@ namespace RaidPartyManager.Domain
             Loadout = loadout;
             PartyStatChanges = partyStatChanges;
             AttackReach = attackReach;
+            VisualCue = visualCue;
         }
     }
 

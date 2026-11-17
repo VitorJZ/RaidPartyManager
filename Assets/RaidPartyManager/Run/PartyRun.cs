@@ -91,20 +91,35 @@ namespace RaidPartyManager.Run
 
         public PartyRun(IEnumerable<PartyMemberStart> startingMembers, IEnumerable<EquipmentDefinition> startingEquipment)
         {
+            members.AddRange(ValidateRoster(startingMembers));
+            foreach (var equipment in startingEquipment)
+                AddEquipment(equipment);
+        }
+
+        private static List<Member> ValidateRoster(IEnumerable<PartyMemberStart> startingMembers)
+        {
+            var roster = new List<Member>();
             foreach (var entry in startingMembers)
             {
                 if (string.IsNullOrWhiteSpace(entry.Id) || entry.Character == null || !Rules.IsPosition(entry.Position) ||
                     entry.Health < 0 || entry.Health > entry.Character.BaseStats.Health ||
-                    members.Any(member => member.Id == entry.Id || member.Position == entry.Position))
+                    roster.Any(member => member.Id == entry.Id || member.Start.Position == entry.Position))
                     throw new ArgumentException("Invalid or duplicate starting member.", nameof(startingMembers));
 
-                members.Add(new Member(entry));
+                roster.Add(new Member(entry));
             }
 
-            if (members.Count < 1 || members.Count > Rules.Positions)
+            if (roster.Count < 1 || roster.Count > Rules.Positions)
                 throw new ArgumentException("The party needs one to four members.", nameof(startingMembers));
-            foreach (var equipment in startingEquipment)
-                AddEquipment(equipment);
+            return roster;
+        }
+
+        public void ResetRoster(IEnumerable<PartyMemberStart> startingMembers)
+        {
+            var roster = ValidateRoster(startingMembers);
+            ResetEncounter();
+            members.Clear();
+            members.AddRange(roster);
         }
 
         public void ResetEncounter()
@@ -141,7 +156,7 @@ namespace RaidPartyManager.Run
         {
             get
             {
-                var formationStats = EquipmentFormation.Resolve(members.Where(IsDeployed).Select(ToCombatant).ToArray());
+                var formationStats = EquipmentFormation.Resolve(CaptureFormation(Side.Party));
                 return members.Select(member => new MemberView(member.Id, member.Character, member.Position, member.Health,
                     formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member), member.Slots)).ToArray();
             }
@@ -149,6 +164,9 @@ namespace RaidPartyManager.Run
 
         public IReadOnlyList<EquipmentInstance> Inventory => inventory.Values.ToArray();
         public int Gold { get; private set; }
+
+        public IReadOnlyList<Combatant> CaptureFormation(Side side) =>
+            members.Where(IsDeployed).Select(member => ToCombatant(member, side)).ToArray();
 
         public bool HasRecruitmentVacancy => members.Count(IsDeployed) < Rules.Positions &&
             members.Where(IsDeployed).Any(member => EquipmentOf(member).Any(item => item.Effect == EquipmentEffect.RecruitmentNotice));
@@ -246,8 +264,7 @@ namespace RaidPartyManager.Run
             if (!CanStartBattle)
                 throw new InvalidOperationException("Place all living members before starting a new battle.");
 
-            var deployed = members.Where(IsDeployed).ToArray();
-            var party = deployed.Select(ToCombatant);
+            var party = CaptureFormation(Side.Party);
             var enemyUnits = enemies.ToArray();
             if (enemyUnits.Any(unit => unit.Side != Side.Enemy))
                 throw new ArgumentException("Encounter units must be enemies.", nameof(enemies));
@@ -410,7 +427,7 @@ namespace RaidPartyManager.Run
             EquipmentOf(member).Aggregate(member.Character.BaseStats + new Stats(member.PermanentAttack, 0, 0, 0),
                 (stats, item) => stats + item.Bonus);
 
-        private Combatant ToCombatant(Member member) => new Combatant(member.Id, member.Character, Side.Party,
+        private Combatant ToCombatant(Member member, Side side) => new Combatant(member.Id, member.Character, side,
             member.Position.Value, PersonalStats(member), member.Health, EquipmentOf(member), member.StartingStatuses, member.Slots);
     }
 }

@@ -1,3 +1,4 @@
+using System;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine.SceneManagement;
@@ -7,16 +8,17 @@ namespace RaidPartyManager.Editor
     internal static class PrototypePlayModeEntry
     {
         [InitializeOnLoadMethod]
-        private static void ConfigureOnLoad()
-        {
-            EditorSceneManager.activeSceneChangedInEditMode += (_, scene) => SetStartScene(scene);
-            EditorApplication.delayCall += () => SetStartScene(SceneManager.GetActiveScene());
-        }
+        private static void ConfigureOnLoad() => EditorApplication.playModeStateChanged += SetStartScene;
 
-        private static void SetStartScene(Scene scene)
+        private static void SetStartScene(PlayModeStateChange change)
         {
-            // Unity's Play Mode tests start in an unsaved bootstrap scene.
-            EditorSceneManager.playModeStartScene = string.IsNullOrEmpty(scene.path) ? null :
+            if (change != PlayModeStateChange.ExitingEditMode)
+                return;
+
+            // Unity Test Framework saves its temporary runner scene as Assets/InitTestScene<guid>.unity.
+            var path = SceneManager.GetActiveScene().path;
+            bool isTestBootstrap = path.StartsWith("Assets/InitTestScene", StringComparison.Ordinal);
+            EditorSceneManager.playModeStartScene = isTestBootstrap ? null :
                 AssetDatabase.LoadAssetAtPath<SceneAsset>("Assets/Scenes/MainMenu.unity");
         }
     }

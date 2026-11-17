@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyBellMagistrate
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyBellMagistrate
+  displayName: "敲钟判官"
+  portrait: {fileID: 2800000, guid: 70aeab73a9dc4bc496bc56d882fa328c, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 82c05b5203d34fbba1fbaf553e61ca22, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 63a2e2aa2a4a4a5b9bd55f219dedcb96, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: e67db3d0ff164139a3743773c5d521ba, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: ae154541c7f94c5db23053dfa9bc3c58, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 2c48ac3ae04e435eb7346df7525f8b26, type: 3}
+  battleFinaleEffect: {fileID: 2800000, guid: 714227928c7d43ccb09eb67622bea0d9, type: 3}
+  profession: 0
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 30
+  traitPower: 0
+  traitText: "完成3次敲钟后，对玩家角色造成敲钟判官损失生命值的魔法伤害"
+  personality: 2
+  attack: 4
+  defense: 2
+  specialDefense: 2
+  health: 28
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0
