@@ -21,6 +21,7 @@ namespace RaidPartyManager.Presentation
             public Texture2D Artwork;
             public bool CanDrag;
             public bool CanDrop;
+            public bool Borderless;
         }
 
         private readonly VisualElement formation;
@@ -136,10 +137,18 @@ namespace RaidPartyManager.Presentation
             if (destination == next)
                 return;
             if (destination != null)
-                PrototypeStyle.Outline(destination.Border, PrototypeStyle.Edge, 4);
+                HighlightSlot(destination, false);
             destination = next;
             if (destination != null)
-                PrototypeStyle.Outline(destination.Border, PrototypeStyle.Ally, 4);
+                HighlightSlot(destination, true);
+        }
+
+        private static void HighlightSlot(Slot slot, bool highlighted)
+        {
+            if (slot.Borderless)
+                slot.Border.style.backgroundColor = highlighted ? new Color(0.45f, 0.73f, 0.68f, 0.16f) : Color.clear;
+            else
+                PrototypeStyle.Outline(slot.Border, highlighted ? PrototypeStyle.Ally : PrototypeStyle.Edge, 4);
         }
 
         private void MovePreview()

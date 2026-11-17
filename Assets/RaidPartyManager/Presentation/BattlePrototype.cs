@@ -18,16 +18,18 @@ namespace RaidPartyManager.Presentation
         private enum Phase { Preparation, Playback, RoundBreak, Settlement }
 
         [SerializeField] private EncounterAsset encounter;
-        [SerializeField, Min(0)] private float secondsBetweenActions = 3f;
+        [SerializeField, Min(0.05f)] private float attackAnimationTimeScale = 1f;
 
         private static PartyRun playModeRun;
 
         private readonly Dictionary<string, int> health = new Dictionary<string, int>();
         private readonly Dictionary<string, int> shields = new Dictionary<string, int>();
         private readonly Dictionary<string, IReadOnlyList<StatusStack>> statuses = new Dictionary<string, IReadOnlyList<StatusStack>>();
+        private readonly Dictionary<string, Stats> partyStats = new Dictionary<string, Stats>();
         private readonly Dictionary<string, (CharacterDefinition Character, int MaximumHealth)> appearances =
             new Dictionary<string, (CharacterDefinition, int)>();
         private readonly Dictionary<string, BattleUnitCard> unitCards = new Dictionary<string, BattleUnitCard>();
+        private readonly Dictionary<string, BattleSpriteView> battleSprites = new Dictionary<string, BattleSpriteView>();
         private readonly List<string> battleLog = new List<string>();
 
         private VisualElement root;
@@ -44,8 +46,16 @@ namespace RaidPartyManager.Presentation
         private BattleResult result;
         private EquipmentInstance reward;
         private int eventIndex;
-        private double nextActionAt;
+        private BattleActionPlayback actionPlayback;
+        private BattleEvent visualAction;
+        private bool waitingForImpact;
+        private VisualElement actionLayer;
         private ScrollView logView;
+        private BattleCharacterDetails characterDetails;
+        private BattleStatusTooltip statusTooltip;
+        private VisualElement inspectedPortrait;
+        private string inspectedMember;
+        private Vector2 inspectionPointer;
 
         // A new Play session must start fresh even when Unity skips domain reload.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -61,6 +71,7 @@ namespace RaidPartyManager.Presentation
             }
 
             PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
+            statusTooltip = new BattleStatusTooltip(root);
 
             content = encounter.ToData();
             run = playModeRun ??= new PartyRun(content.Party.Select(unit =>
@@ -70,11 +81,14 @@ namespace RaidPartyManager.Presentation
 
         private void OnDisable()
         {
+            ClearAction();
+            statusTooltip?.Hide();
             PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
         }
 
         private void ResetDemo()
         {
+            ClearAction();
             run.ResetEncounter();
             phase = Phase.Preparation;
             selectedMember = run.Members[0].Id;
@@ -87,7 +101,9 @@ namespace RaidPartyManager.Presentation
             health.Clear();
             shields.Clear();
             statuses.Clear();
+            partyStats.Clear();
             appearances.Clear();
+            battleSprites.Clear();
             battleLog.Clear();
             Render();
         }
@@ -99,13 +115,13 @@ namespace RaidPartyManager.Presentation
             var request = run.BeginBattle(content.Enemies, content.TickLimit, content.VictoryReward,
                 content.RecruitmentPool, content.CharacterCatalog);
             battle = new BattleSimulator().Start(request);
+            ReadPartyStats();
             foreach (var unit in battle.Formation)
             {
                 health[unit.Id] = unit.Health;
                 appearances[unit.Id] = (unit.Character, unit.Stats.Health);
             }
 
-            nextActionAt = 0d;
             BeginNextRound();
         }
 
@@ -134,26 +150,65 @@ namespace RaidPartyManager.Presentation
         private void SwapBetweenRounds(int from, int to)
         {
             if (phase == Phase.RoundBreak && battle.TrySwapPartyPositions(from, to))
+            {
+                ReadPartyStats();
                 BeginNextRound();
+            }
+        }
+
+        private void ReadPartyStats()
+        {
+            foreach (var entry in battle.ReadPartyStats())
+                partyStats[entry.Key] = entry.Value;
         }
 
         private void Update()
         {
+            double now = Time.unscaledTimeAsDouble;
             if (phase == Phase.Playback)
-                AdvancePlayback(Time.unscaledTimeAsDouble);
+                AdvancePlayback(now);
+            foreach (var sprite in battleSprites.Values)
+                if (sprite.panel != null)
+                    sprite.UpdateFrame(now);
+            if (actionPlayback != null)
+                actionPlayback.Draw(now, actionLayer, unitCards.GetValueOrDefault(visualAction.ActorId),
+                    unitCards.GetValueOrDefault(visualAction.TargetId));
         }
 
         private void AdvancePlayback(double now)
         {
+            if (actionPlayback != null && !waitingForImpact && now >= actionPlayback.FinishAt)
+                ClearAction();
+
             while (eventIndex < roundEvents.Count)
             {
                 var entry = roundEvents[eventIndex];
-                if (entry.Kind == BattleEventKind.Action)
+                bool actionLogged = false;
+                if (entry.Kind == BattleEventKind.Action || entry.AttackReach != AttackReach.Unspecified)
                 {
-                    if (now < nextActionAt)
-                        return;
-                    nextActionAt = now + secondsBetweenActions;
+                    if (waitingForImpact)
+                    {
+                        if (now < actionPlayback.ImpactAt)
+                            return;
+                        actionPlayback.HandleImpact();
+                        waitingForImpact = false;
+                        actionLogged = true;
+                        if (now >= actionPlayback.FinishAt)
+                            ClearAction();
+                    }
+                    else
+                    {
+                        if (HasActiveAnimation(now))
+                            return;
+                        if (BeginAction(entry, now))
+                        {
+                            RecordBattleLine(Describe(entry), entry.Kind);
+                            return;
+                        }
+                    }
                 }
+                if (entry.Kind == BattleEventKind.Finished && HasActiveAnimation(now))
+                    return;
                 eventIndex++;
 
                 if (entry.Kind == BattleEventKind.Finished)
@@ -166,11 +221,19 @@ namespace RaidPartyManager.Presentation
                     return;
                 }
 
-                var line = Describe(entry);
+                string line = actionLogged ? null : Describe(entry);
+                if (entry.PartyStatChanges != null)
+                    foreach (var change in entry.PartyStatChanges)
+                        partyStats[change.Key] = change.Value;
                 if (entry.Loadout != null)
                     ApplyLoadout(entry.Loadout);
                 if (entry.Kind != BattleEventKind.Defeated)
                 {
+                    if (entry.ActionKind == ActionKind.Attack &&
+                        (entry.Amount > 0 || entry.TargetShield < shields.GetValueOrDefault(entry.TargetId)) &&
+                        battleSprites.TryGetValue(entry.TargetId, out var targetSprite) && targetSprite.panel != null)
+                        targetSprite.PlayHit(now);
+
                     health[entry.TargetId] = entry.TargetHealth;
                     shields[entry.TargetId] = entry.TargetShield;
                     statuses[entry.TargetId] = entry.StatusStacks;
@@ -185,12 +248,63 @@ namespace RaidPartyManager.Presentation
                         unitCards[entry.TargetId].Refresh(entry.TargetHealth, entry.TargetShield, entry.StatusStacks);
                 }
 
-                battleLog.Add(line);
-                AppendLog(line, entry.Kind);
+                if (!actionLogged)
+                    RecordBattleLine(line, entry.Kind);
+                if (entry.TargetId == inspectedMember || entry.PartyStatChanges != null)
+                    RefreshCharacterDetails();
             }
 
+            if (HasActiveAnimation(now))
+                return;
+
+            ReadPartyStats();
             phase = Phase.RoundBreak;
             Render();
+        }
+
+        private bool HasActiveAnimation(double now) => actionPlayback != null ||
+            battleSprites.Values.Any(sprite => sprite.panel != null && sprite.IsReactingAt(now));
+
+        private bool BeginAction(BattleEvent entry, double now)
+        {
+            if (entry.ActorId == null || !appearances.TryGetValue(entry.ActorId, out var appearance))
+                return false;
+
+            var character = appearance.Character;
+            var sprite = battleSprites.GetValueOrDefault(entry.ActorId);
+            if (sprite?.panel == null)
+                sprite = null;
+            Texture2D walking = null;
+            Texture2D projectile = null;
+            if (entry.ActionKind == ActionKind.Attack && entry.ActorId != entry.TargetId)
+            {
+                if (entry.AttackReach == AttackReach.Melee)
+                    walking = sprite != null ? content.BattleWalkFor(character.Id) : null;
+                else
+                    projectile = content.ProjectileFor(character.Profession);
+            }
+            if (sprite == null && projectile == null)
+                return false;
+
+            float scale = Mathf.Max(0.05f, attackAnimationTimeScale);
+            actionPlayback = new BattleActionPlayback(sprite, entry.ActionKind, walking, projectile,
+                character.Profession == Profession.Archer, entry.Detail == "未命中", now, scale);
+            visualAction = entry;
+            waitingForImpact = true;
+            return true;
+        }
+
+        private void ClearAction()
+        {
+            actionPlayback?.Clear();
+            actionPlayback = null;
+            waitingForImpact = false;
+        }
+
+        private void RecordBattleLine(string line, BattleEventKind kind)
+        {
+            battleLog.Add(line);
+            AppendLog(line, kind);
         }
 
         private void ApplyLoadout(BattleLoadout loadout)
@@ -220,6 +334,9 @@ namespace RaidPartyManager.Presentation
 
         private void Render()
         {
+            Vector2? previousInspection = inspectedPortrait != null ? inspectionPointer : null;
+            HideCharacterDetails();
+            statusTooltip.Hide();
             root.Clear();
             unitCards.Clear();
             root.style.backgroundColor = PrototypeStyle.Background;
@@ -285,9 +402,12 @@ namespace RaidPartyManager.Presentation
             opposingLines.Add(divider);
             opposingLines.Add(BuildLine(Side.Enemy));
             arena.Add(opposingLines);
+            actionLayer = new VisualElement { name = "battle-action-layer", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(actionLayer);
+            arena.Add(actionLayer);
             page.Add(arena);
 
-            RenderFooter(page);
+            RenderFooter(page, previousInspection);
             if (phase == Phase.Settlement)
                 RenderSettlement(page);
         }
@@ -297,6 +417,7 @@ namespace RaidPartyManager.Presentation
             if (phase != Phase.Preparation && phase != Phase.Settlement)
                 return;
 
+            statusTooltip.Hide();
             root.Clear();
             root.Add(new PartyEditorView(run, EditorPosition, content.PortraitFor, content.IconFor, Render));
         }
@@ -340,7 +461,8 @@ namespace RaidPartyManager.Presentation
                     drag.Register(new FormationSwap.Slot
                     {
                         View = card, Border = card.Q("combatant-portrait"), Position = card.Slot,
-                        Artwork = card.Artwork, Name = card.CharacterName, CanDrag = true, CanDrop = true
+                        Artwork = card.Artwork, Name = card.CharacterName, CanDrag = true, CanDrop = true,
+                        Borderless = card.HasBattleSprite
                     });
             }
             line.Add(positions);
@@ -376,9 +498,18 @@ namespace RaidPartyManager.Presentation
             string subtitle = character == null ? null : preparing && side == Side.Enemy && character.Skill != null
                 ? character.Skill.Name : PersonalityText(character.Personality);
             int shield = !preparing && phase != Phase.Settlement && id != null ? shields.GetValueOrDefault(id) : 0;
+            BattleSpriteView sprite = null;
+            var sheet = side == Side.Party ? content.BattleSpriteFor(character?.Id) : null;
+            if (sheet != null)
+            {
+                if (!battleSprites.TryGetValue(id, out sprite) || sprite.Sheet != sheet)
+                    battleSprites[id] = sprite = new BattleSpriteView(sheet, content.BattleAttackFor(character.Id),
+                        character.Profession, position);
+                sprite.RemoveFromHierarchy();
+            }
             var card = new BattleUnitCard(side, position, id, character, content.PortraitFor(character?.Id),
                 maximumHealth, currentHealth, shield, subtitle, preparing && id != null && id == selectedMember,
-                statusIcon: content.StatusIcon);
+                statusIcon: content.StatusIcon, battleSprite: sprite, statusTooltip: statusTooltip);
             if (id != null)
             {
                 card.Refresh(currentHealth, shield, statuses.GetValueOrDefault(id));
@@ -387,7 +518,7 @@ namespace RaidPartyManager.Presentation
             return card;
         }
 
-        private void RenderFooter(VisualElement page)
+        private void RenderFooter(VisualElement page, Vector2? previousInspection)
         {
             var bottom = PrototypeStyle.Row("battle-footer");
             bottom.style.alignItems = Align.Stretch;
@@ -414,7 +545,7 @@ namespace RaidPartyManager.Presentation
                     ? appearance.Character : member?.Character;
                 var equipment = id != null && battleLoadout != null && battleLoadout.Slots.TryGetValue(id, out var slots)
                     ? slots : member?.EquipmentIds;
-                cards.Add(EquipmentCard(position, id, character, equipment, inventory));
+                cards.Add(EquipmentCard(position, id, character, equipment, inventory, previousInspection));
             }
             roster.Add(cards);
             if (phase == Phase.Preparation)
@@ -425,7 +556,7 @@ namespace RaidPartyManager.Presentation
         }
 
         private VisualElement EquipmentCard(int position, string id, CharacterDefinition character,
-            IReadOnlyList<string> equipment, IReadOnlyList<EquipmentInstance> inventory)
+            IReadOnlyList<string> equipment, IReadOnlyList<EquipmentInstance> inventory, Vector2? previousInspection)
         {
             var card = PrototypeStyle.Row($"equipment-position-{position}");
             card.style.flexGrow = 1;
@@ -439,7 +570,7 @@ namespace RaidPartyManager.Presentation
             bool selected = editable && id == selectedMember;
             PrototypeStyle.Outline(card, selected ? PrototypeStyle.Accent : PrototypeStyle.Edge, 3);
 
-            var portrait = new VisualElement();
+            var portrait = new VisualElement { name = $"equipment-portrait-{position}" };
             portrait.style.width = Length.Percent(39);
             portrait.style.overflow = Overflow.Hidden;
             var art = content.PortraitFor(character?.Id);
@@ -471,11 +602,13 @@ namespace RaidPartyManager.Presentation
             slots.style.minWidth = 0;
             slots.style.justifyContent = Justify.Center;
             slots.style.paddingLeft = slots.style.paddingRight = 2;
+            var equippedItems = new EquipmentDefinition[Rules.EquipmentSlots];
             for (int i = 0; i < Rules.EquipmentSlots; i++)
             {
                 int slot = i;
-                var held = equipment != null ? inventory.FirstOrDefault(item => item.Id == equipment[slot]) : null;
-                string text = $"{slot + 1} · {held?.Definition.Name ?? "空槽"}";
+                var held = equipment != null ? inventory.FirstOrDefault(item => item.Id == equipment[slot])?.Definition : null;
+                equippedItems[slot] = held;
+                string text = $"{slot + 1} · {held?.Name ?? "空槽"}";
                 if (editable)
                 {
                     var button = PrototypeStyle.Button(text, selected ? $"slot-{slot}" : $"slot-{id}-{slot}",
@@ -485,7 +618,7 @@ namespace RaidPartyManager.Presentation
                     button.style.paddingTop = button.style.paddingBottom = 0;
                     button.style.marginLeft = button.style.marginRight = 0;
                     if (held != null)
-                        button.tooltip = held.Definition.Description ?? BonusText(held.Definition.Bonus);
+                        button.tooltip = held.Description ?? BonusText(held.Bonus);
                     slots.Add(button);
                 }
                 else
@@ -497,7 +630,71 @@ namespace RaidPartyManager.Presentation
                 }
             }
             card.Add(slots);
+            if (character != null && (phase == Phase.Playback || phase == Phase.RoundBreak))
+                RegisterCharacterInspection(portrait, position, id, character, equippedItems, previousInspection);
             return card;
+        }
+
+        private void RegisterCharacterInspection(VisualElement portrait, int position, string id, CharacterDefinition character,
+            IReadOnlyList<EquipmentDefinition> equipment, Vector2? previousInspection)
+        {
+            portrait.RegisterCallback<PointerEnterEvent>(evt =>
+            {
+                if (evt.pointerType == UnityEngine.UIElements.PointerType.mouse)
+                    Show((Vector2)evt.position);
+            });
+            portrait.RegisterCallback<PointerMoveEvent>(evt =>
+            {
+                if (inspectedPortrait == portrait)
+                    inspectionPointer = (Vector2)evt.position;
+            });
+            portrait.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                if (inspectedPortrait == portrait)
+                    HideCharacterDetails();
+            });
+            if (previousInspection.HasValue)
+                portrait.RegisterCallback<GeometryChangedEvent>(RestoreInspection);
+
+            void RestoreInspection(GeometryChangedEvent evt)
+            {
+                portrait.UnregisterCallback<GeometryChangedEvent>(RestoreInspection);
+                if (inspectedPortrait != null || !portrait.worldBound.Contains(previousInspection.Value))
+                    return;
+                var target = root.panel?.Pick(previousInspection.Value);
+                if (target != null && (target == portrait || portrait.Contains(target)))
+                    Show(previousInspection.Value);
+            }
+
+            void Show(Vector2 pointer)
+            {
+                HideCharacterDetails();
+                inspectedPortrait = portrait;
+                inspectedMember = id;
+                inspectionPointer = pointer;
+                var details = new BattleCharacterDetails(position, character, equipment);
+                characterDetails = details;
+                details.RegisterCallback<GeometryChangedEvent>(_ => details.PositionAt(root, portrait));
+                root.Add(details);
+                RefreshCharacterDetails();
+                details.PositionAt(root, portrait);
+            }
+        }
+
+        private void RefreshCharacterDetails()
+        {
+            if (characterDetails == null || !partyStats.TryGetValue(inspectedMember, out var stats))
+                return;
+            characterDetails.Refresh(stats, health[inspectedMember], shields.GetValueOrDefault(inspectedMember),
+                statuses.GetValueOrDefault(inspectedMember));
+        }
+
+        private void HideCharacterDetails()
+        {
+            characterDetails?.RemoveFromHierarchy();
+            characterDetails = null;
+            inspectedPortrait = null;
+            inspectedMember = null;
         }
 
         private void SelectMember(string id, int? slot)

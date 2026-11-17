@@ -15,6 +15,9 @@ MonoBehaviour:
   id: CampGuard
   displayName: "篝火守夜人"
   portrait: {fileID: 2800000, guid: da674cea513c4dfab9443f60d30fba01, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 27e8b99b94e145a6a75cb810da4df5cb, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: a02be7fced924c9fb69bba67ce813647, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 04e08f44562a40889ca217e3b5d6e064, type: 3}
   profession: 0
   rosterNumber: 1
   stage: 1

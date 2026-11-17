@@ -1,0 +1,306 @@
+using RaidPartyManager.Domain;
+using UnityEngine;
+using UnityEngine.UIElements;
+
+namespace RaidPartyManager.Presentation
+{
+    // Rows are idle, primary action, hit reaction, and death.
+    internal sealed class BattleSpriteView : VisualElement
+    {
+        private enum Motion { Idle, Action, Hit, Death }
+
+        private const int Columns = 8;
+        private const int Rows = 4;
+        private const int AttackColumns = 4;
+        private const int AttackRows = 2;
+        private const float IdleLength = 1.6f;
+        private static readonly float[] HitEnds = { 0.07f, 0.17f, 0.28f, 0.40f };
+        private static readonly float[] DeathEnds = { 0.08f, 0.19f, 0.32f, 0.46f, 0.60f, 0.74f, 0.87f, 1f };
+
+        private readonly Image figure;
+        private readonly VisualElement effects;
+        private VisualElement overhead;
+        private readonly Profession profession;
+        private readonly Texture2D attackSheet;
+        private readonly float idleOffset;
+        private readonly float[] actionEnds;
+        private readonly float impactTime;
+        private Motion motion;
+        private double motionStart;
+        private bool? alive;
+        private float actionScale = 1f;
+        private ActionKind action;
+        private int displayedFrame = -1;
+        private float effectProgress = -1f;
+        private bool usesExternalEffect;
+
+        public Texture2D Sheet { get; }
+        public Image Figure => figure;
+        public bool IsAlive => alive == true;
+        public bool HasWideAttack => attackSheet != null;
+
+        public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position)
+        {
+            name = "profession-portrait-art";
+            Sheet = sheet;
+            this.attackSheet = attackSheet;
+            this.profession = profession;
+            idleOffset = position * 0.17f;
+            var (ends, contactFrame) = profession switch
+            {
+                Profession.Warrior => (new[] { 0.06f, 0.15f, 0.27f, 0.42f, 0.55f, 0.62f, 0.70f, 0.78f }, 4),
+                Profession.Mage => (new[] { 0.08f, 0.16f, 0.24f, 0.42f, 0.57f, 0.65f, 0.76f, 0.85f }, 4),
+                Profession.Archer => (new[] { 0.07f, 0.14f, 0.23f, 0.34f, 0.54f, 0.65f, 0.74f, 0.83f }, 5),
+                _ => (new[] { 0.07f, 0.15f, 0.27f, 0.42f, 0.57f, 0.68f, 0.77f, 0.88f }, 4)
+            };
+            actionEnds = ends;
+            impactTime = ends[contactFrame - 1];
+            pickingMode = PickingMode.Ignore;
+            style.position = Position.Absolute;
+            style.top = 26;
+            style.bottom = 36;
+            style.left = style.right = 5;
+
+            figure = new Image
+            {
+                name = "battle-sprite",
+                image = sheet,
+                scaleMode = ScaleMode.StretchToFill,
+                pickingMode = PickingMode.Ignore
+            };
+            figure.style.position = Position.Absolute;
+            figure.style.bottom = 0;
+            Add(figure);
+
+            effects = new VisualElement { name = "battle-sprite-effects", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(effects);
+            effects.generateVisualContent += DrawActionEffect;
+            Add(effects);
+
+            RegisterCallback<GeometryChangedEvent>(evt => PositionFigure(evt.newRect.size));
+            ShowFrame(0);
+        }
+
+        public void SetOverhead(VisualElement content)
+        {
+            overhead?.RemoveFromHierarchy();
+            overhead = content;
+            Add(overhead);
+            PositionFigure(contentRect.size);
+        }
+
+        private void PositionFigure(Vector2 size)
+        {
+            if (!(size.x > 0f && size.y > 0f))
+                return;
+
+            float ratio = (float)(Sheet.width / Columns) / (Sheet.height / Rows);
+            float width = Mathf.Min(size.x, size.y * ratio);
+            float height = width / ratio;
+            figure.style.left = (size.x - width) * 0.5f;
+            figure.style.width = width;
+            figure.style.height = height;
+            if (overhead != null)
+            {
+                overhead.style.bottom = height + 2f;
+                overhead.style.left = overhead.style.right = (size.x - Mathf.Min(104f, width * 0.72f)) * 0.5f;
+            }
+        }
+
+        public float ActionLength(ActionKind kind) => kind == ActionKind.Shield ? 0.48f : actionEnds[^1];
+
+        public float PlayAction(ActionKind kind, double now, float scale, bool usesExternalEffect)
+        {
+            action = kind;
+            actionScale = scale;
+            this.usesExternalEffect = usesExternalEffect;
+            SetMotion(Motion.Action, now);
+            return (action == ActionKind.Shield ? 0.16f : impactTime) * scale;
+        }
+
+        public void SetBodyVisible(bool visible, bool keepLocalEffects = false)
+        {
+            figure.visible = visible;
+            effects.visible = visible || keepLocalEffects;
+        }
+
+        public Vector2 PoseSize(Vector2 idleSize) => Vector2.Scale(idleSize,
+            new Vector2(Figure.sourceRect.width / (Sheet.width / Columns), Figure.sourceRect.height / (Sheet.height / Rows)));
+
+        public void PlayHit(double now)
+        {
+            if (alive == true)
+                SetMotion(Motion.Hit, now);
+        }
+
+        public bool IsReactingAt(double now) => motion switch
+        {
+            Motion.Hit => now < motionStart + HitEnds[^1],
+            Motion.Death => now < motionStart + DeathEnds[^1],
+            _ => false
+        };
+
+        public void SetAlive(bool isAlive, double now)
+        {
+            if (alive == isAlive)
+                return;
+            if (isAlive)
+                SetMotion(Motion.Idle, alive.HasValue ? now : now - idleOffset);
+            else
+                SetMotion(Motion.Death, alive.HasValue ? now : now - DeathEnds[^1]);
+            alive = isAlive;
+        }
+
+        private void SetMotion(Motion next, double now)
+        {
+            motion = next;
+            motionStart = now;
+        }
+
+        public void UpdateFrame(double now)
+        {
+            float elapsed = Mathf.Max(0f, (float)(now - motionStart));
+            float actionLength = ActionLength(action);
+            if ((motion == Motion.Hit && elapsed >= HitEnds[^1]) ||
+                (motion == Motion.Action && elapsed >= actionLength * actionScale))
+            {
+                SetMotion(Motion.Idle, now);
+                elapsed = 0f;
+            }
+
+            float offset = 0f;
+            float lift = 0f;
+            float light = -1f;
+            var tint = Color.white;
+            int frame;
+            switch (motion)
+            {
+                case Motion.Death:
+                    frame = 3 * Columns + FrameAt(DeathEnds, elapsed);
+                    break;
+                case Motion.Hit:
+                    frame = 2 * Columns + FrameAt(HitEnds, elapsed);
+                    offset = -Mathf.Sin(elapsed / HitEnds[^1] * Mathf.PI) * 3f;
+                    tint = Color.Lerp(new Color(1f, 0.61f, 0.48f), Color.white, Mathf.Clamp01(elapsed / 0.16f));
+                    break;
+                case Motion.Action:
+                    elapsed /= actionScale;
+                    bool guarding = action == ActionKind.Shield;
+                    frame = guarding ? 2 * Columns + (elapsed < 0.12f ? 0 : elapsed < 0.36f ? 1 : 3)
+                        : Columns + FrameAt(actionEnds, elapsed);
+                    if (profession == Profession.Warrior && action == ActionKind.Attack)
+                        offset = Mathf.Sin(elapsed / actionLength * Mathf.PI) * 4f;
+                    float contact = guarding ? 0.16f : impactTime;
+                    if (!usesExternalEffect && elapsed >= contact)
+                        light = (elapsed - contact) / (actionLength - contact);
+                    break;
+                default:
+                    float cycle = Mathf.Repeat(elapsed, IdleLength);
+                    frame = Mathf.FloorToInt(cycle * Columns / IdleLength);
+                    lift = -0.45f * (1f - Mathf.Cos(cycle / IdleLength * 2f * Mathf.PI));
+                    break;
+            }
+            ShowFrame(frame);
+            figure.tintColor = tint;
+            figure.style.translate = new Translate(offset, lift, 0f);
+            if (effectProgress >= 0f || light >= 0f)
+            {
+                effectProgress = light;
+                effects.MarkDirtyRepaint();
+            }
+        }
+
+        private static int FrameAt(float[] frameEnds, float elapsed)
+        {
+            int frame = 0;
+            while (frame < frameEnds.Length - 1 && elapsed >= frameEnds[frame])
+                frame++;
+            return frame;
+        }
+
+        private void ShowFrame(int frame)
+        {
+            if (displayedFrame == frame)
+                return;
+            displayedFrame = frame;
+            bool usingAttack = attackSheet != null && frame >= Columns && frame < 2 * Columns;
+            var texture = usingAttack ? attackSheet : Sheet;
+            int columns = usingAttack ? AttackColumns : Columns;
+            int rows = usingAttack ? AttackRows : Rows;
+            int index = usingAttack ? frame - Columns : frame;
+            int width = texture.width / columns;
+            int height = texture.height / rows;
+            figure.image = texture;
+            figure.sourceRect = new Rect(index % columns * width, index / columns * height, width, height);
+            // Changing the texture region does not invalidate UI Toolkit's cached drawing.
+            figure.MarkDirtyRepaint();
+        }
+
+        private void DrawActionEffect(MeshGenerationContext context)
+        {
+            if (effectProgress < 0f)
+                return;
+
+            float progress = effectProgress;
+            float fade = Mathf.Sin(Mathf.Clamp01(progress * 1.2f + 0.12f) * Mathf.PI);
+            var pen = context.painter2D;
+            var center = new Vector2(effects.contentRect.width * 0.72f, effects.contentRect.height * 0.52f);
+            pen.lineWidth = 1.65f;
+            if (action == ActionKind.Shield)
+            {
+                pen.strokeColor = new Color(1f, 0.77f, 0.37f, fade);
+                Curve(center, new Vector2(-9f, -20f), new Vector2(29f, -4f), new Vector2(-4f, 23f));
+                return;
+            }
+
+            switch (profession)
+            {
+                case Profession.Warrior:
+                    pen.strokeColor = new Color(1f, 0.66f, 0.29f, fade);
+                    pen.lineWidth = 2.7f;
+                    Curve(center, new Vector2(-10f, -26f), new Vector2(29f, -11f), new Vector2(8f, 24f));
+                    break;
+                case Profession.Mage:
+                    pen.strokeColor = new Color(0.63f, 0.81f, 1f, fade);
+                    Spark(center + new Vector2(progress * 16f, -4f), 10f);
+                    Spark(center + new Vector2(-10f, 14f), 4f);
+                    Spark(center + new Vector2(6f, -20f), 4f);
+                    break;
+                case Profession.Support:
+                    pen.strokeColor = new Color(1f, 0.89f, 0.58f, fade);
+                    if (action == ActionKind.Heal)
+                    {
+                        var middle = new Vector2(effects.contentRect.width * 0.53f, center.y - progress * 13f);
+                        Curve(middle, new Vector2(-21f, 9f), new Vector2(0f, 25f), new Vector2(21f, 9f));
+                        Spark(middle + new Vector2(-14f, -6f), 5f);
+                        Spark(middle + new Vector2(15f, -17f), 6f);
+                    }
+                    else
+                    {
+                        Spark(center + new Vector2(progress * 18f, -5f), 9f);
+                        Spark(center + new Vector2(-9f, 4f), 4f);
+                    }
+                    break;
+            }
+
+            void Curve(Vector2 origin, Vector2 start, Vector2 handle, Vector2 end)
+            {
+                pen.BeginPath();
+                pen.MoveTo(origin + start);
+                pen.QuadraticCurveTo(origin + handle, origin + end);
+                pen.Stroke();
+            }
+
+            void Spark(Vector2 point, float radius)
+            {
+                pen.BeginPath();
+                pen.MoveTo(point + Vector2.up * radius);
+                pen.LineTo(point + Vector2.right * radius * 0.4f);
+                pen.LineTo(point + Vector2.down * radius);
+                pen.LineTo(point + Vector2.left * radius * 0.4f);
+                pen.ClosePath();
+                pen.Stroke();
+            }
+        }
+    }
+}

@@ -194,7 +194,9 @@ namespace RaidPartyManager.Battle
         }
 
         private static int CurrentAttack(Unit actor) =>
-            Math.Max(0, actor.Stats.Attack - (actor.Layers(Weakened) > 0 ? 2 : 0));
+            EffectiveAttack(actor.Stats.Attack, actor.Layers(Weakened) > 0);
+
+        private static int EffectiveAttack(int attack, bool weakened) => Math.Max(0, attack - (weakened ? 2 : 0));
 
         private static int BaseHealing(Unit actor, ActionDefinition action) =>
             action.HealingScalesWithAttack ? CurrentAttack(actor) : action.Power;
@@ -306,12 +308,13 @@ namespace RaidPartyManager.Battle
             actor.LastAttackRound = Round;
             int physicalDealt = 0;
             if (missed)
-                Report(kind, actor, target, name, ActionKind.Attack, reason: reason, detail: "未命中");
+                Report(kind, actor, target, name, ActionKind.Attack, reason: reason, detail: "未命中", weaponAttack: true);
             else
             {
                 int thorns = target.Layers(Thorns);
                 int ember = actor.Layers(Ember);
-                var damage = ResolveStrike(actor, target, parts, name, kind, reason, ignoreDefense: UsesShortbow(actor));
+                var damage = ResolveStrike(actor, target, parts, name, kind, reason,
+                    ignoreDefense: UsesShortbow(actor), weaponAttack: true);
                 actor.LastHitTarget = target.Input.Id;
                 if (damage.Total > 0 && actor.Trait == CharacterTrait.PoisonOnHit)
                     GrantStatus(actor, target, Poison, actor.TraitPower);
@@ -419,7 +422,8 @@ namespace RaidPartyManager.Battle
             ResolveStrike(actor, target, new[] { (type, power) }, name, kind, reason);
 
         private (int Total, int Physical) ResolveStrike(Unit actor, Unit target,
-            IReadOnlyList<(DamageType Type, int Power)> parts, string name, BattleEventKind kind, DecisionReason reason, bool ignoreDefense = false)
+            IReadOnlyList<(DamageType Type, int Power)> parts, string name, BattleEventKind kind, DecisionReason reason,
+            bool ignoreDefense = false, bool weaponAttack = false)
         {
             // All components read the same defensive state before the combined hit consumes it.
             var resolved = parts.Select(part =>
@@ -442,7 +446,7 @@ namespace RaidPartyManager.Battle
             var linked = healthDamage > 0 ? LinkedAllies(target) : new List<Unit>();
             int dealt = LoseHealth(target, LimitDamage(target, healthDamage), out string protection);
             string detail = protection ?? DamageDetail(resolved);
-            Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail);
+            Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack);
             if (target.Health == 0)
                 Report(BattleEventKind.Defeated, actor, target, name, ActionKind.Attack);
             OnLifeLost(actor, target, dealt);

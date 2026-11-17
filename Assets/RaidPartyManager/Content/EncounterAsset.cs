@@ -17,13 +17,20 @@ namespace RaidPartyManager.Content
         public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
         public IReadOnlyList<CharacterDefinition> CharacterCatalog { get; }
         private readonly IReadOnlyDictionary<string, Texture2D> portraits;
+        private readonly IReadOnlyDictionary<string, Texture2D> battleSpriteSheets;
+        private readonly IReadOnlyDictionary<string, Texture2D> battleAttackSheets;
+        private readonly IReadOnlyDictionary<string, Texture2D> battleWalkSheets;
         private readonly IReadOnlyDictionary<string, Texture2D> equipmentIcons;
         private readonly Texture2D[] statusIcons;
+        private readonly Texture2D arrowProjectile;
+        private readonly Texture2D magicProjectile;
 
         internal EncounterData(string name, Combatant[] party, Combatant[] enemies,
             EquipmentDefinition[] startingEquipment, EquipmentDefinition victoryReward, int tickLimit,
             IReadOnlyDictionary<string, Texture2D> portraits, IReadOnlyDictionary<string, Texture2D> equipmentIcons,
-            CharacterDefinition[] recruitmentPool, CharacterDefinition[] characterCatalog, Texture2D[] statusIcons)
+            CharacterDefinition[] recruitmentPool, CharacterDefinition[] characterCatalog, Texture2D[] statusIcons,
+            IReadOnlyDictionary<string, Texture2D> battleSpriteSheets, IReadOnlyDictionary<string, Texture2D> battleAttackSheets,
+            IReadOnlyDictionary<string, Texture2D> battleWalkSheets, Texture2D arrowProjectile, Texture2D magicProjectile)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
@@ -32,8 +39,13 @@ namespace RaidPartyManager.Content
             VictoryReward = victoryReward;
             TickLimit = tickLimit;
             this.portraits = portraits;
+            this.battleSpriteSheets = battleSpriteSheets;
+            this.battleAttackSheets = battleAttackSheets;
+            this.battleWalkSheets = battleWalkSheets;
             this.equipmentIcons = equipmentIcons;
             this.statusIcons = statusIcons;
+            this.arrowProjectile = arrowProjectile;
+            this.magicProjectile = magicProjectile;
             RecruitmentPool = Array.AsReadOnly(recruitmentPool);
             CharacterCatalog = Array.AsReadOnly(characterCatalog);
         }
@@ -46,6 +58,22 @@ namespace RaidPartyManager.Content
 
         public Texture2D PortraitFor(string definitionId) =>
             definitionId != null && portraits.TryGetValue(definitionId, out var portrait) ? portrait : null;
+
+        public Texture2D BattleSpriteFor(string definitionId) =>
+            definitionId != null && battleSpriteSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
+
+        public Texture2D BattleAttackFor(string definitionId) =>
+            definitionId != null && battleAttackSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
+
+        public Texture2D BattleWalkFor(string definitionId) =>
+            definitionId != null && battleWalkSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
+
+        public Texture2D ProjectileFor(Profession profession) => profession switch
+        {
+            Profession.Archer => arrowProjectile,
+            Profession.Mage => magicProjectile,
+            _ => null
+        };
     }
 
     [CreateAssetMenu(menuName = "Raid Party Manager/Encounter")]
@@ -88,6 +116,8 @@ namespace RaidPartyManager.Content
         [SerializeField] private UnitEntry[] enemies = Array.Empty<UnitEntry>();
         [SerializeField] private CharacterAsset[] additionalRecruits = Array.Empty<CharacterAsset>();
         [SerializeField] private Texture2D[] statusIcons = Array.Empty<Texture2D>();
+        [SerializeField] private Texture2D arrowProjectile;
+        [SerializeField] private Texture2D magicProjectile;
         [SerializeField] private EquipmentAsset[] startingEquipment = Array.Empty<EquipmentAsset>();
         [SerializeField, Min(1)] private int startingCopies = 1;
         [SerializeField] private EquipmentAsset victoryReward;
@@ -114,6 +144,12 @@ namespace RaidPartyManager.Content
 
             var portraits = catalog.Values.Where(character => character.Portrait != null)
                 .ToDictionary(character => character.Id, character => character.Portrait, StringComparer.Ordinal);
+            var battleSpriteSheets = catalog.Values.Where(character => character.BattleSpriteSheet != null)
+                .ToDictionary(character => character.Id, character => character.BattleSpriteSheet, StringComparer.Ordinal);
+            var battleAttackSheets = catalog.Values.Where(character => character.BattleAttackSheet != null)
+                .ToDictionary(character => character.Id, character => character.BattleAttackSheet, StringComparer.Ordinal);
+            var battleWalkSheets = catalog.Values.Where(character => character.BattleWalkSheet != null)
+                .ToDictionary(character => character.Id, character => character.BattleWalkSheet, StringComparer.Ordinal);
             var equipmentIcons = startingEquipment.Append(victoryReward)
                 .Where(item => item != null && item.Icon != null)
                 .GroupBy(item => item.ToDefinition().Id, StringComparer.Ordinal)
@@ -122,7 +158,8 @@ namespace RaidPartyManager.Content
                 startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies)).ToArray(),
                 victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits, equipmentIcons,
                 recruits.Select(character => character.ToDefinition()).ToArray(),
-                catalog.Values.Select(character => character.ToDefinition()).ToArray(), statusIcons);
+                catalog.Values.Select(character => character.ToDefinition()).ToArray(), statusIcons, battleSpriteSheets,
+                battleAttackSheets, battleWalkSheets, arrowProjectile, magicProjectile);
         }
     }
 }

@@ -152,6 +152,7 @@ namespace RaidPartyManager.Battle
         private readonly List<(Side Side, string Actor, string Target)> attackHistory =
             new List<(Side Side, string Actor, string Target)>();
         private readonly List<Unit> units;
+        private readonly Dictionary<string, Stats> reportedPartyStats = new Dictionary<string, Stats>();
         private bool canSwap;
         private readonly HashSet<string> consumedEquipment = new HashSet<string>();
         private BattleLoadout currentLoadout;
@@ -171,6 +172,35 @@ namespace RaidPartyManager.Battle
             units = request.Combatants.Select(input => new Unit(input)).ToList();
             unitsById = units.ToDictionary(unit => unit.Input.Id);
             UpdateFormation();
+            foreach (var entry in ReadPartyStats())
+                reportedPartyStats.Add(entry.Key, entry.Value);
+        }
+
+        public IEnumerable<KeyValuePair<string, Stats>> ReadPartyStats()
+        {
+            // Reports can precede the next equipment refresh. Read the derived stats without changing combat state.
+            var living = units.Where(unit => unit.Health > 0).Select(unit => unit.EquipmentInput()).ToArray();
+            var formationStats = EquipmentFormation.Resolve(living);
+            foreach (var unit in units.Where(unit => unit.Input.Side == Side.Party))
+            {
+                string id = unit.Input.Id;
+                var stats = formationStats.TryGetValue(id, out var current) ? current : unit.Stats;
+                int attack = EffectiveAttack(stats.Attack, unit.Health > 0 && unit.Layers(StatusKind.Weakened) > 0);
+                yield return new KeyValuePair<string, Stats>(id, new Stats(attack, stats.Defense, stats.SpecialDefense, stats.Health));
+            }
+        }
+
+        private IReadOnlyList<KeyValuePair<string, Stats>> RecordPartyStatChanges()
+        {
+            List<KeyValuePair<string, Stats>> changes = null;
+            foreach (var entry in ReadPartyStats())
+            {
+                if (reportedPartyStats.TryGetValue(entry.Key, out var previous) && previous.Equals(entry.Value))
+                    continue;
+                reportedPartyStats[entry.Key] = entry.Value;
+                (changes ??= new List<KeyValuePair<string, Stats>>()).Add(entry);
+            }
+            return changes?.AsReadOnly();
         }
 
         public bool TrySwapPartyPositions(int first, int second)
@@ -437,13 +467,16 @@ namespace RaidPartyManager.Battle
 
         private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,
             int amount = 0, DecisionReason reason = DecisionReason.Default, string detail = null,
-            CharacterDefinition form = null, BattleLoadout loadout = null)
+            CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
                     .Select(entry => new StatusStack(entry.Key, entry.Value)).ToArray()) : null;
+            var reach = actor != null && action == ActionKind.Attack && (weaponAttack || kind == BattleEventKind.Action)
+                ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
-                target.Health, target.Shield, StatusText(target), detail, form, form != null ? target.Stats.Health : 0, statuses, loadout));
+                target.Health, target.Shield, StatusText(target), detail, form, form != null ? target.Stats.Health : 0, statuses,
+                loadout, RecordPartyStatChanges(), reach));
         }
     }
 }

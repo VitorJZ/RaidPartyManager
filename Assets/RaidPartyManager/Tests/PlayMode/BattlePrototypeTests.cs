@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
@@ -62,6 +63,33 @@ namespace RaidPartyManager.Tests
             var vigor = root.Q("status-row-guard").Q("status-badge-Vigor");
             Assert.That(vigor.Q<Label>("status-stack-count").text, Is.EqualTo("3"));
             Assert.That(vigor.Q<Image>().image, Is.Not.Null);
+            using (var enter = PointerEnterEvent.GetPooled(Mouse(EventType.MouseMove, vigor.worldBound.center)))
+                Send(vigor, enter);
+            yield return null;
+            var statusTooltip = root.Q("battle-status-tooltip");
+            Assert.That(statusTooltip.Q<Label>("battle-status-tooltip-name").text, Is.EqualTo("盛气 ×3"));
+            Assert.That(statusTooltip.Q<Label>("battle-status-tooltip-description").text, Does.Contain("伤害增加20%"));
+            var largeIcon = statusTooltip.Q("battle-status-tooltip-art").Q<Image>();
+            Assert.That(largeIcon.image, Is.SameAs(vigor.Q<Image>().image));
+            Assert.That(largeIcon.worldBound.width, Is.GreaterThan(vigor.worldBound.width));
+            using (var leave = PointerLeaveEvent.GetPooled(Mouse(EventType.MouseMove, Vector2.zero)))
+                Send(vigor, leave);
+            Assert.That(root.Q("battle-status-tooltip"), Is.Null);
+            var portrait = root.Q("equipment-portrait-1");
+            var details = HoverCharacter(root, portrait);
+            Assert.That(details.Q<Label>("battle-detail-name").text, Does.Contain("篝火守夜人"));
+            Assert.That(details.Q<Label>("battle-detail-health").text, Is.EqualTo("生命  10/10"));
+            Assert.That(details.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  5"));
+            Assert.That(details.Q<Label>("battle-detail-defense").text, Is.EqualTo("防御  4"));
+            Assert.That(details.Q<Label>("battle-detail-special-defense").text, Is.EqualTo("特防  4"));
+            Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("慎重"));
+            Assert.That(details.Q<Label>("battle-detail-statuses").text, Does.Contain("盛气 ×3"));
+            Assert.That(details.Q<Label>("battle-detail-slot-1").text, Is.EqualTo("1 · 空槽"));
+            Assert.That(details.Q<Label>("battle-detail-slot-2").text, Is.EqualTo("2 · 精钢壁垒"));
+            Assert.That(details.Q<Label>("battle-detail-slot-3").text, Is.EqualTo("3 · 空槽"));
+            using (var leave = PointerLeaveEvent.GetPooled(Mouse(EventType.MouseMove, Vector2.zero)))
+                Send(portrait, leave);
+            Assert.That(root.Q("battle-character-details"), Is.Null);
             Press(root, "return-main-menu");
             yield return WaitForScene("MainMenu");
 
@@ -95,7 +123,7 @@ namespace RaidPartyManager.Tests
 
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
             Assert.That(scene, Is.Not.Null);
-            UseShortDelays(scene);
+            UseFastAttacks(scene);
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Assert.That(root.panel, Is.Not.Null);
 
@@ -104,14 +132,25 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("enemy-positions").Children().Select(card => card.name),
                 Is.EqualTo(new[] { "enemy-position-1", "enemy-position-2", "enemy-position-3", "enemy-position-4" }));
             Assert.That(root.Q("party-position-1").Children().Select(element => element.name),
-                Is.EqualTo(new[] { "combatant-portrait", "health-bar", "status-row-guard" }));
+                Is.EqualTo(new[] { "combatant-portrait", "status-row-guard" }));
             Assert.That(root.Q("party-position-1").Q("profession-portrait-art"), Is.Not.Null);
-            Assert.That(root.Q("party-position-1").Q("profession-frame-warrior"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q("profession-frame-warrior"), Is.Null);
+            Assert.That(root.Q("party-position-1").Q("combatant-portrait").resolvedStyle.borderLeftWidth, Is.Zero);
             Assert.That(root.Q("enemy-position-1").Q("profession-frame-warrior"), Is.Null);
             Assert.That(root.Q("enemy-position-2").Q("profession-frame-warrior"), Is.Null);
             Assert.That(root.Q("equipment-position-2").Q("profession-frame-mage"), Is.Not.Null);
             Assert.That(root.Q("equipment-positions").childCount, Is.EqualTo(4));
-            Assert.That(root.Q<Label>("status-guard").text, Is.EqualTo("正常"));
+            var guard = root.Q("party-position-1");
+            var caption = guard.Q("combatant-caption");
+            Assert.That(caption.resolvedStyle.flexDirection, Is.EqualTo(FlexDirection.Row));
+            Assert.That(caption.Q<Label>("combatant-subtitle").text, Is.EqualTo("慎重"));
+            Assert.That(caption.Q("combatant-subtitle").worldBound.center.x,
+                Is.GreaterThan(caption.Q("combatant-name").worldBound.center.x));
+            var bar = guard.Q("health-bar");
+            Assert.That(bar.worldBound.yMax, Is.LessThanOrEqualTo(guard.Q("battle-sprite").worldBound.yMin));
+            Assert.That(bar.Q("health-fill").resolvedStyle.backgroundColor.r,
+                Is.GreaterThan(bar.Q("health-fill").resolvedStyle.backgroundColor.g));
+            Assert.That(guard.Q("status-badges").childCount, Is.Zero);
 
             Press(root, "start");
             Assert.That(root.Q<Button>("start"), Is.Null);
@@ -120,12 +159,16 @@ namespace RaidPartyManager.Tests
             var initialLog = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(initialLog.Any(label => label.text.Contains("获得 4 护盾")), Is.True);
             Assert.That(root.Q("party-position-4").Q("health-bar").Q<Label>().text, Is.EqualTo("5 / 8"));
+            var archerDetails = HoverCharacter(root, root.Q("equipment-portrait-4"));
+            Assert.That(archerDetails.Q<Label>("battle-detail-health").text, Is.EqualTo("生命  5/8"));
+            var mageDetails = HoverCharacter(root, root.Q("equipment-portrait-2"));
+            Assert.That(mageDetails.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  6"));
             yield return ResolveBattle(root);
             var first = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(first.First(label => label.text.Contains("突袭队尾")).text, Does.Contain("银叶射手"));
             Assert.That(root.Q<Label>("reward").text, Does.Contain("狂战士之印"));
-            Assert.That(root.Q<Label>("status-brute").text, Is.EqualTo("倒下"));
-            Assert.That(root.Q<Label>("status-flanker").text, Is.EqualTo("倒下"));
+            Assert.That(root.Q("status-row-brute").parent.Q<Label>("health-value").text, Does.StartWith("倒下"));
+            Assert.That(root.Q("status-row-flanker").parent.Q<Label>("health-value").text, Does.StartWith("倒下"));
             AssertNoFormationButtons(root);
             Press(root, "reset");
 
@@ -168,7 +211,7 @@ namespace RaidPartyManager.Tests
             yield return null;
 
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
-            UseShortDelays(scene);
+            UseFastAttacks(scene);
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "open-party-editor");
             Assert.That(root.Q("editor-positions").Children().Select(card => card.name),
@@ -270,7 +313,7 @@ namespace RaidPartyManager.Tests
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
-            UseShortDelays(scene);
+            UseFastAttacks(scene);
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             AssertNoFormationButtons(root);
             var guard = root.Q("party-position-1");
@@ -278,7 +321,7 @@ namespace RaidPartyManager.Tests
             yield return new WaitForSecondsRealtime(0.35f);
             Assert.That(root.Q("formation-drag-preview"), Is.Null);
             Up(root.Q("party-positions"), root.Q("party-position-4").worldBound.center);
-            Assert.That(root.Q("party-position-1").Q("status-guard"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q("status-row-guard"), Is.Not.Null);
 
             Press(root, "start");
             yield return null;
@@ -304,15 +347,15 @@ namespace RaidPartyManager.Tests
             yield return WaitForFormationDrag(root);
             Up(party, root.Q("enemy-position-1").worldBound.center);
             Assert.That(root.Q<Button>("next-round"), Is.Not.Null, "Dropping on an enemy should not advance.");
-            Assert.That(root.Q("party-position-1").Q("status-guard"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q("status-row-guard"), Is.Not.Null);
 
             Down(guard);
             yield return WaitForFormationDrag(root);
             Up(party, archer.worldBound.center);
             Assert.That(root.Q<Button>("next-round"), Is.Null, "A successful swap should start the next round.");
             Assert.That(root.Q<Label>("battle-phase").text, Is.EqualTo("第 2 回合"));
-            Assert.That(root.Q("party-position-4").Q("status-guard"), Is.Not.Null);
-            Assert.That(root.Q("party-position-1").Q("status-archer"), Is.Not.Null);
+            Assert.That(root.Q("party-position-4").Q("status-row-guard"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q("status-row-archer"), Is.Not.Null);
 
             yield return WaitForRoundBreak(root);
             var log = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
@@ -327,7 +370,7 @@ namespace RaidPartyManager.Tests
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
-            UseShortDelays(scene);
+            UseFastAttacks(scene);
             // Use the real authored characters in a controlled starting formation.
             const BindingFlags fields = BindingFlags.NonPublic | BindingFlags.Instance;
             var encounterField = typeof(BattlePrototype).GetField("encounter", fields);
@@ -361,22 +404,340 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator CharactersActThreeSecondsApartByDefault()
+        public IEnumerator StarterSpritesLoopIdleAndPlayTheirActionAndHitPoses()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
-            var root = Object.FindAnyObjectByType<BattlePrototype>().GetComponent<UIDocument>().rootVisualElement;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            SetAttackAnimationTimeScale(scene, 0.23f);
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var sprites = Enumerable.Range(1, 4)
+                .Select(position => root.Q($"party-position-{position}").Q<Image>("battle-sprite")).ToArray();
+            Assert.That(sprites.All(sprite => sprite?.image != null), Is.True);
+            Assert.That(sprites.Select(sprite => sprite.image.name),
+                Is.EqualTo(new[] { "CampGuard-Expanded", "StarMage-Expanded", "DawnHealer-Expanded", "SilverArcher-Expanded" }));
+            var initialFrames = sprites.Select(sprite => sprite.sourceRect).ToArray();
+            foreach (var pose in initialFrames)
+            {
+                Assert.That(pose.y, Is.EqualTo(0f).Within(0.01f), $"Expected the idle row at startup, got {pose}.");
+                Assert.That(pose.width, Is.EqualTo(224f).Within(0.01f));
+                Assert.That(pose.height, Is.EqualTo(224f).Within(0.01f));
+            }
+
+            var idleFrames = sprites.Select(_ => new HashSet<int>()).ToArray();
+            float deadline = Time.realtimeSinceStartup + 2.2f;
+            while (idleFrames.Any(frames => frames.Count < 8) && Time.realtimeSinceStartup < deadline)
+            {
+                for (int slot = 0; slot < sprites.Length; slot++)
+                    idleFrames[slot].Add(FrameColumn(sprites[slot]));
+                yield return null;
+            }
+            Assert.That(idleFrames.Select(frames => frames.Count), Is.All.EqualTo(8));
+
+            Press(root, "start");
+            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite"), Is.SameAs(sprites[0]));
+            Assert.That(root.Q("enemy-position-1").Q<Image>("battle-sprite"), Is.Null);
+            var actionFrames = new bool[4];
+            bool enemyHasActed = false;
+            bool archerRecoiled = false;
+            deadline = Time.realtimeSinceStartup + 7f;
+            while ((!actionFrames.All(played => played) || !archerRecoiled) && Time.realtimeSinceStartup < deadline)
+            {
+                enemyHasActed |= root.Query<Label>("battle-action").ToList()
+                    .Any(label => label.text.Contains("] 拦路蛮兵 ·") || label.text.Contains("] 绕后猎手 ·"));
+                for (int slot = 0; slot < sprites.Length; slot++)
+                {
+                    int row = FrameRow(sprites[slot]);
+                    if (!enemyHasActed)
+                        actionFrames[slot] |= sprites[slot].image.name.EndsWith("-Attack") || (slot == 0 && row == 2);
+                    else if (slot == 3)
+                        archerRecoiled |= row == 2;
+                }
+                yield return null;
+            }
+            Assert.That(actionFrames, Is.All.True, "All four roles should use their action poses.");
+            Assert.That(archerRecoiled, Is.True, "The enemy's rear attack should animate the archer's hit reaction.");
+            yield return WaitForRoundBreak(root);
+            yield return new WaitForSecondsRealtime(0.45f);
+            Assert.That(sprites.Select(FrameRow), Is.All.EqualTo(0), "Survivors resume idle after action and hit.");
+        }
+
+        [UnityTest]
+        public IEnumerator LethalDamagePlaysDeathAndHoldsTheFinalPose()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            UseFastAttacks(scene);
+
+            const BindingFlags fields = BindingFlags.NonPublic | BindingFlags.Instance;
+            var encounterField = typeof(BattlePrototype).GetField("encounter", fields);
+            var encounter = Object.Instantiate((ScriptableObject)encounterField.GetValue(scene));
+            var enemies = (object[])encounter.GetType().GetField("enemies", fields).GetValue(encounter);
+            var hunterCharacter = enemies[1].GetType().GetField("character", fields);
+            var hunter = Object.Instantiate((ScriptableObject)hunterCharacter.GetValue(enemies[1]));
+            hunter.GetType().GetField("attack", fields).SetValue(hunter, 50);
+            hunter.GetType().GetField("health", fields).SetValue(hunter, 100);
+            hunterCharacter.SetValue(enemies[1], hunter);
+            scene.enabled = false;
+            StartWithFreshPlaySession();
+            encounterField.SetValue(scene, encounter);
+            scene.enabled = true;
+
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var archer = root.Q("party-position-4").Q<Image>("battle-sprite");
+            Press(root, "start");
+            var deathFrames = new HashSet<int>();
+            float deadline = Time.realtimeSinceStartup + 6f;
+            while (deathFrames.Count < 8 && Time.realtimeSinceStartup < deadline)
+            {
+                if (FrameRow(archer) == 3)
+                    deathFrames.Add(FrameColumn(archer));
+                yield return null;
+            }
+            Assert.That(deathFrames, Is.EquivalentTo(Enumerable.Range(0, 8)));
+            Assert.That(root.Q("party-position-4").Q<Label>("health-value").text, Does.StartWith("倒下"));
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.That(FrameRow(archer), Is.EqualTo(3));
+            Assert.That(FrameColumn(archer), Is.EqualTo(7));
+            Object.Destroy(hunter);
+            Object.Destroy(encounter);
+        }
+
+        private static int FrameRow(Image sprite) => Mathf.RoundToInt(sprite.sourceRect.y / sprite.sourceRect.height);
+        private static int FrameColumn(Image sprite) => Mathf.RoundToInt(sprite.sourceRect.x / sprite.sourceRect.width);
+
+        [UnityTest]
+        public IEnumerator AttackWindupRepaintsTheRenderedCharacterBeforeTheProjectile()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("Rendered-pixel verification requires a graphics device.");
+
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            SetAttackAnimationTimeScale(scene, 0.70f);
+            var document = scene.GetComponent<UIDocument>();
+            var root = document.rootVisualElement;
+            var originalTarget = document.panelSettings.targetTexture;
+            var target = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
+            target.Create();
+            try
+            {
+                document.panelSettings.targetTexture = target;
+                yield return null;
+                yield return null;
+                Press(root, "start");
+
+                Color32[] firstPose = null;
+                Color32[] raisedStaff = null;
+                float deadline = Time.realtimeSinceStartup + 8f;
+                while (raisedStaff == null && Time.realtimeSinceStartup < deadline)
+                {
+                    var pose = root.Q<Image>("battle-attack-pose");
+                    if (pose?.image != null && pose.image.name == "StarMage-Attack" && FrameRow(pose) == 0)
+                    {
+                        int column = FrameColumn(pose);
+                        if ((column == 0 && firstPose == null) || (column == 3 && firstPose != null))
+                        {
+                            yield return null; // Let the changed atlas region reach the rendered panel.
+                            if (pose.panel != null && FrameRow(pose) == 0 && FrameColumn(pose) == column)
+                            {
+                                Assert.That(root.Q("battle-projectile"), Is.Null);
+                                Rect body = root.Q("party-position-2").Q<Image>("battle-sprite").worldBound;
+                                var pixels = ReadRenderedRegion(target, root.worldBound, body);
+                                if (column == 0)
+                                    firstPose = pixels;
+                                else
+                                    raisedStaff = pixels;
+                            }
+                        }
+                    }
+                    yield return null;
+                }
+
+                Assert.That(firstPose, Is.Not.Null);
+                Assert.That(raisedStaff, Is.Not.Null);
+                int changedPixels = firstPose.Zip(raisedStaff, (a, b) =>
+                    Mathf.Abs(a.r - b.r) + Mathf.Abs(a.g - b.g) + Mathf.Abs(a.b - b.b))
+                    .Count(difference => difference > 48);
+                Assert.That(changedPixels, Is.GreaterThan(500), "The rendered mage must visibly raise the staff before launch.");
+            }
+            finally
+            {
+                document.panelSettings.targetTexture = originalTarget;
+                target.Release();
+                Object.Destroy(target);
+            }
+        }
+
+        private static Color32[] ReadRenderedRegion(RenderTexture target, Rect panel, Rect region)
+        {
+            float scaleX = target.width / panel.width;
+            float scaleY = target.height / panel.height;
+            int width = Mathf.RoundToInt(region.width * scaleX);
+            int height = Mathf.RoundToInt(region.height * scaleY);
+            var rect = new Rect(Mathf.RoundToInt((region.xMin - panel.xMin) * scaleX),
+                Mathf.RoundToInt((panel.yMax - region.yMax) * scaleY), width, height);
+            var previous = RenderTexture.active;
+            var sample = new Texture2D(width, height, TextureFormat.RGBA32, false);
+            try
+            {
+                RenderTexture.active = target;
+                sample.ReadPixels(rect, 0, 0, false);
+                return sample.GetPixels32();
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                Object.Destroy(sample);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator WeaponAttacksTravelToTheirTargetBeforeDamageAndMeleeReturns()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            const BindingFlags fields = BindingFlags.NonPublic | BindingFlags.Instance;
+            SetAttackAnimationTimeScale(scene, 0.67f);
+            var encounterField = typeof(BattlePrototype).GetField("encounter", fields);
+            var encounter = Object.Instantiate((ScriptableObject)encounterField.GetValue(scene));
+            var party = (object[])encounter.GetType().GetField("party", fields).GetValue(encounter);
+            var characterField = party[0].GetType().GetField("character", fields);
+            var guard = Object.Instantiate((ScriptableObject)characterField.GetValue(party[0]));
+            guard.GetType().GetField("hasSkill", fields).SetValue(guard, false);
+            characterField.SetValue(party[0], guard);
+            var enemiesField = encounter.GetType().GetField("enemies", fields);
+            var enemies = (object[])enemiesField.GetValue(encounter);
+            var brute = Object.Instantiate((ScriptableObject)characterField.GetValue(enemies[0]));
+            brute.GetType().GetField("health", fields).SetValue(brute, 120);
+            characterField.SetValue(enemies[0], brute);
+            var singleEnemy = System.Array.CreateInstance(enemies.GetType().GetElementType(), 1);
+            singleEnemy.SetValue(enemies[0], 0);
+            enemiesField.SetValue(encounter, singleEnemy);
+
+            scene.enabled = false;
+            StartWithFreshPlaySession();
+            encounterField.SetValue(scene, encounter);
+            scene.enabled = true;
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            yield return null;
+            var guardBody = root.Q("party-position-1").Q<Image>("battle-sprite");
+            float home = guardBody.worldBound.center.x;
+            var seenProjectiles = new HashSet<string>();
+            var visibleWindups = new HashSet<string>();
+            var walkOut = new HashSet<int>();
+            var walkBack = new HashSet<int>();
+            string flying = null;
+            int healthBeforeFlight = 0;
+            float flightStart = 0;
+            float flightEnd = 0;
+            double flightStartedAt = 0;
+            int? healthBeforeMelee = null;
+            float attackPosition = 0;
+            bool returned = false;
+            Press(root, "start");
+            float deadline = Time.realtimeSinceStartup + 9f;
+            while ((seenProjectiles.Count < 2 || !returned) && Time.realtimeSinceStartup < deadline)
+            {
+                string healthText = root.Q("enemy-position-1").Q<Label>("health-value").text;
+                int enemyHealth = int.Parse(healthText.Split('/')[0].Trim());
+                var projectile = root.Q<Image>("battle-projectile");
+                var pose = root.Q<Image>("battle-attack-pose");
+                if (projectile == null && pose?.image != null &&
+                    (pose.image.name == "StarMage-Attack" || pose.image.name == "SilverArcher-Attack"))
+                {
+                    int slot = pose.image.name == "StarMage-Attack" ? 2 : 4;
+                    var body = root.Q($"party-position-{slot}").Q<Image>("battle-sprite");
+                    Assert.That(pose.style.width.value.value, Is.GreaterThan(body.layout.width));
+                    visibleWindups.Add(pose.image.name);
+                }
+                if (projectile != null)
+                {
+                    flightEnd = projectile.worldBound.center.x;
+                    if (flying == null)
+                    {
+                        flying = projectile.image.name;
+                        healthBeforeFlight = enemyHealth;
+                        flightStart = flightEnd;
+                        flightStartedAt = Time.unscaledTimeAsDouble;
+                    }
+                    Assert.That(enemyHealth, Is.EqualTo(healthBeforeFlight), "Damage must wait for contact.");
+                }
+                else if (flying != null)
+                {
+                    Assert.That(flightEnd, Is.GreaterThan(flightStart + 30f));
+                    Assert.That(enemyHealth, Is.LessThan(healthBeforeFlight));
+                    double minimumFlight = flying == "Arrow" ? 0.36d : 0.46d;
+                    Assert.That(Time.unscaledTimeAsDouble - flightStartedAt, Is.GreaterThan(minimumFlight));
+                    seenProjectiles.Add(flying);
+                    flying = null;
+                }
+
+                var moving = root.Q<Image>("battle-moving-character");
+                if (moving != null)
+                {
+                    healthBeforeMelee ??= enemyHealth;
+                    if (moving.image.name == "CampGuardWalk")
+                    {
+                        int frame = FrameRow(moving) * 3 + FrameColumn(moving);
+                        if (moving.style.scale.value.value.x > 0)
+                        {
+                            walkOut.Add(frame);
+                            Assert.That(enemyHealth, Is.EqualTo(healthBeforeMelee.Value));
+                        }
+                        else
+                        {
+                            walkBack.Add(frame);
+                            Assert.That(enemyHealth, Is.LessThan(healthBeforeMelee.Value));
+                        }
+                    }
+                    else
+                    {
+                        Assert.That(moving.image.name, Is.EqualTo("CampGuard-Attack"));
+                        attackPosition = moving.worldBound.center.x;
+                    }
+                }
+                else if (healthBeforeMelee.HasValue)
+                {
+                    returned = true;
+                    Assert.That(guardBody.visible, Is.True);
+                    Assert.That(guardBody.worldBound.center.x, Is.EqualTo(home).Within(2f));
+                }
+                yield return null;
+            }
+            Assert.That(seenProjectiles, Is.EquivalentTo(new[] { "Arrow", "MagicOrb" }));
+            Assert.That(visibleWindups, Is.EquivalentTo(new[] { "StarMage-Attack", "SilverArcher-Attack" }));
+            Assert.That(walkOut, Is.EquivalentTo(Enumerable.Range(0, 6)));
+            Assert.That(walkBack, Is.EquivalentTo(Enumerable.Range(0, 6)));
+            Assert.That(attackPosition, Is.GreaterThan(home + 28f));
+            Assert.That(returned, Is.True);
+            Object.Destroy(guard);
+            Object.Destroy(brute);
+            Object.Destroy(encounter);
+        }
+
+        [UnityTest]
+        public IEnumerator NextCharacterActsAsSoonAsThePreviousAnimationFinishes()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "start");
             yield return null;
             Assert.That(root.Query<Label>("battle-action").ToList(), Has.Count.EqualTo(1));
-            double first = Time.unscaledTimeAsDouble;
-            yield return new WaitForSecondsRealtime(2.5f);
-            Assert.That(root.Query<Label>("battle-action").ToList(), Has.Count.EqualTo(1));
-            while (root.Query<Label>("battle-action").ToList().Count == 1 && Time.unscaledTimeAsDouble < first + 4d)
+            var first = typeof(BattlePrototype).GetField("actionPlayback", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(scene);
+            Assert.That(first, Is.Not.Null);
+            double finishAt = (double)first.GetType().GetProperty("FinishAt").GetValue(first);
+            while (root.Query<Label>("battle-action").ToList().Count == 1 && Time.unscaledTimeAsDouble < finishAt + 1d)
                 yield return null;
 
             Assert.That(root.Query<Label>("battle-action").ToList(), Has.Count.EqualTo(2));
-            Assert.That(Time.unscaledTimeAsDouble - first, Is.InRange(2.95d, 4d));
+            Assert.That(Time.unscaledTimeAsDouble - finishAt, Is.InRange(0d, 0.18d));
         }
 
         [UnityTest]
@@ -403,8 +764,8 @@ namespace RaidPartyManager.Tests
             yield return DragFormation(root, "edit-member-guard", "edit-position-1");
             yield return DragFormation(root, "edit-member-archer", "edit-position-4");
             Press(root, "back-party-editor");
-            Assert.That(root.Q("party-position-1").Q("status-guard"), Is.Not.Null);
-            Assert.That(root.Q("party-position-4").Q("status-archer"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q("status-row-guard"), Is.Not.Null);
+            Assert.That(root.Q("party-position-4").Q("status-row-archer"), Is.Not.Null);
         }
 
         private static IEnumerator DragFormation(VisualElement root, string from, string to)
@@ -420,9 +781,11 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("formation-drag-preview"), Is.Null);
         }
 
-        private static void UseShortDelays(BattlePrototype scene) =>
-            typeof(BattlePrototype).GetField("secondsBetweenActions", BindingFlags.NonPublic | BindingFlags.Instance)
-                .SetValue(scene, 0.15f);
+        private static void UseFastAttacks(BattlePrototype scene) => SetAttackAnimationTimeScale(scene, 0.10f);
+
+        private static void SetAttackAnimationTimeScale(BattlePrototype scene, float scale) =>
+            typeof(BattlePrototype).GetField("attackAnimationTimeScale", BindingFlags.NonPublic | BindingFlags.Instance)
+                .SetValue(scene, scale);
 
         private static void AssertNoFormationButtons(VisualElement root)
         {
@@ -481,6 +844,15 @@ namespace RaidPartyManager.Tests
 
         private static Event Mouse(EventType type, Vector2 point) =>
             new Event { type = type, mousePosition = point, button = 0, clickCount = 1 };
+
+        private static VisualElement HoverCharacter(VisualElement root, VisualElement portrait)
+        {
+            using var enter = PointerEnterEvent.GetPooled(Mouse(EventType.MouseMove, portrait.worldBound.center));
+            Send(portrait, enter);
+            var details = root.Q("battle-character-details");
+            Assert.That(details, Is.Not.Null);
+            return details;
+        }
 
         private static void Send(VisualElement target, EventBase evt)
         {

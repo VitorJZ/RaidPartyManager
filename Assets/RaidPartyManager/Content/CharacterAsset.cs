@@ -39,6 +39,12 @@ namespace RaidPartyManager.Content
         [SerializeField] private string id;
         [SerializeField] private string displayName;
         [SerializeField] private Texture2D portrait;
+        [Tooltip("Eight columns. Rows contain 8 idle, 8 action, 4 hit and 8 death poses.")]
+        [SerializeField] private Texture2D battleSpriteSheet;
+        [Tooltip("Optional full-width attack poses in four columns and two rows.")]
+        [SerializeField] private Texture2D battleAttackSheet;
+        [Tooltip("Six walking frames in three columns and two rows.")]
+        [SerializeField] private Texture2D battleWalkSheet;
         [SerializeField] private Profession profession;
         [SerializeField, Min(0)] private int rosterNumber;
         [SerializeField, Min(1)] private int stage = 1;
@@ -59,6 +65,9 @@ namespace RaidPartyManager.Content
         [SerializeField] private ActionSpec skill = new ActionSpec();
 
         internal Texture2D Portrait => portrait;
+        internal Texture2D BattleSpriteSheet => battleSpriteSheet;
+        internal Texture2D BattleAttackSheet => battleAttackSheet;
+        internal Texture2D BattleWalkSheet => battleWalkSheet;
         internal string Id => id;
         internal System.Collections.Generic.IEnumerable<CharacterAsset> RelatedForms =>
             evolutions.Append(battleForm).Where(form => form != null);

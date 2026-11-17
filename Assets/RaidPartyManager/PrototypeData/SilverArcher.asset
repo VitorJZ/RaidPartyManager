@@ -15,6 +15,8 @@ MonoBehaviour:
   id: SilverArcher
   displayName: "银叶射手"
   portrait: {fileID: 2800000, guid: abea044ca852463092af4d7bf79ea5ac, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 189e38ac596647ddbc9d94f9e33151b3, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 3d392b1538844bb5afe52960958439f2, type: 3}
   profession: 2
   rosterNumber: 13
   stage: 1

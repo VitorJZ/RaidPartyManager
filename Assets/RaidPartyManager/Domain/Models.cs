@@ -276,12 +276,15 @@ namespace RaidPartyManager.Domain
         public int MaximumHealth { get; }
         public IReadOnlyList<StatusStack> StatusStacks { get; }
         public BattleLoadout Loadout { get; }
+        public IReadOnlyList<KeyValuePair<string, Stats>> PartyStatChanges { get; }
+        public AttackReach AttackReach { get; }
 
         public BattleEvent(int tick, BattleEventKind kind, string actorId = null, string targetId = null,
             string actionName = null, ActionKind actionKind = ActionKind.Attack,
             DecisionReason reason = DecisionReason.Default, int amount = 0, int targetHealth = 0, int targetShield = 0,
             string targetStatuses = null, string detail = null, CharacterDefinition form = null, int maximumHealth = 0,
-            IReadOnlyList<StatusStack> statusStacks = null, BattleLoadout loadout = null)
+            IReadOnlyList<StatusStack> statusStacks = null, BattleLoadout loadout = null,
+            IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified)
         {
             Tick = tick;
             Kind = kind;
@@ -299,6 +302,8 @@ namespace RaidPartyManager.Domain
             MaximumHealth = maximumHealth;
             StatusStacks = statusStacks;
             Loadout = loadout;
+            PartyStatChanges = partyStatChanges;
+            AttackReach = attackReach;
         }
     }
 
