@@ -27,7 +27,7 @@ namespace RaidPartyManager.Presentation
         public Rect BodyBounds => battleSprite?.Figure.worldBound ?? portrait.worldBound;
 
         public BattleUnitCard(Side side, int position, string unitId, CharacterDefinition character,
-            Texture2D art, int maximumHealth, int health, int shield, string subtitle, bool selected, bool hidden = false,
+            Texture2D art, int maximumHealth, int health, int shield, string subtitle, bool hidden = false,
             Func<StatusKind, Texture2D> statusIcon = null, BattleSpriteView battleSprite = null,
             BattleStatusTooltip statusTooltip = null)
         {
@@ -75,7 +75,7 @@ namespace RaidPartyManager.Presentation
             {
                 portrait.style.backgroundColor = character == null ? PrototypeStyle.Inset
                     : Color.Lerp(PrototypeStyle.PanelColor, sideColor, 0.14f);
-                PrototypeStyle.Outline(portrait, selected ? PrototypeStyle.Accent : PrototypeStyle.Edge, 4);
+                PrototypeStyle.Outline(portrait, PrototypeStyle.Edge, 4);
             }
             Add(portrait);
 

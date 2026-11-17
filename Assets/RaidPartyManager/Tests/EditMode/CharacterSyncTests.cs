@@ -18,6 +18,10 @@ namespace RaidPartyManager.Tests
                 "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
 
             Assert.That(scene.Party.Select(unit => unit.Stats.Health), Is.EqualTo(new[] { 10, 7, 12, 8 }));
+            Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0)
+                .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 35)));
+            Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0).Select(character => character.Skill),
+                Is.All.Null);
             var officer = scene.RecruitmentPool.Single(character => character.RosterNumber == 33);
             var archer = scene.RecruitmentPool.Single(character => character.RosterNumber == 34);
             var darkForm = scene.CharacterCatalog.Single(character => character.RosterNumber == 35);
@@ -27,6 +31,55 @@ namespace RaidPartyManager.Tests
             Assert.That(scene.PortraitFor(officer.Id), Is.Not.Null);
             Assert.That(scene.PortraitFor(archer.Id), Is.Not.Null);
             Assert.That(scene.PortraitFor(darkForm.Id), Is.Not.Null);
+
+            foreach (var entry in scene.CharacterCatalog.Where(character => character.RosterNumber > 0))
+            {
+                var sprite = scene.BattleSpriteFor(entry.Id);
+                var attack = scene.BattleAttackFor(entry.Id);
+                var walk = scene.BattleWalkFor(entry.Id);
+                Assert.That(sprite != null && sprite.width % 8 == 0 && sprite.height % 4 == 0, Is.True,
+                    $"Missing or invalid idle and hit atlas for {entry.Name}.");
+                Assert.That(attack != null && attack.width % 4 == 0 && attack.height % 2 == 0, Is.True,
+                    $"Missing or invalid attack atlas for {entry.Name}.");
+                if (entry.Reach == AttackReach.Melee)
+                    Assert.That(walk != null && walk.width % 3 == 0 && walk.height % 2 == 0, Is.True,
+                        $"Missing or invalid six-frame walk atlas for {entry.Name}.");
+            }
+        }
+
+        [Test]
+        public void StarterFamiliesAddFirstHitDamageAndDrawSingleTargetAttacks()
+        {
+            var soldier = Unit(Load("ValiantSoldier"), "soldier", 1);
+            var defender = Unit(Load("HeavyBulwark"), "defender", 2);
+            var enemy = Fighter("enemy", Side.Enemy, 1, attack: 4);
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(
+                new BattleRequest("frontline", new[] { soldier, defender, enemy }, 20));
+
+            var actions = result.Events.Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
+            Assert.That(actions.Where(entry => entry.ActorId == soldier.Id).Select(entry => entry.Amount),
+                Is.EqualTo(new[] { 8, 6 }));
+            Assert.That(actions.Where(entry => entry.ActorId == enemy.Id).Select(entry => entry.TargetId),
+                Is.EqualTo(new[] { defender.Id, defender.Id }));
+        }
+
+        [Test]
+        public void SurvivingTreasureHuntersSettleTheirGoldAndAccessory()
+        {
+            var goldHunter = Load("GoldHunter");
+            var relicHunter = Load("RelicHunter");
+            var accessory = new EquipmentDefinition("ring", "ring", default);
+            var run = new PartyRun(new[]
+            {
+                new PartyMemberStart("gold", goldHunter, 1, goldHunter.BaseStats.Health),
+                new PartyMemberStart("relic", relicHunter, 2, relicHunter.BaseStats.Health)
+            }, new[] { accessory });
+            var enemy = Fighter("enemy", Side.Enemy, 1, health: 40);
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(run.BeginBattle(new[] { enemy }, 10, null));
+
+            Assert.That(run.TrySettle(result, out _), Is.True);
+            Assert.That(run.Gold, Is.EqualTo(5));
+            Assert.That(run.Inventory.Select(item => item.Definition.Id), Is.EqualTo(new[] { accessory.Id, accessory.Id }));
         }
 
         [Test]

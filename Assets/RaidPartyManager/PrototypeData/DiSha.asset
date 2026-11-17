@@ -15,6 +15,9 @@ MonoBehaviour:
   id: DiSha
   displayName: "地煞"
   portrait: {fileID: 2800000, guid: 212714460433452184894867e9da36e5, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 205baf30bd104f44b12ae1e43e985fd8, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: c3f291a9267b45778a411ada3c05c01c, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: ff399068664a4fd6beed0bcc2f2c0ba5, type: 3}
   profession: 0
   rosterNumber: 35
   stage: 1

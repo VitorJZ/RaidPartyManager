@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: GildedMerchant
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: GildedMerchant
+  displayName: "鎏金商王"
+  portrait: {fileID: 2800000, guid: c3e32ef0533c4d329177e179e3a87304, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 3cd30c3db9a24e6cb065c587e1ffbe46, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: ea764243e3574f94bc178122421ef5ca, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: bf0d3bd588514cc8bbcf33689af836d1, type: 3}
+  profession: 3
+  rosterNumber: 27
+  stage: 2
+  reach: 1
+  fixedTrait: 27
+  traitPower: 50
+  traitText: "商店的所有物品打5折"
+  personality: 4
+  attack: 4
+  defense: 1
+  specialDefense: 1
+  health: 11
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

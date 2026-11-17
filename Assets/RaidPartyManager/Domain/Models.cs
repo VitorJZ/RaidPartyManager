@@ -11,7 +11,8 @@ namespace RaidPartyManager.Domain
         None, DamageLimit, GainEmberWhenHit, RepeatTargetDamage, ArcherVolley, PoisonOnHit,
         MissingHealthDamage, EscalatingAttack, PermanentAttackOnKill, IgnoreMagicDefense, LightningChant,
         Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, BlessAlly, RevealEnemies,
-        PiercingArrow, BorrowAllyAttack
+        PiercingArrow, BorrowAllyAttack, HealAlly, FirstDamageToTarget, HealOnDamage, DrawAttacks,
+        ExposeMeleeAttacker, GoldOnSurvival, AccessoryOnSurvival, ShopDiscount
     }
     public enum Personality { Aggressive, Cautious, Reckless, Gentle, Cooperative, Calm }
     public enum Side { Party, Enemy }
@@ -317,12 +318,14 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<Combatant> Recruits { get; }
         public IReadOnlyDictionary<string, int> PermanentAttackGains { get; }
         public int PotionsEarned { get; }
+        public int GoldEarned { get; }
+        public int AccessoriesEarned { get; }
         public BattleLoadout Loadout { get; }
 
         public BattleResult(string id, BattleOutcome outcome, IEnumerable<KeyValuePair<string, int>> health,
             IEnumerable<BattleEvent> events, IEnumerable<KeyValuePair<string, int>> partyPositions = null,
             IEnumerable<Combatant> recruits = null, IEnumerable<KeyValuePair<string, int>> permanentAttackGains = null,
-            int potionsEarned = 0, BattleLoadout loadout = null)
+            int potionsEarned = 0, BattleLoadout loadout = null, int goldEarned = 0, int accessoriesEarned = 0)
         {
             Id = id;
             Outcome = outcome;
@@ -337,6 +340,8 @@ namespace RaidPartyManager.Domain
                 (permanentAttackGains ?? Enumerable.Empty<KeyValuePair<string, int>>())
                     .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal));
             PotionsEarned = potionsEarned;
+            GoldEarned = goldEarned;
+            AccessoriesEarned = accessoriesEarned;
             Loadout = loadout;
         }
     }

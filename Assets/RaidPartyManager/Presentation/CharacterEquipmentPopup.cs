@@ -99,12 +99,32 @@ namespace RaidPartyManager.Presentation
 
             var header = PrototypeStyle.Row();
             header.style.alignItems = Align.Center;
-            header.style.justifyContent = Justify.SpaceBetween;
             var name = PrototypeStyle.Text(selected.Character.Name, 24);
             name.name = "details-character-name";
+            name.style.flexShrink = 0;
+            name.style.whiteSpace = WhiteSpace.NoWrap;
             header.Add(name);
+            var temperament = selected.Character.Personality;
+            var personality = PrototypeStyle.Row("details-personality");
+            personality.style.alignItems = Align.Center;
+            personality.style.flexGrow = 1;
+            personality.style.minWidth = 0;
+            personality.style.marginLeft = 14;
+            personality.style.marginRight = 12;
+            var personalityName = PrototypeStyle.Text($"{PersonalityText(temperament)}：", 14, PrototypeStyle.Accent);
+            personalityName.name = "details-personality-name";
+            personalityName.style.flexShrink = 0;
+            personalityName.style.whiteSpace = WhiteSpace.NoWrap;
+            personality.Add(personalityName);
+            var description = PrototypeStyle.Text(PersonalityDescription(temperament), 14, PrototypeStyle.Muted);
+            description.name = "details-personality-description";
+            description.style.flexShrink = 1;
+            description.style.minWidth = 0;
+            personality.Add(description);
+            header.Add(personality);
             var dismiss = PrototypeStyle.Button("关闭", "close-character-details", close);
             dismiss.style.width = dismiss.style.height = 43;
+            dismiss.style.flexShrink = 0;
             dismiss.style.paddingLeft = dismiss.style.paddingRight = 0;
             dismiss.style.whiteSpace = WhiteSpace.NoWrap;
             PrototypeStyle.Middle(dismiss);
@@ -146,7 +166,7 @@ namespace RaidPartyManager.Presentation
             left.Add(equipped);
             profile.Add(left);
             body.Add(profile);
-            body.Add(BuildBackpack(inventory));
+            body.Add(BuildBackpack(inventory, selected.EquipmentIds.Any(id => id != null)));
             dialog.Add(body);
             Add(dialog);
         }
@@ -207,7 +227,7 @@ namespace RaidPartyManager.Presentation
             return column;
         }
 
-        private VisualElement BuildBackpack(IReadOnlyDictionary<string, EquipmentInstance> inventory)
+        private VisualElement BuildBackpack(IReadOnlyDictionary<string, EquipmentInstance> inventory, bool canUnequip)
         {
             var backpack = PrototypeStyle.Panel();
             backpack.name = "character-backpack";
@@ -219,7 +239,10 @@ namespace RaidPartyManager.Presentation
             header.style.alignItems = Align.Center;
             header.Add(PrototypeStyle.Text("共享背包", 17, PrototypeStyle.Accent));
 
-            int pages = Math.Max(1, (bag.FindLastIndex(id => id != null) + PageSize) / PageSize);
+            int occupiedSpan = bag.FindLastIndex(id => id != null) + 1;
+            int pages = Math.Max(1, (occupiedSpan + PageSize - 1) / PageSize);
+            if (canUnequip && occupiedSpan == pages * PageSize && !bag.Take(occupiedSpan).Contains(null))
+                pages++;
             page = Math.Min(page, pages - 1);
             if (pages > 1)
             {
@@ -454,48 +477,16 @@ namespace RaidPartyManager.Presentation
         {
             HideTooltip();
             hovered = cell;
-            tooltipPanel = PrototypeStyle.Panel();
-            tooltipPanel.name = "equipment-tooltip";
-            tooltipPanel.style.position = Position.Absolute;
-            tooltipPanel.style.marginTop = 0;
-            tooltipPanel.style.width = 208;
-            tooltipPanel.style.backgroundColor = (Color)new Color32(32, 34, 40, 255);
-            PrototypeStyle.Outline(tooltipPanel, PrototypeStyle.Accent, 7);
-
             var item = cell.Item.Definition;
-            var art = new EquipmentIcon(item, iconFor(item.Id));
-            art.style.height = 87;
-            art.style.backgroundColor = PrototypeStyle.Inset;
-            PrototypeStyle.Outline(art, PrototypeStyle.Edge, 4);
-            tooltipPanel.Add(art);
-            var name = PrototypeStyle.Text(item.Name, 16, PrototypeStyle.Accent);
-            name.name = "equipment-tooltip-name";
-            name.style.marginTop = 5;
-            name.style.paddingBottom = 4;
-            name.style.borderBottomWidth = 1;
-            name.style.borderBottomColor = PrototypeStyle.Edge;
-            tooltipPanel.Add(name);
-            var description = PrototypeStyle.Text(string.IsNullOrWhiteSpace(item.Description) ? BonusText(item.Bonus) : item.Description,
-                13, PrototypeStyle.Ink);
-            description.name = "equipment-tooltip-description";
-            description.style.marginTop = 5;
-            tooltipPanel.Add(description);
-            IgnorePicking(tooltipPanel);
+            tooltipPanel = new EquipmentTooltip(item, iconFor(item.Id));
 
             var bounds = this.WorldToLocal(cell.View.worldBound);
             float x = bounds.xMax + 8;
-            if (x + 208 > layout.width)
-                x = bounds.xMin - 216;
-            tooltipPanel.style.left = Mathf.Clamp(x, 4, Mathf.Max(4, layout.width - 212));
+            if (x + EquipmentTooltip.Width > layout.width)
+                x = bounds.xMin - EquipmentTooltip.Width - 8;
+            tooltipPanel.style.left = Mathf.Clamp(x, 4, Mathf.Max(4, layout.width - EquipmentTooltip.Width - 4));
             tooltipPanel.style.top = Mathf.Clamp(bounds.yMin, 4, Mathf.Max(4, layout.height - 195));
             Add(tooltipPanel);
-
-            static void IgnorePicking(VisualElement element)
-            {
-                element.pickingMode = PickingMode.Ignore;
-                foreach (var child in element.Children())
-                    IgnorePicking(child);
-            }
         }
 
         private void HideTooltip()

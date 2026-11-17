@@ -58,7 +58,9 @@ namespace RaidPartyManager.Battle
             public int LastAttackRound;
             public readonly EquippedItem[] Slots;
             public string LastHitTarget;
+            public readonly HashSet<string> DamagedTargets = new HashSet<string>();
             public bool Revived;
+            public bool ResolvingDamageHeal;
 
             public CharacterTrait Trait => CopiedTrait ?? Input.Character.Trait;
             public int TraitPower => CopiedTrait.HasValue ? CopiedTraitPower : Input.Character.TraitPower;
@@ -298,6 +300,9 @@ namespace RaidPartyManager.Battle
         private IEnumerable<Unit> TargetableOpponents(Unit actor)
         {
             var enemies = Opponents(actor).ToArray();
+            var guards = enemies.Where(unit => unit.Trait == CharacterTrait.DrawAttacks).ToArray();
+            if (guards.Length > 0)
+                return guards;
             var visible = enemies.Where(unit => !unit.Has(EquipmentEffect.StealthCloak)).ToArray();
             return visible.Length > 0 ? visible : enemies;
         }
@@ -349,6 +354,8 @@ namespace RaidPartyManager.Battle
             var skill = actor.Input.Character.Skill;
             if (skill != null && Tick >= actor.SkillReadyAt)
                 AddLegalOptions(actor, skill, options);
+            if (actor.Trait == CharacterTrait.HealAlly)
+                AddLegalOptions(actor, HealAllyAction, options);
             AddLegalOptions(actor, actor.Input.Character.BasicAttack, options);
             if (options.Count == 0)
                 return;
@@ -461,8 +468,11 @@ namespace RaidPartyManager.Battle
             var attackGains = party.Where(unit => unit.PermanentAttack > 0)
                 .Select(unit => new KeyValuePair<string, int>(unit.Input.Id, unit.PermanentAttack));
             var potions = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GeneratePotion);
+            int gold = party.Where(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GoldOnSurvival)
+                .Sum(unit => unit.TraitPower);
+            int accessories = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.AccessoryOnSurvival);
             Result = new BattleResult(request.Id, outcome, health, events, partyPositions,
-                recruits.Select(unit => unit.RecruitmentResult()), attackGains, potions, currentLoadout);
+                recruits.Select(unit => unit.RecruitmentResult()), attackGains, potions, currentLoadout, gold, accessories);
         }
 
         private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,

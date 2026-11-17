@@ -15,6 +15,9 @@ MonoBehaviour:
   id: KindleGuard
   displayName: "薪火铁卫"
   portrait: {fileID: 2800000, guid: d0f416acfb4b40afb8083bed8d466491, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: ff0d95ea3fb74ff2b4172264d11f4867, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 49547ac92816422985c022b09b06820c, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: b400ae937c1c4e16a1a9596a97e8bea5, type: 3}
   profession: 0
   rosterNumber: 2
   stage: 2

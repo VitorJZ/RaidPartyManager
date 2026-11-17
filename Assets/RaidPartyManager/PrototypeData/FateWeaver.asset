@@ -15,6 +15,8 @@ MonoBehaviour:
   id: FateWeaver
   displayName: "命运编织者"
   portrait: {fileID: 2800000, guid: 2ab26c687f2a4805aabecaf79f3da072, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: e45c2f45463241d3ae8b2fb0d07731ed, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: d045604c549f42cbaa1328dfbf77e8af, type: 3}
   profession: 3
   rosterNumber: 30
   stage: 1

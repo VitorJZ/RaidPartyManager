@@ -214,6 +214,8 @@ namespace RaidPartyManager.Battle
             int attack = CurrentAttack(actor) - falloff;
             if (actor.Trait == CharacterTrait.RepeatTargetDamage && actor.LastHitTarget == target.Input.Id)
                 attack += actor.TraitPower;
+            if (actor.Trait == CharacterTrait.FirstDamageToTarget && !actor.DamagedTargets.Contains(target.Input.Id))
+                attack += actor.TraitPower;
             if (actor.Trait == CharacterTrait.MissingHealthDamage)
                 attack += actor.Stats.Health - actor.Health;
             int eagleEyes = actor.Count(EagleEye);
@@ -450,6 +452,9 @@ namespace RaidPartyManager.Battle
             if (target.Health == 0)
                 Report(BattleEventKind.Defeated, actor, target, name, ActionKind.Attack);
             OnLifeLost(actor, target, dealt);
+            if (dealt > 0 && weaponAttack && actor.Input.Side != target.Input.Side &&
+                target.Trait == CharacterTrait.ExposeMeleeAttacker && IsMeleeStrike(actor))
+                GrantStatus(target, actor, Exposed, target.TraitPower);
 
             foreach (var ally in linked)
             {
@@ -467,6 +472,10 @@ namespace RaidPartyManager.Battle
                 UpdateEquipment();
             return (dealt, PhysicalLifeLoss(resolved, absorbed, dealt));
         }
+
+        private static bool IsMeleeStrike(Unit actor) => UsesShortbow(actor) ||
+            actor.Input.Character.Reach == AttackReach.Melee ||
+            (actor.Input.Character.Reach == AttackReach.Unspecified && actor.Input.Character.Profession == Profession.Warrior);
 
         private static int PhysicalLifeLoss(IEnumerable<(DamageType Type, int Amount)> parts, int shield, int healthLoss)
         {

@@ -15,6 +15,9 @@ MonoBehaviour:
   id: FallenAcolyte
   displayName: "堕落神侍"
   portrait: {fileID: 2800000, guid: 759d791927de4bef8ca1e66c9387775d, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 1052e055a9414e7eb51f0f4e9d906182, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: c5b30514131b42f1b3723988ddf3cf55, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: da969b536ef2413faf5e635b404f401a, type: 3}
   profession: 0
   rosterNumber: 24
   stage: 2

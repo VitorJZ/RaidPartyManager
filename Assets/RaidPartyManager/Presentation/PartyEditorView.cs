@@ -12,6 +12,7 @@ namespace RaidPartyManager.Presentation
     internal sealed class PartyEditorView : VisualElement
     {
         private readonly PartyRun run;
+        private readonly IReadOnlyList<CharacterDefinition> roster;
         private readonly Func<MemberView, int?> positionOf;
         private readonly Func<string, Texture2D> portraitFor;
         private readonly Func<string, Texture2D> iconFor;
@@ -20,10 +21,11 @@ namespace RaidPartyManager.Presentation
         private string memberId;
         private readonly List<string> backpackCells = new List<string>();
 
-        public PartyEditorView(PartyRun run, Func<MemberView, int?> positionOf,
+        public PartyEditorView(PartyRun run, IReadOnlyList<CharacterDefinition> catalog, Func<MemberView, int?> positionOf,
             Func<string, Texture2D> portraitFor, Func<string, Texture2D> iconFor, Action back)
         {
             this.run = run;
+            roster = catalog.Where(character => character.RosterNumber > 0).OrderBy(character => character.RosterNumber).ToArray();
             this.positionOf = positionOf;
             this.portraitFor = portraitFor;
             this.iconFor = iconFor;
@@ -65,7 +67,7 @@ namespace RaidPartyManager.Presentation
                 if (evt.keyCode != KeyCode.Escape)
                     return;
                 if (memberId != null)
-                    CloseDetails();
+                    CloseModal();
                 else
                     back();
                 evt.StopPropagation();
@@ -84,7 +86,7 @@ namespace RaidPartyManager.Presentation
                 if (run.TryPlace(from.MemberId, to.Position))
                     RenderRoster();
             }, slot => OpenDetails(slot.MemberId));
-            layout.Add(PrototypeStyle.Text("长按立绘可换位，点按打开装备。", 13, PrototypeStyle.Muted));
+            layout.Add(PrototypeStyle.Text("长按立绘换位，左键查看装备，右键替换队员。", 13, PrototypeStyle.Muted));
             var row = PrototypeStyle.Row("editor-positions");
             row.style.justifyContent = Justify.SpaceAround;
             var members = run.Members;
@@ -114,6 +116,7 @@ namespace RaidPartyManager.Presentation
             {
                 var button = PrototypeStyle.Button(member.Character.Name, $"edit-member-{member.Id}",
                     () => OpenDetails(member.Id));
+                RegisterReplacement(button, member);
                 bench.Add(button);
                 drag.Register(new FormationSwap.Slot
                 {
@@ -198,6 +201,7 @@ namespace RaidPartyManager.Presentation
                 open.style.backgroundColor = Color.clear;
                 PrototypeStyle.Outline(open, Color.clear, 4);
                 card.Add(open);
+                RegisterReplacement(card, member);
                 open.RegisterCallback<PointerEnterEvent>(_ => PrototypeStyle.Outline(namePlate, PrototypeStyle.Accent, 4));
                 open.RegisterCallback<PointerLeaveEvent>(_ => PrototypeStyle.Outline(namePlate, PrototypeStyle.Edge, 4));
             }
@@ -211,16 +215,41 @@ namespace RaidPartyManager.Presentation
 
         private void OpenDetails(string id)
         {
+            var member = run.Members.Single(candidate => candidate.Id == id);
+            OpenModal(id, new CharacterEquipmentPopup(run, id, portraitFor(member.Character.Id), iconFor, backpackCells,
+                RenderRoster, CloseModal), "close-character-details");
+        }
+
+        private void RegisterReplacement(VisualElement target, MemberView member)
+        {
+            target.RegisterCallback<PointerUpEvent>(evt =>
+            {
+                if (evt.button != 1 || memberId != null)
+                    return;
+                var inParty = new HashSet<string>(run.Members.Select(entry => entry.Character.Id));
+                var popup = new PartyReplacementPopup(member.Character, roster, inParty, portraitFor, replacement =>
+                {
+                    if (run.TryReplaceMember(member.Id, replacement, positionOf(member)))
+                    {
+                        RenderRoster();
+                        CloseModal();
+                    }
+                }, CloseModal);
+                OpenModal(member.Id, popup, "close-party-replacement");
+                evt.StopPropagation();
+            });
+        }
+
+        private void OpenModal(string id, VisualElement popup, string closeButton)
+        {
             memberId = id;
             overview.SetEnabled(false);
             modalLayer.style.display = DisplayStyle.Flex;
-            var member = run.Members.Single(candidate => candidate.Id == id);
-            modalLayer.Add(new CharacterEquipmentPopup(run, id, portraitFor(member.Character.Id), iconFor, backpackCells,
-                RenderRoster, CloseDetails));
-            modalLayer.Q<Button>("close-character-details").Focus();
+            modalLayer.Add(popup);
+            popup.Q<Button>(closeButton).Focus();
         }
 
-        private void CloseDetails()
+        private void CloseModal()
         {
             string previous = memberId;
             memberId = null;

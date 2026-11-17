@@ -42,12 +42,4 @@ MonoBehaviour:
     power: 0
     cooldown: 0
     damageType: 0
-  hasSkill: 1
-  skill:
-    id: guard
-    displayName: "\u4E3E\u76FE"
-    kind: 2
-    target: 4
-    power: 4
-    cooldown: 24
-    damageType: 0
+  hasSkill: 0

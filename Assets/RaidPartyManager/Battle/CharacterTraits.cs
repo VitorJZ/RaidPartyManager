@@ -8,6 +8,8 @@ namespace RaidPartyManager.Battle
     public sealed partial class BattleSession
     {
         private static readonly StatusKind[] BlessingStatuses = { Vigor, Swift, Resolve, Undying, Ember, Thorns };
+        private static readonly ActionDefinition HealAllyAction = new ActionDefinition(
+            "trait-heal", "治疗", ActionKind.Heal, TargetRule.WoundedAlly, 0, healingScalesWithAttack: true);
 
         private void ApplyBattleStartTraits()
         {
@@ -116,12 +118,22 @@ namespace RaidPartyManager.Battle
 
             if (target.Health > 0 && target.Trait == GainEmberWhenHit)
                 GrantStatus(target, target, Ember, target.TraitPower);
-            if (target.Health == 0 && source != null && source.Input.Side != target.Input.Side &&
-                source.Trait == PermanentAttackOnKill)
+            if (source == null || source.Input.Side == target.Input.Side)
+                return;
+            if (source.Trait == FirstDamageToTarget)
+                source.DamagedTargets.Add(target.Input.Id);
+            if (target.Health == 0 && source.Trait == PermanentAttackOnKill)
             {
                 source.PermanentAttack += source.TraitPower;
                 Report(BattleEventKind.Effect, source, source, "击杀成长", ActionKind.Shield,
                     detail: $"攻击永久 +{source.TraitPower}");
+            }
+            if (source.Trait == HealOnDamage && source.Health > 0 && amount >= 2 && !source.ResolvingDamageHeal)
+            {
+                // Equipment can turn healing into another hit. Settle that hit without re-entering lifesteal.
+                source.ResolvingDamageHeal = true;
+                Heal(source, source, amount / 2, "残晖汲取", BattleEventKind.Effect, hostileTarget: target);
+                source.ResolvingDamageHeal = false;
             }
         }
     }

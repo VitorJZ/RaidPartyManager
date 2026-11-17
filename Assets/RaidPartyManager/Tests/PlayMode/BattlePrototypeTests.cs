@@ -49,17 +49,29 @@ namespace RaidPartyManager.Tests
             Press(root, "edit-member-guard");
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("精钢壁垒"));
             Assert.That(root.Q("edit-item-gear-1"), Is.Null);
+            const string spentPotion = "edit-item-gear-45";
+            var potionCell = FindBackpackCell(root, spentPotion);
+            Assert.That(potionCell, Is.Not.Null);
+            yield return null;
+            yield return Drag(root, potionCell, root.Q("edit-slot-0"));
+            Assert.That(root.Q<Label>("equipped-name-0").text, Is.EqualTo("盛气药水"));
             Press(root, "close-character-details");
             Press(root, "back-party-editor");
-            Press(root, "slot-0");
-            var potionButton = root.Q("quick-equipment").Query<Button>().ToList()
-                .First(button => button.text.StartsWith("盛气药水"));
-            string spentPotion = potionButton.name;
-            Press(root, spentPotion);
             Press(root, "start");
-            Assert.That(root.Q("equipment-position-1").Query<Label>().ToList()
-                .Any(label => label.text == "1 · 空槽"), Is.True);
+            Assert.That(root.Q("equipment-position-1").Q("equipment-slot-1").Q<Image>(), Is.Null);
             yield return null;
+            var equippedShield = root.Q("equipment-position-1").Q("equipment-slot-2");
+            var shieldImage = equippedShield.Q<Image>();
+            Assert.That(shieldImage.image, Is.Not.Null);
+            using (var enter = PointerEnterEvent.GetPooled(Mouse(EventType.MouseMove, equippedShield.worldBound.center)))
+                Send(equippedShield, enter);
+            var itemTooltip = root.Q("equipment-tooltip");
+            Assert.That(itemTooltip.Q<Label>("equipment-tooltip-name").text, Is.EqualTo("精钢壁垒"));
+            Assert.That(itemTooltip.Q<Label>("equipment-tooltip-description").text, Does.Contain("防御和特防"));
+            Assert.That(itemTooltip.Q("equipment-tooltip-art").Q<Image>().image, Is.SameAs(shieldImage.image));
+            using (var leave = PointerLeaveEvent.GetPooled(Mouse(EventType.MouseMove, Vector2.zero)))
+                Send(equippedShield, leave);
+            Assert.That(root.Q("equipment-tooltip"), Is.Null);
             var vigor = root.Q("status-row-guard").Q("status-badge-Vigor");
             Assert.That(vigor.Q<Label>("status-stack-count").text, Is.EqualTo("3"));
             Assert.That(vigor.Q<Image>().image, Is.Not.Null);
@@ -97,10 +109,14 @@ namespace RaidPartyManager.Tests
             yield return WaitForScene("BattlePrototype");
             root = Object.FindAnyObjectByType<BattlePrototype>().GetComponent<UIDocument>().rootVisualElement;
             Assert.That(root.Q<Button>("start").enabledInHierarchy, Is.True);
-            Assert.That(root.Q<Button>("slot-1").text, Does.Contain("精钢壁垒"));
-            Assert.That(root.Q<Button>("slot-0").text, Does.Contain("空槽"));
-            Press(root, "slot-0");
-            Assert.That(root.Q<Button>(spentPotion), Is.Null);
+            var guardEquipment = root.Q("equipment-position-1");
+            Assert.That(guardEquipment.Q("equipment-slot-2").Q<Image>().image, Is.Not.Null);
+            Assert.That(guardEquipment.Q("equipment-slot-1").Q<Image>(), Is.Null);
+            Assert.That(guardEquipment.Q<Label>("equipment-defense").text, Is.EqualTo("4"));
+            Assert.That(guardEquipment.Q<Label>("equipment-special-defense").text, Is.EqualTo("4"));
+            Press(root, "open-party-editor");
+            Press(root, "edit-member-guard");
+            Assert.That(FindBackpackCell(root, spentPotion), Is.Null);
         }
 
         private static void PressMenu(string button) =>
@@ -140,6 +156,29 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("enemy-position-2").Q("profession-frame-warrior"), Is.Null);
             Assert.That(root.Q("equipment-position-2").Q("profession-frame-mage"), Is.Not.Null);
             Assert.That(root.Q("equipment-positions").childCount, Is.EqualTo(4));
+            var backpackIcon = root.Q<Image>("battle-backpack-icon");
+            Assert.That(backpackIcon.image, Is.Not.Null);
+            var backpack = root.Q("battle-backpack-items");
+            Assert.That(backpack.childCount, Is.EqualTo(16));
+            Assert.That(backpack.worldBound.yMax, Is.LessThan(root.Q("equipment-positions").worldBound.yMin));
+            Assert.That(backpackIcon.worldBound.xMax, Is.LessThan(backpack.worldBound.xMin));
+            var firstBackpackItem = backpack.ElementAt(0);
+            using (var enter = PointerEnterEvent.GetPooled(Mouse(EventType.MouseMove, firstBackpackItem.worldBound.center)))
+                Send(firstBackpackItem, enter);
+            Assert.That(root.Q<Label>("equipment-tooltip-name").text, Is.EqualTo("精钢壁垒"));
+            using (var leave = PointerLeaveEvent.GetPooled(Mouse(EventType.MouseMove, Vector2.zero)))
+                Send(firstBackpackItem, leave);
+
+            var startingMageEquipment = root.Q("equipment-position-2");
+            Assert.That(startingMageEquipment.Q<Label>("equipment-attack").text, Is.EqualTo("5"));
+            var slots = startingMageEquipment.Q("equipment-slots").Children().ToArray();
+            Assert.That(slots.Select(slot => slot.name),
+                Is.EqualTo(new[] { "equipment-slot-1", "equipment-slot-2", "equipment-slot-3" }));
+            Assert.That(slots.Select(slot => slot.worldBound.center.y), Is.Ordered.Ascending);
+            var magePortrait = startingMageEquipment.Q("equipment-portrait-2");
+            Assert.That(slots[0].worldBound.xMax, Is.LessThanOrEqualTo(magePortrait.worldBound.xMin));
+            Assert.That(startingMageEquipment.Q("equipment-stats").worldBound.xMin, Is.GreaterThanOrEqualTo(magePortrait.worldBound.xMax));
+            AssertBattleEquipmentIsReadOnly(root);
             var guard = root.Q("party-position-1");
             var caption = guard.Q("combatant-caption");
             Assert.That(caption.resolvedStyle.flexDirection, Is.EqualTo(FlexDirection.Row));
@@ -155,14 +194,19 @@ namespace RaidPartyManager.Tests
             Press(root, "start");
             Assert.That(root.Q<Button>("start"), Is.Null);
             Assert.That(root.Q("enemy-position-1").Q("profession-frame-warrior"), Is.Not.Null);
+            yield return null;
+            AssertBattleEquipmentIsReadOnly(root);
             yield return WaitForRoundBreak(root);
+            AssertBattleEquipmentIsReadOnly(root);
             var initialLog = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
-            Assert.That(initialLog.Any(label => label.text.Contains("获得 4 护盾")), Is.True);
+            Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 普攻")), Is.True);
+            Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 举盾")), Is.False);
             Assert.That(root.Q("party-position-4").Q("health-bar").Q<Label>().text, Is.EqualTo("5 / 8"));
             var archerDetails = HoverCharacter(root, root.Q("equipment-portrait-4"));
             Assert.That(archerDetails.Q<Label>("battle-detail-health").text, Is.EqualTo("生命  5/8"));
             var mageDetails = HoverCharacter(root, root.Q("equipment-portrait-2"));
             Assert.That(mageDetails.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  6"));
+            Assert.That(root.Q("equipment-position-2").Q<Label>("equipment-attack").text, Is.EqualTo("6"));
             yield return ResolveBattle(root);
             var first = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(first.First(label => label.text.Contains("突袭队尾")).text, Does.Contain("银叶射手"));
@@ -179,18 +223,18 @@ namespace RaidPartyManager.Tests
             Press(root, "open-party-editor");
             yield return DragFormation(root, "edit-member-guard", "edit-position-1");
             yield return DragFormation(root, "edit-member-guard", "edit-position-4");
+            Press(root, "edit-member-mage");
+            yield return null;
+            yield return Drag(root, root.Q("bag-cell-0"), root.Q("edit-slot-1"));
+            Press(root, "close-character-details");
             Press(root, "back-party-editor");
-            Press(root, "slot-0");
-            Press(root, "item-gear-1");
-            Assert.That(root.Q<Button>("item-gear-1").text, Does.Contain("篝火守夜人"));
-            Press(root, "member-mage");
-            Press(root, "slot-0");
-            Press(root, "item-gear-1");
-            Assert.That(root.Q<Button>("item-gear-1").text, Does.Contain("星辉术师"));
-            Press(root, "slot-1");
-            Press(root, "item-gear-1");
-            Assert.That(root.Q<Button>("slot-0").text, Does.Contain("空槽"));
-            Assert.That(root.Q<Button>("slot-1").text, Does.Contain("精钢壁垒"));
+            var mageEquipment = root.Q("equipment-position-2");
+            Assert.That(mageEquipment.Q("equipment-slot-1").Q<Image>(), Is.Null);
+            Assert.That(mageEquipment.Q("equipment-slot-2").Q<Image>().image, Is.Not.Null);
+            Assert.That(mageEquipment.Q<Label>("equipment-defense").text, Is.EqualTo("1"));
+            Assert.That(root.Q("battle-backpack-items").childCount, Is.EqualTo(16));
+            Assert.That(root.Q("backpack-item-gear-1"), Is.Null);
+            Assert.That(root.Q("backpack-item-gear-17"), Is.Not.Null);
 
             Press(root, "start");
             yield return ResolveBattle(root);
@@ -198,10 +242,11 @@ namespace RaidPartyManager.Tests
             Assert.That(second.First(label => label.text.Contains("突袭队尾")).text, Does.Contain("篝火守夜人"));
             Press(root, "reset");
             Assert.That(root.Q<Button>("start").enabledInHierarchy, Is.True);
-            Press(root, "slot-0");
-            Assert.That(root.Q<Button>("item-gear-1").text, Does.EndWith("星辉术师"));
-            Assert.That(root.Q<Button>("item-gear-177").text, Does.EndWith("背包"));
             Assert.That(root.Q("party-position-4").Q("health-bar").Q<Label>().text, Is.EqualTo("8 / 8"));
+            Assert.That(root.Q("equipment-position-2").Q("equipment-slot-2").Q<Image>().image, Is.Not.Null);
+            Press(root, "open-party-editor");
+            Press(root, "edit-member-mage");
+            Assert.That(FindBackpackCell(root, "edit-item-gear-177"), Is.Not.Null);
         }
 
         [UnityTest]
@@ -267,8 +312,7 @@ namespace RaidPartyManager.Tests
             Press(root, "close-character-details");
             Press(root, "back-party-editor");
 
-            Press(root, "slot-1");
-            Assert.That(root.Q<Button>("slot-1").text, Does.Contain("精钢壁垒"));
+            Assert.That(root.Q("equipment-position-1").Q("equipment-slot-2").Q<Image>().image, Is.Not.Null);
             Press(root, "open-party-editor");
             yield return DragFormation(root, "edit-member-guard", "editor-bench");
             Assert.That(root.Q("edit-position-1").Q<Button>("edit-member-guard"), Is.Null);
@@ -285,12 +329,9 @@ namespace RaidPartyManager.Tests
             var archerHealth = root.Q("edit-position-4").Q("character-health").Q<Label>().text;
             Assert.That(archerHealth, Does.Contain(battleHealth));
             Press(root, "edit-member-guard");
-            yield return null;
-            while (root.Q<Button>("bag-next") is Button next && next.enabledInHierarchy)
-                Press(root, "bag-next");
-            yield return null;
-            var rewardCell = root.Q("edit-item-gear-177")?.parent;
+            var rewardCell = FindBackpackCell(root, "edit-item-gear-177");
             Assert.That(rewardCell, Is.Not.Null);
+            yield return null;
             string rewardCellName = rewardCell.name;
             Down(rewardCell);
             yield return WaitForDrag(root);
@@ -302,6 +343,11 @@ namespace RaidPartyManager.Tests
             yield return Drag(root, root.Q(rewardCellName), root.Q("edit-slot-1"));
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("狂战士之印"));
             Assert.That(root.Q(rewardCellName).Q("edit-item-gear-1"), Is.Not.Null);
+            Press(root, "bag-next");
+            yield return null;
+            yield return Drag(root, root.Q("edit-slot-1"), root.Q("bag-cell-176"));
+            Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("装备槽 2"));
+            Assert.That(root.Q("bag-cell-176").Q("edit-item-gear-177"), Is.Not.Null);
             Press(root, "close-character-details");
             Press(root, "back-party-editor");
             Assert.That(root.Q<Label>("reward").text, Does.Contain("狂战士之印"));
@@ -365,7 +411,7 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator IntelligenceOfficerRevealsEnemiesAndCelestialFormsUpdateThePortrait()
+        public IEnumerator IntelligenceOfficerRevealsEnemiesAndCelestialFormsUpdateTheBattleSprite()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
@@ -389,16 +435,27 @@ namespace RaidPartyManager.Tests
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             var enemy = root.Q("enemy-position-1");
             Assert.That(enemy.Q("profession-frame-warrior"), Is.Not.Null);
-            Assert.That(root.Q("party-position-1").Q("profession-frame-archer"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Is.EqualTo("TianGong-Combat"));
+            Assert.That(root.Q("party-position-2").Q<Image>("battle-sprite").image.name, Is.EqualTo("IntelligenceOfficer-Combat"));
             Press(root, "start");
             yield return WaitForRoundBreak(root);
-            Assert.That(root.Q("party-position-1").Q("profession-frame-warrior"), Is.Not.Null);
-            Assert.That(root.Q("party-position-1").Q("profession-portrait-art"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Is.EqualTo("DiSha-Combat"));
             Assert.That(root.Q("party-position-1").Query<Label>().ToList().Any(label => label.text == "地煞"), Is.True);
 
             Press(root, "next-round");
+            var meleeSheets = new HashSet<string>();
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while (root.Q<Button>("next-round") == null && Time.realtimeSinceStartup < deadline)
+            {
+                var moving = root.Q<Image>("battle-moving-character");
+                if (moving?.image != null)
+                    meleeSheets.Add(moving.image.name);
+                yield return null;
+            }
+            Assert.That(meleeSheets, Does.Contain("DiSha-Walk"));
+            Assert.That(meleeSheets, Does.Contain("DiSha-Attack"));
             yield return WaitForRoundBreak(root);
-            Assert.That(root.Q("party-position-1").Q("profession-frame-archer"), Is.Not.Null);
+            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Is.EqualTo("TianGong-Combat"));
             Assert.That(root.Q("party-position-1").Query<Label>().ToList().Any(label => label.text == "天弓"), Is.True);
             Object.Destroy(encounter);
         }
@@ -463,7 +520,7 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator LethalDamagePlaysDeathAndHoldsTheFinalPose()
+        public IEnumerator RightClickReplacesACharacterAndTheNewCharacterPlaysAllDeathFrames()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
@@ -485,21 +542,50 @@ namespace RaidPartyManager.Tests
             scene.enabled = true;
 
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
-            var archer = root.Q("party-position-4").Q<Image>("battle-sprite");
+            Press(root, "open-party-editor");
+            Press(root, "edit-member-archer");
+            yield return null;
+            yield return Drag(root, root.Q("bag-cell-0"), root.Q("edit-slot-0"));
+            Press(root, "close-character-details");
+
+            yield return null;
+            var outgoing = root.Q("edit-member-archer");
+            using (var right = PointerUpEvent.GetPooled(new Event
+                   { type = EventType.MouseUp, button = 1, mousePosition = outgoing.worldBound.center }))
+                Send(outgoing, right);
+            var popup = root.Q("party-replacement");
+            Assert.That(popup, Is.Not.Null);
+            var candidates = popup.Q<ScrollView>("replacement-candidates");
+            Assert.That(candidates.Query<Button>().ToList().Count, Is.EqualTo(35));
+            yield return null;
+            Assert.That(candidates.verticalScroller.highValue, Is.GreaterThan(0));
+            Assert.That(popup.Q<Button>("replace-with-CampGuard").enabledInHierarchy, Is.False);
+            Assert.That(popup.Q<Button>("replace-with-SilverArcher").enabledInHierarchy, Is.False);
+            Press(root, "replace-with-RelicHunter");
+            Assert.That(root.Q("party-replacement"), Is.Null);
+            Assert.That(root.Q("edit-position-4").Q<Label>("character-name").text, Is.EqualTo("秘宝猎手"));
+            Assert.That(root.Q("edit-position-4").Q("character-health").Q<Label>().text, Does.Contain("11/11"));
+            Press(root, "edit-member-archer");
+            Assert.That(root.Q("edit-item-gear-1"), Is.Not.Null);
+            Press(root, "close-character-details");
+            Press(root, "back-party-editor");
+
+            var replacement = root.Q("party-position-4").Q<Image>("battle-sprite");
+            Assert.That(replacement.image.name, Is.EqualTo("RelicHunter-Combat"));
             Press(root, "start");
             var deathFrames = new HashSet<int>();
             float deadline = Time.realtimeSinceStartup + 6f;
             while (deathFrames.Count < 8 && Time.realtimeSinceStartup < deadline)
             {
-                if (FrameRow(archer) == 3)
-                    deathFrames.Add(FrameColumn(archer));
+                if (FrameRow(replacement) == 3)
+                    deathFrames.Add(FrameColumn(replacement));
                 yield return null;
             }
             Assert.That(deathFrames, Is.EquivalentTo(Enumerable.Range(0, 8)));
             Assert.That(root.Q("party-position-4").Q<Label>("health-value").text, Does.StartWith("倒下"));
             yield return new WaitForSecondsRealtime(0.3f);
-            Assert.That(FrameRow(archer), Is.EqualTo(3));
-            Assert.That(FrameColumn(archer), Is.EqualTo(7));
+            Assert.That(FrameRow(replacement), Is.EqualTo(3));
+            Assert.That(FrameColumn(replacement), Is.EqualTo(7));
             Object.Destroy(hunter);
             Object.Destroy(encounter);
         }
@@ -791,6 +877,32 @@ namespace RaidPartyManager.Tests
         {
             Assert.That(root.Q("party-positions").Query<Button>().ToList(), Is.Empty);
             Assert.That(root.Q<Button>("unplace"), Is.Null);
+        }
+
+        private static void AssertBattleEquipmentIsReadOnly(VisualElement root)
+        {
+            Assert.That(root.Q("roster-equipment").Query<Button>().ToList(), Is.Empty);
+            var portrait = root.Q("equipment-portrait-1");
+            var target = root.panel.Pick(portrait.worldBound.center);
+            Assert.That(target == portrait || portrait.Contains(target), Is.True);
+            using (var down = PointerDownEvent.GetPooled(Mouse(EventType.MouseDown, portrait.worldBound.center)))
+                Send(target, down);
+            Up(target, portrait.worldBound.center);
+            Assert.That(root.Q("quick-equipment"), Is.Null);
+            Assert.That(root.Q("character-details"), Is.Null);
+        }
+
+        private static VisualElement FindBackpackCell(VisualElement root, string itemName)
+        {
+            while (true)
+            {
+                var item = root.Q(itemName);
+                if (item != null)
+                    return item.parent;
+                if (root.Q<Button>("bag-next") is not Button next || !next.enabledInHierarchy)
+                    return null;
+                Press(root, "bag-next");
+            }
         }
 
         private static IEnumerator WaitForRoundBreak(VisualElement root)

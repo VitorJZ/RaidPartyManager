@@ -39,7 +39,7 @@ bool settled = run.TrySettle(result, out var reward);
 
 ## 战斗界面
 
-`BattlePrototype` 负责布阵、配装、回放和结算。`BattleUnitCard` 根据行动事件更新生命条和状态栏。立绘从内容层读取，角色和战斗数据不依赖 Unity 的渲染资源。参阅 [战斗界面与状态栏](BattleUI.md)。
+`BattlePrototype` 负责战前准备、回放和结算，并提供进入角色编辑的入口。`BattleUnitCard` 根据行动事件更新生命条和状态栏。立绘从内容层读取，角色和战斗数据不依赖 Unity 的渲染资源。参阅 [战斗界面与状态栏](BattleUI.md)。
 
 ## 角色编辑与装备交互
 

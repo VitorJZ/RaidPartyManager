@@ -41,12 +41,4 @@ MonoBehaviour:
     power: 0
     cooldown: 0
     damageType: 1
-  hasSkill: 1
-  skill:
-    id: star
-    displayName: "\u661F\u8F89\u672F"
-    kind: 0
-    target: 0
-    power: 3
-    cooldown: 24
-    damageType: 1
+  hasSkill: 0

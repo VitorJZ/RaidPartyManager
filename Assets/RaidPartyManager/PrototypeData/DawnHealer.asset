@@ -21,7 +21,7 @@ MonoBehaviour:
   rosterNumber: 22
   stage: 1
   reach: 2
-  fixedTrait: 0
+  fixedTrait: 20
   traitPower: 0
   traitText: "选择友方目标，为其恢复生命值"
   evolutions:
@@ -41,13 +41,4 @@ MonoBehaviour:
     power: 0
     cooldown: 0
     damageType: 0
-  hasSkill: 1
-  skill:
-    id: heal
-    displayName: "\u6668\u66E6\u6CBB\u7597"
-    kind: 1
-    target: 3
-    power: 0
-    healingScalesWithAttack: 1
-    cooldown: 24
-    damageType: 0
+  hasSkill: 0

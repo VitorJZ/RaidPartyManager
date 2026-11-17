@@ -24,5 +24,16 @@ namespace RaidPartyManager.Presentation
             Personality.Gentle => "温柔", Personality.Cooperative => "配合", Personality.Calm => "冷静",
             _ => personality.ToString()
         };
+
+        public static string PersonalityDescription(Personality personality) => personality switch
+        {
+            Personality.Aggressive => "哪一招打得最疼，便使哪一招。",
+            Personality.Cautious => "留得青山在，能护住自己就先护住自己。",
+            Personality.Reckless => "护身的事一会儿再说，先攻上去！",
+            Personality.Gentle => "刀兵且慢，先给最撑不住的同伴疗伤。",
+            Personality.Cooperative => "同伴的刀箭往哪儿去，便跟上去合攻一处。",
+            Personality.Calm => "满场刀光也不急，先找血条最短的敌人收尾。",
+            _ => string.Empty
+        };
     }
 }

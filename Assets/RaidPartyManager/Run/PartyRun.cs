@@ -82,6 +82,7 @@ namespace RaidPartyManager.Run
         private readonly List<Member> members = new List<Member>();
         private readonly Dictionary<string, EquipmentInstance> inventory = new Dictionary<string, EquipmentInstance>();
         private readonly Dictionary<string, EquipmentDefinition> potionDefinitions = new Dictionary<string, EquipmentDefinition>();
+        private readonly Dictionary<string, EquipmentDefinition> accessoryDefinitions = new Dictionary<string, EquipmentDefinition>();
         private BattleRequest activeBattle;
         private EquipmentDefinition activeReward;
         private int nextItemId;
@@ -147,6 +148,7 @@ namespace RaidPartyManager.Run
         }
 
         public IReadOnlyList<EquipmentInstance> Inventory => inventory.Values.ToArray();
+        public int Gold { get; private set; }
 
         public bool HasRecruitmentVacancy => members.Count(IsDeployed) < Rules.Positions &&
             members.Where(IsDeployed).Any(member => EquipmentOf(member).Any(item => item.Effect == EquipmentEffect.RecruitmentNotice));
@@ -214,6 +216,27 @@ namespace RaidPartyManager.Run
 
             member.Character = newForm;
             member.Health = Math.Min(member.Health, PersonalStats(member).Health);
+            return true;
+        }
+
+        public bool TryReplaceMember(string memberId, CharacterDefinition replacement, int? lastPosition = null)
+        {
+            var member = FindMember(memberId);
+            if (activeBattle != null || member == null || replacement == null ||
+                members.Any(existing => existing.Character.Id == replacement.Id))
+                return false;
+
+            int? position = member.Position;
+            if (!position.HasValue && member.Health == 0 && lastPosition is int slot &&
+                Rules.IsPosition(slot) && members.All(existing => existing.Position != slot))
+                position = slot;
+
+            // Equipment instances remain in inventory. Replacing the member releases their assigned slots.
+            members[members.IndexOf(member)] = new Member(new PartyMemberStart(
+                member.Id, replacement, position ?? member.Start.Position, replacement.BaseStats.Health))
+            {
+                Position = position
+            };
             return true;
         }
 
@@ -298,7 +321,8 @@ namespace RaidPartyManager.Run
             }
 
             if ((recruits.Count > 0 && positions.Count == 0) || result.PotionsEarned < 0 ||
-                result.PotionsEarned > Rules.Positions || result.PermanentAttackGains.Any(gain =>
+                result.PotionsEarned > Rules.Positions || result.GoldEarned < 0 || result.GoldEarned > int.MaxValue - Gold ||
+                result.AccessoriesEarned < 0 || result.AccessoriesEarned > Rules.Positions || result.PermanentAttackGains.Any(gain =>
                     gain.Value < 0 || !allUnits.Any(unit => unit.Side == Side.Party && unit.Id == gain.Key)))
                 return false;
 
@@ -343,12 +367,9 @@ namespace RaidPartyManager.Run
 
             if (result.Outcome == BattleOutcome.Victory && activeReward != null)
                 reward = AddEquipment(activeReward);
-            if (result.PotionsEarned > 0 && potionDefinitions.Count > 0)
-            {
-                var potions = potionDefinitions.Values.ToArray();
-                for (int count = 0; count < result.PotionsEarned; count++)
-                    AddEquipment(potions[rewardRandom.Next(potions.Length)]);
-            }
+            Gold += result.GoldEarned;
+            AddRandomRewards(potionDefinitions, result.PotionsEarned);
+            AddRandomRewards(accessoryDefinitions, result.AccessoriesEarned);
             activeBattle = null;
             activeReward = null;
             return true;
@@ -364,7 +385,18 @@ namespace RaidPartyManager.Run
             inventory.Add(item.Id, item);
             if (definition.IsPotion)
                 potionDefinitions.TryAdd(definition.Id, definition);
+            else if (definition.Effect != EquipmentEffect.RecruitmentNotice)
+                accessoryDefinitions.TryAdd(definition.Id, definition);
             return item;
+        }
+
+        private void AddRandomRewards(Dictionary<string, EquipmentDefinition> pool, int count)
+        {
+            if (count <= 0 || pool.Count == 0)
+                return;
+            var choices = pool.Values.ToArray();
+            for (int i = 0; i < count; i++)
+                AddEquipment(choices[rewardRandom.Next(choices.Length)]);
         }
 
         private static bool IsDeployed(Member member) => member.Health > 0 && member.Position.HasValue;

@@ -15,6 +15,8 @@ MonoBehaviour:
   id: RadiantMixer
   displayName: "灵辉调和师"
   portrait: {fileID: 2800000, guid: 921ebb96956746a8b741c50b08dd4ffa, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: a8cacd3bcf84452d9c4b7f5b548f6faa, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: e366b8265cc94b14afebf879df4af7df, type: 3}
   profession: 3
   rosterNumber: 28
   stage: 1

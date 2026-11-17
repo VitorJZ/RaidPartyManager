@@ -104,7 +104,7 @@ namespace RaidPartyManager.Presentation
 
         private void OnPointerUp(PointerUpEvent evt)
         {
-            if (source == null || evt.pointerId != pointerId)
+            if (evt.button != 0 || source == null || evt.pointerId != pointerId)
                 return;
 
             var from = source;

@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: RelicHunter
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: RelicHunter
+  displayName: "秘宝猎手"
+  portrait: {fileID: 2800000, guid: 5af58746427048198bae6f56bcd1cf09, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 41e3c9a5f8f9414a83d4062419887df3, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: d4f833c7b70c408599352f1bef2f7bd4, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: a42dd4d72fdd472b928886861142764a, type: 3}
+  profession: 3
+  rosterNumber: 26
+  stage: 2
+  reach: 1
+  fixedTrait: 26
+  traitPower: 1
+  traitText: "战斗结束时，若仍然存活，获得1件饰品"
+  personality: 5
+  attack: 4
+  defense: 1
+  specialDefense: 1
+  health: 11
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

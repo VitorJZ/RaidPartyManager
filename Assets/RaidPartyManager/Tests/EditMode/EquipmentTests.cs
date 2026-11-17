@@ -214,7 +214,7 @@ namespace RaidPartyManager.Tests
 
         [TestCase("DawnHealer", 7)]
         [TestCase("DivinePriest", 9)]
-        public void AuthoredHealingUsesCurrentAttackAndRebelEarringTargetsEnemiesWithMagic(
+        public void HealingTraitUsesCurrentAttackEveryRoundAndRebelEarringTargetsEnemiesWithMagic(
             string assetName, int expectedHealing)
         {
             var character = AssetDatabase.LoadAssetAtPath<CharacterAsset>(
@@ -231,11 +231,11 @@ namespace RaidPartyManager.Tests
             Assert.That(run.TryEquip("healer", 0, run.Inventory.Single(item => item.Definition == bonus).Id), Is.True);
             var simulator = new BattleSimulator(random: new FixedRoll(0.9));
 
-            var healing = simulator.Simulate(run.BeginBattle(new[] { enemy }, character.ActionInterval, null));
-            var heal = Action(healing, "healer");
-            Assert.That(heal.TargetId, Is.EqualTo(wounded.Id));
-            Assert.That(heal.ActionKind, Is.EqualTo(ActionKind.Heal));
-            Assert.That(heal.Amount, Is.EqualTo(expectedHealing));
+            var healing = simulator.Simulate(run.BeginBattle(new[] { enemy }, 2 * character.ActionInterval, null));
+            var turns = healing.Events.Where(entry => entry.ActorId == "healer" && entry.Kind == BattleEventKind.Action).ToArray();
+            Assert.That(turns.Select(entry => entry.TargetId), Is.EqualTo(new[] { wounded.Id, wounded.Id }));
+            Assert.That(turns.Select(entry => entry.ActionKind), Is.All.EqualTo(ActionKind.Heal));
+            Assert.That(turns.Select(entry => entry.Amount), Is.All.EqualTo(expectedHealing));
             Assert.That(run.TrySettle(healing, out _), Is.True);
 
             Assert.That(run.TryEquip("healer", 1, run.Inventory.Single(item => item.Definition == earring).Id), Is.True);

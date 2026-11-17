@@ -242,6 +242,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.BattlePrototype
   encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
+  backpackIcon: {fileID: 2800000, guid: 6e47ea84955e41c9997c3d367af2fb70, type: 3}
 --- !u!114 &1741968123
 MonoBehaviour:
   m_ObjectHideFlags: 0

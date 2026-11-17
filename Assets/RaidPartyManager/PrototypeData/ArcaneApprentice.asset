@@ -15,6 +15,9 @@ MonoBehaviour:
   id: ArcaneApprentice
   displayName: "秘术学徒"
   portrait: {fileID: 2800000, guid: 5321055fc8fc481192e44b0079422a05, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: c232f20f56624713ae4d3435157e0d1f, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: b9a1debe6c564e0b93e1b443d2d52500, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 5813f0e800604f7eafe6d72e8f911967, type: 3}
   profession: 1
   rosterNumber: 19
   stage: 1

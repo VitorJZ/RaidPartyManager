@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: GoldHunter
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: GoldHunter
+  displayName: "寻金猎人"
+  portrait: {fileID: 2800000, guid: 0c3265c635dd421896f94dc50fad73da, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: ed185ad8e91647aa8c2e5b72f5760b1f, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: eadc2e9e1661401ab80724038cb40f0d, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 8083d71888f3423082fef10e5edd5e46, type: 3}
+  profession: 3
+  rosterNumber: 25
+  stage: 1
+  reach: 1
+  fixedTrait: 25
+  traitPower: 5
+  traitText: "战斗结束时，若仍然存活，额外获得5金币"
+  evolutions:
+  - {fileID: 11400000, guid: 1b56c722b45045eea02a53c43b6f6472, type: 2}
+  - {fileID: 11400000, guid: aee2eeafbf56409593501dd5800dd22e, type: 2}
+  personality: 1
+  attack: 3
+  defense: 0
+  specialDefense: 0
+  health: 10
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

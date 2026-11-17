@@ -15,6 +15,8 @@ MonoBehaviour:
   id: StarChaser
   displayName: "逐星神射"
   portrait: {fileID: 2800000, guid: 7ed9f8cac39a4379b7f0d41029cc68c2, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 5a1f84f5729f4435a1e78c5bfb3f1c55, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: bc8d8a274ca0406c9660801fab5653db, type: 3}
   profession: 2
   rosterNumber: 12
   stage: 2

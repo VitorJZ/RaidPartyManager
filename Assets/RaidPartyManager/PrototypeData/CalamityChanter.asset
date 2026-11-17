@@ -15,6 +15,9 @@ MonoBehaviour:
   id: CalamityChanter
   displayName: "灾厄吟唱者"
   portrait: {fileID: 2800000, guid: 58f8506c951b4bbf8c08b1e2afb2afcc, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 4eba4e4b62f74f1592b598b9608518ba, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 51d249a20e844b1799d6defdfa4efb67, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 60b853e1ffee430582b41c8c81ad8a1f, type: 3}
   profession: 1
   rosterNumber: 20
   stage: 2

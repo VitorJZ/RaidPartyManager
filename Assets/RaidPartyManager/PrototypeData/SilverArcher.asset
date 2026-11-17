@@ -41,12 +41,4 @@ MonoBehaviour:
     power: 0
     cooldown: 0
     damageType: 0
-  hasSkill: 1
-  skill:
-    id: precise
-    displayName: "\u7CBE\u51C6\u5C04\u51FB"
-    kind: 0
-    target: 0
-    power: 2
-    cooldown: 25
-    damageType: 0
+  hasSkill: 0

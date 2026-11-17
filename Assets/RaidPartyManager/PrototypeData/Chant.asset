@@ -15,6 +15,8 @@ MonoBehaviour:
   id: Chant
   displayName: "颂歌"
   portrait: {fileID: 2800000, guid: d497dc32a92946f58bdd8ced215dccca, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: abed1ef4a47249eda1e191f5cb2e82c9, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 01eada5e2a1543c19cba99cbc7339336, type: 3}
   profession: 3
   rosterNumber: 32
   stage: 1
