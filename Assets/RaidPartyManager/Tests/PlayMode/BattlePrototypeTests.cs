@@ -220,6 +220,10 @@ namespace RaidPartyManager.Tests
             UseFastAttacks(scene);
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Assert.That(root.panel, Is.Not.Null);
+            var background = root.Q("battlefield").resolvedStyle.backgroundImage.texture;
+            Assert.That(background, Is.Not.Null);
+            Assert.That(((Texture2D[])typeof(BattlePrototype).GetField("battleBackgrounds", PrivateInstance)
+                .GetValue(scene)).Distinct().Count(), Is.EqualTo(13));
 
             Assert.That(root.Q("party-positions").Children().Select(card => card.name),
                 Is.EqualTo(new[] { "party-position-4", "party-position-3", "party-position-2", "party-position-1" }));
@@ -275,6 +279,7 @@ namespace RaidPartyManager.Tests
             yield return null;
             AssertBattleEquipmentIsReadOnly(root);
             yield return WaitForRoundBreak(root);
+            Assert.That(root.Q("battlefield").resolvedStyle.backgroundImage.texture, Is.SameAs(background));
             AssertBattleEquipmentIsReadOnly(root);
             var initialLog = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 普攻")), Is.True);
@@ -286,6 +291,7 @@ namespace RaidPartyManager.Tests
             Assert.That(mageDetails.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  6"));
             Assert.That(root.Q("equipment-position-2").Q<Label>("equipment-attack").text, Is.EqualTo("6"));
             yield return ResolveBattle(root);
+            Assert.That(root.Q("battlefield").resolvedStyle.backgroundImage.texture, Is.SameAs(background));
             var first = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(first.First(label => label.text.Contains("突袭队尾")).text, Does.Contain("银叶射手"));
             Assert.That(root.Q<Label>("reward").text, Does.Contain("狂战士之印"));

@@ -243,6 +243,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.BattlePrototype
   encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
   backpackIcon: {fileID: 2800000, guid: 6e47ea84955e41c9997c3d367af2fb70, type: 3}
+  battleBackgrounds:
+  - {fileID: 2800000, guid: d1538346d12e4d88888e19ea36f54969, type: 3}
+  - {fileID: 2800000, guid: 959ef6380f0a43a49442d609a5ac103d, type: 3}
+  - {fileID: 2800000, guid: db8158419c0e4d9c944aa1151f3fffc6, type: 3}
+  - {fileID: 2800000, guid: c05348e0fd3740489c6d003ac711677b, type: 3}
+  - {fileID: 2800000, guid: 8e15373ee1a546ef8016103ff4108a60, type: 3}
+  - {fileID: 2800000, guid: f553d855539e49f7b139191c929ff801, type: 3}
+  - {fileID: 2800000, guid: 2685ca8f113f4b78937d1103236ff82f, type: 3}
+  - {fileID: 2800000, guid: 02b84dc5c28c4388960f6ca8aa426f23, type: 3}
+  - {fileID: 2800000, guid: dc7475de3abf4d64ae13a6d94eb48c28, type: 3}
+  - {fileID: 2800000, guid: 7b11c8f942914a1e85a1876c04515f3d, type: 3}
+  - {fileID: 2800000, guid: 6ad9638923b6473fb85d8bd4121f12bd, type: 3}
+  - {fileID: 2800000, guid: 7c1aafeac067405899669a99319276ab, type: 3}
+  - {fileID: 2800000, guid: 855c7c44eb2b469ab565c0083f80aa7c, type: 3}
   randomizeLineups: 1
 --- !u!114 &1741968123
 MonoBehaviour:

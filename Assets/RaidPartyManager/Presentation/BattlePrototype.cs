@@ -20,6 +20,7 @@ namespace RaidPartyManager.Presentation
 
         [SerializeField] private EncounterAsset encounter;
         [SerializeField] private Texture2D backpackIcon;
+        [SerializeField] private Texture2D[] battleBackgrounds = Array.Empty<Texture2D>();
         [SerializeField] private bool randomizeLineups = true;
         [SerializeField, Min(0.05f)] private float attackAnimationTimeScale = 1f;
 
@@ -47,6 +48,7 @@ namespace RaidPartyManager.Presentation
         private Font localFont;
         private FontAsset localFontAsset;
         private EncounterData content;
+        private Texture2D battleBackground;
         private PartyRun run;
         private PartyRun enemyRun;
         private IReadOnlyList<Combatant> preparedEnemies;
@@ -148,6 +150,8 @@ namespace RaidPartyManager.Presentation
             appearances.Clear();
             battleSprites.Clear();
             battleLog.Clear();
+            var backgrounds = battleBackgrounds.Where(texture => texture != null).ToArray();
+            battleBackground = backgrounds.Length > 0 ? backgrounds[draftRandom.Next(backgrounds.Length)] : null;
             Render();
         }
 
@@ -469,6 +473,12 @@ namespace RaidPartyManager.Presentation
 
             var arena = PrototypeStyle.Panel();
             arena.name = "battlefield";
+            if (battleBackground != null)
+            {
+                arena.style.backgroundImage = new StyleBackground(battleBackground);
+                arena.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                arena.style.unityBackgroundImageTintColor = new Color(0.78f, 0.78f, 0.78f, 1f);
+            }
             if (phase == Phase.RoundBreak)
             {
                 var hint = PrototypeStyle.Text("长按一名队员，拖到另一名存活队员上交换站位。", 13, PrototypeStyle.Muted);
