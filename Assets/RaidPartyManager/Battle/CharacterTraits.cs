@@ -120,6 +120,9 @@ namespace RaidPartyManager.Battle
                 GrantStatus(target, target, Ember, target.TraitPower);
             if (source == null || source.Input.Side == target.Input.Side)
                 return;
+            target.LastAttacker = source.Input.Id;
+            if (amount >= 7)
+                target.WantsRetreat = true;
             if (source.Trait == FirstDamageToTarget)
                 source.DamagedTargets.Add(target.Input.Id);
             if (target.Health == 0 && source.Trait == PermanentAttackOnKill)

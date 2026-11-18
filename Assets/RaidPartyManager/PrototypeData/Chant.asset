@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: Chant
   displayName: "颂歌"
-  portrait: {fileID: 2800000, guid: d497dc32a92946f58bdd8ced215dccca, type: 3}
+  portrait: {fileID: 2800000, guid: d05dded0b4b24974805e13335c2df2bf, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 88473127eaa84be68478f3078d4a2ce1, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: abed1ef4a47249eda1e191f5cb2e82c9, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 01eada5e2a1543c19cba99cbc7339336, type: 3}
   profession: 3
@@ -24,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 16
   traitPower: 0
   traitText: "回合开始时，随机对1名队友施加增益状态"
-  personality: 3
+  personality: 8
   attack: 1
   defense: 0
   specialDefense: 0

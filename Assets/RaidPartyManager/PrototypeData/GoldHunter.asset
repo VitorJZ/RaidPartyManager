@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: GoldHunter
   displayName: "寻金猎人"
-  portrait: {fileID: 2800000, guid: 0c3265c635dd421896f94dc50fad73da, type: 3}
+  portrait: {fileID: 2800000, guid: 2e835b2c799b41e5903f2dabb0010927, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 7f7f00fdea2a41c9b7f43f03a6de2622, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: ed185ad8e91647aa8c2e5b72f5760b1f, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: eadc2e9e1661401ab80724038cb40f0d, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 8083d71888f3423082fef10e5edd5e46, type: 3}
@@ -28,7 +29,7 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: 1b56c722b45045eea02a53c43b6f6472, type: 2}
   - {fileID: 11400000, guid: aee2eeafbf56409593501dd5800dd22e, type: 2}
-  personality: 1
+  personality: 6
   attack: 3
   defense: 0
   specialDefense: 0

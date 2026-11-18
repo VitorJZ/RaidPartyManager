@@ -34,6 +34,13 @@ namespace RaidPartyManager.Tests
 
             foreach (var entry in scene.CharacterCatalog.Where(character => character.RosterNumber > 0))
             {
+                var portrait = scene.PortraitFor(entry.Id);
+                Assert.That(portrait, Is.Not.Null, $"Missing party portrait for {entry.Name}.");
+                Assert.That(portrait.name, Is.EqualTo(entry.Id + "-Expressive"), $"Wrong party portrait for {entry.Name}.");
+                Assert.That((float)portrait.width / portrait.height, Is.InRange(0.625f, 0.71f), entry.Name);
+                var seated = scene.CampSpriteFor(entry.Id);
+                Assert.That(seated, Is.Not.Null, $"Missing camp seated artwork for {entry.Name}.");
+                Assert.That(seated.width, Is.EqualTo(seated.height), entry.Name);
                 var sprite = scene.BattleSpriteFor(entry.Id);
                 var attack = scene.BattleAttackFor(entry.Id);
                 var walk = scene.BattleWalkFor(entry.Id);

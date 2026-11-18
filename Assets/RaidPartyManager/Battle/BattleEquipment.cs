@@ -215,7 +215,7 @@ namespace RaidPartyManager.Battle
             var components = new List<(DamageType Type, int Power)>();
             if (actor.Has(ExecutionMask) && actor.LastAttackRound != Round)
             {
-                components.Add((DamageType.Fixed, Math.Max(1, target.Stats.Health / 10)));
+                components.Add((DamageType.True, Math.Max(1, target.Stats.Health / 10)));
                 return components;
             }
 
@@ -285,7 +285,7 @@ namespace RaidPartyManager.Battle
                         break;
                     if (unit.Health == 0)
                         continue;
-                    if (Hit(actor, unit, action, kind, reason, falloff: falloff))
+                    if (Hit(actor, unit, action, kind, reason, falloff: falloff, firstTarget: kind == BattleEventKind.Action))
                         falloff++;
                     kind = BattleEventKind.Effect;
                 }
@@ -310,13 +310,23 @@ namespace RaidPartyManager.Battle
 
         private bool Hit(Unit actor, Unit target, ActionDefinition action, BattleEventKind kind,
             DecisionReason reason, string equipmentName = null, int falloff = 0, bool canCounter = true,
-            BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1)
+            BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true)
         {
             string name = equipmentName ?? action.Name;
             bool missed = (actor.Layers(Injured) > 0 && random.NextDouble() < 0.20) ||
                 (target.Layers(Swift) > 0 && random.NextDouble() < 0.20);
+            bool execution = actor.Has(ExecutionMask) && actor.LastAttackRound != Round;
             var parts = AttackComponents(actor, target, action, falloff);
             actor.LastAttackRound = Round;
+            if (firstTarget && actor.Input.Side == Side.Party)
+            {
+                int gain = Math.Min(actor.Count(MoneyTreeBranch), int.MaxValue - request.PartyGold - equipmentGold);
+                if (gain > 0)
+                {
+                    equipmentGold += gain;
+                    Report(BattleEventKind.Effect, actor, actor, "摇钱树枝", ActionKind.Shield, detail: $"金币 +{gain}");
+                }
+            }
             int physicalDealt = 0;
             if (missed)
                 Report(kind, actor, target, name, ActionKind.Attack, reason: reason, detail: "未命中", weaponAttack: true, visual: visual);
@@ -333,7 +343,7 @@ namespace RaidPartyManager.Battle
                 if (thorns > 0 && damage.Total >= 2 && actor.Health > 0)
                     Strike(target, actor, damage.Total / 2, DamageType.Physical, "荆棘", BattleEventKind.Effect);
 
-                if (actor.Health > 0 && ember > 0 && parts[0].Type != DamageType.Fixed && !actor.Has(EternalFire))
+                if (actor.Health > 0 && ember > 0 && !execution && !actor.Has(EternalFire))
                 {
                     RemoveLayers(actor, Ember, ember);
                     Report(BattleEventKind.Effect, actor, actor, "余烬", ActionKind.Shield, detail: "消耗余烬");
@@ -386,8 +396,10 @@ namespace RaidPartyManager.Battle
 
         private int Damage(Unit actor, Unit target, int power, DamageType type, bool ignoreDefense)
         {
+            if (type != DamageType.Physical && target.Has(InsulatingOrb))
+                return 0;
             if (type == DamageType.Fixed)
-                return power;
+                return (int)Math.Min(int.MaxValue, (long)power + (actor?.Count(WindChime) ?? 0));
             int defense = ignoreDefense ? 0 : type == DamageType.Physical ? target.Stats.Defense :
                 (type == DamageType.Magic || type == DamageType.Fire) && actor?.Trait != CharacterTrait.IgnoreMagicDefense
                     ? target.Stats.SpecialDefense : 0;
@@ -399,6 +411,12 @@ namespace RaidPartyManager.Battle
                 amount *= 1m + actor.Layers(Vigor) * 0.20m;
                 if (actor.Trait == CharacterTrait.Rebirth && actor.Revived)
                     amount *= 2;
+                if (actor.Input.Side == Side.Party && (request.PartyGold > 0 || equipmentGold > 0))
+                {
+                    int statues = units.Where(ally => ally.Health > 0 && ally.Input.Side == actor.Input.Side &&
+                        Math.Abs(ally.Input.Position - actor.Input.Position) == 1).Sum(ally => ally.Count(LionGoldStatue));
+                    amount *= 1m + (request.PartyGold + equipmentGold) * (decimal)statues / 100;
+                }
                 int wolves = actor.Count(LoneWolf);
                 if (wolves > 0)
                 {
@@ -414,7 +432,7 @@ namespace RaidPartyManager.Battle
                 amount *= type == DamageType.Fire ? 3 : 2;
             if (type == DamageType.Fire)
                 amount *= 1m + 0.5m * target.Layers(Chill);
-            return (int)Math.Min(int.MaxValue, decimal.Floor(amount));
+            return (int)Math.Min(int.MaxValue, decimal.Floor(amount) + (actor?.Count(WindChime) ?? 0));
         }
 
         private int ProjectedDamage(Unit actor, Unit target, IReadOnlyList<(DamageType Type, int Power)> parts,
@@ -461,6 +479,7 @@ namespace RaidPartyManager.Battle
             Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack, visual: visual);
             if (target.Health == 0)
                 Report(BattleEventKind.Defeated, actor, target, name, ActionKind.Attack);
+            var lifeLost = LifeLossByType(resolved, absorbed, dealt);
             OnLifeLost(actor, target, dealt);
             if (dealt > 0 && weaponAttack && actor.Input.Side != target.Input.Side &&
                 target.Trait == CharacterTrait.ExposeMeleeAttacker && IsMeleeStrike(actor))
@@ -470,7 +489,10 @@ namespace RaidPartyManager.Battle
             {
                 if (dealt <= 0)
                     break;
-                int mirrored = LoseHealth(ally, LimitDamage(ally, dealt), out string allyProtection);
+                int linkedDamage = ally.Has(InsulatingOrb) ? lifeLost.Physical : dealt;
+                if (linkedDamage == 0)
+                    continue;
+                int mirrored = LoseHealth(ally, LimitDamage(ally, linkedDamage), out string allyProtection);
                 Report(BattleEventKind.Effect, target, ally, "红绳", ActionKind.Attack, mirrored,
                     detail: allyProtection);
                 if (ally.Health == 0)
@@ -480,16 +502,33 @@ namespace RaidPartyManager.Battle
 
             if (target.Health == 0 || linked.Any(ally => ally.Health == 0))
                 UpdateEquipment();
-            return (dealt, PhysicalLifeLoss(resolved, absorbed, dealt));
+            int crystals = actor?.Count(ArcaneCrystal) ?? 0;
+            if (lifeLost.Magic > 0 && crystals > 0 && actor.Health > 0 && !actor.ResolvingCrystalHeal)
+            {
+                actor.ResolvingCrystalHeal = true;
+                // The earrings can turn the heal back into magic damage.
+                try
+                {
+                    Heal(actor, actor, (int)Math.Min(int.MaxValue, (long)lifeLost.Magic * crystals),
+                        "魔导水晶", BattleEventKind.Effect, hostileTarget: target);
+                }
+                finally
+                {
+                    actor.ResolvingCrystalHeal = false;
+                }
+            }
+            return (dealt, lifeLost.Physical);
         }
 
         private static bool IsMeleeStrike(Unit actor) => UsesShortbow(actor) ||
             actor.Input.Character.Reach == AttackReach.Melee ||
             (actor.Input.Character.Reach == AttackReach.Unspecified && actor.Input.Character.Profession == Profession.Warrior);
 
-        private static int PhysicalLifeLoss(IEnumerable<(DamageType Type, int Amount)> parts, int shield, int healthLoss)
+        private static (int Physical, int Magic) LifeLossByType(IEnumerable<(DamageType Type, int Amount)> parts,
+            int shield, int healthLoss)
         {
             int physical = 0;
+            int magic = 0;
             foreach (var part in parts)
             {
                 if (healthLoss == 0)
@@ -500,8 +539,10 @@ namespace RaidPartyManager.Battle
                 healthLoss -= applied;
                 if (part.Type == DamageType.Physical)
                     physical += applied;
+                else if (part.Type is DamageType.Magic or DamageType.Fire)
+                    magic += applied;
             }
-            return physical;
+            return (physical, magic);
         }
 
         private static string DamageDetail(IReadOnlyList<(DamageType Type, int Amount)> parts)
@@ -567,7 +608,7 @@ namespace RaidPartyManager.Battle
         }
 
         private static int HealingPower(Unit target, int power) =>
-            power * (1 << target.Count(HealingRing));
+            (int)Math.Min(int.MaxValue, (long)power * (1 << target.Count(HealingRing)));
 
         private void Heal(Unit actor, Unit target, int power, string name, BattleEventKind kind,
             DecisionReason reason = DecisionReason.Default, Unit hostileTarget = null, BattleVisualCue visual = BattleVisualCue.None)

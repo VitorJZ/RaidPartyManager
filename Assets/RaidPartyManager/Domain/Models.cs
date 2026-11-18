@@ -15,13 +15,17 @@ namespace RaidPartyManager.Domain
         ExposeMeleeAttacker, GoldOnSurvival, AccessoryOnSurvival, ShopDiscount,
         EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack
     }
-    public enum Personality { Aggressive, Cautious, Reckless, Gentle, Cooperative, Calm }
+    public enum Personality
+    {
+        Aggressive, Cautious, Reckless, Gentle, Cooperative, Calm,
+        Timid, Vengeful, Careful, Stubborn, Impatient, Focused, Patient, Greedy
+    }
     public enum Side { Party, Enemy }
     public enum ActionKind { Attack, Heal, Shield }
     public enum DamageType { Physical, Magic, Fire, Lightning, True, Default, Fixed }
     public enum TargetRule { AnyEnemy, FrontEnemy, RearEnemy, WoundedAlly, Self }
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
-    public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth }
+    public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth, Retaliate, FinishWounded, StayOnTarget, UseSkill, SaveSkill, AvoidOverkill, EmergencyHeal }
     public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged }
     public enum BattleVisualCue
     {
@@ -166,12 +170,14 @@ namespace RaidPartyManager.Domain
         public Stats Bonus { get; }
         public string Description { get; }
         public EquipmentEffect Effect { get; }
+        public int Tier { get; }
+        public int Price { get; }
         public bool IsPotion => Effect is EquipmentEffect.VigorPotion or EquipmentEffect.SwiftPotion or
             EquipmentEffect.ResolvePotion or EquipmentEffect.GreedPotion or EquipmentEffect.ThornsPotion or
             EquipmentEffect.PurityPotion;
 
         public EquipmentDefinition(string id, string name, Stats bonus, string description = null,
-            EquipmentEffect effect = EquipmentEffect.None)
+            EquipmentEffect effect = EquipmentEffect.None, int tier = 2, int price = 20)
         {
             if (string.IsNullOrWhiteSpace(id) || bonus.Attack < 0 || bonus.Defense < 0 ||
                 bonus.SpecialDefense < 0 || bonus.Health < 0)
@@ -181,6 +187,8 @@ namespace RaidPartyManager.Domain
             Bonus = bonus;
             Description = description;
             Effect = effect;
+            Tier = tier;
+            Price = price;
         }
     }
 
@@ -228,11 +236,13 @@ namespace RaidPartyManager.Domain
         public int TickLimit { get; }
         public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
         public IReadOnlyDictionary<string, CharacterDefinition> CharacterCatalog { get; }
+        public int PartyGold { get; }
 
         public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit,
-            IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null)
+            IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null,
+            int partyGold = 0)
         {
-            if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0)
+            if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0 || partyGold < 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
             var units = combatants.ToArray();
             if (units.Select(unit => unit.Id).Distinct(StringComparer.Ordinal).Count() != units.Length ||
@@ -243,6 +253,7 @@ namespace RaidPartyManager.Domain
             Id = id;
             Combatants = Array.AsReadOnly(units);
             TickLimit = tickLimit;
+            PartyGold = partyGold;
             RecruitmentPool = Array.AsReadOnly(recruitmentPool?.ToArray() ?? Array.Empty<CharacterDefinition>());
             CharacterCatalog = new System.Collections.ObjectModel.ReadOnlyDictionary<string, CharacterDefinition>(
                 (characterCatalog ?? Enumerable.Empty<CharacterDefinition>()).Concat(RecruitmentPool)

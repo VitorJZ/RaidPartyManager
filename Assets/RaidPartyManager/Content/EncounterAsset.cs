@@ -24,6 +24,7 @@ namespace RaidPartyManager.Content
         private readonly IReadOnlyDictionary<string, Texture2D> battleWalkSheets;
         private readonly IReadOnlyDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)> battleExtras;
         private readonly IReadOnlyDictionary<string, Texture2D> battleProjectiles;
+        private readonly IReadOnlyDictionary<string, Texture2D> campSprites;
         private readonly IReadOnlyDictionary<string, Texture2D> equipmentIcons;
         private readonly Texture2D[] statusIcons;
         private readonly Texture2D arrowProjectile;
@@ -37,7 +38,8 @@ namespace RaidPartyManager.Content
             IReadOnlyDictionary<string, Texture2D> battleWalkSheets, Texture2D arrowProjectile, Texture2D magicProjectile,
             CharacterDefinition[] enemyRoster,
             IReadOnlyDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)> battleExtras,
-            IReadOnlyDictionary<string, Texture2D> battleProjectiles)
+            IReadOnlyDictionary<string, Texture2D> battleProjectiles,
+            IReadOnlyDictionary<string, Texture2D> campSprites)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
@@ -51,6 +53,7 @@ namespace RaidPartyManager.Content
             this.battleWalkSheets = battleWalkSheets;
             this.battleExtras = battleExtras;
             this.battleProjectiles = battleProjectiles;
+            this.campSprites = campSprites;
             this.equipmentIcons = equipmentIcons;
             this.statusIcons = statusIcons;
             this.arrowProjectile = arrowProjectile;
@@ -87,6 +90,9 @@ namespace RaidPartyManager.Content
 
         public Texture2D PortraitFor(string definitionId) =>
             definitionId != null && portraits.TryGetValue(definitionId, out var portrait) ? portrait : null;
+
+        public Texture2D CampSpriteFor(string definitionId) =>
+            definitionId != null && campSprites.TryGetValue(definitionId, out var sprite) ? sprite : null;
 
         public Texture2D BattleSpriteFor(string definitionId) =>
             definitionId != null && battleSpriteSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
@@ -216,7 +222,9 @@ namespace RaidPartyManager.Content
                 enemyChoices.Select(character => character.ToDefinition()).ToArray(),
                 catalog.Values.ToDictionary(character => character.Id, character => character.BattleExtras, StringComparer.Ordinal),
                 catalog.Values.Where(character => character.BattleProjectile != null)
-                    .ToDictionary(character => character.Id, character => character.BattleProjectile, StringComparer.Ordinal));
+                    .ToDictionary(character => character.Id, character => character.BattleProjectile, StringComparer.Ordinal),
+                catalog.Values.Where(character => character.CampSeatedSprite != null)
+                    .ToDictionary(character => character.Id, character => character.CampSeatedSprite, StringComparer.Ordinal));
         }
     }
 }

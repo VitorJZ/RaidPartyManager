@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: HeavyBulwark
   displayName: "重盾铁卫"
-  portrait: {fileID: 2800000, guid: beee661ad22a4beb958d6dd1ad9794d8, type: 3}
+  portrait: {fileID: 2800000, guid: 66a969e208ac47539117013706b511cd, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: c37cab791f414e069ddd8544a2253ed7, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: aa25b18f40324ceb86c42df20ee66ddf, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 36eaa69178054175bc3c790357b88a43, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 40dbcd35e5ad4c28968494fb774f9c59, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 23
   traitPower: 0
   traitText: "在场时，敌方只能以自己为目标"
-  personality: 1
+  personality: 9
   attack: 4
   defense: 5
   specialDefense: 1

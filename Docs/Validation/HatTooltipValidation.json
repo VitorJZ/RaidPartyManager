@@ -1,0 +1,22 @@
+{
+  "verified_utc": "2026-11-17T20:23:51.125387+00:00",
+  "scope": "Hat trick header removal and all three revealed-item hover panels",
+  "functional_test": "AdventureSceneTests.HatGameActuallyMovesOnScreenThenAwardsTheTrackedItem",
+  "test_result": "Passed",
+  "checks": [
+    "No duplicated target artwork or name above the hats",
+    "Visible seven-step shuffle and correct reward",
+    "All three rewards show matching artwork, name and description on hover",
+    "Moving away and closing the event remove the tooltip"
+  ],
+  "build": {
+    "path": "Builds/EventPreview/RaidPartyManager.app",
+    "platform": "macOS",
+    "bytes": 800547515,
+    "errors": 0
+  },
+  "source_sha256": {
+    "Assets/RaidPartyManager/Presentation/HatGameView.cs": "a2ba64c5aae87fb9263360aa88decdef69e71be83e2dc47aa30ecada6e6558b5",
+    "Assets/RaidPartyManager/Tests/PlayMode/AdventureSceneTests.cs": "82b40b32d6231a7f9c10b2482d55902c990c98c3b783ac9f56171adb864bd5e9"
+  }
+}

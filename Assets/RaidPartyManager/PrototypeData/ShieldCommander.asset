@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: ShieldCommander
   displayName: "盾阵统领"
-  portrait: {fileID: 2800000, guid: 629d8dd8a4ed4e14bd81b4f36e08422b, type: 3}
+  portrait: {fileID: 2800000, guid: 2db88a96f04a44c297a916ec110acd3b, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 839e4e2f913243a79f3f164fb9251e72, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 45c39d07e6794850bad6159859be1075, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: a009cb21ffc1497bad75dd8077e46a1a, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: b5f326c46c70453fa5b53382c4f91554, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 24
   traitPower: 1
   traitText: "受到近战伤害时，对伤害来源方施加1层破绽"
-  personality: 4
+  personality: 11
   attack: 4
   defense: 4
   specialDefense: 4

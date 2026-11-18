@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: CalamityChanter
   displayName: "灾厄吟唱者"
-  portrait: {fileID: 2800000, guid: 58f8506c951b4bbf8c08b1e2afb2afcc, type: 3}
+  portrait: {fileID: 2800000, guid: 662935f3d5944de598529be3fbd1852c, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 123bec37552643a596ccc7171752ecff, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 4eba4e4b62f74f1592b598b9608518ba, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 51d249a20e844b1799d6defdfa4efb67, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 60b853e1ffee430582b41c8c81ad8a1f, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 10
   traitPower: 30
   traitText: "每3回合，若仍然存活，对所有敌方单位造成30点雷电伤害"
-  personality: 0
+  personality: 12
   attack: 0
   defense: 2
   specialDefense: 2

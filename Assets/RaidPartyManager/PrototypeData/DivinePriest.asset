@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: DivinePriest
   displayName: "神恩主祭"
-  portrait: {fileID: 2800000, guid: 78bd951272b54d8284d052ad911c4c50, type: 3}
+  portrait: {fileID: 2800000, guid: e256f3acb87f4cc99e0109dd98714f3f, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 1ccf2c09815e4a5495bbf20b5ff94bb7, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 453ce515bd6f4235b210a78d723b2e1e, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 765b4a6a255e4b94ab48d3614ffea424, type: 3}
   profession: 3
@@ -24,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 20
   traitPower: 0
   traitText: "选择友方目标，为其恢复生命值"
-  personality: 3
+  personality: 12
   attack: 5
   defense: 3
   specialDefense: 4

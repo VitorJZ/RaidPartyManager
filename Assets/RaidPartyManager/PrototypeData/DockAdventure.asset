@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6116ba6b72ae419a9b54859f0e27640d, type: 3}
+  m_Name: DockAdventure
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.AdventureContentAsset
+  encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
+  backdrop: {fileID: 2800000, guid: d1538346d12e4d88888e19ea36f54969, type: 3}
+  townBackdrop: {fileID: 2800000, guid: 455fc0d01d334dcb8fe18e03e27579a7, type: 3}
+  eventParchment: {fileID: 2800000, guid: 4e047520344d41258ad09562525ee5fb, type: 3}
+  hat: {fileID: 2800000, guid: 319abf16933f4bd7a4a5204b5f81e445, type: 3}
+  eventArtwork:
+  - {fileID: 2800000, guid: c9fc61dbb0364c9290c76944903d0ac3, type: 3}
+  - {fileID: 2800000, guid: e17f6a91f0dd44fbb6cfc6ec3486da0b, type: 3}
+  - {fileID: 2800000, guid: 334159e627224017bae9998f958a31c9, type: 3}
+  - {fileID: 2800000, guid: 473e12cfb8e642549dc3d115ab42bf85, type: 3}
+  - {fileID: 2800000, guid: 8b489ca65ebe484d804cb4c6d1a5330d, type: 3}
+  - {fileID: 2800000, guid: ce6a995cf1014626a42beae2dc9589b4, type: 3}
+  - {fileID: 2800000, guid: b752d5127ec34ffc930c023b38cd8735, type: 3}
+  - {fileID: 2800000, guid: b04564eb0b0c4248bf0a8a1bdb464cc4, type: 3}
+  - {fileID: 2800000, guid: d5d99177077f47b4987b094c0013e0d9, type: 3}
+  eventInkArtwork:
+  - {fileID: 2800000, guid: 321cd972bddb4022ac738c6665299051, type: 3}
+  - {fileID: 2800000, guid: f5dc0eef4c8b433a91cb012be31f32ec, type: 3}
+  - {fileID: 2800000, guid: a6f6728849024551a96f31fe88c4044c, type: 3}
+  - {fileID: 2800000, guid: 22ab89df40a6442ab16aaf4f4e0e9ff8, type: 3}
+  - {fileID: 2800000, guid: c87b89915da24bc9a2e9105ed0d6102d, type: 3}
+  - {fileID: 2800000, guid: 2dc857d2a3dd43289a84c2714eba6544, type: 3}
+  - {fileID: 2800000, guid: f3078ed71d7f4cedb20c412682134b46, type: 3}
+  - {fileID: 2800000, guid: d8e3ed1da3834c788972fa316a7cfb31, type: 3}
+  - {fileID: 2800000, guid: 8298cfb8057d4c8c8311199849257abd, type: 3}
+  eventInkShader: {fileID: 4800000, guid: 0bc5bebf3e60464eb043e09f2eac1a92, type: 3}
+  nodeIcons:
+  - {fileID: 2800000, guid: 50a218fa09de453fa0315a3dc5f2e0a8, type: 3}
+  - {fileID: 2800000, guid: e145c3b97a7e445dafbd290b48eb0f82, type: 3}
+  - {fileID: 2800000, guid: f0bfffe7d89e4c52b0188d12b59b9207, type: 3}
+  - {fileID: 2800000, guid: 1cbd634b6eb54eca85d11f95fe180e1e, type: 3}
+  - {fileID: 2800000, guid: 9f5c47c1683f46709a441a28a27c2128, type: 3}
+  - {fileID: 2800000, guid: 628e7cce474c44c5882c3dd764bb910b, type: 3}

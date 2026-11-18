@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: HeavyWarrior
   displayName: "重甲战士"
-  portrait: {fileID: 2800000, guid: 84a391f9e99a4a13b18398fbbac01db4, type: 3}
+  portrait: {fileID: 2800000, guid: 9e896caa2ceb46f68910fe200b6140e3, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: f066eef19e214e8db3e23b6155d0114b, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 5299cd127b924cff816ab3ef86542837, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 3070b79abe1f40a2abc017a989aa6f8a, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 5ed0c4832384463e94fc5bcf5d9565d0, type: 3}
@@ -28,7 +29,7 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: 8ffe802f198c420680f45a710de5e506, type: 2}
   - {fileID: 11400000, guid: 0df9435a01ac48b5aee2ee4873cb00db, type: 2}
-  personality: 1
+  personality: 9
   attack: 4
   defense: 4
   specialDefense: 0

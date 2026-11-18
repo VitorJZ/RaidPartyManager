@@ -1,0 +1,44 @@
+{
+  "verified_utc": "2026-11-17T20:14:11.763998+00:00",
+  "edit_mode": {
+    "passed": 82,
+    "failed": 0
+  },
+  "play_mode": {
+    "passed": 22,
+    "failed": 0
+  },
+  "build": {
+    "platform": "macOS",
+    "path": "Builds/EventPreview/RaidPartyManager.app",
+    "bytes": 800546871,
+    "errors": 0,
+    "startup_check_seconds": 15,
+    "startup_runtime_errors": 0
+  },
+  "screenshots": [
+    "EventSelect.png",
+    "EventWindow.png",
+    "HatGame.png",
+    "Town.png",
+    "DockRoute.png"
+  ],
+  "runtime_source_sha256": {
+    "Assets/RaidPartyManager/Run/AdventureRun.cs": "812e5253b569a0b16e586f203c1a63cc38fab9003e4c096cdd1bedd95e4e0b26",
+    "Assets/RaidPartyManager/Run/PartyRun.cs": "a7e90aa030fafabc6d6d9eeaed6e1ce4d50723360c3cb6e561c07f1c3f632680",
+    "Assets/RaidPartyManager/Domain/Models.cs": "64a05edf5f93655765a5cdab08c36e000f4ff193abe5106883b68f32f9a5fb30",
+    "Assets/RaidPartyManager/Content/AdventureContentAsset.cs": "e0335c663f479975159bd1bd7d55813bcfd0f55c681b285da371e35b960374f0",
+    "Assets/RaidPartyManager/Content/EquipmentAsset.cs": "88840f717c9809421592743f95e783311f8b27f0d0b94fca74cb77ef52c42b61",
+    "Assets/RaidPartyManager/Presentation/AdventureFlow.cs": "77a21a721c21f353227d23ce811228dd9b1ea932fd163fab9b45564e7bc5de63",
+    "Assets/RaidPartyManager/Presentation/AdventureEventHub.cs": "f8f26cb81a3bef457b7ef830c8bec9bcd5b180e5ec33aa1a1e3ce49584a170a7",
+    "Assets/RaidPartyManager/Presentation/AdventureEventWindow.cs": "f342762d9f88b7dcfcf7afff4a40ef519153c63f50c9098b08de40477f784c32",
+    "Assets/RaidPartyManager/Presentation/AdventureWidgets.cs": "3d58df4c024256346e59d33f7bbc5962c6fb21d6f06c45973b7620c23f7a24be",
+    "Assets/RaidPartyManager/Presentation/HatGameView.cs": "43bdf1f6cc89841fcdce6cc725cff7df7d16fb78350564dba7c7556519ba28aa",
+    "Assets/RaidPartyManager/Presentation/DockTown.cs": "5d184c2db7b6829879bb0f6b844a7a55db8f6ddaec97ff30822ba0a287b2691e",
+    "Assets/RaidPartyManager/Presentation/CampPrototype.cs": "e6d1d303fe2c86b0ea567304a8dcdd8d29241697ca45de9a0ab5dbb603aacbcc",
+    "Assets/RaidPartyManager/Presentation/DockShop.cs": "e92b53cdd67564ce5823c7af11f9d3b4f701f6a1d4b4d92f47d2c8744f621215",
+    "Assets/RaidPartyManager/Presentation/BattlePrototype.cs": "6ea7d08afa38085219057227886553bd1d76f59b2112107bb4fccf072029674c",
+    "Assets/RaidPartyManager/Presentation/PrototypeSceneMenu.cs": "a4416ef4219fa92d9bc278cf884725230e1a9de5b0309ef1532728cd509b777d",
+    "Assets/RaidPartyManager/Presentation/PartyEditorView.cs": "75a9b830840aaae0ebbc3857c50540aa43f81ad307f08c12762c4df5d882b06b"
+  }
+}

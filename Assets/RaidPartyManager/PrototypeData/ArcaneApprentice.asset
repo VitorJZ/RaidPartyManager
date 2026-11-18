@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: ArcaneApprentice
   displayName: "秘术学徒"
-  portrait: {fileID: 2800000, guid: 5321055fc8fc481192e44b0079422a05, type: 3}
+  portrait: {fileID: 2800000, guid: 5c7cf2b386c84ff7914664c94e06f329, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: eaa1df8e59194def93089dca06db19d3, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: c232f20f56624713ae4d3435157e0d1f, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: b9a1debe6c564e0b93e1b443d2d52500, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 5813f0e800604f7eafe6d72e8f911967, type: 3}
@@ -28,7 +29,7 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: fcb202e5ffbd48f7a687f1cdf43d38a1, type: 2}
   - {fileID: 11400000, guid: bc5f72ba1f5149c78a8d20281f7e158c, type: 2}
-  personality: 0
+  personality: 6
   attack: 5
   defense: 2
   specialDefense: 2

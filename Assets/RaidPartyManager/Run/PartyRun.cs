@@ -44,8 +44,9 @@ namespace RaidPartyManager.Run
         public int Health { get; }
         public Stats EffectiveStats { get; }
         public IReadOnlyList<string> EquipmentIds { get; }
+        public bool IsAway { get; }
 
-        internal MemberView(string id, CharacterDefinition character, int? position, int health, Stats stats, string[] slots)
+        internal MemberView(string id, CharacterDefinition character, int? position, int health, Stats stats, string[] slots, bool isAway = false)
         {
             Id = id;
             Character = character;
@@ -53,6 +54,7 @@ namespace RaidPartyManager.Run
             Health = health;
             EffectiveStats = stats;
             EquipmentIds = Array.AsReadOnly((string[])slots.Clone());
+            IsAway = isAway;
         }
     }
 
@@ -66,6 +68,7 @@ namespace RaidPartyManager.Run
             public int? Position;
             public int Health;
             public int PermanentAttack;
+            public bool IsAway;
             public IReadOnlyDictionary<StatusKind, int> StartingStatuses;
             public readonly string[] Slots = new string[Rules.EquipmentSlots];
 
@@ -129,6 +132,8 @@ namespace RaidPartyManager.Run
             var occupied = new HashSet<int>();
             foreach (var member in members)
             {
+                if (member.IsAway)
+                    continue;
                 member.Health = Math.Min(member.Start.Health, PersonalStats(member).Health);
                 member.StartingStatuses = member.Start.StartingStatuses;
                 if (!IsRooted(member) || member.Health == 0 || !member.Position.HasValue)
@@ -136,7 +141,7 @@ namespace RaidPartyManager.Run
                 else
                     occupied.Add(member.Position.Value);
             }
-            foreach (var member in members.Where(member => member.Health > 0 && !member.Position.HasValue))
+            foreach (var member in members.Where(member => !member.IsAway && member.Health > 0 && !member.Position.HasValue))
             {
                 if (occupied.Add(member.Start.Position))
                     member.Position = member.Start.Position;
@@ -144,7 +149,7 @@ namespace RaidPartyManager.Run
 
             // A recruited member's first position may also be an original member's starting slot.
             int open = 1;
-            foreach (var member in members.Where(member => member.Health > 0 && !member.Position.HasValue))
+            foreach (var member in members.Where(member => !member.IsAway && member.Health > 0 && !member.Position.HasValue))
             {
                 while (occupied.Contains(open))
                     open++;
@@ -158,7 +163,7 @@ namespace RaidPartyManager.Run
             {
                 var formationStats = EquipmentFormation.Resolve(CaptureFormation(Side.Party));
                 return members.Select(member => new MemberView(member.Id, member.Character, member.Position, member.Health,
-                    formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member), member.Slots)).ToArray();
+                    formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member), member.Slots, member.IsAway)).ToArray();
             }
         }
 
@@ -168,17 +173,17 @@ namespace RaidPartyManager.Run
         public IReadOnlyList<Combatant> CaptureFormation(Side side) =>
             members.Where(IsDeployed).Select(member => ToCombatant(member, side)).ToArray();
 
-        public bool HasRecruitmentVacancy => members.Count(IsDeployed) < Rules.Positions &&
+        public bool HasRecruitmentVacancy => members.Count(IsDeployed) + members.Count(member => member.IsAway) < Rules.Positions &&
             members.Where(IsDeployed).Any(member => EquipmentOf(member).Any(item => item.Effect == EquipmentEffect.RecruitmentNotice));
 
         public bool CanStartBattle => activeBattle == null && members.Any(IsDeployed) &&
-            (members.All(member => member.Health == 0 || member.Position.HasValue) || HasRecruitmentVacancy);
+            (members.All(member => member.IsAway || member.Health == 0 || member.Position.HasValue) || HasRecruitmentVacancy);
 
         // Moving onto an occupied position swaps its occupant into the mover's old position.
         public bool TryPlace(string memberId, int? position)
         {
             var member = FindMember(memberId);
-            if (activeBattle != null || member == null || member.Health == 0 ||
+            if (activeBattle != null || member == null || member.IsAway || member.Health == 0 ||
                 (position.HasValue && !Rules.IsPosition(position.Value)) ||
                 (member.Position.HasValue && member.Position != position && IsRooted(member)))
                 return false;
@@ -202,7 +207,7 @@ namespace RaidPartyManager.Run
         public bool TryEquip(string memberId, int slot, string equipmentId)
         {
             var receiver = FindMember(memberId);
-            if (activeBattle != null || receiver == null || slot < 0 || slot >= Rules.EquipmentSlots ||
+            if (activeBattle != null || receiver == null || receiver.IsAway || slot < 0 || slot >= Rules.EquipmentSlots ||
                 (equipmentId != null && !inventory.ContainsKey(equipmentId)))
                 return false;
 
@@ -229,7 +234,7 @@ namespace RaidPartyManager.Run
         public bool TryChangeForm(string memberId, CharacterDefinition newForm)
         {
             var member = FindMember(memberId);
-            if (activeBattle != null || member == null || newForm == null)
+            if (activeBattle != null || member == null || member.IsAway || newForm == null)
                 return false;
 
             member.Character = newForm;
@@ -240,7 +245,7 @@ namespace RaidPartyManager.Run
         public bool TryReplaceMember(string memberId, CharacterDefinition replacement, int? lastPosition = null)
         {
             var member = FindMember(memberId);
-            if (activeBattle != null || member == null || replacement == null ||
+            if (activeBattle != null || member == null || member.IsAway || replacement == null ||
                 members.Any(existing => existing.Character.Id == replacement.Id))
                 return false;
 
@@ -268,7 +273,10 @@ namespace RaidPartyManager.Run
             var enemyUnits = enemies.ToArray();
             if (enemyUnits.Any(unit => unit.Side != Side.Enemy))
                 throw new ArgumentException("Encounter units must be enemies.", nameof(enemies));
-            var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit, recruitmentPool, characterCatalog);
+            // An absent companion retains a party slot, including against recruitment-notice summons.
+            if (members.Any(member => member.IsAway) && members.Count(member => member.Health > 0) >= Rules.Positions)
+                recruitmentPool = null;
+            var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit, recruitmentPool, characterCatalog, Gold);
             nextBattleId++;
             activeBattle = request;
             activeReward = victoryReward;
@@ -394,17 +402,120 @@ namespace RaidPartyManager.Run
 
         private Member FindMember(string id) => members.Find(member => member.Id == id);
 
-        private EquipmentInstance AddEquipment(EquipmentDefinition definition)
+        public void AddGold(int amount)
+        {
+            if (amount < 0 || Gold > int.MaxValue - amount)
+                throw new ArgumentOutOfRangeException(nameof(amount));
+            Gold += amount;
+        }
+
+        public bool TrySpendGold(int amount)
+        {
+            if (activeBattle != null || amount < 0 || Gold < amount)
+                return false;
+            Gold -= amount;
+            return true;
+        }
+
+        public void CancelBattle()
+        {
+            activeBattle = null;
+            activeReward = null;
+        }
+
+        public int Rest(double fraction)
+        {
+            if (activeBattle != null || fraction <= 0 || fraction > 1)
+                return 0;
+            int healed = 0;
+            foreach (var member in members.Where(member => member.Health > 0 && !member.IsAway))
+            {
+                int before = member.Health;
+                int maximum = PersonalStats(member).Health;
+                member.Health = Math.Min(maximum, member.Health + (int)Math.Ceiling(maximum * fraction));
+                healed += member.Health - before;
+            }
+            return healed;
+        }
+
+        public bool TryConsumeItems(IReadOnlyList<string> ids)
+        {
+            if (activeBattle != null || ids == null || ids.Count == 0 || ids.Distinct().Count() != ids.Count ||
+                ids.Any(id => !inventory.ContainsKey(id) || members.Any(member => member.Slots.Contains(id))))
+                return false;
+            foreach (var id in ids)
+                inventory.Remove(id);
+            return true;
+        }
+
+        public bool TryRecruit(CharacterDefinition character)
+        {
+            if (activeBattle != null || character == null || members.Any(member => member.Character.Id == character.Id))
+                return false;
+            var dead = members.FirstOrDefault(member => member.Health == 0);
+            if (members.Count >= Rules.Positions && dead == null)
+                return false;
+            if (dead != null)
+                return TryReplaceMember(dead.Id, character, Enumerable.Range(1, Rules.Positions)
+                    .First(slot => members.All(member => member.Position != slot)));
+            int position = Enumerable.Range(1, Rules.Positions).First(slot => members.All(member => member.Position != slot));
+            string id = "recruit-" + character.Id;
+            while (FindMember(id) != null)
+                id += "-ally";
+            members.Add(new Member(new PartyMemberStart(id, character, position, character.BaseStats.Health)));
+            return true;
+        }
+
+        public bool TrySendAway(string memberId)
+        {
+            var member = FindMember(memberId);
+            if (activeBattle != null || member == null || member.IsAway || !IsDeployed(member) || IsRooted(member) ||
+                members.Count(IsDeployed) <= 1)
+                return false;
+            member.IsAway = true;
+            member.Position = null;
+            return true;
+        }
+
+        public bool TryReturnMember(string memberId, int preferredPosition)
+        {
+            var member = FindMember(memberId);
+            if (activeBattle != null || member == null || !member.IsAway)
+                return false;
+            int position = Rules.IsPosition(preferredPosition) && members.All(other => other.Position != preferredPosition)
+                ? preferredPosition : Enumerable.Range(1, Rules.Positions).FirstOrDefault(slot => members.All(other => other.Position != slot));
+            if (!Rules.IsPosition(position))
+                return false;
+            member.IsAway = false;
+            member.Position = position;
+            return true;
+        }
+
+        public EquipmentInstance AddEquipment(EquipmentDefinition definition)
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
             var item = new EquipmentInstance($"gear-{++nextItemId}", definition);
             inventory.Add(item.Id, item);
+            RegisterReward(definition);
+            return item;
+        }
+
+        public void RegisterRewardCatalog(IEnumerable<EquipmentDefinition> definitions)
+        {
+            foreach (var definition in definitions)
+                RegisterReward(definition ?? throw new ArgumentNullException(nameof(definitions)));
+        }
+
+        private void RegisterReward(EquipmentDefinition definition)
+        {
+            if (definition.Tier < 0 || definition.Price <= 0)
+                return;
+
             if (definition.IsPotion)
                 potionDefinitions.TryAdd(definition.Id, definition);
             else if (definition.Effect != EquipmentEffect.RecruitmentNotice)
                 accessoryDefinitions.TryAdd(definition.Id, definition);
-            return item;
         }
 
         private void AddRandomRewards(Dictionary<string, EquipmentDefinition> pool, int count)

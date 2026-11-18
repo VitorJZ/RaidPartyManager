@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: TwilightKnight
   displayName: "残晖骑士"
-  portrait: {fileID: 2800000, guid: 2971c73ed5584ffda48625a98da88da7, type: 3}
+  portrait: {fileID: 2800000, guid: 0e2c67d2a8784f639c22e6eb7a7dea18, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: abc868e9dab74ccab3d7eafd6c6dacd0, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 9da0a158b68c4ce7951260bafd69a7a7, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: a9831b5ab6fc4a078370c476ed781c1e, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 0d7a3489fe584a0ca0fab2bea4267eaa, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 22
   traitPower: 0
   traitText: "造成伤害时，恢复等同于伤害一半的生命值"
-  personality: 2
+  personality: 7
   attack: 8
   defense: 1
   specialDefense: 3

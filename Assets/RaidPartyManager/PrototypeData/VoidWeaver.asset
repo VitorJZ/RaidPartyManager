@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: VoidWeaver
   displayName: "虚空织法者"
-  portrait: {fileID: 2800000, guid: 068226a89ad3498e926b076a582a07f6, type: 3}
+  portrait: {fileID: 2800000, guid: f685204dd48b458aad89de4848fe027a, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: ec1887eb6f374a11a93ba039167a9d0e, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 6db72edfa1864360bf7a0d9065e20933, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: f4ec419d743140619d2f9f8ab8a5946f, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 09a635f4c8614b9b83ea586877a50bc4, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 0
   traitPower: 0
   traitText: "攻击时，造成2次伤害，1次为物理伤害，1次为法术伤害"
-  personality: 0
+  personality: 13
   attack: 6
   defense: 3
   specialDefense: 3

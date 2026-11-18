@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: DawnHealer
   displayName: "晨曦圣女"
-  portrait: {fileID: 2800000, guid: 0775d8088d934abb82256ade99f89822, type: 3}
+  portrait: {fileID: 2800000, guid: 33760efecccc4f008021c9525c5d071c, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 26a1183d973e4afdb60b33e843844df1, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 9b9fe123069c4bb3816852421878746f, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: a2b2688ffc2843a5872301a9953f7521, type: 3}
   profession: 3
@@ -27,7 +28,7 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: b3b1007214be467b8d411bcdc457319f, type: 2}
   - {fileID: 11400000, guid: 49f4ef44a0b043e78d4acf2411bdc0fa, type: 2}
-  personality: 3
+  personality: 8
   attack: 3
   defense: 1
   specialDefense: 3

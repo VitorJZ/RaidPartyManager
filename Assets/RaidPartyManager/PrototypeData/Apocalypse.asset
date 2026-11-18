@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: Apocalypse
   displayName: "天启"
-  portrait: {fileID: 2800000, guid: f568d39143374b1aaa25deae2bd72d7f, type: 3}
+  portrait: {fileID: 2800000, guid: 20d5b20c29ab497da0548fa5a8a410f2, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 79a9c313fd254cc090672b882b61ffbf, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: a0cdd7f642b045e98f0de08207dcafb9, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: f92d946bccf548fcbb13bbbd60b69fad, type: 3}
   profession: 3
@@ -24,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 15
   traitPower: 0
   traitText: "战斗开始时，将此特性随机变成1名2阶角色的特性"
-  personality: 3
+  personality: 13
   attack: 5
   defense: 1
   specialDefense: 1

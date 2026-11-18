@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: GildedMerchant
   displayName: "鎏金商王"
-  portrait: {fileID: 2800000, guid: c3e32ef0533c4d329177e179e3a87304, type: 3}
+  portrait: {fileID: 2800000, guid: 2a9c71684a55427fad97e9848ea316a8, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: f1e3c0260f3f44cd92bd46c319b100b2, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 3cd30c3db9a24e6cb065c587e1ffbe46, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: ea764243e3574f94bc178122421ef5ca, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: bf0d3bd588514cc8bbcf33689af836d1, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 27
   traitPower: 50
   traitText: "商店的所有物品打5折"
-  personality: 4
+  personality: 13
   attack: 4
   defense: 1
   specialDefense: 1

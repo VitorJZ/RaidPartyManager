@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: FateWeaver
   displayName: "命运编织者"
-  portrait: {fileID: 2800000, guid: 2ab26c687f2a4805aabecaf79f3da072, type: 3}
+  portrait: {fileID: 2800000, guid: da4c4e6271784693b10633dc43bb42b8, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 89d6b0a5f2914c88b82600805c4349bd, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: e45c2f45463241d3ae8b2fb0d07731ed, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: d045604c549f42cbaa1328dfbf77e8af, type: 3}
   profession: 3
@@ -24,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 14
   traitPower: 0
   traitText: "战斗开始时，使一名队友在本场战斗里进阶"
-  personality: 3
+  personality: 12
   attack: 5
   defense: 2
   specialDefense: 2

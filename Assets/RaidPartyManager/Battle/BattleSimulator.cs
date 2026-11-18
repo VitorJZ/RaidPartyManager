@@ -58,9 +58,13 @@ namespace RaidPartyManager.Battle
             public int LastAttackRound;
             public readonly EquippedItem[] Slots;
             public string LastHitTarget;
+            public string LastAttacker;
+            public string FocusTarget;
+            public bool WantsRetreat;
             public readonly HashSet<string> DamagedTargets = new HashSet<string>();
             public bool Revived;
             public bool ResolvingDamageHeal;
+            public bool ResolvingCrystalHeal;
             public int BellRings;
 
             public CharacterTrait Trait => CopiedTrait ?? Input.Character.Trait;
@@ -157,6 +161,7 @@ namespace RaidPartyManager.Battle
         private readonly List<Unit> units;
         private readonly Dictionary<string, Stats> reportedPartyStats = new Dictionary<string, Stats>();
         private bool canSwap;
+        private int equipmentGold;
         private readonly HashSet<string> consumedEquipment = new HashSet<string>();
         private BattleLoadout currentLoadout;
         public BattleLoadout OpeningLoadout { get; private set; }
@@ -213,7 +218,7 @@ namespace RaidPartyManager.Battle
 
             var from = LivingPartyUnitAt(first);
             var to = LivingPartyUnitAt(second);
-            if (from == null || to == null || from.Has(EquipmentEffect.TreeRoot) || to.Has(EquipmentEffect.TreeRoot))
+            if (from == null || to == null || IsLockedInBattle(from) || IsLockedInBattle(to))
                 return false;
 
             from.MoveTo(second);
@@ -223,7 +228,40 @@ namespace RaidPartyManager.Battle
             return true;
         }
 
-        public bool IsPositionLocked(int position) => LivingPartyUnitAt(position)?.Has(EquipmentEffect.TreeRoot) ?? false;
+        public bool IsPositionLocked(int position)
+        {
+            var unit = LivingPartyUnitAt(position);
+            return unit != null && IsLockedInBattle(unit);
+        }
+
+        private static bool IsLockedInBattle(Unit unit) => unit.Has(EquipmentEffect.TreeRoot) ||
+            unit.Input.Character.Personality == Personality.Stubborn;
+
+        private void ResolveRetreats()
+        {
+            var retreating = units.Where(unit => unit.Health > 0 &&
+                unit.Input.Character.Personality == Personality.Timid && !IsLockedInBattle(unit) &&
+                (unit.WantsRetreat || (long)unit.Health * 2 < unit.Stats.Health)).ToArray();
+            if (retreating.Length == 0)
+                return;
+
+            foreach (var unit in retreating.Reverse())
+            {
+                unit.WantsRetreat = false;
+                int from = unit.Input.Position;
+                int rear = Enumerable.Range(from, Rules.Positions - from + 1).Reverse().First(position =>
+                    position == from || !units.Any(ally => ally.Input.Side == unit.Input.Side &&
+                        ally.Input.Position == position &&
+                        (ally.Health == 0 || IsLockedInBattle(ally) || retreating.Contains(ally))));
+                if (rear == from)
+                    continue;
+                var ally = units.FirstOrDefault(ally => ally.Input.Side == unit.Input.Side && ally.Input.Position == rear);
+                ally?.MoveTo(from);
+                unit.MoveTo(rear);
+                Report(BattleEventKind.Effect, unit, unit, "胆小", ActionKind.Shield, detail: $"退到了 {rear} 号位");
+            }
+            UpdateFormation();
+        }
 
         public IReadOnlyList<BattleEvent> AdvanceRound()
         {
@@ -257,6 +295,7 @@ namespace RaidPartyManager.Battle
                 EndRound();
                 if (!FinishIfDecided())
                 {
+                    ResolveRetreats();
                     if ((long)Tick + RoundInterval() > request.TickLimit)
                         Finish(BattleOutcome.Timeout, request.TickLimit);
                     else
@@ -357,9 +396,13 @@ namespace RaidPartyManager.Battle
             var skill = actor.Input.Character.Skill;
             if (skill != null && Tick >= actor.SkillReadyAt)
                 AddLegalOptions(actor, skill, options);
+            // The two healing traits use healing in place of a basic attack while there is a valid target.
+            int skillOptions = options.Count;
             if (actor.Trait == CharacterTrait.HealAlly)
                 AddLegalOptions(actor, HealAllyAction, options);
-            AddLegalOptions(actor, actor.Input.Character.BasicAttack, options);
+            if (options.Count == skillOptions ||
+                actor.Input.Character.Personality == Personality.Greedy && !actor.Has(EquipmentEffect.RebelEarring))
+                AddLegalOptions(actor, actor.Input.Character.BasicAttack, options);
             if (options.Count == 0)
                 return;
 
@@ -374,7 +417,8 @@ namespace RaidPartyManager.Battle
                 break;
             }
 
-            var context = new DecisionContext(actor.Snapshot(), Tick, actor.Health, actor.Shield, allyTarget);
+            var context = new DecisionContext(actor.Snapshot(), Tick, actor.Health, actor.Shield, allyTarget,
+                actor.LastAttacker, actor.FocusTarget);
             var decision = policy.Choose(context, options.AsReadOnly());
             if (decision.OptionIndex < 0 || decision.OptionIndex >= options.Count)
                 throw new InvalidOperationException("The decision policy must choose a legal option.");
@@ -400,7 +444,10 @@ namespace RaidPartyManager.Battle
             }
 
             if (choice.Kind == ActionKind.Attack)
+            {
+                actor.FocusTarget = target.Input.Id;
                 attackHistory.Add((actor.Input.Side, actor.Input.Id, target.Input.Id));
+            }
         }
 
         private void AddLegalOptions(Unit actor, ActionDefinition action, List<ActionOption> options)
@@ -471,8 +518,9 @@ namespace RaidPartyManager.Battle
             var attackGains = party.Where(unit => unit.PermanentAttack > 0)
                 .Select(unit => new KeyValuePair<string, int>(unit.Input.Id, unit.PermanentAttack));
             var potions = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GeneratePotion);
-            int gold = party.Where(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GoldOnSurvival)
-                .Sum(unit => unit.TraitPower);
+            int gold = (int)Math.Min((long)int.MaxValue - request.PartyGold, equipmentGold + party
+                .Where(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GoldOnSurvival)
+                .Sum(unit => (long)unit.TraitPower));
             int accessories = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.AccessoryOnSurvival);
             Result = new BattleResult(request.Id, outcome, health, events, partyPositions,
                 recruits.Select(unit => unit.RecruitmentResult()), attackGains, potions, currentLoadout, gold, accessories);

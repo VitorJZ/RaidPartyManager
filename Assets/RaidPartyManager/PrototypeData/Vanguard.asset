@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: Vanguard
   displayName: "破阵先锋"
-  portrait: {fileID: 2800000, guid: 77a09cbe2e0b4b08806840f3b58f6f26, type: 3}
+  portrait: {fileID: 2800000, guid: 95ac55e24eb447fb9bd82409c8b1dc65, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 71e8d9e2c6934375810c199e3faa719a, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: e1b78bc2bcfd4a6aa7f5f4bdb230f82b, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 05945a0a3cfd4ca5bc093aa1f0296f96, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 2fa13dca21244d34b31303901806efb6, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 21
   traitPower: 5
   traitText: "第1次对1个目标造成伤害时，造成的伤害+5"
-  personality: 0
+  personality: 10
   attack: 8
   defense: 3
   specialDefense: 3

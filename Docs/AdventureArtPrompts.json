@@ -1,0 +1,216 @@
+{
+  "tool": "image_gen.imagegen",
+  "mode": "built-in generate with style reference; transparent hat prop",
+  "style_reference": "Assets/RaidPartyManager/Art/Camp/Camp-Background.png",
+  "images": [
+    {
+      "slug": "01-Investor",
+      "name": "引资的创业者",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. An earnest adult harbor inventor in a worn leather apron presents a hand-drawn unlettered mechanical skiff blueprint on a small pier-side worktable. A modest open coin purse and unfinished brass contraption, hopeful face, one relaxed open hand asking for investment. A weathered sailboat in the fog behind.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-b4e9d287-0ff3-4e63-96f3-e75eff763c84.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-b4e9d287-0ff3-4e63-96f3-e75eff763c84.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/01-Investor.png",
+      "guid": "c9fc61dbb0364c9290c76944903d0ac3"
+    },
+    {
+      "slug": "02-LostTraveler",
+      "name": "呼朋引伴",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. A lone adult lost traveler waits at a fork in a fogbound wooden quay, a travel cloak and worn backpack, holding an old rolled map with no writing. Three-quarter visible thoughtful face, open inviting pose, backpack equipment ambiguous so the player can imagine different professions. Harbor lanterns guide the path.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-99937d78-cec0-4bea-b31a-698ace5dbf9c.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-99937d78-cec0-4bea-b31a-698ace5dbf9c.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/02-LostTraveler.png",
+      "guid": "334159e627224017bae9998f958a31c9"
+    },
+    {
+      "slug": "03-FoundCoins",
+      "name": "捡到钱了",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. Close three-quarter elevated view of a small worn leather money pouch accidentally left on damp harbor planks. A handful of old copper-gold coins has spilled beside it; coins show abstract worn relief only, no numbers or writing. Warm lantern reflection, foggy quay receding behind, quiet fortunate discovery, no people.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-73d28857-71cb-4715-9b0c-f50d403c08de.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-73d28857-71cb-4715-9b0c-f50d403c08de.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/03-FoundCoins.png",
+      "guid": "473e12cfb8e642549dc3d115ab42bf85"
+    },
+    {
+      "slug": "04-HatTrick",
+      "name": "帽子戏法",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. A playful adult dockside trickster smiles behind a low wooden table bearing exactly THREE identical dark rounded leather hats arranged left, center, right. Hands relaxed on outer sides of the table and never covering hats. On the table beside them a small mysterious glimmer suggests a hidden trinket. The game supplies all moving hats and rewards as a separate UI, so keep hats simple, no visible reward under the hats. Moonlit pier, warm lantern.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-8cb5a378-cf15-4150-9638-e137384a06c2.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-8cb5a378-cf15-4150-9638-e137384a06c2.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/04-HatTrick.png",
+      "guid": "8b489ca65ebe484d804cb4c6d1a5330d"
+    },
+    {
+      "slug": "05-Forge",
+      "name": "锻造台",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. An abandoned harbor blacksmith's anvil and glowing small forge. Two old anonymous pieces of adventuring gear laid beside the anvil, and one newly reforged luminous silver-gold charm above the anvil in a subtle magical glow. Restrained sparks, rough workbench, tongs and hammer, no text or engravings, no humans.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-a31c6a48-051f-4d4c-85e6-9975e194fa3b.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-a31c6a48-051f-4d4c-85e6-9975e194fa3b.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/05-Forge.png",
+      "guid": "ce6a995cf1014626a42beae2dc9589b4"
+    },
+    {
+      "slug": "06-LockedChest",
+      "name": "上锁的宝箱",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. A sturdy old ironbound treasure chest with a heavy padlock and short chain on a quiet moonlit pier, viewed three-quarter. One adult cloaked adventurer patiently sits nearby to guard and work at the lock with small tools, face visible, no violence. An empty harbor path beyond implies the party will continue and return later. Clear chest focal point.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-8ab01257-fc79-48e4-97cd-98fa4cec2dbc.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-8ab01257-fc79-48e4-97cd-98fa4cec2dbc.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/06-LockedChest.png",
+      "guid": "b752d5127ec34ffc930c023b38cd8735"
+    },
+    {
+      "slug": "07-AscensionTrial",
+      "name": "升阶试炼",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. A solemn trial gateway on the fogbound wharf. A formidable adult armored harbor sentinel with a bell-shaped bronze helm stands at one side, full body readable, holding a lowered weapon in a challenge pose; an elegant small closed reliquary glowing with gold light rests on a stone plinth opposite him. The composition presents the dramatic choice of a safe treasure or a difficult trial, no symbols or text.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-299cc545-5d88-4225-be10-3d1e3b170421.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-299cc545-5d88-4225-be10-3d1e3b170421.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/07-AscensionTrial.png",
+      "guid": "b04564eb0b0c4248bf0a8a1bdb464cc4"
+    },
+    {
+      "slug": "08-Alchemist",
+      "name": "炼药师的小白鼠",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. An eccentric adult harbor alchemist in a weathered coat and brass goggles offers exactly THREE distinctly colored potion bottles on a small worktable, red amber, turquoise blue, and lavender purple. Curious friendly visible face, gloved hands rested on the table away from bottles, fine natural anatomy. Shelves with restrained glassware and warm smoky lanterns, medieval coastal laboratory, no labels.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-ef7a8e63-4554-43f6-ac43-f0a6fee206a3.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-ef7a8e63-4554-43f6-ac43-f0a6fee206a3.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/08-Alchemist.png",
+      "guid": "d5d99177077f47b4987b094c0013e0d9"
+    },
+    {
+      "slug": "09-Ambush",
+      "name": "随机敌人",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. Four distinct adult hostile harbor outcasts emerge across a foggy wooden pier: a worn rifle carrier, a lantern-bearing occultist, an armored brute with a lowered cleaver, and a crossbow scavenger. Clear varied silhouettes, threatening standoff, no attack impact, no gore. A warm brass alarm bell on a pylon, wet planks, desaturated blue fog.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-cac5f970-96fa-441b-878b-249a54365582.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-cac5f970-96fa-441b-878b-249a54365582.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/09-Ambush.png",
+      "guid": "e17f6a91f0dd44fbb6cfc6ec3486da0b"
+    },
+    {
+      "slug": "Hat-Prop",
+      "name": "帽子戏法单体帽",
+      "transparent": true,
+      "prompt": "Use case: stylized-concept. One isolated medieval dockside trickster's rounded dark brown-black leather hat for a three-hat shell game, 1:1 square genuinely transparent RGBA background. Slight elevated front three-quarter view, wide rounded brim, low rounded crown, narrow tarnished brass buckle, warm amber lighting at front right and cool blue rim behind. Detailed hand-painted fine pixel-art anime dark-fantasy RPG style, clear simple readable silhouette, exactly ONE hat, complete silhouette well within the square with ample transparent margin. No person, hand, table, ground, cast shadow, object under the hat, magic, letters, numbers, text, watermark, border or checkerboard.",
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-77c8e9c6-c4c3-4c90-841f-fac4e464ccff.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-77c8e9c6-c4c3-4c90-841f-fac4e464ccff.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/Hat-Prop.png",
+      "guid": "319abf16933f4bd7a4a5204b5f81e445"
+    },
+    {
+      "slug": "Town-Background",
+      "name": "弥雾码头城镇",
+      "prompt": "Use case: illustration-story. Asset type: one production landscape event illustration, roughly 16:9, for Raid Party Manager, a 2D anime dark-fantasy party roguelike. The attached image is a STYLE AND LOCATION reference only. Match its fine hand-painted pixel-art texture, weathered medieval coastal harbor, blue sea fog, old wood, muted teal and warm amber lantern lighting. Draw a complete cinematic narrative illustration of the specified event, focused, readable at 600 by 340 pixels. Stylized anime adults with expressive visible faces and natural hands, never photographic or 3D. Full bleed, no borders, collage, words, letters, numbers, item-rank symbols, UI, typography, watermark or signature. One scene only. Wide establishing view of a small lived-in medieval coastal harbor town square at twilight, camera slightly elevated around 15 degrees. Broad clear cobbled square foreground, calm foggy sailing harbor in distance. Four readable service landmarks frame the middle distance: on the left a welcoming wooden adventurers' tavern entrance with a warm doorway, mid-left an open general-goods shop stall, mid-right a sheltered resting courtyard with benches and a small hearth, on the right a wooden public noticeboard with unlettered parchment pinned to it. Rich weathered wood, mossy stone and brass lanterns, no readable signs, words or numbers. No foreground people blocking the four landmarks. Full-bleed 16:9 scene, no UI.",
+      "transparent": false,
+      "source": "/Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-88cd9caa-4e3a-4774-916e-3c1b5aee7674.png",
+      "hint": "Generated images are saved to /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6 as /Users/aegir/.codex/generated_images/01a1dff7-515d-7e92-8229-f1e8f040d8d6/exec-88cd9caa-4e3a-4774-916e-3c1b5aee7674.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "path": "Assets/RaidPartyManager/Art/Events/Town-Background.png",
+      "guid": "455fc0d01d334dcb8fe18e03e27579a7"
+    },
+    {
+      "slug": "Event-Parchment",
+      "name": "手绘羊皮纸弹窗背景",
+      "prompt": "Use case: stylized-concept. Create ONE wide rectangular full-bleed hand-painted vellum parchment texture to be imported directly as an event-dialog background for Raid Party Manager, a painterly medieval dark-fantasy game. Wide landscape about 1.65:1. Straight-on orthographic, sheet fills every pixel to all four edges, no desk or exterior background and no perspective. Light warm ivory and pale honey, subtly mottled with watercolor washes and desaturated fine painted paper fibers. The central 88 percent including upper band and lower half remains evenly bright low-contrast cream for dark brown Chinese text and event paintings laid over it. Keep warmer amber edge wear and irregular subtle tide marks confined to narrow outer margins. Just a trace of fine warm sepia dry-brush linework near the four corners, no enclosing dark outline or graphic panel divisions. The old paper feels authentic through delicate hand-painted brush textures; illustrative rather than photoreal, peaceful restrained palette. No rolled scroll ends, no holes, no burns, no ink splatters in the content area, no illustrations, no objects, no people, no hands, no UI, no lettering, no numbers, no seal, no watermark. Output just the pale parchment surface, full bleed, opaque.",
+      "mode": "built-in generate without reference image",
+      "transparent": false,
+      "path": "Assets/RaidPartyManager/Art/Events/Event-Parchment.png",
+      "guid": "4e047520344d41258ad09562525ee5fb"
+    },
+    {
+      "slug": "01-Investor-Ink",
+      "name": "引资的创业者",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 1, left of the contact sheet. The cheerful scruffy young dockside inventor in a patched apron leans over his workbench, offering a skiff sketch with simple diagram lines and no readable script. Keep open gesture, small coin purse, sketched gear and model of his unfinished boat. Tiny disconnected rigging lines behind him only as context.",
+      "guid": "321cd972bddb4022ac738c6665299051",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/01-Investor-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "02-LostTraveler-Ink",
+      "name": "呼朋引伴",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 1, center of the contact sheet. A slightly bemused young cloaked traveler at a wharf turning an old map over, tousled hair, travel pack and cloak buckle. Show body down to knee, one small lantern post and plank strokes beneath, maritime hints dissolve before edges.",
+      "guid": "a6f6728849024551a96f31fe88c4044c",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/02-LostTraveler-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "03-FoundCoins-Ink",
+      "name": "捡到钱了",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 1, right of the contact sheet. A battered drawstring coin purse with several coins spilled between old dock planks and a curious perched seagull leaning toward them, close three-quarter view. A few broken parallel grain lines and damp marks beneath this still life, then transparency, dramatic tactile detail.",
+      "guid": "22ab89df40a6442ab16aaf4f4e0e9ff8",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/03-FoundCoins-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "04-HatTrick-Ink",
+      "name": "帽子戏法",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 2, left of the contact sheet. The amused harbor trickster wearing his distinctive feathered cap sits behind an old tabletop with EXACTLY three low rounded leather hats in a clear row, separate from his worn cap. Hands away from the props, quietly confident grin. Sketch only the table lip and a faint corner of knotted rope to anchor the scene.",
+      "guid": "c87b89915da24bc9a2e9105ed0d6102d",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/04-HatTrick-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "05-Forge-Ink",
+      "name": "锻造台",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 2, center of the contact sheet. Old harbor forge still life centered on a weighty anvil, tongs, hammer and two pieces of used gear. A simple newly worked iron charm over the anvil, thin isolated flecks suggested by ink. Sparse firebox linework in one rear corner; no architecture fills the background.",
+      "guid": "2dc857d2a3dd43289a84c2714eba6544",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/05-Forge-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "06-LockedChest-Ink",
+      "name": "上锁的宝箱",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 2, right of the contact sheet. A determined cloaked adult kneeling beside a large ironbound chest with chain and ornate padlock, working at the lock, little old lantern at one side. Natural believable hands. Keep the forms large, make the old hinges, salt crust and wood grain readable in hand drawn crosshatching.",
+      "guid": "f3078ed71d7f4cedb20c412682134b46",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/06-LockedChest-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "07-AscensionTrial-Ink",
+      "name": "升阶试炼",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 3, left of the contact sheet. An imposing adult armored sentinel with a bronze bell-shaped helmet and one lowered heavy sword at a worn arch threshold. A small anonymously wrapped gift rests on a stone step near their feet, no visible item. A few expressive lines suggest receding stones; the opening has no broad opaque fill.",
+      "guid": "d8e3ed1da3834c788972fa316a7cfb31",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/07-AscensionTrial-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "08-Alchemist-Ink",
+      "name": "炼药师的小白鼠",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 3, center of the contact sheet. The eager older harbor alchemist with untidy hair and pushed-up round goggles presents exactly three different potion bottles, entirely achromatic, on the small worktable. Show him down to waist, and his hands clear of the bottles. A thin curling wisp and a few small sketched lab tools as texture.",
+      "guid": "8298cfb8057d4c8c8311199849257abd",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/08-Alchemist-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    },
+    {
+      "slug": "09-Ambush-Ink",
+      "name": "随机敌人",
+      "prompt": "Use case: style-transfer. Production raster illustration for the LEFT HALF of an in-game vellum event window. Refer to only the specified panel of the provided contact sheet for its established subject; create ONE new image, not a contact sheet. Recompose as a centered, single vignette, square to slightly taller than wide, so the visible drawing occupies about 86–90 percent of the canvas. Redraw in BLACK AND WHITE only as a traditional hand-drawn graphite and ink book illustration: lively fine pressure-varying black pen lines, dark charcoal crosshatching and sparse dry pencil shading, strong silhouettes and expressive faces. Artfully omit most surroundings; only use a few isolated lightly drawn prop or ground strokes, visually taper and break the linework into empty space. Keep the tonal modeling airy and medium-light. TRUE TRANSPARENT RGBA PNG: empty areas, light gaps, highlights, gaps between contours, and every corner must be TRANSPARENT; only the black and gray ink marks should be visible, like an ink layer stamped over a separate piece of parchment. NO white paper or white fill, no gray matte, no beige or color, no rectangular silhouette, no image border, no frame, no edging, no oval outline, no opaque background haze or panel, no checkerboard pattern, no embedded text, no logo. Preserve the theme and recognizable subject in the requested reference panel. The source is row 3, right of the contact sheet. Exactly four gritty adult outlaws in a tense huddle on a wharf: a lean rifle carrier, lantern-bearing hooded occultist, broad armored brute with a lowered cleaver, and a compact crossbow scavenger. Foreground standoff, avoid clash and gore. Cropped around the lower boots and sparse line strokes of the wharf, no scenery fill.",
+      "guid": "f5dc0eef4c8b433a91cb012be31f32ec",
+      "transparent": true,
+      "mode": "built-in ImageGen style transfer",
+      "path": "Assets/RaidPartyManager/Art/Events/Ink/09-Ambush-Ink.png",
+      "reference": "Docs/Previews/EventArt.jpg"
+    }
+  ]
+}

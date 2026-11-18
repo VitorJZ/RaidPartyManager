@@ -172,7 +172,7 @@ namespace RaidPartyManager.Tests
             Assert.That(details.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  5"));
             Assert.That(details.Q<Label>("battle-detail-defense").text, Is.EqualTo("防御  4"));
             Assert.That(details.Q<Label>("battle-detail-special-defense").text, Is.EqualTo("特防  4"));
-            Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("慎重"));
+            Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("谨慎"));
             Assert.That(details.Q<Label>("battle-detail-statuses").text, Does.Contain("盛气 ×3"));
             Assert.That(details.Q<Label>("battle-detail-slot-1").text, Is.EqualTo("1 · 空槽"));
             Assert.That(details.Q<Label>("battle-detail-slot-2").text, Is.EqualTo("2 · 精钢壁垒"));
@@ -264,7 +264,7 @@ namespace RaidPartyManager.Tests
             var guard = root.Q("party-position-1");
             var caption = guard.Q("combatant-caption");
             Assert.That(caption.resolvedStyle.flexDirection, Is.EqualTo(FlexDirection.Row));
-            Assert.That(caption.Q<Label>("combatant-subtitle").text, Is.EqualTo("慎重"));
+            Assert.That(caption.Q<Label>("combatant-subtitle").text, Is.EqualTo("谨慎"));
             Assert.That(caption.Q("combatant-subtitle").worldBound.center.x,
                 Is.GreaterThan(caption.Q("combatant-name").worldBound.center.x));
             var bar = guard.Q("health-bar");
@@ -330,7 +330,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("equipment-position-2").Q("equipment-slot-2").Q<Image>().image, Is.Not.Null);
             Press(root, "open-party-editor");
             Press(root, "edit-member-mage");
-            Assert.That(FindBackpackCell(root, "edit-item-gear-177"), Is.Not.Null);
+            Assert.That(FindBackpackCell(root, "edit-item-gear-197"), Is.Not.Null);
         }
 
         [UnityTest]
@@ -350,6 +350,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("edit-position-2").Q("profession-frame-mage"), Is.Not.Null);
             var guardCard = root.Q("edit-position-1");
             Assert.That(guardCard.Q("profession-frame-warrior"), Is.Not.Null);
+            Assert.That(guardCard.Q("profession-portrait-art"), Is.Not.Null);
             Assert.That(guardCard.Q<Label>("character-name").text, Is.EqualTo("篝火守夜人"));
             Assert.That(guardCard.Q("character-health").Q<Label>().text, Does.Contain("10/10"));
 
@@ -413,7 +414,7 @@ namespace RaidPartyManager.Tests
             var archerHealth = root.Q("edit-position-4").Q("character-health").Q<Label>().text;
             Assert.That(archerHealth, Does.Contain(battleHealth));
             Press(root, "edit-member-guard");
-            var rewardCell = FindBackpackCell(root, "edit-item-gear-177");
+            var rewardCell = FindBackpackCell(root, "edit-item-gear-197");
             Assert.That(rewardCell, Is.Not.Null);
             yield return null;
             string rewardCellName = rewardCell.name;
@@ -421,17 +422,18 @@ namespace RaidPartyManager.Tests
             yield return WaitForDrag(root);
             Up(root.Q("character-details-layer").ElementAt(0), Vector2.one);
             Assert.That(root.Q("equipment-drag-preview"), Is.Null);
-            Assert.That(root.Q(rewardCellName).Q("edit-item-gear-177"), Is.Not.Null);
+            Assert.That(root.Q(rewardCellName).Q("edit-item-gear-197"), Is.Not.Null);
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("精钢壁垒"));
 
             yield return Drag(root, root.Q(rewardCellName), root.Q("edit-slot-1"));
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("狂战士之印"));
             Assert.That(root.Q(rewardCellName).Q("edit-item-gear-1"), Is.Not.Null);
-            Press(root, "bag-next");
             yield return null;
-            yield return Drag(root, root.Q("edit-slot-1"), root.Q("bag-cell-176"));
+            var emptyCell = root.Q("bag-cell-197");
+            Assert.That(emptyCell, Is.Not.Null);
+            yield return Drag(root, root.Q("edit-slot-1"), emptyCell);
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("装备槽 2"));
-            Assert.That(root.Q("bag-cell-176").Q("edit-item-gear-177"), Is.Not.Null);
+            Assert.That(root.Q(emptyCell.name).Q("edit-item-gear-197"), Is.Not.Null);
             Press(root, "close-character-details");
             Press(root, "back-party-editor");
             Assert.That(root.Q<Label>("reward").text, Does.Contain("狂战士之印"));
@@ -922,7 +924,7 @@ namespace RaidPartyManager.Tests
             Down(guard);
             Up(root.Q("editor-roster"), guard.worldBound.center);
             Assert.That(root.Q("character-details"), Is.Not.Null);
-            Assert.That(root.Q<Label>("equipment-page").text, Does.Contain("11"));
+            Assert.That(root.Q<Label>("equipment-page").text, Is.EqualTo("1/13"));
             Press(root, "close-character-details");
 
             yield return DragFormation(root, "edit-member-guard", "edit-position-4");

@@ -16,12 +16,18 @@ namespace RaidPartyManager.Presentation
         private FontAsset localFontAsset;
 
         internal static Button ReturnButton() =>
-            PrototypeStyle.Button("返回主菜单", "return-main-menu", () => OpenScene("MainMenu"));
+            PrototypeStyle.Button("返回主菜单", "return-main-menu", () => OpenStandalone("MainMenu"));
 
-        private static void OpenScene(string destination)
+        internal static void OpenScene(string destination)
         {
             if (loadingScene == null || loadingScene.isDone)
                 loadingScene = SceneManager.LoadSceneAsync(destination);
+        }
+
+        private static void OpenStandalone(string destination)
+        {
+            AdventureFlow.ClearSceneContext();
+            OpenScene(destination);
         }
 
         private void OnEnable()
@@ -60,14 +66,29 @@ namespace RaidPartyManager.Presentation
             panel.Add(title);
 
             var battleButton = PrototypeStyle.Button("战斗", "open-battle",
-                () => OpenScene("BattlePrototype"), true);
+                () => OpenStandalone("BattlePrototype"), true);
             battleButton.style.minHeight = 46;
             panel.Add(battleButton);
 
-            var templateButton = PrototypeStyle.Button("模板", "open-template", () => OpenScene("SampleScene"));
+            var templateButton = PrototypeStyle.Button("模板", "open-template", () => OpenStandalone("SampleScene"));
             templateButton.style.minHeight = 46;
             templateButton.style.marginTop = 10;
             panel.Add(templateButton);
+
+            var shopButton = PrototypeStyle.Button("商店", "open-shop", () => OpenStandalone("DockShop"));
+            shopButton.style.minHeight = 46;
+            shopButton.style.marginTop = 10;
+            panel.Add(shopButton);
+
+            var campButton = PrototypeStyle.Button("营地", "open-camp", () => OpenStandalone("Camp"));
+            campButton.style.minHeight = 46;
+            campButton.style.marginTop = 10;
+            panel.Add(campButton);
+
+            var eventsButton = PrototypeStyle.Button("事件选择", "open-events", AdventureFlow.OpenHub);
+            eventsButton.style.minHeight = 46;
+            eventsButton.style.marginTop = 10;
+            panel.Add(eventsButton);
 
             root.Add(panel);
         }

@@ -1,0 +1,135 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b0ccbd8a4c0540b998dcc12cf4857960, type: 3}
+  m_Name: SkillCatalog
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.SkillCatalogAsset
+  skills:
+  - number: 1
+    displayName: "战争咆哮"
+    icon: {fileID: 2800000, guid: 4ba7b58c8e3b44ddaaa84497543f3446, type: 3}
+    requirement: 0
+    cost: 1
+    description: "下一次攻击造成的伤害翻倍"
+  - number: 2
+    displayName: "熊熊烈火"
+    icon: {fileID: 2800000, guid: 909cb0486b08453d911183649594a74e, type: 3}
+    requirement: 1
+    cost: 2
+    description: "对所有敌方单位造成1+攻击力的火焰伤害"
+  - number: 3
+    displayName: "极度冰点"
+    icon: {fileID: 2800000, guid: e4fc14c9b63b4a019913213b1d0771f7, type: 3}
+    requirement: 1
+    cost: 2
+    description: "对最多2名角色施加1层冰冻"
+  - number: 4
+    displayName: "阳光普照"
+    icon: {fileID: 2800000, guid: 5b3226e79c354d2490b2afb679ad1988, type: 3}
+    requirement: 2
+    cost: 1
+    description: "所有友方角色恢复3点生命值"
+  - number: 5
+    displayName: "坚如磐石"
+    icon: {fileID: 2800000, guid: 8d31be5d590440b9ab910f5e6bc744b3, type: 3}
+    requirement: 0
+    cost: 1
+    description: "免疫下一次受到的大于7的伤害"
+  - number: 6
+    displayName: "妙手回春"
+    icon: {fileID: 2800000, guid: f4e3a103cc034515bcd95bd8af3bb0c2, type: 3}
+    requirement: 0
+    cost: 1
+    description: "恢复1名角色10点生命值"
+  - number: 7
+    displayName: "万箭齐发"
+    icon: {fileID: 2800000, guid: f26422bac9534a92be183541c4a328e7, type: 3}
+    requirement: 3
+    cost: 1
+    description: "下一次攻击对所有敌方造成伤害"
+  - number: 8
+    displayName: "星陨术"
+    icon: {fileID: 2800000, guid: 084cd3a6a53b40eda9704dcb625babd8, type: 3}
+    requirement: 1
+    cost: 1
+    description: "下一次攻击对所有敌方造成伤害"
+  - number: 9
+    displayName: "横扫千军"
+    icon: {fileID: 2800000, guid: f72c205566294d89a088858e42a73b6f, type: 3}
+    requirement: 4
+    cost: 1
+    description: "下一次攻击对所有敌方造成伤害"
+  - number: 10
+    displayName: "闪电鞭"
+    icon: {fileID: 2800000, guid: 748df8415c704fb1a5b6d3a64117f21a, type: 3}
+    requirement: 1
+    cost: 2
+    description: "对1名敌方单位造成3点雷电伤害，场上每有1个敌方存活，重复1次"
+  - number: 11
+    displayName: "毒瘴爆发"
+    icon: {fileID: 2800000, guid: 37856a01d2ab458c875017d5ba4c4f97, type: 3}
+    requirement: 0
+    cost: 2
+    description: "对1名角色施加等同于使用者攻击力层数的中毒"
+  - number: 12
+    displayName: "血肉盛宴"
+    icon: {fileID: 2800000, guid: c20660494a964527b692878af3aeb530, type: 3}
+    requirement: 5
+    cost: 2
+    description: "吞食1名敌方阵亡单位的尸体，生命值和上限+3"
+  - number: 13
+    displayName: "闪身步"
+    icon: {fileID: 2800000, guid: 846e8c1aa4c743048df70dd7a77ffbeb, type: 3}
+    requirement: 3
+    cost: 1
+    description: "获得2层敏捷，2层盛气"
+  - number: 14
+    displayName: "金钟罩"
+    icon: {fileID: 2800000, guid: 19e3444facb24303a8f46ed1ed045336, type: 3}
+    requirement: 0
+    cost: 2
+    description: "所有友方角色本回合不会受到来自攻击的伤害"
+  - number: 15
+    displayName: "火眼金睛"
+    icon: {fileID: 2800000, guid: 3cedf78a239248009a1b783c5136e245, type: 3}
+    requirement: 2
+    cost: 1
+    description: "对所有敌方单位施加1层破绽"
+  - number: 16
+    displayName: "猩红收割"
+    icon: {fileID: 2800000, guid: e113141cb0ec40608da82a52593a0e9b, type: 3}
+    requirement: 0
+    cost: 2
+    description: "对1名敌方单位造成等同于攻击力的真实伤害，并恢复等量的生命值"
+  - number: 17
+    displayName: "英雄赞歌"
+    icon: {fileID: 2800000, guid: 3425bdd337bd44d1948c06a652235be2, type: 3}
+    requirement: 2
+    cost: 1
+    description: "对所有友方单位施加1层纯净"
+  - number: 18
+    displayName: "震慑八方"
+    icon: {fileID: 2800000, guid: 077d684f60b5438697500672b81e501e, type: 3}
+    requirement: 5
+    cost: 2
+    description: "对所有敌方单位施加1层眩晕"
+  - number: 19
+    displayName: "裂地震击"
+    icon: {fileID: 2800000, guid: af54efc1fb5542cdadc656bbda335f4b, type: 3}
+    requirement: 5
+    cost: 2
+    description: "对1名敌方及其相邻的单位造成3+使用者攻击力的伤害"
+  - number: 20
+    displayName: "穿云箭"
+    icon: {fileID: 2800000, guid: b7d69feceeb4421086ec5e3f50006654, type: 3}
+    requirement: 3
+    cost: 1
+    description: "对目标造成当前生命值10%的真实伤害"

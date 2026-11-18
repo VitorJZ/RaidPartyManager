@@ -128,14 +128,15 @@ namespace RaidPartyManager.Presentation
             drag.Register(new FormationSwap.Slot { View = benchTarget, Border = benchTarget, CanDrop = true });
             foreach (var member in members.Where(entry => !displayed.Contains(entry.Id)))
             {
-                var button = PrototypeStyle.Button(member.Character.Name, $"edit-member-{member.Id}",
+                var button = PrototypeStyle.Button(member.Character.Name + (member.IsAway ? " · 守候宝箱" : ""), $"edit-member-{member.Id}",
                     () => OpenDetails(member.Id));
+                button.SetEnabled(!member.IsAway);
                 RegisterReplacement(button, member);
                 bench.Add(button);
                 drag.Register(new FormationSwap.Slot
                 {
                     View = button, Border = button, MemberId = member.Id, Name = member.Character.Name,
-                    Artwork = portraitFor(member.Character.Id), CanDrag = member.Health > 0
+                    Artwork = portraitFor(member.Character.Id), CanDrag = member.Health > 0 && !member.IsAway
                 });
             }
             layout.Add(bench);

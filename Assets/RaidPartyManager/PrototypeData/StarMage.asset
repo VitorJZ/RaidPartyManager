@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: StarMage
   displayName: "星辉术师"
-  portrait: {fileID: 2800000, guid: 64197e4543e748ddbf025504510ebee6, type: 3}
+  portrait: {fileID: 2800000, guid: bf40ff962d2b420396e55b17fbd991df, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 73cc9fb44a944a54856bf4d8fea90191, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 31e108cc52fb4d4e8778d23fd926eec6, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: ac71ebb467064456972a03152cb7618e, type: 3}
   profession: 1
@@ -27,7 +28,7 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: 25eac7b6d5e1413eaa93b00783845587, type: 2}
   - {fileID: 11400000, guid: 018149b49b4745d2be95650c3382ee90, type: 2}
-  personality: 0
+  personality: 10
   attack: 5
   defense: 0
   specialDefense: 3

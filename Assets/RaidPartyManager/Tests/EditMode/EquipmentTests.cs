@@ -14,15 +14,15 @@ namespace RaidPartyManager.Tests
     public sealed class EquipmentTests
     {
         [Test]
-        public void TestEncounterStocksFourOfAllFortyFourIllustratedItems()
+        public void TestEncounterStocksFourOfEachBattleReadyIllustratedItem()
         {
             var encounter = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
                 "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
             var stacks = encounter.StartingEquipment.GroupBy(item => item.Id).ToArray();
-            Assert.That(stacks, Has.Length.EqualTo(44));
+            Assert.That(stacks, Has.Length.EqualTo(49));
             Assert.That(stacks.All(stack => stack.Count() == 4 && encounter.IconFor(stack.Key) != null), Is.True);
             Assert.That(stacks.Select(stack => stack.First().Effect).Where(effect => effect != None),
-                Is.EquivalentTo(Enum.GetValues(typeof(EquipmentEffect)).Cast<EquipmentEffect>().Where(effect => effect != None)));
+                Is.EquivalentTo(Enum.GetValues(typeof(EquipmentEffect)).Cast<EquipmentEffect>().Where(effect => effect is not (None or CoinDevourer or EchoChalice))));
         }
 
         [TestCase(VigorPotion, "盛气 3", "盛气 2")]
@@ -537,6 +537,41 @@ namespace RaidPartyManager.Tests
                 statuses: new Dictionary<StatusKind, int> { { StatusKind.Resolve, 2 } });
             var chilled = Unit("enemy", Side.Enemy, statuses: new Dictionary<StatusKind, int> { { StatusKind.Chill, 1 } });
             Assert.That(Action(Fight(prism, chilled), prism.Id).Amount, Is.EqualTo(14));
+        }
+
+        [Test]
+        public void LionStatueBuffsAdjacentAlliesAndBranchGoldSettles()
+        {
+            var attacker = Unit("attacker", Side.Party, gear: Gear(MoneyTreeBranch));
+            var holder = Unit("holder", Side.Party, 2, gear: Gear(LionGoldStatue));
+            var far = Unit("far", Side.Party, 4);
+            var enemy = Unit("enemy", Side.Enemy, stats: new Stats(1, 0, 0, 60));
+            var result = new BattleSimulator(random: new FixedRoll(0.9)).Simulate(
+                new BattleRequest("gold-statue", new[] { attacker, holder, far, enemy }, 1, partyGold: 100));
+
+            Assert.That(Action(result, attacker.Id).Amount, Is.EqualTo(attacker.Stats.Attack * 2));
+            Assert.That(Action(result, holder.Id).Amount, Is.EqualTo(holder.Stats.Attack));
+            Assert.That(Action(result, far.Id).Amount, Is.EqualTo(far.Stats.Attack));
+            Assert.That(result.GoldEarned, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void CrystalRestoresMagicLifeLossAndOrbBlocksOnlyTheNonphysicalComponent()
+        {
+            var basic = new ActionDefinition("mix", "mix", ActionKind.Attack, TargetRule.FrontEnemy, 0,
+                damageType: DamageType.Physical, additionalDamage: new[] { new DamageComponent(DamageType.Magic) });
+            var caster = Unit("caster", Side.Party, gear: Gear(ArcaneCrystal, WindChime),
+                basic: basic, stats: new Stats(5, 0, 0, 30), health: 10);
+            var defender = Unit("enemy", Side.Enemy, stats: new Stats(1, 2, 3, 30));
+
+            var ordinary = Fight(caster, defender);
+            Assert.That(Action(ordinary, caster.Id).Amount, Is.EqualTo(7));
+            Assert.That(ordinary.Events.Single(entry => entry.ActionName == "魔导水晶").Amount, Is.EqualTo(3));
+
+            var insulated = Unit("enemy", Side.Enemy, gear: Gear(InsulatingOrb), stats: defender.Stats);
+            var mixed = Fight(caster, insulated);
+            Assert.That(Action(mixed, caster.Id).Amount, Is.EqualTo(4));
+            Assert.That(mixed.Events.Any(entry => entry.ActionName == "魔导水晶"), Is.False);
         }
 
         private static BattleEvent Action(BattleResult result, string actor) =>

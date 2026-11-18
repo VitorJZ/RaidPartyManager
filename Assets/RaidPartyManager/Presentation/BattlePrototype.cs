@@ -51,6 +51,7 @@ namespace RaidPartyManager.Presentation
         private Texture2D battleBackground;
         private PartyRun run;
         private PartyRun enemyRun;
+        private AdventureRun adventure;
         private IReadOnlyList<Combatant> preparedEnemies;
         private Phase phase;
         private BattleSession battle;
@@ -80,6 +81,22 @@ namespace RaidPartyManager.Presentation
             partyEdited = enemiesEdited = false;
         }
 
+        internal static PartyRun GetPlaySession(EncounterData content)
+        {
+            if (playModeRun == null)
+            {
+                var formation = content.Draft(Side.Party, new System.Random());
+                playModeRun = new PartyRun(formation.Select(unit => new PartyMemberStart(
+                    unit.Id, unit.Character, unit.Position, unit.Health, unit.StartingStatuses)), content.StartingEquipment);
+            }
+            return playModeRun;
+        }
+
+        internal static void ReceiveShopEquipment(EncounterData content, EquipmentDefinition equipment) =>
+            GetPlaySession(content).AddEquipment(equipment);
+
+        internal static void MarkPartyEdited() => partyEdited = true;
+
         private void OnEnable()
         {
             if (initialized)
@@ -105,7 +122,8 @@ namespace RaidPartyManager.Presentation
             statusTooltip = new BattleStatusTooltip(root);
 
             content = encounter.ToData();
-            run = playModeRun ??= new PartyRun(RosterStart(Side.Party), content.StartingEquipment);
+            adventure = AdventureFlow.ForScene("BattlePrototype");
+            run = adventure?.Party ?? (playModeRun ??= new PartyRun(RosterStart(Side.Party), content.StartingEquipment));
             enemyRun = playModeEnemies ??= new PartyRun(RosterStart(Side.Enemy), Array.Empty<EquipmentDefinition>());
             ResetDemo();
         }
@@ -119,6 +137,7 @@ namespace RaidPartyManager.Presentation
 
         private void OnDisable()
         {
+            adventure?.AbortBattle();
             ClearAction();
             ClearImpactEffects();
             statusTooltip?.Hide();
@@ -130,13 +149,15 @@ namespace RaidPartyManager.Presentation
         {
             ClearAction();
             ClearImpactEffects();
-            if (reroll && randomizeLineups && !partyEdited)
+            if (adventure != null)
+                run.CancelBattle();
+            else if (reroll && randomizeLineups && !partyEdited)
                 run.ResetRoster(RosterStart(Side.Party));
             else
                 run.ResetEncounter();
             if (reroll && randomizeLineups && !enemiesEdited)
                 enemyRun.ResetRoster(RosterStart(Side.Enemy));
-            preparedEnemies = enemyRun.CaptureFormation(Side.Enemy);
+            preparedEnemies = adventure != null ? adventure.PrepareEnemies(content.EnemyRoster) : enemyRun.CaptureFormation(Side.Enemy);
             phase = Phase.Preparation;
             battle = null;
             battleLoadout = null;
@@ -152,6 +173,8 @@ namespace RaidPartyManager.Presentation
             battleLog.Clear();
             var backgrounds = battleBackgrounds.Where(texture => texture != null).ToArray();
             battleBackground = backgrounds.Length > 0 ? backgrounds[draftRandom.Next(backgrounds.Length)] : null;
+            if (adventure != null)
+                battleBackground = backgrounds.FirstOrDefault(texture => texture.name.StartsWith("01-")) ?? battleBackground;
             Render();
         }
 
@@ -159,8 +182,9 @@ namespace RaidPartyManager.Presentation
         {
             if (phase != Phase.Preparation || !run.CanStartBattle)
                 return;
-            var request = run.BeginBattle(preparedEnemies, content.TickLimit, content.VictoryReward,
+            var request = run.BeginBattle(preparedEnemies, content.TickLimit, adventure != null ? null : content.VictoryReward,
                 content.RecruitmentPool, content.CharacterCatalog);
+            adventure?.BindBattle(request.Id);
             battle = new BattleSimulator().Start(request);
             ReadPartyStats();
             foreach (var unit in battle.Formation)
@@ -274,6 +298,8 @@ namespace RaidPartyManager.Presentation
                     result = battle.Result;
                     if (!run.TrySettle(result, out reward))
                         throw new InvalidOperationException("The active replay could not be settled.");
+                    if (adventure != null && !adventure.SettleBattle(result))
+                        throw new InvalidOperationException("The route encounter could not be settled.");
                     phase = Phase.Settlement;
                     Render();
                     return;
@@ -437,7 +463,8 @@ namespace RaidPartyManager.Presentation
             header.style.alignItems = Align.Center;
             var heading = new VisualElement();
             heading.Add(PrototypeStyle.Text("讨伐队经理", 29));
-            heading.Add(PrototypeStyle.Text(content.Name, 13, PrototypeStyle.Muted));
+            heading.Add(PrototypeStyle.Text(adventure != null ? "弥雾码头 · " + AdventureFlow.NodeName(adventure.Current.Battle.Kind) :
+                content.Name, 13, PrototypeStyle.Muted));
             header.Add(heading);
             var tools = PrototypeStyle.Row();
             tools.style.alignItems = Align.Center;
@@ -454,7 +481,7 @@ namespace RaidPartyManager.Presentation
             if (phase == Phase.Preparation || phase == Phase.Settlement)
             {
                 tools.Add(PrototypeStyle.Button("角色编辑", "open-party-editor", OpenPartyEditor));
-                if (content.EnemyRoster.Count > 0)
+                if (content.EnemyRoster.Count > 0 && adventure == null)
                     tools.Add(PrototypeStyle.Button("敌方编辑", "open-enemy-editor", OpenEnemyEditor));
             }
             if (phase == Phase.Preparation)
@@ -466,7 +493,10 @@ namespace RaidPartyManager.Presentation
             if (phase == Phase.RoundBreak)
                 tools.Add(PrototypeStyle.Button("下回合", "next-round", ContinueRound, true));
             if (phase == Phase.Settlement)
-                tools.Add(PrototypeStyle.Button("重置演练", "reset", () => ResetDemo(reroll: true), true));
+            {
+                if (adventure == null) tools.Add(PrototypeStyle.Button("重置演练", "reset", () => ResetDemo(reroll: true), true));
+                else tools.Add(AdventureFlow.ReturnButton());
+            }
             tools.Add(PrototypeSceneMenu.ReturnButton());
             header.Add(tools);
             page.Add(header);
@@ -911,6 +941,8 @@ namespace RaidPartyManager.Presentation
                 summary.Add(PrototypeStyle.Text($"获得 {result.GoldEarned} 金币 · 当前 {run.Gold} 金币", 13, PrototypeStyle.Accent));
             if (result.AccessoriesEarned > 0)
                 summary.Add(PrototypeStyle.Text($"获得 {result.AccessoriesEarned} 件饰品，已放入共享背包", 13, PrototypeStyle.Accent));
+            if (adventure != null)
+                AdventureWidgets.BattleRewards(summary, adventure, content, Render);
             page.Add(summary);
         }
 
@@ -962,6 +994,10 @@ namespace RaidPartyManager.Presentation
             DecisionReason.HighestDamage => "（激进：伤害优先）", DecisionReason.SelfProtection => "（慎重：自保）",
             DecisionReason.FavorAttack => "（鲁莽：先攻）", DecisionReason.WoundedAlly => "（温柔：救援）",
             DecisionReason.FollowAlly => "（配合：追击）", DecisionReason.LowestHealth => "（冷静：低血量目标）",
+            DecisionReason.Retaliate => "（记仇：还击）", DecisionReason.FinishWounded => "（谨慎：低生命目标）",
+            DecisionReason.StayOnTarget => "（专注：继续集火）", DecisionReason.UseSkill => "（急躁：技能优先）",
+            DecisionReason.SaveSkill => "（隐忍：保留技能）", DecisionReason.AvoidOverkill => "（贪心：有效伤害）",
+            DecisionReason.EmergencyHeal => "（贪心：紧急救援）",
             _ => ""
         };
 

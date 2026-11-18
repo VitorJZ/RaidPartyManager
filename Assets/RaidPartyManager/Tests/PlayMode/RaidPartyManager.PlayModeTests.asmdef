@@ -1,7 +1,11 @@
 {
   "name": "RaidPartyManager.PlayModeTests",
   "references": [
-    "RaidPartyManager.Presentation"
+    "RaidPartyManager.Presentation",
+    "RaidPartyManager.Run",
+    "RaidPartyManager.Domain",
+    "RaidPartyManager.Content",
+    "RaidPartyManager.Battle"
   ],
   "optionalUnityReferences": [
     "TestAssemblies"

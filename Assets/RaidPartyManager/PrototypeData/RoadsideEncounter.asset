@@ -125,6 +125,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 2c227616c169451cbe00c12354c57615, type: 2}
   - {fileID: 11400000, guid: 06b3e65dbd45457aa53dd090c9d89621, type: 2}
   - {fileID: 11400000, guid: 6a7c30866f134460a69530643a7f18b4, type: 2}
+  - {fileID: 11400000, guid: c8d397ac45804887ac0b0064e16860e6, type: 2}
+  - {fileID: 11400000, guid: dff3c952d192419dbf7df85d1158afed, type: 2}
+  - {fileID: 11400000, guid: 703ea5a2052a4bbbafb822cbbef6b825, type: 2}
+  - {fileID: 11400000, guid: e2415aeadfc347cc9ddbc11b4e4b412b, type: 2}
+  - {fileID: 11400000, guid: ffcda19142e640ce8235352195d987a4, type: 2}
   startingCopies: 4
   victoryReward: {fileID: 11400000, guid: 756e87ec389e6924f86f5145ab2e62cc, type: 2}
   tickLimit: 200

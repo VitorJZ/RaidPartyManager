@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: DiSha
   displayName: "地煞"
-  portrait: {fileID: 2800000, guid: 212714460433452184894867e9da36e5, type: 3}
+  portrait: {fileID: 2800000, guid: 9f0f7b87134a4997a96d3effc04204bb, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: b00c6a2f680a4cf9b6f12d346a07805a, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 205baf30bd104f44b12ae1e43e985fd8, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: c3f291a9267b45778a411ada3c05c01c, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: ff399068664a4fd6beed0bcc2f2c0ba5, type: 3}
@@ -26,7 +27,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "额外获取后方队友的攻击力，并使其在本回合无法行动；回合结束时，切换为天弓。"
   battleForm: {fileID: 11400000, guid: dac678d7eeb14344a6e1c949c2424d14, type: 2}
-  personality: 2
+  personality: 7
   attack: 5
   defense: 2
   specialDefense: 1

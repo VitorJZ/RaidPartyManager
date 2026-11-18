@@ -1,0 +1,199 @@
+{
+  "mode": "Built-in ImageGen",
+  "source": "讨伐队经理-图鉴.xlsx",
+  "icons": {
+    "equipment": [
+      {
+        "number": 45,
+        "name": "狮王金雕",
+        "art": "Assets/RaidPartyManager/Art/Equipment/45-LionGoldStatue.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/Equipment/LionGoldStatue.asset",
+        "prompt": "Create a square 1:1 RPG inventory equipment illustration for Raid Party Manager, an original fantasy pixel-art Unity game. Depict a richly gold-plated small roaring lion statuette with an angular crown-like mane, sculpted forepaws braced against a few embossed coins built into its tiny plinth; distinctive asymmetrical silhouette. One intact isolated object, visually occupy about 77–84% of the square, clean breathing room, no floor or shadow, genuine transparent background. Dark fantasy anime-inspired hand-painted pixel illustration with carefully clustered pixels, crisp stepped edges, rich metallic lighting and material texture, a limited and coherent palette, strong small-icon readability, close three-quarter depiction. No text, figures, border, UI, other objects, or composited checkerboard."
+      },
+      {
+        "number": 46,
+        "name": "魔导水晶",
+        "art": "Assets/RaidPartyManager/Art/Equipment/46-ArcaneCrystal.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/Equipment/ArcaneCrystal.asset",
+        "prompt": "Create a square 1:1 RPG inventory equipment illustration for Raid Party Manager, an original fantasy pixel-art Unity game. Depict a single sharply faceted lilac and deep cobalt wizard's crystal suspended in a compact antique brass claw cage, an inner pale lavender vein like a spell-channel. One intact isolated object, visually occupy about 77–84% of the square, clean breathing room, no floor or shadow, genuine transparent background. Dark fantasy anime-inspired hand-painted pixel illustration with carefully clustered pixels, crisp stepped edges, rich metallic lighting and material texture, a limited and coherent palette, strong small-icon readability, close three-quarter depiction. No text, figures, border, UI, other objects, or composited checkerboard."
+      },
+      {
+        "number": 47,
+        "name": "绝缘灵珠",
+        "art": "Assets/RaidPartyManager/Art/Equipment/47-InsulatingOrb.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/Equipment/InsulatingOrb.asset",
+        "prompt": "Create a square 1:1 RPG inventory equipment illustration for Raid Party Manager, an original fantasy pixel-art Unity game. Depict a smooth celadon-jade pearl with a dark indigo insulating ceramic ring tight around its equator, paired copper filigree collars, calm pale interior with tiny blue trapped sparks. One intact isolated object, visually occupy about 77–84% of the square, clean breathing room, no floor or shadow, genuine transparent background. Dark fantasy anime-inspired hand-painted pixel illustration with carefully clustered pixels, crisp stepped edges, rich metallic lighting and material texture, a limited and coherent palette, strong small-icon readability, close three-quarter depiction. No text, figures, border, UI, other objects, or composited checkerboard."
+      },
+      {
+        "number": 48,
+        "name": "吞金兽",
+        "art": "Assets/RaidPartyManager/Art/Equipment/48-CoinDevourer.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/Equipment/CoinDevourer.asset",
+        "prompt": "Create a square 1:1 RPG inventory equipment illustration for Raid Party Manager, an original fantasy pixel-art Unity game. Depict a mischievous small bronze beast statuette with a squat toad-and-dragon silhouette, wide toothy slot-like mouth holding a half-swallowed ancient gold coin, tiny jade eyes, polished edges. One intact isolated object, visually occupy about 77–84% of the square, clean breathing room, no floor or shadow, genuine transparent background. Dark fantasy anime-inspired hand-painted pixel illustration with carefully clustered pixels, crisp stepped edges, rich metallic lighting and material texture, a limited and coherent palette, strong small-icon readability, close three-quarter depiction. No text, figures, border, UI, other objects, or composited checkerboard."
+      },
+      {
+        "number": 49,
+        "name": "摇钱树枝",
+        "art": "Assets/RaidPartyManager/Art/Equipment/49-MoneyTreeBranch.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/Equipment/MoneyTreeBranch.asset",
+        "prompt": "Create a square 1:1 RPG inventory equipment illustration for Raid Party Manager, an original fantasy pixel-art Unity game. Depict one gnarled crooked short tree branch, with three or four antique pierced gold coins apparently growing from its woody twigs and one or two small jade leaves, energetic diagonal silhouette. One intact isolated object, visually occupy about 77–84% of the square, clean breathing room, no floor or shadow, genuine transparent background. Dark fantasy anime-inspired hand-painted pixel illustration with carefully clustered pixels, crisp stepped edges, rich metallic lighting and material texture, a limited and coherent palette, strong small-icon readability, close three-quarter depiction. No text, figures, border, UI, other objects, or composited checkerboard."
+      },
+      {
+        "number": 50,
+        "name": "余响圣杯",
+        "art": "Assets/RaidPartyManager/Art/Equipment/50-EchoChalice.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/Equipment/EchoChalice.asset",
+        "prompt": "Create a square 1:1 RPG inventory equipment illustration for Raid Party Manager, an original fantasy pixel-art Unity game. Depict an ornate tarnished silver chalice with a violet inset gemstone on its stem and a thin luminous lavender echo ring rising close over the rim, subtly engraved repeated ripples. One intact isolated object, visually occupy about 77–84% of the square, clean breathing room, no floor or shadow, genuine transparent background. Dark fantasy anime-inspired hand-painted pixel illustration with carefully clustered pixels, crisp stepped edges, rich metallic lighting and material texture, a limited and coherent palette, strong small-icon readability, close three-quarter depiction. No text, figures, border, UI, other objects, or composited checkerboard."
+      },
+      {
+        "number": 51,
+        "name": "祈风铃",
+        "art": "Assets/RaidPartyManager/Art/Equipment/51-WindChime.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/Equipment/WindChime.asset",
+        "prompt": "Create a square 1:1 RPG inventory equipment illustration for Raid Party Manager, an original fantasy pixel-art Unity game. Depict a single elegant warm bronze prayer bell with little wind swirl engravings, short teal cord and one small trailing muted red ribbon, readable simple diagonal silhouette. One intact isolated object, visually occupy about 77–84% of the square, clean breathing room, no floor or shadow, genuine transparent background. Dark fantasy anime-inspired hand-painted pixel illustration with carefully clustered pixels, crisp stepped edges, rich metallic lighting and material texture, a limited and coherent palette, strong small-icon readability, close three-quarter depiction. No text, figures, border, UI, other objects, or composited checkerboard."
+      }
+    ],
+    "skill": [
+      {
+        "number": 1,
+        "name": "战争咆哮",
+        "art": "Assets/RaidPartyManager/Art/Skills/01-WarCry.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a rust-gold war horn with two bold concentric amber soundwaves. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 2,
+        "name": "熊熊烈火",
+        "art": "Assets/RaidPartyManager/Art/Skills/02-BlazingFire.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show three surging crimson flame tongues curling over a smoldering coal. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 3,
+        "name": "极度冰点",
+        "art": "Assets/RaidPartyManager/Art/Skills/03-AbsoluteZero.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show two long ice needles enclosing a frigid turquoise snow crystal. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 4,
+        "name": "阳光普照",
+        "art": "Assets/RaidPartyManager/Art/Skills/04-Sunshine.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a golden radiant sun disc above an open silver hand blessing the party. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 5,
+        "name": "坚如磐石",
+        "art": "Assets/RaidPartyManager/Art/Skills/05-StoneGuard.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a solid rough grey shield-shaped slab standing against a stopped impact. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 6,
+        "name": "妙手回春",
+        "art": "Assets/RaidPartyManager/Art/Skills/06-HealingHands.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a pair of gloved healer hands tending a green pulse above a white bandage. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 7,
+        "name": "万箭齐发",
+        "art": "Assets/RaidPartyManager/Art/Skills/07-ArrowBarrage.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a fan of four wooden arrows with cool teal fletching streaking from lower left to upper right. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 8,
+        "name": "星陨术",
+        "art": "Assets/RaidPartyManager/Art/Skills/08-Starfall.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a large lilac meteor with a bright gold angular star core and three trailing purple sparks. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 9,
+        "name": "横扫千军",
+        "art": "Assets/RaidPartyManager/Art/Skills/09-SweepingStrike.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a broad iron glaive tracing a thick amber horizontal arc. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 10,
+        "name": "闪电鞭",
+        "art": "Assets/RaidPartyManager/Art/Skills/10-LightningWhip.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a thick electric blue zigzag whip unfurling from one bronze grip. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 11,
+        "name": "毒瘴爆发",
+        "art": "Assets/RaidPartyManager/Art/Skills/11-ToxicMist.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a sharp acid-green cloud bursting from a shattered small poison vial. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 12,
+        "name": "血肉盛宴",
+        "art": "Assets/RaidPartyManager/Art/Skills/12-FleshFeast.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a brutal wolf-skull war trophy with a single supernatural red ember in its jaws, no gore. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 13,
+        "name": "闪身步",
+        "art": "Assets/RaidPartyManager/Art/Skills/13-Sidestep.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show an agile jade leather boot with one teal afterimage and thin gold motion streak. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 14,
+        "name": "金钟罩",
+        "art": "Assets/RaidPartyManager/Art/Skills/14-GoldenBell.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a wide golden bronze bell enclosed in a strong domed shield outline. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 15,
+        "name": "火眼金睛",
+        "art": "Assets/RaidPartyManager/Art/Skills/15-FieryEyes.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a stylized glowing amber eye with one crimson flame-shaped pupil. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 16,
+        "name": "猩红收割",
+        "art": "Assets/RaidPartyManager/Art/Skills/16-CrimsonReap.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a silver crescent sickle with a crimson trail curled around a ruby drop. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 17,
+        "name": "英雄赞歌",
+        "art": "Assets/RaidPartyManager/Art/Skills/17-HeroHymn.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show an ivory and gold lyre with a bright central white star and narrow gold strings. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 18,
+        "name": "震慑八方",
+        "art": "Assets/RaidPartyManager/Art/Skills/18-Overwhelm.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a powerful engraved war drum with clean golden ripples and jagged shock rays. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 19,
+        "name": "裂地震击",
+        "art": "Assets/RaidPartyManager/Art/Skills/19-Earthshatter.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show a squared iron maul splitting a little ochre rock ledge into three broad shards. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 20,
+        "name": "穿云箭",
+        "art": "Assets/RaidPartyManager/Art/Skills/20-CloudPiercer.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show one brilliant blue-fletched silver arrow clearly piercing a compact silvery cloud. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      }
+    ]
+  }
+}

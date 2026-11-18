@@ -21,3 +21,5 @@ MonoBehaviour:
   defenseBonus: 1
   specialDefenseBonus: 1
   healthBonus: 0
+  shopTier: 2
+  shopPrice: 20

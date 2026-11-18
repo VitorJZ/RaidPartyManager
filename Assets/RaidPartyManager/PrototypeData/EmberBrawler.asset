@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: EmberBrawler
   displayName: "余烬斗士"
-  portrait: {fileID: 2800000, guid: 15a3db88847e4a889b091ab9b7e48f24, type: 3}
+  portrait: {fileID: 2800000, guid: 97141dd2614d4048aea866913620261e, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 437932ffbc954ea587850e75a42cc7e7, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: e4117ad9242b4177ac8072c4d3252410, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 0be75646985e41a29eec6bde7a949dc9, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: c913e6092fd94a80ad4a92fbd3347b06, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 2
   traitPower: 1
   traitText: "受到伤害时，获得1层余烬；"
-  personality: 2
+  personality: 10
   attack: 7
   defense: 3
   specialDefense: 3

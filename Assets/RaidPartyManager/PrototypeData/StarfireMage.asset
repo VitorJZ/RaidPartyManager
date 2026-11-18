@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: StarfireMage
   displayName: "焚星魔导师"
-  portrait: {fileID: 2800000, guid: e181e5d025e24799a9296328127e30ef, type: 3}
+  portrait: {fileID: 2800000, guid: 0f4299962c3144c799a532ce1c039026, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 78f568c8361e45e49d7f909a31669df7, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 88173ff37ebe44eda04a165e45078b38, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 77b839a069114612a42857de8bbb3e0f, type: 3}
   profession: 1
@@ -24,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 7
   traitPower: 2
   traitText: "回合结束时，攻击力+2，并使此效果+2"
-  personality: 0
+  personality: 10
   attack: 6
   defense: 2
   specialDefense: 3

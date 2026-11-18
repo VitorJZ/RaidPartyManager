@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: ValiantSoldier
   displayName: "英勇士兵"
-  portrait: {fileID: 2800000, guid: 6a82a0e464af4e2fa60c77ae3b546b98, type: 3}
+  portrait: {fileID: 2800000, guid: e73c667ecea64c249645c1e3189688ee, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 98239ee596554d70bf03a94c6f94b687, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: a37e317a166d46c7875be450898b2395, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 34a8062b62764eb3a63e620099aa52af, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 616e9191260f408a8fd4fbd29e1cef68, type: 3}
@@ -28,7 +29,7 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: 9b2ac04ac5064e6cb6c7efa29470ba0b, type: 2}
   - {fileID: 11400000, guid: 608a2af79ca548c19ec7c9b5cdda981a, type: 2}
-  personality: 2
+  personality: 10
   attack: 6
   defense: 3
   specialDefense: 2

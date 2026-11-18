@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: SilverArcher
   displayName: "银叶射手"
-  portrait: {fileID: 2800000, guid: abea044ca852463092af4d7bf79ea5ac, type: 3}
+  portrait: {fileID: 2800000, guid: 4467e529a5aa428dbbc11d286a58205a, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 6efccb1833ab41b7a0fb4ca914fbe377, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 189e38ac596647ddbc9d94f9e33151b3, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 3d392b1538844bb5afe52960958439f2, type: 3}
   profession: 2
@@ -27,7 +28,7 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: 073b61052ee344ad99ddcad8662fd4b5, type: 2}
   - {fileID: 11400000, guid: 6061c98492e642bc8bda76784a6c1cd3, type: 2}
-  personality: 5
+  personality: 8
   attack: 5
   defense: 2
   specialDefense: 2

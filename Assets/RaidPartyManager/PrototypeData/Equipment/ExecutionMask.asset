@@ -16,8 +16,10 @@ MonoBehaviour:
   displayName: "处刑者面具"
   effect: 38
   icon: {fileID: 2800000, guid: a3d24298421f4a1cbffe59214788ca70, type: 3}
-  description: "回合内的第1次攻击造成目标最大生命值10%的固定伤害"
+  description: "回合内的第1次攻击造成目标最大生命值10%的真实伤害"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0
   healthBonus: 0
+  shopTier: 2
+  shopPrice: 25

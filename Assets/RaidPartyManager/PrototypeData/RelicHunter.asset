@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: RelicHunter
   displayName: "秘宝猎手"
-  portrait: {fileID: 2800000, guid: 5af58746427048198bae6f56bcd1cf09, type: 3}
+  portrait: {fileID: 2800000, guid: 84ab9deb9a8e47289f4229f6eaa089df, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 17e92ea666a340d588c935e5abb90b1b, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 41e3c9a5f8f9414a83d4062419887df3, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: d4f833c7b70c408599352f1bef2f7bd4, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: a42dd4d72fdd472b928886861142764a, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 26
   traitPower: 1
   traitText: "战斗结束时，若仍然存活，获得1件饰品"
-  personality: 5
+  personality: 13
   attack: 4
   defense: 1
   specialDefense: 1

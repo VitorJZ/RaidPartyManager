@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: Chronomancer
   displayName: "时序秘法师"
-  portrait: {fileID: 2800000, guid: fdcdff149ca24cb2bca3845e4ed316c6, type: 3}
+  portrait: {fileID: 2800000, guid: ca6ca036315c4bf0a732435ac1af3fac, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: ff0981a1e185473889051046625fce99, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 5e748189b93444c9889c2a158aa8cc48, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 987638d485b3496d803a9a34708968e2, type: 3}
   profession: 1
@@ -24,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 8
   traitPower: 2
   traitText: "每击杀1名敌方角色，攻击力永久+2"
-  personality: 0
+  personality: 12
   attack: 5
   defense: 0
   specialDefense: 3

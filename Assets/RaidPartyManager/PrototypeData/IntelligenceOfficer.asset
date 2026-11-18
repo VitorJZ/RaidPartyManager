@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
   id: IntelligenceOfficer
   displayName: "情报官"
-  portrait: {fileID: 2800000, guid: cd4dcdeaece547a383e5ab8e5a1befc5, type: 3}
+  portrait: {fileID: 2800000, guid: b5c0702cbeff48b2a83ac6701342a702, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: da2a890122174030a3767c4a3881a5ca, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: fc05ad6a7a984c888af4a836a20eac09, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: d7eeecc1ce6f43038174ba4a08260df8, type: 3}
   battleWalkSheet: {fileID: 2800000, guid: 3de4431c5fcb4e3f9e9ceb58bd3864f2, type: 3}
@@ -25,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 17
   traitPower: 0
   traitText: "进入战斗节点前，可以查看敌方的阵容"
-  personality: 3
+  personality: 11
   attack: 5
   defense: 1
   specialDefense: 1

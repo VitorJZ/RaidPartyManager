@@ -39,6 +39,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private string id;
         [SerializeField] private string displayName;
         [SerializeField] private Texture2D portrait;
+        [SerializeField] private Texture2D campSeatedSprite;
         [Tooltip("Eight columns. Rows contain 8 idle, 8 action, 4 hit and 8 death poses.")]
         [SerializeField] private Texture2D battleSpriteSheet;
         [Tooltip("Optional full-width attack poses in four columns and two rows.")]
@@ -70,6 +71,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private ActionSpec skill = new ActionSpec();
 
         internal Texture2D Portrait => portrait;
+        internal Texture2D CampSeatedSprite => campSeatedSprite;
         internal Texture2D BattleSpriteSheet => battleSpriteSheet;
         internal Texture2D BattleAttackSheet => battleAttackSheet;
         internal Texture2D BattleWalkSheet => battleWalkSheet;
