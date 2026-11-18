@@ -24,7 +24,7 @@ namespace RaidPartyManager.Presentation
                 loadingScene = SceneManager.LoadSceneAsync(destination);
         }
 
-        private static void OpenStandalone(string destination)
+        internal static void OpenStandalone(string destination)
         {
             AdventureFlow.ClearSceneContext();
             OpenScene(destination);

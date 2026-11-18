@@ -33,6 +33,40 @@ namespace RaidPartyManager.Presentation
             portrait.Add(frame);
         }
 
+        public static void AddFittedTo(VisualElement parent, Profession? profession, Texture2D art)
+        {
+            if (art == null || !profession.HasValue)
+                return;
+
+            var frame = new VisualElement { pickingMode = PickingMode.Ignore };
+            frame.style.position = Position.Absolute;
+            parent.Add(frame);
+            var artwork = new Image
+            {
+                name = "profession-portrait-art",
+                image = art,
+                scaleMode = ScaleMode.ScaleToFit,
+                pickingMode = PickingMode.Ignore
+            };
+            PrototypeStyle.Fill(artwork);
+            frame.Add(artwork);
+            AddTo(frame, profession, null);
+            parent.RegisterCallback<GeometryChangedEvent>(evt =>
+            {
+                float width = evt.newRect.width;
+                float height = evt.newRect.height;
+                float ratio = (float)art.width / art.height;
+                float inset = InnerInset(FrameScale(Mathf.Min(width, height * ratio)));
+                float innerWidth = Mathf.Max(0, Mathf.Min(width - 2 * inset, (height - 2 * inset) * ratio));
+                float innerHeight = innerWidth / ratio;
+                frame.style.width = innerWidth + 2 * inset;
+                frame.style.height = innerHeight + 2 * inset;
+                frame.style.left = (width - innerWidth) * 0.5f - inset;
+                frame.style.top = (height - innerHeight) * 0.5f - inset;
+                artwork.style.left = artwork.style.right = artwork.style.top = artwork.style.bottom = inset;
+            });
+        }
+
         private static void Draw(MeshGenerationContext context, Vector2 size, Profession profession)
         {
             if (size.x < 20 || size.y < 24)

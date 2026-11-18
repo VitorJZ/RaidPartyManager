@@ -33,12 +33,12 @@ namespace RaidPartyManager.Presentation
             root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
             root.style.backgroundColor = PrototypeStyle.Background;
             var header = PrototypeStyle.Row();
-            header.style.position = Position.Absolute; header.style.top = 16; header.style.left = header.style.right = 22;
+            header.style.position = Position.Absolute; header.style.top = RunTopBar.Height + 7; header.style.left = header.style.right = 22;
             header.style.alignItems = Align.Center;
             header.Add(AdventureFlow.ReturnButton());
             var title = PrototypeStyle.Text("弥雾码头 · 城镇", 26, PrototypeStyle.Accent);
             title.style.marginLeft = 16; title.style.flexGrow = 1; header.Add(title);
-            var status = PrototypeStyle.Text($"已使用 {run.Current.UsedServices.Count}／2 项服务   ·   金币 {run.Party.Gold}", 17);
+            var status = PrototypeStyle.Text($"已使用 {run.Current.UsedServices.Count}／2 项服务", 17);
             status.name = "town-services-count"; status.style.backgroundColor = PrototypeStyle.PanelColor;
             status.style.paddingLeft = status.style.paddingRight = 12; header.Add(status); root.Add(header);
             var services = PrototypeStyle.Row("town-services");
@@ -58,6 +58,10 @@ namespace RaidPartyManager.Presentation
             notice.style.backgroundColor = new Color(0.07f, 0.08f, 0.09f, 0.88f);
             notice.style.paddingLeft = notice.style.paddingRight = 12; notice.style.paddingTop = notice.style.paddingBottom = 9;
             root.Add(notice);
+            var content = assets.Encounter;
+            var topBar = new RunTopBar(root, run.Party, content,
+                () => RunTopBar.EditParty(root, run.Party, content, () => root.Q<RunTopBar>().Refresh()), "open-town-editor");
+            RunTopBar.PlaceAtTop(root, topBar);
         }
 
         private void Service(VisualElement parent, string title, string description, TownService service, NodeKind icon,
@@ -79,7 +83,8 @@ namespace RaidPartyManager.Presentation
         private void Recruit()
         {
             var overlay = new VisualElement { name = "town-recruit-window" };
-            PrototypeStyle.Fill(overlay); overlay.style.backgroundColor = new Color(0, 0, 0, 0.8f);
+            PrototypeStyle.Fill(overlay); overlay.style.top = RunTopBar.Height;
+            overlay.style.backgroundColor = new Color(0, 0, 0, 0.8f);
             overlay.style.alignItems = Align.Center; overlay.style.justifyContent = Justify.Center;
             var panel = PrototypeStyle.Panel(); panel.style.width = Length.Percent(70); panel.style.maxWidth = 760;
             panel.style.height = Length.Percent(88); overlay.Add(panel);

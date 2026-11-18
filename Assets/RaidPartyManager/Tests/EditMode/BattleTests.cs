@@ -180,6 +180,68 @@ namespace RaidPartyManager.Tests
             Assert.Throws<System.InvalidOperationException>(() => new BattleSimulator(new FixedOptionPolicy(9)).Simulate(request));
         }
 
+        [TestCase(false, 2)]
+        [TestCase(true, 4)]
+        public void SkillEnergyLastsTheWholeBattleAndCastsReplaceAttacksAndCounters(bool hasChalice, int capacity)
+        {
+            var baseUnit = Unit("party", Side.Party, 1, maxHealth: 100);
+            var enemy = Unit("enemy", Side.Enemy, 1, maxHealth: 200, attack: 1);
+            var book = new SkillBookDefinition("warcry", "战争咆哮", "", SkillRequirement.None, 1, 2, SkillEffect.WarCry);
+            var horn = new EquipmentDefinition("horn", "反击的号角", default, effect: EquipmentEffect.CounterHorn);
+            var chalice = new EquipmentDefinition("chalice", "余响圣杯", default, effect: EquipmentEffect.EchoChalice);
+            var party = new Combatant(baseUnit.Id, baseUnit.Character, baseUnit.Side, baseUnit.Position, baseUnit.Stats,
+                baseUnit.Health, hasChalice ? new[] { horn, chalice } : new[] { horn }, learnedSkills: new[] { book });
+            var battle = new BattleSimulator().Start(new BattleRequest("energy", new[] { party, enemy }, 9));
+
+            Assert.That(battle.ReadPartyEnergy().Single().Value.Remaining, Is.EqualTo(capacity));
+            var casts = new System.Collections.Generic.List<int>();
+            while (battle.Result == null)
+            {
+                var round = battle.AdvanceRound();
+                foreach (var cast in round.Where(entry => entry.ActorEnergy.HasValue))
+                {
+                    var energy = cast.ActorEnergy.Value;
+                    Assert.That(energy.Capacity, Is.EqualTo(capacity));
+                    casts.Add(energy.Remaining);
+                    Assert.That(round.Any(entry => entry.ActorId == party.Id && entry.ActionKind == ActionKind.Attack), Is.False);
+                }
+            }
+            Assert.That(casts, Is.EqualTo(Enumerable.Range(0, capacity).Reverse()));
+            Assert.That(battle.Result.Events.Any(entry => entry.ActorId == party.Id && entry.ActionKind == ActionKind.Attack &&
+                entry.Kind == BattleEventKind.Action && entry.Amount == 10), Is.True);
+            Assert.That(battle.ReadPartyEnergy().Single().Value.Remaining, Is.EqualTo(capacity));
+        }
+
+        [Test]
+        public void TwoEnergySkillUsesFireDefenseForEveryTargetAndFallsBackToBasicAttack()
+        {
+            var actor = Unit("caster", Side.Party, 1, maxHealth: 50);
+            var book = new SkillBookDefinition("fire", "熊熊烈火", "", SkillRequirement.Mage, 2, 1, SkillEffect.BlazingFire);
+            var mage = new CharacterDefinition("caster", "caster", Profession.Mage, Personality.Impatient,
+                actor.Stats, 1, actor.Character.BasicAttack);
+            var caster = new Combatant(actor.Id, mage, actor.Side, 1, actor.Stats, actor.Health, learnedSkills: new[] { book });
+            var front = Unit("front", Side.Enemy, 1, specialDefense: 2);
+            var back = Unit("back", Side.Enemy, 4, specialDefense: 4);
+
+            var result = Fight(new[] { caster, front, back }, 2);
+            var cast = result.Events.Single(entry => entry.ActorEnergy.HasValue);
+            Assert.That(cast.ActorEnergy.Value.Remaining, Is.Zero);
+            var targets = result.Events.Where(entry => entry.ActionName == book.Name && entry.ActionKind == ActionKind.Attack);
+            Assert.That(targets.Select(entry => (entry.TargetId, entry.Amount)), Is.EqualTo(new[] { (front.Id, 4), (back.Id, 2) }));
+            Assert.That(result.Events.Where(entry => entry.ActorId == actor.Id && entry.Kind == BattleEventKind.Action)
+                .Select(entry => (entry.Tick, entry.ActionName)), Is.EqualTo(new[] { (1, book.Name), (2, "basic") }));
+        }
+
+        [Test]
+        public void OrdinaryEnemyTargetingIgnoresTheAuthoredPersonality()
+        {
+            var enemy = Unit("enemy", Side.Enemy, 1, Personality.Aggressive);
+            var action = FirstAction(Fight(enemy, Unit("front", Side.Party, 1, defense: 20),
+                Unit("back", Side.Party, 4)), enemy.Id);
+            Assert.That(action.TargetId, Is.EqualTo("front"));
+            Assert.That(action.Reason, Is.EqualTo(DecisionReason.Default));
+        }
+
         private sealed class FixedOptionPolicy : IDecisionPolicy
         {
             private readonly int index;

@@ -56,6 +56,14 @@ namespace RaidPartyManager.Battle
             public int BorrowedAttack;
             public int BlockedRound;
             public int LastAttackRound;
+            public int LastSkillRound;
+            public int ProtectedRound;
+            public int BonusMaximumHealth;
+            public bool DoubleNextAttack;
+            public bool SweepNextAttack;
+            public bool StoneGuard;
+            public bool CorpseConsumed;
+            public BattleEnergy Energy;
             public readonly EquippedItem[] Slots;
             public string LastHitTarget;
             public string LastAttacker;
@@ -84,6 +92,7 @@ namespace RaidPartyManager.Battle
                 Health = input.Health;
                 Stats = input.Stats;
                 Gear = input.Equipment.ToArray();
+                Energy = BattleEnergy.Full(Gear);
                 Slots = new EquippedItem[Math.Max(Rules.EquipmentSlots, Gear.Length)];
                 if (input.EquipmentSlots.Count == 0)
                 {
@@ -112,8 +121,8 @@ namespace RaidPartyManager.Battle
                 var next = form.BaseStats;
                 var stats = Input.Stats + new Stats(next.Attack - before.Attack, next.Defense - before.Defense,
                     next.SpecialDefense - before.SpecialDefense, next.Health - before.Health);
-                Health = Math.Min(Health, stats.Health);
-                Input = new Combatant(Input.Id, form, Input.Side, Input.Position, stats, Health, Input.Equipment);
+                Health = Math.Min(Health, stats.Health + BonusMaximumHealth);
+                Input = new Combatant(Input.Id, form, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), Input.Equipment);
                 GrowthTriggers = 0;
                 SkillReadyAt = 0;
             }
@@ -130,13 +139,13 @@ namespace RaidPartyManager.Battle
                     previous.Defense - oldBonus.Defense + newBonus.Defense,
                     previous.SpecialDefense - oldBonus.SpecialDefense + newBonus.SpecialDefense,
                     previous.Health - oldBonus.Health + newBonus.Health);
-                Health = Math.Min(Health, stats.Health);
-                Input = new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, stats, Health, equipment);
+                Health = Math.Min(Health, stats.Health + BonusMaximumHealth);
+                Input = new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), equipment);
             }
 
             public Combatant EquipmentInput() =>
                 new Combatant(Input.Id, Input.Character, Input.Side, Input.Position,
-                    Input.Stats + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack, 0, 0, 0), Health, Input.Equipment);
+                    Input.Stats + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack, 0, 0, BonusMaximumHealth), Health, Input.Equipment);
 
             public Combatant RecruitmentResult() =>
                 new Combatant(Original.Id, Original.Character, Original.Side, Input.Position, Original.Stats,
@@ -183,6 +192,10 @@ namespace RaidPartyManager.Battle
             foreach (var entry in ReadPartyStats())
                 reportedPartyStats.Add(entry.Key, entry.Value);
         }
+
+        public IEnumerable<KeyValuePair<string, BattleEnergy>> ReadPartyEnergy() => units
+            .Where(unit => unit.Input.Side == Side.Party)
+            .Select(unit => new KeyValuePair<string, BattleEnergy>(unit.Input.Id, unit.Energy));
 
         public IEnumerable<KeyValuePair<string, Stats>> ReadPartyStats()
         {
@@ -235,11 +248,11 @@ namespace RaidPartyManager.Battle
         }
 
         private static bool IsLockedInBattle(Unit unit) => unit.Has(EquipmentEffect.TreeRoot) ||
-            unit.Input.Character.Personality == Personality.Stubborn;
+            (unit.Input.Side == Side.Party && unit.Input.Character.Personality == Personality.Stubborn);
 
         private void ResolveRetreats()
         {
-            var retreating = units.Where(unit => unit.Health > 0 &&
+            var retreating = units.Where(unit => unit.Input.Side == Side.Party && unit.Health > 0 &&
                 unit.Input.Character.Personality == Personality.Timid && !IsLockedInBattle(unit) &&
                 (unit.WantsRetreat || (long)unit.Health * 2 < unit.Stats.Health)).ToArray();
             if (retreating.Length == 0)
@@ -393,6 +406,8 @@ namespace RaidPartyManager.Battle
             if (actor.Input.Side == Side.Enemy && TryEnemyTurn(actor))
                 return;
             var options = new List<ActionOption>();
+            if (actor.Input.Side == Side.Party && actor.Original.LearnedSkills.Count > 0)
+                AddLearnedSkillOptions(actor, options);
             var skill = actor.Input.Character.Skill;
             if (skill != null && Tick >= actor.SkillReadyAt)
                 AddLegalOptions(actor, skill, options);
@@ -401,7 +416,8 @@ namespace RaidPartyManager.Battle
             if (actor.Trait == CharacterTrait.HealAlly)
                 AddLegalOptions(actor, HealAllyAction, options);
             if (options.Count == skillOptions ||
-                actor.Input.Character.Personality == Personality.Greedy && !actor.Has(EquipmentEffect.RebelEarring))
+                actor.Input.Side == Side.Party && actor.Input.Character.Personality == Personality.Greedy &&
+                !actor.Has(EquipmentEffect.RebelEarring))
                 AddLegalOptions(actor, actor.Input.Character.BasicAttack, options);
             if (options.Count == 0)
                 return;
@@ -425,6 +441,11 @@ namespace RaidPartyManager.Battle
 
             var choice = options[decision.OptionIndex];
             var target = unitsById[choice.Target.Id];
+            if (choice.Book != null)
+            {
+                CastLearnedSkill(actor, target, choice.Book, decision.Reason);
+                return;
+            }
             if (choice.Action == skill || skill != null && choice.Action.Id == skill.Id)
                 actor.SkillReadyAt = (long)Tick + skill.Cooldown;
 
@@ -515,6 +536,8 @@ namespace RaidPartyManager.Battle
             var partyPositions = units.Where(unit => unit.Input.Side == Side.Party)
                 .Select(unit => new KeyValuePair<string, int>(unit.Input.Id, unit.Input.Position));
             var party = units.Where(unit => unit.Input.Side == Side.Party).ToArray();
+            foreach (var actor in party)
+                actor.Energy = new BattleEnergy(actor.Energy.Capacity, actor.Energy.Capacity);
             var attackGains = party.Where(unit => unit.PermanentAttack > 0)
                 .Select(unit => new KeyValuePair<string, int>(unit.Input.Id, unit.PermanentAttack));
             var potions = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GeneratePotion);
@@ -529,7 +552,7 @@ namespace RaidPartyManager.Battle
         private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,
             int amount = 0, DecisionReason reason = DecisionReason.Default, string detail = null,
             CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false,
-            BattleVisualCue visual = BattleVisualCue.None)
+            BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
@@ -538,7 +561,7 @@ namespace RaidPartyManager.Battle
                 ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
                 target.Health, target.Shield, StatusText(target), detail, form, form != null ? target.Stats.Health : 0, statuses,
-                loadout, RecordPartyStatChanges(), reach, visual));
+                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy));
         }
     }
 }

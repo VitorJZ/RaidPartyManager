@@ -27,8 +27,9 @@ namespace RaidPartyManager.Tests
             Press(MenuRoot(), "open-battle");
             yield return WaitForScene("BattlePrototype");
             int startingItems = InventoryCount();
-            Press(Object.FindAnyObjectByType<BattlePrototype>().GetComponent<UIDocument>().rootVisualElement,
-                "return-main-menu");
+            var battleRoot = Object.FindAnyObjectByType<BattlePrototype>().GetComponent<UIDocument>().rootVisualElement;
+            Press(battleRoot, "open-settings");
+            Press(battleRoot, "return-main-menu");
             yield return WaitForScene("MainMenu");
             Press(MenuRoot(), "open-shop");
             yield return WaitForScene("DockShop");
@@ -105,6 +106,7 @@ namespace RaidPartyManager.Tests
             Up(root, counter);
             Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 2));
+            Press(root, "open-settings");
             Press(root, "return-main-menu");
             yield return WaitForScene("MainMenu");
             Press(MenuRoot(), "open-battle");

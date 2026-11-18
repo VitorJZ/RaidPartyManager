@@ -119,6 +119,7 @@ namespace RaidPartyManager.Run
         private readonly Random random;
         private readonly CharacterDefinition[] characters;
         private readonly EquipmentDefinition[] equipment;
+        private readonly EquipmentDefinition[] battleLoot;
         private readonly HashSet<int> investorFloors = new HashSet<int>();
         private readonly List<AwayCompanion> away = new List<AwayCompanion>();
         private int eventsTaken, elitesTaken;
@@ -146,7 +147,9 @@ namespace RaidPartyManager.Run
         {
             Party = party ?? throw new ArgumentNullException(nameof(party));
             this.characters = characters.Where(c => c.RosterNumber > 0).ToArray();
-            this.equipment = equipment.Where(e => e.Tier >= 0 && e.Price > 0).GroupBy(e => e.Id).Select(g => g.First()).ToArray();
+            var items = equipment.GroupBy(e => e.Id).Select(g => g.First()).ToArray();
+            this.equipment = items.Where(e => e.Tier >= 0 && e.Price > 0).ToArray();
+            battleLoot = items.Where(e => e.CanDropInBattle).ToArray();
             Party.RegisterRewardCatalog(this.equipment);
             this.random = random ?? new Random();
             IsInspection = inspection;
@@ -408,15 +411,22 @@ namespace RaidPartyManager.Run
 
         public bool SettleBattle(BattleResult result)
         {
+            if (!SettleBattle(result, out int gold))
+                return false;
+            Party.AddGold(Math.Min(gold, int.MaxValue - Party.Gold));
+            return true;
+        }
+
+        public bool SettleBattle(BattleResult result, out int gold)
+        {
+            gold = 0;
             var ticket = Current?.Battle;
             if (ticket == null || ticket.Settled || result == null || ticket.RequestId != result.Id || ticket.Enemies == null ||
                 ticket.Enemies.Any(e => !result.HealthById.ContainsKey(e.Id))) return false;
             ticket.Settled = true;
             bool victory = result.Outcome == BattleOutcome.Victory;
-            int gold = Current.Event == AdventureEventKind.Ambush ? (victory ? random.Next(5, 11) : 0) :
-                ticket.Enemies.Where(e => result.HealthById[e.Id] == 0).Sum(e =>
-                    ticket.EliteIds.Contains(e.Id) ? random.Next(8, 13) : random.Next(3, 6));
-            Party.AddGold(gold);
+            gold = Current.Event == AdventureEventKind.Ambush ? (victory ? random.Next(5, 11) : 0) :
+                RollKillGold(result, ticket.Enemies, random, ticket.EliteIds);
             Current.Message = $"战斗获得 {gold} 金币。";
             if (!victory)
             {
@@ -440,11 +450,15 @@ namespace RaidPartyManager.Run
             return true;
         }
 
+        public static int RollKillGold(BattleResult result, IEnumerable<Combatant> enemies, Random random,
+            ISet<string> elites = null) => enemies.Where(enemy => result.HealthById[enemy.Id] == 0)
+                .Sum(enemy => elites?.Contains(enemy.Id) == true ? random.Next(8, 13) : random.Next(3, 6));
+
         private EquipmentDefinition RollBattleReward(bool elite, IEnumerable<string> excluded = null)
         {
             double roll = random.NextDouble();
             int tier = roll < (elite ? 0.5 : 0.3) ? 1 : random.Next(2, 4);
-            return PickItem(tier, excluded);
+            return PickItem(battleLoot.Where(item => item.Tier == tier), excluded);
         }
 
         public bool ClaimReward(int index)
@@ -603,11 +617,15 @@ namespace RaidPartyManager.Run
         private void Finish(string message) { Current.Message = message; Current.Resolved = true; }
         private IEnumerable<CharacterDefinition> RecruitCandidates() => characters.Where(c => c.Stage == 1 &&
             !Party.Members.Any(m => m.Character.Id == c.Id));
-        private EquipmentDefinition PickItem(int tier, IEnumerable<string> excluded = null)
+        private EquipmentDefinition PickItem(int tier, IEnumerable<string> excluded = null) =>
+            PickItem(equipment.Where(item => item.Tier == tier), excluded);
+
+        private EquipmentDefinition PickItem(IEnumerable<EquipmentDefinition> tierItems, IEnumerable<string> excluded)
         {
             var forbidden = new HashSet<string>(excluded ?? Array.Empty<string>());
-            var choices = equipment.Where(e => e.Tier == tier && !forbidden.Contains(e.Id)).ToArray();
-            if (choices.Length == 0) choices = equipment.Where(e => e.Tier == tier).ToArray();
+            var pool = tierItems.ToArray();
+            var choices = pool.Where(item => !forbidden.Contains(item.Id)).ToArray();
+            if (choices.Length == 0) choices = pool;
             if (choices.Length == 0) throw new InvalidOperationException("Missing equipment reward pool.");
             return choices[random.Next(choices.Length)];
         }

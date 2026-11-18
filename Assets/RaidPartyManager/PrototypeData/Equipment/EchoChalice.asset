@@ -16,10 +16,10 @@ MonoBehaviour:
   displayName: "余响圣杯"
   effect: 48
   icon: {fileID: 2800000, guid: b1bfeb096e3a414e989890fd361fca85, type: 3}
-  description: "魔力上限变为4"
+  description: "能量上限变为4"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0
   healthBonus: 0
-  shopTier: -1
+  shopTier: 2
   shopPrice: 0

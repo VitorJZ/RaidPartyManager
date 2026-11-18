@@ -242,7 +242,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.BattlePrototype
   encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
-  backpackIcon: {fileID: 2800000, guid: 6e47ea84955e41c9997c3d367af2fb70, type: 3}
+  battleLogParchment: {fileID: 2800000, guid: 4e047520344d41258ad09562525ee5fb, type: 3}
   battleBackgrounds:
   - {fileID: 2800000, guid: d1538346d12e4d88888e19ea36f54969, type: 3}
   - {fileID: 2800000, guid: 959ef6380f0a43a49442d609a5ac103d, type: 3}

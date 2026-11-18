@@ -15,13 +15,21 @@ namespace RaidPartyManager.Presentation
         private const int PageSize = Columns * Columns;
         private const int HoldMilliseconds = 300;
         private const float TileSize = 73;
+        private const float SlotSize = 65;
+        private const float BagCellMargin = 2;
+        private const float BackpackPadding = 9;
+
+        private enum CellKind { EquipmentBag, EquipmentSlot, BookBag, SkillSlot }
 
         private sealed class Cell
         {
             public VisualElement View;
             public EquipmentInstance Item;
-            public bool IsBackpack;
+            public SkillBookDefinition LearnedSkill;
+            public CellKind Kind;
             public int Index;
+            public EquipmentDefinition Definition => Item?.Definition ?? LearnedSkill;
+            public bool IsSlot => Kind is CellKind.EquipmentSlot or CellKind.SkillSlot;
         }
 
         private readonly PartyRun run;
@@ -31,8 +39,14 @@ namespace RaidPartyManager.Presentation
         private readonly Func<string, Texture2D> iconFor;
         private readonly Action changed;
         private readonly Action close;
-        private int page;
-        private int? keyboardSlot;
+        private readonly int[] pages = new int[2];
+        private bool showSkillBooks;
+        private int Page
+        {
+            get => pages[showSkillBooks ? 1 : 0];
+            set => pages[showSkillBooks ? 1 : 0] = value;
+        }
+        private (CellKind Kind, int Index)? keyboardSlot;
         private VisualElement tooltipPanel;
         private Cell hovered;
         private Cell source;
@@ -92,13 +106,14 @@ namespace RaidPartyManager.Presentation
             var dialog = PrototypeStyle.Panel();
             dialog.name = "character-details";
             dialog.style.width = Length.Percent(89);
-            dialog.style.maxWidth = 930;
+            dialog.style.maxWidth = 730;
             dialog.style.marginTop = 0;
             dialog.style.paddingTop = dialog.style.paddingBottom = 16;
             dialog.style.paddingLeft = dialog.style.paddingRight = 19;
 
             var header = PrototypeStyle.Row();
             header.style.alignItems = Align.Center;
+            header.style.justifyContent = Justify.SpaceBetween;
             var name = PrototypeStyle.Text(selected.Character.Name, 24);
             name.name = "details-character-name";
             name.style.flexShrink = 0;
@@ -107,10 +122,8 @@ namespace RaidPartyManager.Presentation
             var temperament = selected.Character.Personality;
             var personality = PrototypeStyle.Row("details-personality");
             personality.style.alignItems = Align.Center;
-            personality.style.flexGrow = 1;
             personality.style.minWidth = 0;
-            personality.style.marginLeft = 14;
-            personality.style.marginRight = 12;
+            personality.style.marginTop = 2;
             var personalityName = PrototypeStyle.Text($"{PersonalityText(temperament)}：", 14, PrototypeStyle.Accent);
             personalityName.name = "details-personality-name";
             personalityName.style.flexShrink = 0;
@@ -121,7 +134,6 @@ namespace RaidPartyManager.Presentation
             description.style.flexShrink = 1;
             description.style.minWidth = 0;
             personality.Add(description);
-            header.Add(personality);
             var dismiss = PrototypeStyle.Button("关闭", "close-character-details", close);
             dismiss.style.width = dismiss.style.height = 43;
             dismiss.style.flexShrink = 0;
@@ -131,44 +143,46 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(dismiss, PrototypeStyle.Accent, 23);
             header.Add(dismiss);
             dialog.Add(header);
+            dialog.Add(personality);
 
             var body = PrototypeStyle.Row();
             body.style.alignItems = Align.Stretch;
             var profile = PrototypeStyle.Panel();
             profile.name = "character-profile";
-            profile.style.flexGrow = 5;
+            profile.style.flexGrow = 1;
             profile.style.flexBasis = 0;
+            profile.style.flexDirection = FlexDirection.Row;
             profile.style.minWidth = 0;
             profile.style.marginRight = 12;
-            var left = PrototypeStyle.Row();
-            left.Add(BuildCharacter(selected));
-
-            var equipped = new VisualElement();
-            equipped.name = "character-equipment";
-            equipped.style.width = 106;
-            equipped.style.marginLeft = 10;
-            equipped.style.alignItems = Align.Center;
-            equipped.style.justifyContent = Justify.SpaceBetween;
-            for (int slot = 0; slot < Rules.EquipmentSlots; slot++)
-            {
-                var item = selected.EquipmentIds[slot] == null ? null : inventory[selected.EquipmentIds[slot]];
-                var entry = new VisualElement();
-                entry.style.alignItems = Align.Center;
-                var label = PrototypeStyle.Text(item?.Definition.Name ?? $"装备槽 {slot + 1}", 12,
-                    item != null ? PrototypeStyle.Ink : PrototypeStyle.Muted);
-                label.name = $"equipped-name-{slot}";
-                label.style.marginBottom = 3;
-                PrototypeStyle.Middle(label);
-                entry.Add(label);
-                entry.Add(BuildCell(false, slot, item));
-                equipped.Add(entry);
-            }
-            left.Add(equipped);
-            profile.Add(left);
+            profile.Add(BuildCharacter(selected));
+            profile.Add(BuildSlots(selected, inventory));
             body.Add(profile);
             body.Add(BuildBackpack(inventory, selected.EquipmentIds.Any(id => id != null)));
+            body.Add(BuildBookmarks());
             dialog.Add(body);
             Add(dialog);
+        }
+
+        private VisualElement BuildSlots(MemberView member, IReadOnlyDictionary<string, EquipmentInstance> inventory)
+        {
+            var slots = new VisualElement { name = "character-slots" };
+            slots.style.marginLeft = 12;
+            slots.style.flexShrink = 0;
+
+            var equipped = new VisualElement { name = "character-equipment" };
+            for (int slot = 0; slot < Rules.EquipmentSlots; slot++)
+            {
+                var id = member.EquipmentIds[slot];
+                equipped.Add(BuildCell(CellKind.EquipmentSlot, slot, id == null ? null : inventory[id]));
+            }
+            slots.Add(equipped);
+
+            var skills = new VisualElement { name = "details-skill-slots" };
+            skills.style.marginTop = 4;
+            for (int slot = 0; slot < member.SkillSlotCount; slot++)
+                skills.Add(BuildCell(CellKind.SkillSlot, slot, learned: member.LearnedSkills[slot]));
+            slots.Add(skills);
+            return slots;
         }
 
         private VisualElement BuildCharacter(MemberView member)
@@ -178,10 +192,8 @@ namespace RaidPartyManager.Presentation
             column.style.flexBasis = 0;
             column.style.minWidth = 0;
             var portrait = new VisualElement { name = "details-portrait" };
-            portrait.style.height = 270;
-            portrait.style.width = Length.Percent(100);
-            portrait.style.maxWidth = 198;
-            portrait.style.alignSelf = Align.Center;
+            portrait.style.height = 250;
+            portrait.style.flexShrink = 0;
             portrait.style.backgroundColor = PrototypeStyle.Inset;
             portrait.style.overflow = Overflow.Hidden;
             PrototypeStyle.Outline(portrait, PrototypeStyle.Edge, 5);
@@ -195,64 +207,105 @@ namespace RaidPartyManager.Presentation
             }
             column.Add(portrait);
 
-            var details = PrototypeStyle.Row();
-            details.style.marginTop = 8;
-            details.style.width = Length.Percent(100);
-            details.style.maxWidth = 198;
-            details.style.alignSelf = Align.Center;
-            var values = new VisualElement();
-            values.style.flexGrow = 1;
             var stats = member.EffectiveStats;
             var baseline = member.Character.BaseStats;
-            values.Add(PrototypeStyle.Text($"攻击  {StatText(stats.Attack, baseline.Attack)}", 13));
-            values.Add(PrototypeStyle.Text($"防御  {StatText(stats.Defense, baseline.Defense)}", 13));
-            values.Add(PrototypeStyle.Text($"特防  {StatText(stats.SpecialDefense, baseline.SpecialDefense)}", 13));
-            details.Add(values);
-            var health = PrototypeStyle.Text($"当前生命\n{HealthText(member.Health, stats.Health)}", 13, PrototypeStyle.Ally);
-            health.name = "details-health";
-            health.style.paddingLeft = health.style.paddingRight = 6;
-            health.style.backgroundColor = PrototypeStyle.Inset;
-            PrototypeStyle.Middle(health);
-            PrototypeStyle.Outline(health, PrototypeStyle.Edge, 4);
-            details.Add(health);
-            column.Add(details);
+            var attributes = PrototypeStyle.Row("details-attributes");
+            attributes.style.marginTop = 5;
+            attributes.Add(Attribute("攻击", StatText(stats.Attack, baseline.Attack), "details-attack"));
+            attributes.Add(Attribute("防御", StatText(stats.Defense, baseline.Defense), "details-defense"));
+            attributes.Add(Attribute("特防", StatText(stats.SpecialDefense, baseline.SpecialDefense), "details-special-defense"));
+            column.Add(attributes);
+
             if (!string.IsNullOrWhiteSpace(member.Character.TraitText))
             {
                 var trait = PrototypeStyle.Text(member.Character.TraitText, 12, PrototypeStyle.Muted);
                 trait.name = "details-fixed-trait";
-                trait.style.whiteSpace = WhiteSpace.Normal;
-                trait.style.marginTop = 6;
+                trait.style.marginTop = 8;
+                trait.style.flexGrow = 1;
+                trait.style.minHeight = 48;
+                trait.style.paddingTop = trait.style.paddingBottom = 7;
+                trait.style.paddingLeft = trait.style.paddingRight = 8;
+                trait.style.backgroundColor = PrototypeStyle.Inset;
+                PrototypeStyle.Outline(trait, PrototypeStyle.Edge, 4);
                 column.Add(trait);
             }
             return column;
+        }
+
+        private static VisualElement Attribute(string title, string value, string name)
+        {
+            var stat = PrototypeStyle.Text($"{title} {value}", 12);
+            stat.name = name;
+            stat.style.flexGrow = 1;
+            PrototypeStyle.Middle(stat);
+            return stat;
+        }
+
+        private VisualElement BuildBookmarks()
+        {
+            var bookmarks = new VisualElement { name = "backpack-bookmarks" };
+            bookmarks.style.paddingTop = 32;
+            bookmarks.style.flexShrink = 0;
+            Bookmark(false, "装备", "backpack-equipment-tab");
+            Bookmark(true, "技能书", "backpack-skill-tab");
+            return bookmarks;
+
+            void Bookmark(bool books, string title, string name)
+            {
+                bool active = showSkillBooks == books;
+                var tab = PrototypeStyle.Button(title, name, () =>
+                {
+                    if (showSkillBooks == books) return;
+                    showSkillBooks = books;
+                    keyboardSlot = null;
+                    ChangePage();
+                    this.Q(name)?.Focus();
+                });
+                tab.style.width = 62;
+                tab.style.height = 36;
+                tab.style.paddingLeft = tab.style.paddingRight = 3;
+                tab.style.marginLeft = -1;
+                tab.style.marginRight = 0;
+                tab.style.marginBottom = 4;
+                tab.style.whiteSpace = WhiteSpace.NoWrap;
+                PrototypeStyle.Outline(tab, active ? PrototypeStyle.Accent : PrototypeStyle.Edge, 0);
+                tab.style.borderTopRightRadius = tab.style.borderBottomRightRadius = 6;
+                tab.style.backgroundColor = active ? (Color)new Color32(67, 49, 35, 255) : PrototypeStyle.Inset;
+                tab.style.color = active ? PrototypeStyle.Accent : PrototypeStyle.Muted;
+                bookmarks.Add(tab);
+            }
         }
 
         private VisualElement BuildBackpack(IReadOnlyDictionary<string, EquipmentInstance> inventory, bool canUnequip)
         {
             var backpack = PrototypeStyle.Panel();
             backpack.name = "character-backpack";
-            backpack.style.flexGrow = 6;
-            backpack.style.flexBasis = 0;
+            backpack.style.width = Columns * (TileSize + 2 * BagCellMargin) + 2 * BackpackPadding + 2;
+            backpack.style.maxWidth = Length.Percent(50);
             backpack.style.minWidth = 0;
+            backpack.style.flexShrink = 0;
+            backpack.style.paddingLeft = backpack.style.paddingRight = BackpackPadding;
             var header = PrototypeStyle.Row();
             header.style.justifyContent = Justify.SpaceBetween;
             header.style.alignItems = Align.Center;
+            header.style.flexWrap = Wrap.Wrap;
             header.Add(PrototypeStyle.Text("共享背包", 17, PrototypeStyle.Accent));
 
-            int occupiedSpan = bag.FindLastIndex(id => id != null) + 1;
-            int pages = Math.Max(1, (occupiedSpan + PageSize - 1) / PageSize);
-            if (canUnequip && occupiedSpan == pages * PageSize && !bag.Take(occupiedSpan).Contains(null))
-                pages++;
-            page = Math.Min(page, pages - 1);
-            if (pages > 1)
+            var books = showSkillBooks ? run.SkillBooks : null;
+            int occupiedSpan = showSkillBooks ? books.Count : bag.FindLastIndex(id => id != null) + 1;
+            int pageCount = Math.Max(1, (occupiedSpan + PageSize - 1) / PageSize);
+            if (!showSkillBooks && canUnequip && occupiedSpan == pageCount * PageSize && !bag.Take(occupiedSpan).Contains(null))
+                pageCount++;
+            Page = Math.Min(Page, pageCount - 1);
+            if (pageCount > 1)
             {
                 var navigation = PrototypeStyle.Row();
-                var back = PrototypeStyle.Button("上一页", "bag-previous", () => { page--; ChangePage(); });
-                var next = PrototypeStyle.Button("下一页", "bag-next", () => { page++; ChangePage(); });
-                back.SetEnabled(page > 0);
-                next.SetEnabled(page + 1 < pages);
+                var back = PrototypeStyle.Button("上一页", "bag-previous", () => { Page--; ChangePage(); });
+                var next = PrototypeStyle.Button("下一页", "bag-next", () => { Page++; ChangePage(); });
+                back.SetEnabled(Page > 0);
+                next.SetEnabled(Page + 1 < pageCount);
                 navigation.Add(back);
-                var pageLabel = PrototypeStyle.Text($"{page + 1}/{pages}", 13, PrototypeStyle.Muted);
+                var pageLabel = PrototypeStyle.Text($"{Page + 1}/{pageCount}", 13, PrototypeStyle.Muted);
                 pageLabel.name = "equipment-page";
                 navigation.Add(pageLabel);
                 navigation.Add(next);
@@ -261,20 +314,22 @@ namespace RaidPartyManager.Presentation
             backpack.Add(header);
 
             var grid = new VisualElement { name = "backpack-grid" };
-            grid.style.alignItems = Align.Center;
             grid.style.marginTop = 5;
             for (int row = 0; row < Columns; row++)
             {
                 var line = PrototypeStyle.Row();
                 for (int col = 0; col < Columns; col++)
                 {
-                    int index = page * PageSize + row * Columns + col;
-                    var item = index < bag.Count && bag[index] != null ? inventory[bag[index]] : null;
-                    line.Add(BuildCell(true, index, item));
+                    int index = Page * PageSize + row * Columns + col;
+                    var item = showSkillBooks ? (index < books.Count ? books[index] : null)
+                        : (index < bag.Count && bag[index] != null ? inventory[bag[index]] : null);
+                    line.Add(BuildCell(showSkillBooks ? CellKind.BookBag : CellKind.EquipmentBag, index, item));
                 }
                 grid.Add(line);
             }
             backpack.Add(grid);
+            if (showSkillBooks && books.Count == 0)
+                backpack.Add(PrototypeStyle.Text("背包里暂时没有技能书", 13, PrototypeStyle.Muted));
             return backpack;
         }
 
@@ -284,25 +339,41 @@ namespace RaidPartyManager.Presentation
             Render();
         }
 
-        private VisualElement BuildCell(bool isBackpack, int index, EquipmentInstance item)
+        private static string CellName(CellKind kind, int index) => kind switch
         {
-            var view = new VisualElement
-            {
-                name = isBackpack ? $"bag-cell-{index}" : $"edit-slot-{index}",
-                focusable = item != null || !isBackpack,
-                tabIndex = item != null || !isBackpack ? 0 : -1
-            };
-            var cell = new Cell { View = view, Item = item, IsBackpack = isBackpack, Index = index };
+            CellKind.EquipmentBag => $"bag-cell-{index}",
+            CellKind.EquipmentSlot => $"edit-slot-{index}",
+            CellKind.BookBag => $"book-cell-{index}",
+            _ => $"skill-slot-{index}"
+        };
+
+        private VisualElement BuildCell(CellKind kind, int index, EquipmentInstance item = null, SkillBookDefinition learned = null)
+        {
+            bool selectable = item != null || kind == CellKind.EquipmentSlot || kind == CellKind.SkillSlot && learned == null;
+            var view = new VisualElement { name = CellName(kind, index), focusable = selectable, tabIndex = selectable ? 0 : -1 };
+            var cell = new Cell { View = view, Kind = kind, Index = index, Item = item, LearnedSkill = learned };
             view.userData = cell;
-            view.style.width = view.style.height = TileSize;
-            view.style.flexShrink = 0;
-            view.style.marginLeft = view.style.marginRight = 3;
-            view.style.marginTop = view.style.marginBottom = 3;
-            view.style.backgroundColor = item == null ? PrototypeStyle.Inset : (Color)new Color32(36, 38, 45, 255);
+            view.style.width = view.style.height = cell.IsSlot ? SlotSize : TileSize;
+            view.style.flexShrink = cell.IsSlot ? 0 : 1;
+            view.style.minWidth = 0;
+            view.style.marginLeft = view.style.marginRight = cell.IsSlot ? 0 : BagCellMargin;
+            view.style.marginBottom = cell.IsSlot ? 5 : BagCellMargin;
+            if (!cell.IsSlot)
+                view.style.marginTop = BagCellMargin;
+            view.style.backgroundColor = cell.Definition == null ? PrototypeStyle.Inset : (Color)new Color32(36, 38, 45, 255);
             RestoreCellOutline(cell);
-            if (item != null)
+            if (cell.Definition != null)
             {
-                var art = new EquipmentIcon(item.Definition, iconFor(item.Definition.Id)) { name = isBackpack ? $"edit-item-{item.Id}" : "equipment-icon" };
+                var art = new EquipmentIcon(cell.Definition, iconFor(cell.Definition.Id))
+                {
+                    name = kind switch
+                    {
+                        CellKind.EquipmentBag => $"edit-item-{item.Id}",
+                        CellKind.BookBag => $"edit-book-{item.Id}",
+                        CellKind.SkillSlot => "learned-skill-icon",
+                        _ => "equipment-icon"
+                    }
+                };
                 view.Add(art);
                 view.RegisterCallback<PointerEnterEvent>(evt =>
                 {
@@ -316,32 +387,40 @@ namespace RaidPartyManager.Presentation
                     if (source == cell && ghost == null)
                         CancelInteraction();
                 });
-                view.RegisterCallback<PointerDownEvent>(evt => BeginHold(evt, cell));
+                if (item != null)
+                    view.RegisterCallback<PointerDownEvent>(evt => BeginHold(evt, cell));
             }
-            else if (!isBackpack)
+            if (cell.IsSlot)
             {
-                var empty = PrototypeStyle.Text("空槽", 12, PrototypeStyle.Muted);
-                empty.pickingMode = PickingMode.Ignore;
-                empty.style.flexGrow = 1;
-                PrototypeStyle.Middle(empty);
-                view.Add(empty);
+                bool isEquipment = kind == CellKind.EquipmentSlot;
+                string slotName = isEquipment ? $"装备槽 {index + 1}" : $"技能槽 {index + 1}";
+                var caption = PrototypeStyle.Text(cell.Definition?.Name ?? slotName, 10,
+                    cell.Definition == null ? PrototypeStyle.Muted : PrototypeStyle.Ink);
+                caption.name = isEquipment ? $"equipped-name-{index}" : $"skill-name-{index}";
+                caption.pickingMode = PickingMode.Ignore;
+                caption.style.whiteSpace = WhiteSpace.NoWrap;
+                caption.style.overflow = Overflow.Hidden;
+                caption.style.textOverflow = TextOverflow.Ellipsis;
+                caption.style.flexGrow = cell.Definition == null ? 1 : 0;
+                PrototypeStyle.Middle(caption);
+                view.Add(caption);
             }
 
             view.RegisterCallback<NavigationSubmitEvent>(evt =>
             {
-                if (source != null)
+                if (source != null || !selectable)
                     return;
-                if (isBackpack && item != null && keyboardSlot.HasValue)
+                if (!cell.IsSlot && keyboardSlot is { } selected)
                 {
-                    var slot = this.Q($"edit-slot-{keyboardSlot.Value}")?.userData as Cell;
-                    Swap(cell, slot);
+                    if (this.Q(CellName(selected.Kind, selected.Index))?.userData is Cell slot && CanDrop(cell, slot))
+                        ApplyDrop(cell, slot);
                 }
-                else if (!isBackpack)
+                else if (cell.IsSlot)
                 {
-                    keyboardSlot = index;
-                    HideTooltip();
-                    Render();
-                    this.Q($"edit-slot-{index}")?.Focus();
+                    keyboardSlot = (kind, index);
+                    showSkillBooks = kind == CellKind.SkillSlot;
+                    ChangePage();
+                    this.Q(view.name)?.Focus();
                 }
                 evt.StopPropagation();
             });
@@ -400,7 +479,7 @@ namespace RaidPartyManager.Presentation
             Cell target = ghost != null ? TargetAt(evt.position) : null;
             CancelInteraction();
             if (target != null)
-                Swap(from, target);
+                ApplyDrop(from, target);
             evt.StopPropagation();
         }
 
@@ -409,7 +488,7 @@ namespace RaidPartyManager.Presentation
             var picked = panel?.Pick(position);
             for (var element = picked; element != null && element != this; element = element.parent)
             {
-                if (element.userData is Cell cell && cell.IsBackpack != source.IsBackpack)
+                if (element.userData is Cell cell && CanDrop(source, cell))
                     return cell;
             }
             return null;
@@ -427,7 +506,7 @@ namespace RaidPartyManager.Presentation
         }
 
         private void RestoreCellOutline(Cell cell) => PrototypeStyle.Outline(cell.View,
-            !cell.IsBackpack && keyboardSlot == cell.Index ? PrototypeStyle.Accent : PrototypeStyle.Edge, 5);
+            keyboardSlot == (cell.Kind, cell.Index) || cell.LearnedSkill != null ? PrototypeStyle.Accent : PrototypeStyle.Edge, 5);
 
         private void MoveGhost()
         {
@@ -453,31 +532,46 @@ namespace RaidPartyManager.Presentation
                 this.ReleasePointer(captured);
         }
 
-        private void Swap(Cell from, Cell target)
+        private bool CanDrop(Cell from, Cell target) => (from.Kind, target.Kind) switch
         {
-            if (target == null || from.IsBackpack == target.IsBackpack)
-                return;
+            (CellKind.EquipmentBag, CellKind.EquipmentSlot) or (CellKind.EquipmentSlot, CellKind.EquipmentBag) => true,
+            (CellKind.BookBag, CellKind.SkillSlot) => run.CanLearnSkill(memberId, target.Index, from.Item?.Id),
+            _ => false
+        };
 
-            var bagCell = from.IsBackpack ? from : target;
-            var worn = from.IsBackpack ? target : from;
-            if (!run.TryEquip(memberId, worn.Index, bagCell.Item?.Id))
-                return;
+        private void ApplyDrop(Cell from, Cell target)
+        {
+            Cell slot;
+            if (from.Kind == CellKind.BookBag)
+            {
+                if (!run.TryLearnSkill(memberId, target.Index, from.Item.Id))
+                    return;
+                slot = target;
+            }
+            else
+            {
+                var bagCell = from.Kind == CellKind.EquipmentBag ? from : target;
+                slot = from.Kind == CellKind.EquipmentSlot ? from : target;
+                if (!run.TryEquip(memberId, slot.Index, bagCell.Item?.Id))
+                    return;
 
-            while (bag.Count <= bagCell.Index)
-                bag.Add(null);
-            bag[bagCell.Index] = worn.Item?.Id;
+                while (bag.Count <= bagCell.Index)
+                    bag.Add(null);
+                bag[bagCell.Index] = slot.Item?.Id;
+            }
+
             keyboardSlot = null;
             HideTooltip();
             changed();
             Render();
-            this.Q($"edit-slot-{worn.Index}")?.Focus();
+            this.Q(CellName(slot.Kind, slot.Index))?.Focus();
         }
 
         private void ShowTooltip(Cell cell)
         {
             HideTooltip();
             hovered = cell;
-            var item = cell.Item.Definition;
+            var item = cell.Definition;
             tooltipPanel = new EquipmentTooltip(item, iconFor(item.Id));
 
             var bounds = this.WorldToLocal(cell.View.worldBound);
@@ -485,7 +579,7 @@ namespace RaidPartyManager.Presentation
             if (x + EquipmentTooltip.Width > layout.width)
                 x = bounds.xMin - EquipmentTooltip.Width - 8;
             tooltipPanel.style.left = Mathf.Clamp(x, 4, Mathf.Max(4, layout.width - EquipmentTooltip.Width - 4));
-            tooltipPanel.style.top = Mathf.Clamp(bounds.yMin, 4, Mathf.Max(4, layout.height - 195));
+            tooltipPanel.style.top = Mathf.Clamp(bounds.yMin, 4, Mathf.Max(4, layout.height - (item is SkillBookDefinition ? 249 : 195)));
             Add(tooltipPanel);
         }
 

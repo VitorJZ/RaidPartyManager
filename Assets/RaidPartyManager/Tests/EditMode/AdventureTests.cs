@@ -234,6 +234,31 @@ namespace RaidPartyManager.Tests
             }
         }
 
+        [TestCase(NodeKind.NormalBattle, 1)]
+        [TestCase(NodeKind.EliteBattle, 2)]
+        public void SkillBooksUseTheBattleRewardRollAndEnterTheBookPageWhenClaimed(NodeKind kind, int rewards)
+        {
+            var party = Create().Party;
+            var run = new AdventureRun(party, content.CharacterCatalog, content.SkillBooks, true, new Random(13));
+            foreach (var member in party.Members)
+                party.TryEquip(member.Id, 0, party.AddEquipment(new EquipmentDefinition("test-power", "test", new Stats(100, 0, 0, 0))).Id);
+            Assert.That(run.Inspect(kind), Is.True);
+            var request = party.BeginBattle(run.PrepareEnemies(content.EnemyRoster), 200, null);
+            run.BindBattle(request.Id);
+            var result = new BattleSimulator().Simulate(request);
+            Assert.That(result.Outcome, Is.EqualTo(BattleOutcome.Victory));
+            Assert.That(party.TrySettle(result, out _), Is.True);
+            Assert.That(run.SettleBattle(result), Is.True);
+            Assert.That(run.Current.Rewards.Select(reward => reward.Id).Distinct().Count(), Is.EqualTo(rewards));
+            Assert.That(run.Current.Rewards, Is.All.InstanceOf<SkillBookDefinition>());
+            var chosen = run.Current.Rewards[0];
+            int gearCount = party.Inventory.Count;
+            Assert.That(run.ClaimReward(0), Is.True);
+            Assert.That(run.ClaimReward(0), Is.False);
+            Assert.That(party.SkillBooks.Single().Definition, Is.SameAs(chosen));
+            Assert.That(party.Inventory.Count, Is.EqualTo(gearCount));
+        }
+
         [Test]
         public void ContentHasEveryEventIllustrationAndSceneArtwork()
         {

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using RaidPartyManager.Domain;
@@ -15,7 +16,8 @@ namespace RaidPartyManager.Presentation
         private readonly Label specialDefense;
         private readonly Label conditions;
 
-        public BattleCharacterDetails(int position, CharacterDefinition character, IReadOnlyList<EquipmentDefinition> equipment)
+        public BattleCharacterDetails(int position, CharacterDefinition character, IReadOnlyList<EquipmentDefinition> equipment,
+            IReadOnlyList<SkillBookDefinition> skills, Func<string, Texture2D> iconFor)
         {
             name = "battle-character-details";
             style.position = Position.Absolute;
@@ -47,6 +49,28 @@ namespace RaidPartyManager.Presentation
             conditions = Field("statuses", "");
             conditions.style.marginTop = 6;
             Add(conditions);
+
+            var known = skills.Where(skill => skill != null).ToArray();
+            var skillsHeading = Field("skills", known.Length == 0 ? "技能  无" : "已学技能", 13, PrototypeStyle.Accent);
+            skillsHeading.style.marginTop = 6;
+            Add(skillsHeading);
+            for (int i = 0; i < known.Length; i++)
+            {
+                var skill = known[i];
+                var row = PrototypeStyle.Row();
+                row.style.alignItems = Align.Center;
+                var icon = new EquipmentIcon(skill, iconFor(skill.Id));
+                icon.style.width = icon.style.height = 25;
+                icon.style.flexGrow = 0;
+                icon.style.flexShrink = 0;
+                icon.style.marginRight = 5;
+                row.Add(icon);
+                row.Add(Field($"skill-{i + 1}", $"{skill.Name} · {skill.Cost} 能量"));
+                Add(row);
+                var description = Field($"skill-effect-{i + 1}", skill.Description, 11, PrototypeStyle.Muted);
+                description.style.paddingLeft = 30;
+                Add(description);
+            }
 
             var gearHeading = Field("equipment", "装备", 13, PrototypeStyle.Accent);
             gearHeading.style.marginTop = 6;

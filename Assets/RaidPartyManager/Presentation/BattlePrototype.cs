@@ -15,11 +15,10 @@ namespace RaidPartyManager.Presentation
     [RequireComponent(typeof(UIDocument))]
     public sealed class BattlePrototype : MonoBehaviour
     {
-        private enum Phase { Preparation, Playback, RoundBreak, Settlement }
-        private const int VisibleBackpackItems = 16;
+        private enum Phase { Preparation, Entering, Playback, RoundBreak, Settlement }
 
         [SerializeField] private EncounterAsset encounter;
-        [SerializeField] private Texture2D backpackIcon;
+        [SerializeField] private Texture2D battleLogParchment;
         [SerializeField] private Texture2D[] battleBackgrounds = Array.Empty<Texture2D>();
         [SerializeField] private bool randomizeLineups = true;
         [SerializeField, Min(0.05f)] private float attackAnimationTimeScale = 1f;
@@ -38,9 +37,11 @@ namespace RaidPartyManager.Presentation
         private readonly Dictionary<string, (CharacterDefinition Character, int MaximumHealth)> appearances =
             new Dictionary<string, (CharacterDefinition, int)>();
         private readonly Dictionary<string, BattleUnitCard> unitCards = new Dictionary<string, BattleUnitCard>();
-        private readonly Dictionary<string, (Label Attack, Label Defense, Label SpecialDefense)> equipmentStats =
-            new Dictionary<string, (Label Attack, Label Defense, Label SpecialDefense)>();
+        private static readonly Color AvailableEnergy = new Color32(194, 105, 255, 255);
+        private readonly Dictionary<string, BattleEnergy> partyEnergy = new Dictionary<string, BattleEnergy>();
+        private readonly Dictionary<string, VisualElement> energyBars = new Dictionary<string, VisualElement>();
         private readonly Dictionary<string, BattleSpriteView> battleSprites = new Dictionary<string, BattleSpriteView>();
+        private readonly BattleEntrance entrance = new BattleEntrance();
         private readonly List<string> battleLog = new List<string>();
         private readonly List<BattleEffectPlayback> impactEffects = new List<BattleEffectPlayback>();
 
@@ -58,13 +59,21 @@ namespace RaidPartyManager.Presentation
         private BattleLoadout battleLoadout;
         private IReadOnlyList<BattleEvent> roundEvents;
         private BattleResult result;
-        private EquipmentInstance reward;
+        private EquipmentDefinition[] pendingLoot = Array.Empty<EquipmentDefinition>();
+        private int pendingGold;
+        private bool leavingVictory;
         private int eventIndex;
         private BattleActionPlayback actionPlayback;
         private BattleEvent visualAction;
         private bool waitingForImpact;
         private VisualElement actionLayer;
+        private VisualElement entranceLayer;
+        private bool enemyEntranceScheduled;
         private ScrollView logView;
+        private double? settingsOpenedAt;
+        private double pausedTime;
+
+        private double PlaybackNow => (settingsOpenedAt ?? Time.unscaledTimeAsDouble) - pausedTime;
         private BattleCharacterDetails characterDetails;
         private BattleStatusTooltip statusTooltip;
         private EquipmentTooltip equipmentTooltip;
@@ -87,13 +96,11 @@ namespace RaidPartyManager.Presentation
             {
                 var formation = content.Draft(Side.Party, new System.Random());
                 playModeRun = new PartyRun(formation.Select(unit => new PartyMemberStart(
-                    unit.Id, unit.Character, unit.Position, unit.Health, unit.StartingStatuses)), content.StartingEquipment);
+                    unit.Id, unit.Character, unit.Position, unit.Health, unit.StartingStatuses)),
+                    content.StartingEquipment.Concat(content.SkillBooks));
             }
             return playModeRun;
         }
-
-        internal static void ReceiveShopEquipment(EncounterData content, EquipmentDefinition equipment) =>
-            GetPlaySession(content).AddEquipment(equipment);
 
         internal static void MarkPartyEdited() => partyEdited = true;
 
@@ -123,7 +130,8 @@ namespace RaidPartyManager.Presentation
 
             content = encounter.ToData();
             adventure = AdventureFlow.ForScene("BattlePrototype");
-            run = adventure?.Party ?? (playModeRun ??= new PartyRun(RosterStart(Side.Party), content.StartingEquipment));
+            run = adventure?.Party ?? (playModeRun ??= new PartyRun(RosterStart(Side.Party),
+                content.StartingEquipment.Concat(content.SkillBooks)));
             enemyRun = playModeEnemies ??= new PartyRun(RosterStart(Side.Enemy), Array.Empty<EquipmentDefinition>());
             ResetDemo();
         }
@@ -138,6 +146,7 @@ namespace RaidPartyManager.Presentation
         private void OnDisable()
         {
             adventure?.AbortBattle();
+            entrance.Clear(unitCards);
             ClearAction();
             ClearImpactEffects();
             statusTooltip?.Hide();
@@ -147,6 +156,9 @@ namespace RaidPartyManager.Presentation
 
         private void ResetDemo(bool reroll = false)
         {
+            settingsOpenedAt = null;
+            pausedTime = 0;
+            entrance.Clear(unitCards);
             ClearAction();
             ClearImpactEffects();
             if (adventure != null)
@@ -163,11 +175,14 @@ namespace RaidPartyManager.Presentation
             battleLoadout = null;
             roundEvents = null;
             result = null;
-            reward = null;
+            pendingLoot = Array.Empty<EquipmentDefinition>();
+            pendingGold = 0;
+            leavingVictory = false;
             health.Clear();
             shields.Clear();
             statuses.Clear();
             partyStats.Clear();
+            partyEnergy.Clear();
             appearances.Clear();
             battleSprites.Clear();
             battleLog.Clear();
@@ -175,6 +190,18 @@ namespace RaidPartyManager.Presentation
             battleBackground = backgrounds.Length > 0 ? backgrounds[draftRandom.Next(backgrounds.Length)] : null;
             if (adventure != null)
                 battleBackground = backgrounds.FirstOrDefault(texture => texture.name.StartsWith("01-")) ?? battleBackground;
+            entrance.Add(run.CaptureFormation(Side.Party), content);
+            enemyEntranceScheduled = false;
+            RenderPreparation();
+        }
+
+        private void RenderPreparation()
+        {
+            if (phase == Phase.Preparation && !enemyEntranceScheduled && CanPreviewEnemies())
+            {
+                entrance.Add(preparedEnemies, content);
+                enemyEntranceScheduled = true;
+            }
             Render();
         }
 
@@ -187,13 +214,26 @@ namespace RaidPartyManager.Presentation
             adventure?.BindBattle(request.Id);
             battle = new BattleSimulator().Start(request);
             ReadPartyStats();
+            ReadPartyEnergy();
             foreach (var unit in battle.Formation)
             {
                 health[unit.Id] = unit.Health;
                 appearances[unit.Id] = (unit.Character, unit.Stats.Health);
             }
 
-            BeginNextRound();
+            if (!enemyEntranceScheduled)
+            {
+                entrance.Add(battle.Formation.Where(unit => unit.Side == Side.Enemy), content);
+                enemyEntranceScheduled = true;
+            }
+
+            if (entrance.Active)
+            {
+                phase = Phase.Entering;
+                Render();
+            }
+            else
+                BeginNextRound();
         }
 
         private void BeginNextRound()
@@ -204,6 +244,8 @@ namespace RaidPartyManager.Presentation
             foreach (var unit in battle.Formation)
             {
                 health.TryAdd(unit.Id, unit.Health);
+                if (unit.Side == Side.Party)
+                    partyEnergy.TryAdd(unit.Id, BattleEnergy.Full(unit.Equipment));
                 appearances.TryAdd(unit.Id, (unit.Character, unit.Stats.Health));
             }
             eventIndex = 0;
@@ -227,6 +269,12 @@ namespace RaidPartyManager.Presentation
             }
         }
 
+        private void ReadPartyEnergy()
+        {
+            foreach (var entry in battle.ReadPartyEnergy())
+                partyEnergy[entry.Key] = entry.Value;
+        }
+
         private void ReadPartyStats()
         {
             foreach (var entry in battle.ReadPartyStats())
@@ -235,8 +283,15 @@ namespace RaidPartyManager.Presentation
 
         private void Update()
         {
-            double now = Time.unscaledTimeAsDouble;
-            if (phase == Phase.Playback)
+            if (settingsOpenedAt.HasValue)
+                return;
+
+            double now = PlaybackNow;
+            if (entrance.Active)
+                entrance.Show(now, entranceLayer, unitCards);
+            if (phase == Phase.Entering && !entrance.Active)
+                BeginNextRound();
+            else if (phase == Phase.Playback)
                 AdvancePlayback(now);
             foreach (var sprite in battleSprites.Values)
                 if (sprite.panel != null)
@@ -295,23 +350,34 @@ namespace RaidPartyManager.Presentation
 
                 if (entry.Kind == BattleEventKind.Finished)
                 {
-                    result = battle.Result;
-                    if (!run.TrySettle(result, out reward))
-                        throw new InvalidOperationException("The active replay could not be settled.");
-                    if (adventure != null && !adventure.SettleBattle(result))
-                        throw new InvalidOperationException("The route encounter could not be settled.");
+                    SettleBattle();
+                    foreach (var member in run.Members)
+                    {
+                        if (member.Health <= 0 || !result.HealthById.TryGetValue(member.Id, out int finalHealth) || finalHealth != 0)
+                            continue;
+                        health[member.Id] = member.Health;
+                        shields.Remove(member.Id);
+                        statuses.Remove(member.Id);
+                    }
+                    ReadPartyEnergy();
                     phase = Phase.Settlement;
-                    Render();
+                    if (result.Outcome == BattleOutcome.Victory)
+                        ContinueVictory();
+                    else
+                        Render();
                     return;
                 }
 
                 string line = actionLogged ? null : Describe(entry);
+                if (entry.ActorEnergy is { } energy)
+                {
+                    partyEnergy[entry.ActorId] = energy;
+                    if (energyBars.TryGetValue(entry.ActorId, out var bar))
+                        PaintEnergy(bar, energy);
+                }
                 if (entry.PartyStatChanges != null)
                     foreach (var change in entry.PartyStatChanges)
-                    {
                         partyStats[change.Key] = change.Value;
-                        RefreshEquipmentStats(change.Key, change.Value);
-                    }
                 if (entry.Loadout != null)
                     ApplyLoadout(entry.Loadout);
                 if (entry.Kind != BattleEventKind.Defeated)
@@ -332,7 +398,7 @@ namespace RaidPartyManager.Presentation
                     else if (entry.Loadout != null)
                         Render();
                     else
-                        unitCards[entry.TargetId].Refresh(entry.TargetHealth, entry.TargetShield, entry.StatusStacks);
+                        unitCards[entry.TargetId].Refresh(entry.TargetHealth, entry.TargetShield, now, entry.StatusStacks);
                     if (entry.Detail != "未命中" && EffectArt(entry) is Texture2D effect)
                         impactEffects.Add(new BattleEffectPlayback(entry.TargetId, effect, now, AnimationScale));
                 }
@@ -349,6 +415,28 @@ namespace RaidPartyManager.Presentation
             ReadPartyStats();
             phase = Phase.RoundBreak;
             Render();
+        }
+
+        private void SettleBattle()
+        {
+            result = battle.Result;
+            if (result.Outcome != BattleOutcome.Victory)
+            {
+                if (!run.TrySettle(result, out _) || adventure != null && !adventure.SettleBattle(result))
+                    throw new InvalidOperationException("The battle loss could not be settled.");
+                return;
+            }
+
+            if (!run.TryFinishBattle(result, out var loot))
+                throw new InvalidOperationException("The active replay could not be settled.");
+            int gold;
+            if (adventure == null)
+                gold = AdventureRun.RollKillGold(result, battle.Formation.Where(unit => unit.Side == Side.Enemy), draftRandom);
+            else if (!adventure.SettleBattle(result, out gold))
+                throw new InvalidOperationException("The route encounter could not be settled.");
+
+            pendingLoot = loot.ToArray();
+            pendingGold = (int)Math.Min(int.MaxValue - run.Gold, (long)result.GoldEarned + gold);
         }
 
         private bool HasActiveAnimation(double now) => actionPlayback != null ||
@@ -444,94 +532,132 @@ namespace RaidPartyManager.Presentation
             HideEquipmentTooltip();
             root.Clear();
             unitCards.Clear();
-            equipmentStats.Clear();
+            energyBars.Clear();
             root.style.backgroundColor = PrototypeStyle.Background;
             root.style.color = PrototypeStyle.Ink;
 
-            var page = new ScrollView { name = "prototype" };
-            page.style.flexGrow = 1;
-            page.verticalScroller.valueChanged += _ => HideEquipmentTooltip();
-            page.horizontalScroller.valueChanged += _ => HideEquipmentTooltip();
-            page.contentContainer.style.paddingTop = 16;
-            page.contentContainer.style.paddingBottom = 16;
-            page.contentContainer.style.paddingLeft = 22;
-            page.contentContainer.style.paddingRight = 22;
-            root.Add(page);
-
-            var header = PrototypeStyle.Row();
-            header.style.justifyContent = Justify.SpaceBetween;
-            header.style.alignItems = Align.Center;
-            var heading = new VisualElement();
-            heading.Add(PrototypeStyle.Text("讨伐队经理", 29));
-            heading.Add(PrototypeStyle.Text(adventure != null ? "弥雾码头 · " + AdventureFlow.NodeName(adventure.Current.Battle.Kind) :
-                content.Name, 13, PrototypeStyle.Muted));
-            header.Add(heading);
-            var tools = PrototypeStyle.Row();
-            tools.style.alignItems = Align.Center;
-            var phaseLabel = PrototypeStyle.Text(phase switch
-            {
-                Phase.Preparation => "战前准备",
-                Phase.Playback => $"第 {battle.Round} 回合",
-                Phase.RoundBreak => $"第 {battle.Round} 回合结束",
-                _ => "战斗结算"
-            }, 14, PrototypeStyle.Accent);
-            phaseLabel.name = "battle-phase";
-            phaseLabel.style.marginRight = 8;
-            tools.Add(phaseLabel);
-            if (phase == Phase.Preparation || phase == Phase.Settlement)
-            {
-                tools.Add(PrototypeStyle.Button("角色编辑", "open-party-editor", OpenPartyEditor));
-                if (content.EnemyRoster.Count > 0 && adventure == null)
-                    tools.Add(PrototypeStyle.Button("敌方编辑", "open-enemy-editor", OpenEnemyEditor));
-            }
-            if (phase == Phase.Preparation)
-            {
-                var start = PrototypeStyle.Button("开始自动战斗", "start", StartBattle, true);
-                start.SetEnabled(run.CanStartBattle);
-                tools.Add(start);
-            }
-            if (phase == Phase.RoundBreak)
-                tools.Add(PrototypeStyle.Button("下回合", "next-round", ContinueRound, true));
-            if (phase == Phase.Settlement)
-            {
-                if (adventure == null) tools.Add(PrototypeStyle.Button("重置演练", "reset", () => ResetDemo(reroll: true), true));
-                else tools.Add(AdventureFlow.ReturnButton());
-            }
-            tools.Add(PrototypeSceneMenu.ReturnButton());
-            header.Add(tools);
-            page.Add(header);
-
-            var arena = PrototypeStyle.Panel();
-            arena.name = "battlefield";
+            var backdrop = new VisualElement { name = "battle-background", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(backdrop);
             if (battleBackground != null)
             {
-                arena.style.backgroundImage = new StyleBackground(battleBackground);
-                arena.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-                arena.style.unityBackgroundImageTintColor = new Color(0.78f, 0.78f, 0.78f, 1f);
+                backdrop.style.backgroundImage = new StyleBackground(battleBackground);
+                backdrop.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                backdrop.style.unityBackgroundImageTintColor = new Color(0.78f, 0.78f, 0.78f, 1f);
             }
+            root.Add(backdrop);
+
+            bool defeat = phase == Phase.Settlement && result.Outcome != BattleOutcome.Victory;
+            bool setup = phase == Phase.Preparation || defeat;
+            var topBar = new RunTopBar(root, run, content, setup ? OpenPartyEditor : null, actions: BattleControls(defeat),
+                settingsChanged: SetSettingsOpen,
+                openEnemyEditor: setup && content.EnemyRoster.Count > 0 && adventure == null ? OpenEnemyEditor : null);
+            root.Add(topBar);
+
+            var page = new ScrollView { name = "prototype" };
+            page.style.flexGrow = 1;
+            page.style.minHeight = 0;
+            page.verticalScroller.valueChanged += _ => HideEquipmentTooltip();
+            page.contentContainer.style.flexGrow = 1;
+            page.contentContainer.style.paddingTop = 8;
+            page.contentContainer.style.paddingLeft = page.contentContainer.style.paddingRight = 22;
+            root.Add(page);
+
+            var arena = new VisualElement { name = "battlefield" };
+            arena.style.marginTop = StyleKeyword.Auto;
+            arena.style.flexShrink = 0;
             if (phase == Phase.RoundBreak)
             {
                 var hint = PrototypeStyle.Text("长按一名队员，拖到另一名存活队员上交换站位。", 13, PrototypeStyle.Muted);
                 hint.style.marginBottom = 8;
                 arena.Add(hint);
             }
+            bool showEnemies = phase != Phase.Preparation || CanPreviewEnemies();
             var opposingLines = PrototypeStyle.Row();
             opposingLines.style.alignItems = Align.Stretch;
             opposingLines.Add(BuildLine(Side.Party));
             var divider = PrototypeStyle.Text("◆", 11, PrototypeStyle.Accent);
             divider.style.width = 24;
+            divider.visible = showEnemies;
             PrototypeStyle.Middle(divider);
             opposingLines.Add(divider);
-            opposingLines.Add(BuildLine(Side.Enemy));
+            opposingLines.Add(BuildLine(Side.Enemy, showEnemies));
             arena.Add(opposingLines);
             actionLayer = new VisualElement { name = "battle-action-layer", pickingMode = PickingMode.Ignore };
             PrototypeStyle.Fill(actionLayer);
             arena.Add(actionLayer);
+            entranceLayer = new VisualElement { name = "battle-entrance-layer", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(entranceLayer);
+            entranceLayer.style.overflow = Overflow.Hidden;
+            arena.Add(entranceLayer);
             page.Add(arena);
+            if (entrance.Active)
+                entrance.Show(PlaybackNow, entranceLayer, unitCards);
 
-            RenderFooter(page, previousInspection);
-            if (phase == Phase.Settlement)
-                RenderSettlement(page);
+            var footer = BuildFooter(previousInspection);
+            root.Add(footer);
+            if (defeat)
+                RenderDefeat(page);
+            else if (phase == Phase.Settlement)
+            {
+                page.SetEnabled(false);
+                footer.SetEnabled(false);
+                topBar.SetEnabled(false);
+                RenderVictory();
+            }
+        }
+
+        private VisualElement BattleControls(bool defeat)
+        {
+            var controls = PrototypeStyle.Row("battle-controls");
+            controls.style.alignItems = Align.Center;
+            controls.style.flexShrink = 0;
+            controls.style.marginLeft = 7;
+            if (phase == Phase.Preparation)
+            {
+                var start = PrototypeStyle.Button("开始战斗", "start", StartBattle, true);
+                start.SetEnabled(run.CanStartBattle);
+                controls.Add(start);
+                return controls;
+            }
+
+            var label = PrototypeStyle.Text(phase switch
+            {
+                Phase.Entering => "入场",
+                Phase.Playback => $"第 {battle.Round} 回合",
+                Phase.RoundBreak => $"第 {battle.Round} 回合结束",
+                _ => "战斗结算"
+            }, 13, PrototypeStyle.Accent);
+            label.name = "battle-phase";
+            label.style.marginRight = 6;
+            label.style.whiteSpace = WhiteSpace.NoWrap;
+            controls.Add(label);
+            if (phase == Phase.RoundBreak)
+                controls.Add(PrototypeStyle.Button("下回合", "next-round", ContinueRound, true));
+            if (defeat)
+            {
+                if (adventure == null)
+                    controls.Add(PrototypeStyle.Button("重置演练", "reset", () => ResetDemo(reroll: true), true));
+                else
+                    controls.Add(AdventureFlow.ReturnButton());
+            }
+            return controls;
+        }
+
+        private void SetSettingsOpen(bool open)
+        {
+            double now = Time.unscaledTimeAsDouble;
+            if (open)
+            {
+                settingsOpenedAt = now;
+                HideCharacterDetails();
+                statusTooltip.Hide();
+                HideEquipmentTooltip();
+            }
+            else if (settingsOpenedAt.HasValue)
+            {
+                pausedTime += now - settingsOpenedAt.Value;
+                settingsOpenedAt = null;
+            }
         }
 
         private void OpenPartyEditor()
@@ -539,11 +665,11 @@ namespace RaidPartyManager.Presentation
             if (phase != Phase.Preparation && phase != Phase.Settlement)
                 return;
 
+            entrance.Clear(unitCards);
             statusTooltip.Hide();
             HideEquipmentTooltip();
             root.Clear();
-            root.Add(new PartyEditorView(run, content.CharacterCatalog, EditorPosition, content.PortraitFor, content.IconFor,
-                Render, edited: () => partyEdited = true));
+            root.Add(new PartyEditorView(run, content, RenderPreparation, edited: () => partyEdited = true));
         }
 
         private void OpenEnemyEditor()
@@ -551,40 +677,29 @@ namespace RaidPartyManager.Presentation
             if (phase != Phase.Preparation && phase != Phase.Settlement)
                 return;
 
+            entrance.Clear(unitCards);
             statusTooltip.Hide();
             HideEquipmentTooltip();
             root.Clear();
-            root.Add(new PartyEditorView(enemyRun, content.EnemyRoster, member => member.Position, content.PortraitFor,
-                content.IconFor, () =>
+            root.Add(new PartyEditorView(enemyRun, content, () =>
                 {
                     preparedEnemies = enemyRun.CaptureFormation(Side.Enemy);
-                    Render();
+                    RenderPreparation();
                 }, Side.Enemy, () => enemiesEdited = true));
         }
 
-        private int? EditorPosition(MemberView member)
-        {
-            if (member.Position.HasValue || phase != Phase.Settlement)
-                return member.Position;
+        private bool CanPreviewEnemies() =>
+            run.Members.Any(member => member.Health > 0 && member.Character.Trait == CharacterTrait.RevealEnemies);
 
-            // Settlement removes defeated members from the formation. Keep their last battle slots in the editor.
-            return member.Health == 0 ? battle.Formation.FirstOrDefault(unit => unit.Side == Side.Party && unit.Id == member.Id)?.Position : null;
-        }
-
-        private VisualElement BuildLine(Side side)
+        private VisualElement BuildLine(Side side, bool showUnits = true)
         {
             bool isParty = side == Side.Party;
             var line = new VisualElement();
             line.style.flexGrow = 1;
             line.style.flexBasis = 0;
             line.style.minWidth = 0;
-            bool hideEnemies = !isParty && phase == Phase.Preparation &&
-                !run.Members.Any(member => member.Health > 0 && member.Character.Trait == CharacterTrait.RevealEnemies);
-            var title = PrototypeStyle.Text(isParty ? "己方阵列" : hideEnemies ? "敌方阵列 · 待侦察" : "敌方阵列", 13,
-                isParty ? PrototypeStyle.Ally : PrototypeStyle.Enemy);
-            title.style.unityTextAlign = isParty ? TextAnchor.MiddleLeft : TextAnchor.MiddleRight;
-            title.style.marginBottom = 7;
-            line.Add(title);
+            if (!showUnits)
+                return line;
 
             var positions = PrototypeStyle.Row(isParty ? "party-positions" : "enemy-positions");
             var drag = isParty && phase == Phase.RoundBreak
@@ -593,11 +708,15 @@ namespace RaidPartyManager.Presentation
             for (int index = 0; index < Rules.Positions; index++)
             {
                 int slot = isParty ? Rules.Positions - index : index + 1;
-                var card = hideEnemies
-                    ? new BattleUnitCard(side, slot, null, null, null, 0, 0, 0, null, hidden: true)
-                    : PositionCard(side, slot);
-                positions.Add(card);
-                if (drag != null && card.CanSwap && !battle.IsPositionLocked(card.Slot))
+                var card = PositionCard(side, slot);
+                var slotView = (VisualElement)card ?? new VisualElement { pickingMode = PickingMode.Ignore };
+                slotView.name = $"{(isParty ? "party" : "enemy")}-position-{slot}";
+                slotView.style.flexGrow = 1;
+                slotView.style.flexBasis = 0;
+                slotView.style.minWidth = 0;
+                slotView.style.marginLeft = slotView.style.marginRight = 4;
+                positions.Add(slotView);
+                if (drag != null && card?.CanSwap == true && !battle.IsPositionLocked(card.Slot))
                     drag.Register(new FormationSwap.Slot
                     {
                         View = card, Border = card.Q("combatant-portrait"), Position = card.Slot,
@@ -635,9 +754,10 @@ namespace RaidPartyManager.Presentation
                 maximumHealth = appearance.Item2;
             }
 
-            string subtitle = character == null ? null : preparing && side == Side.Enemy && character.Skill != null
-                ? character.Skill.Name : PersonalityText(character.Personality);
-            int shield = !preparing && phase != Phase.Settlement && id != null ? shields.GetValueOrDefault(id) : 0;
+            if (id == null)
+                return null;
+
+            int shield = !preparing && phase != Phase.Settlement ? shields.GetValueOrDefault(id) : 0;
             BattleSpriteView sprite = null;
             var sheet = content.BattleSpriteFor(character?.Id);
             if (sheet != null)
@@ -648,31 +768,33 @@ namespace RaidPartyManager.Presentation
                 sprite.RemoveFromHierarchy();
             }
             var card = new BattleUnitCard(side, position, id, character, content.PortraitFor(character?.Id),
-                maximumHealth, currentHealth, shield, subtitle,
+                maximumHealth, currentHealth, shield, PlaybackNow,
                 statusIcon: content.StatusIcon, battleSprite: sprite, statusTooltip: statusTooltip);
-            if (id != null)
-            {
-                card.Refresh(currentHealth, shield, statuses.GetValueOrDefault(id));
-                unitCards[id] = card;
-            }
+            card.Refresh(currentHealth, shield, PlaybackNow, statuses.GetValueOrDefault(id));
+            unitCards[id] = card;
             return card;
         }
 
-        private void RenderFooter(VisualElement page, Vector2? previousInspection)
+        private VisualElement BuildFooter(Vector2? previousInspection)
         {
             var bottom = PrototypeStyle.Row("battle-footer");
             bottom.style.alignItems = Align.Stretch;
+            bottom.style.justifyContent = Justify.Center;
+            bottom.style.flexShrink = 0;
+            bottom.style.paddingLeft = bottom.style.paddingRight = 22;
+            bottom.style.paddingBottom = 10;
             var roster = PrototypeStyle.Panel();
             roster.name = "roster-equipment";
             roster.style.flexGrow = 7;
             roster.style.flexBasis = 0;
             roster.style.minWidth = 0;
-            roster.style.marginRight = 10;
+            roster.style.maxWidth = 558;
+            roster.style.marginRight = 32;
+            roster.style.paddingTop = roster.style.paddingBottom = 6;
+            roster.style.paddingLeft = roster.style.paddingRight = 7;
 
             var members = run.Members;
             var inventory = run.Inventory;
-            var equipped = new HashSet<string>(members.SelectMany(member => member.EquipmentIds));
-            roster.Add(BuildBackpackStrip(inventory.Where(item => !equipped.Contains(item.Id)).Take(VisibleBackpackItems)));
             var cards = PrototypeStyle.Row("equipment-positions");
             for (int position = Rules.Positions; position >= 1; position--)
             {
@@ -684,9 +806,9 @@ namespace RaidPartyManager.Presentation
                     ? appearance.Character : member?.Character;
                 var equipment = id != null && battleLoadout != null && battleLoadout.Slots.TryGetValue(id, out var slots)
                     ? slots : member?.EquipmentIds;
-                Stats? stats = phase != Phase.Preparation && id != null && partyStats.TryGetValue(id, out var current)
-                    ? current : member?.EffectiveStats;
-                cards.Add(EquipmentCard(position, id, character, stats, equipment, inventory, previousInspection));
+                var skills = member == null ? Array.Empty<SkillBookDefinition>() :
+                    member.LearnedSkills.Take(member.SkillSlotCount).ToArray();
+                cards.Add(EquipmentCard(position, id, character, equipment, inventory, skills, previousInspection));
             }
             roster.Add(cards);
             if (phase == Phase.Preparation)
@@ -698,59 +820,40 @@ namespace RaidPartyManager.Presentation
             }
             bottom.Add(roster);
             bottom.Add(BuildLog());
-            page.Add(bottom);
+            return bottom;
         }
 
-        private VisualElement BuildBackpackStrip(IEnumerable<EquipmentInstance> items)
-        {
-            var strip = PrototypeStyle.Row("battle-backpack");
-            strip.style.alignItems = Align.Center;
-            strip.style.marginBottom = 7;
-            var icon = new Image { name = "battle-backpack-icon", image = backpackIcon,
-                scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
-            icon.style.width = icon.style.height = 34;
-            icon.style.flexShrink = 0;
-            icon.style.marginRight = 8;
-            strip.Add(icon);
-
-            var tiles = PrototypeStyle.Row("battle-backpack-items");
-            tiles.style.flexGrow = 1;
-            tiles.style.minWidth = 0;
-            foreach (var item in items)
-            {
-                var tile = EquipmentTile($"backpack-item-{item.Id}", item.Definition);
-                tile.style.marginRight = 3;
-                tiles.Add(tile);
-            }
-            strip.Add(tiles);
-            return strip;
-        }
-
-        private VisualElement EquipmentCard(int position, string id, CharacterDefinition character, Stats? stats,
-            IReadOnlyList<string> equipment, IReadOnlyList<EquipmentInstance> inventory, Vector2? previousInspection)
+        private VisualElement EquipmentCard(int position, string id, CharacterDefinition character,
+            IReadOnlyList<string> equipment, IReadOnlyList<EquipmentInstance> inventory,
+            IReadOnlyList<SkillBookDefinition> skills, Vector2? previousInspection)
         {
             var card = PrototypeStyle.Row($"equipment-position-{position}");
             card.style.flexGrow = 1;
             card.style.flexBasis = 0;
             card.style.minWidth = 0;
-            card.style.height = 132;
+            card.style.height = 104;
             card.style.marginRight = position == 1 ? 0 : 5;
+            if (id == null)
+            {
+                card.pickingMode = PickingMode.Ignore;
+                return card;
+            }
+
             card.style.backgroundColor = PrototypeStyle.Inset;
             card.style.overflow = Overflow.Hidden;
             PrototypeStyle.Outline(card, PrototypeStyle.Edge, 3);
 
             var slots = new VisualElement { name = "equipment-slots" };
-            slots.style.width = Length.Percent(24);
-            slots.style.maxWidth = 42;
+            slots.style.width = 34;
             slots.style.alignItems = Align.Center;
             slots.style.justifyContent = Justify.SpaceBetween;
             slots.style.flexShrink = 0;
-            slots.style.paddingTop = slots.style.paddingBottom = 7;
-            slots.style.paddingLeft = slots.style.paddingRight = 3;
+            slots.style.paddingTop = slots.style.paddingBottom = 3;
+            slots.style.paddingLeft = slots.style.paddingRight = 2;
             var equippedItems = new EquipmentDefinition[Rules.EquipmentSlots];
             for (int slot = 0; slot < Rules.EquipmentSlots; slot++)
             {
-                var held = equipment != null ? inventory.FirstOrDefault(item => item.Id == equipment[slot])?.Definition : null;
+                var held = inventory.FirstOrDefault(item => item.Id == equipment[slot])?.Definition;
                 equippedItems[slot] = held;
                 slots.Add(EquipmentTile($"equipment-slot-{slot + 1}", held, slot + 1));
             }
@@ -761,64 +864,62 @@ namespace RaidPartyManager.Presentation
             portrait.style.flexBasis = 0;
             portrait.style.minWidth = 0;
             portrait.style.overflow = Overflow.Hidden;
-            var art = content.PortraitFor(character?.Id);
-            ProfessionFrame.AddTo(portrait, character?.Profession, art);
+            var illustration = new VisualElement { name = "equipment-portrait-art", pickingMode = PickingMode.Ignore };
+            illustration.style.flexGrow = 1;
+            illustration.style.flexBasis = 0;
+            portrait.Add(illustration);
+            ProfessionFrame.AddFittedTo(illustration, character.Profession, content.PortraitFor(character.Id));
 
-            var caption = PrototypeStyle.Text(character?.Name ?? $"{position} 号位", 10);
-            caption.style.position = Position.Absolute;
-            caption.style.left = caption.style.right = caption.style.bottom = 3;
-            caption.style.backgroundColor = new Color(0.064f, 0.069f, 0.086f, 0.90f);
+            var caption = PrototypeStyle.Text(character.Name, 10);
             caption.style.paddingBottom = caption.style.paddingTop = 2;
+            caption.style.whiteSpace = WhiteSpace.NoWrap;
+            caption.style.overflow = Overflow.Hidden;
+            caption.style.textOverflow = TextOverflow.Ellipsis;
+            caption.pickingMode = PickingMode.Ignore;
             PrototypeStyle.Middle(caption);
             portrait.Add(caption);
             card.Add(portrait);
 
-            var attributes = new VisualElement { name = "equipment-stats" };
-            attributes.style.width = Length.Percent(35);
-            attributes.style.flexShrink = 0;
-            attributes.style.minWidth = 0;
-            attributes.style.justifyContent = Justify.SpaceBetween;
-            attributes.style.paddingLeft = attributes.style.paddingRight = 4;
-            attributes.style.paddingTop = attributes.style.paddingBottom = 13;
-            var attack = AddAttribute("攻击", "equipment-attack");
-            var defense = AddAttribute("防御", "equipment-defense");
-            var specialDefense = AddAttribute("特防", "equipment-special-defense");
-            card.Add(attributes);
-            if (id != null)
-            {
-                equipmentStats[id] = (attack, defense, specialDefense);
-                if (stats.HasValue)
-                    RefreshEquipmentStats(id, stats.Value);
-            }
+            var bar = new VisualElement { name = "equipment-energy", pickingMode = PickingMode.Ignore };
+            bar.style.width = 15;
+            bar.style.flexShrink = 0;
+            bar.style.flexDirection = FlexDirection.ColumnReverse;
+            bar.style.marginTop = bar.style.marginBottom = 4;
+            bar.style.marginLeft = bar.style.marginRight = 2;
+            bar.style.paddingTop = bar.style.paddingBottom = 2;
+            bar.style.paddingLeft = bar.style.paddingRight = 2;
+            bar.style.backgroundColor = PrototypeStyle.Background;
+            PrototypeStyle.Outline(bar, new Color32(103, 77, 127, 255), 7);
+            var energy = phase != Phase.Preparation && partyEnergy.TryGetValue(id, out var current)
+                ? current : BattleEnergy.Full(equippedItems.Where(item => item != null));
+            PaintEnergy(bar, energy);
+            energyBars[id] = bar;
+            card.Add(bar);
 
-            if (character != null && (phase == Phase.Playback || phase == Phase.RoundBreak))
-                RegisterCharacterInspection(portrait, position, id, character, equippedItems, previousInspection);
+            if (phase == Phase.Playback || phase == Phase.RoundBreak)
+                RegisterCharacterInspection(portrait, position, id, character, equippedItems, skills, previousInspection);
             return card;
-
-            Label AddAttribute(string title, string name)
-            {
-                var row = PrototypeStyle.Row();
-                row.style.alignItems = Align.Center;
-                row.style.justifyContent = Justify.SpaceBetween;
-                var label = PrototypeStyle.Text(title, 11, PrototypeStyle.Muted);
-                label.style.whiteSpace = WhiteSpace.NoWrap;
-                row.Add(label);
-                var value = PrototypeStyle.Text("—", 13);
-                value.name = name;
-                value.style.whiteSpace = WhiteSpace.NoWrap;
-                row.Add(value);
-                attributes.Add(row);
-                return value;
-            }
         }
 
-        private void RefreshEquipmentStats(string id, Stats stats)
+        private static void PaintEnergy(VisualElement bar, BattleEnergy energy)
         {
-            if (!equipmentStats.TryGetValue(id, out var values))
-                return;
-            values.Attack.text = stats.Attack.ToString();
-            values.Defense.text = stats.Defense.ToString();
-            values.SpecialDefense.text = stats.SpecialDefense.ToString();
+            bar.tooltip = $"能量  {energy.Remaining}/{energy.Capacity}";
+            if (bar.childCount != energy.Capacity)
+            {
+                bar.Clear();
+                for (int i = 0; i < energy.Capacity; i++)
+                {
+                    var cell = new VisualElement { name = $"energy-cell-{i + 1}", pickingMode = PickingMode.Ignore };
+                    cell.style.flexGrow = 1;
+                    cell.style.flexBasis = 0;
+                    cell.style.marginTop = cell.style.marginBottom = 1;
+                    cell.style.borderTopLeftRadius = cell.style.borderTopRightRadius = 3;
+                    cell.style.borderBottomLeftRadius = cell.style.borderBottomRightRadius = 3;
+                    bar.Add(cell);
+                }
+            }
+            for (int i = 0; i < energy.Capacity; i++)
+                bar[i].style.backgroundColor = i < energy.Remaining ? AvailableEnergy : Color.white;
         }
 
         private VisualElement EquipmentTile(string name, EquipmentDefinition item, int? slot = null)
@@ -841,6 +942,12 @@ namespace RaidPartyManager.Presentation
 
             var artwork = content.IconFor(item.Id);
             view.Add(new EquipmentIcon(item, artwork));
+            RegisterEquipmentTooltip(view, item, artwork);
+            return view;
+        }
+
+        private void RegisterEquipmentTooltip(VisualElement view, EquipmentDefinition item, Texture2D artwork)
+        {
             view.RegisterCallback<PointerEnterEvent>(evt =>
             {
                 if (evt.pointerType != UnityEngine.UIElements.PointerType.mouse)
@@ -855,7 +962,6 @@ namespace RaidPartyManager.Presentation
                 if (equipmentTooltipAnchor == view)
                     HideEquipmentTooltip();
             });
-            return view;
         }
 
         private void HideEquipmentTooltip()
@@ -866,7 +972,7 @@ namespace RaidPartyManager.Presentation
         }
 
         private void RegisterCharacterInspection(VisualElement portrait, int position, string id, CharacterDefinition character,
-            IReadOnlyList<EquipmentDefinition> equipment, Vector2? previousInspection)
+            IReadOnlyList<EquipmentDefinition> equipment, IReadOnlyList<SkillBookDefinition> skills, Vector2? previousInspection)
         {
             portrait.RegisterCallback<PointerEnterEvent>(evt =>
             {
@@ -902,7 +1008,7 @@ namespace RaidPartyManager.Presentation
                 inspectedPortrait = portrait;
                 inspectedMember = id;
                 inspectionPointer = pointer;
-                var details = new BattleCharacterDetails(position, character, equipment);
+                var details = new BattleCharacterDetails(position, character, equipment, skills, content.IconFor);
                 characterDetails = details;
                 details.RegisterCallback<GeometryChangedEvent>(_ => details.PositionAt(root, portrait));
                 root.Add(details);
@@ -927,22 +1033,156 @@ namespace RaidPartyManager.Presentation
             inspectedMember = null;
         }
 
-        private void RenderSettlement(VisualElement page)
+        private IReadOnlyList<EquipmentDefinition> LootChoices =>
+            adventure?.Current is { Resolved: false } visit ? visit.Rewards : Array.Empty<EquipmentDefinition>();
+
+        private void ContinueVictory()
+        {
+            if (pendingGold > 0 || pendingLoot.Any(item => item != null) || LootChoices.Count > 0)
+            {
+                Render();
+                return;
+            }
+            if (leavingVictory)
+                return;
+
+            leavingVictory = true;
+            HideEquipmentTooltip();
+            root.Q("victory-rewards")?.SetEnabled(false);
+            if (adventure == null)
+                PrototypeSceneMenu.OpenStandalone("MainMenu");
+            else
+                AdventureFlow.ReturnFromNode();
+        }
+
+        private void RenderVictory()
+        {
+            var overlay = new VisualElement { name = "victory-rewards" };
+            PrototypeStyle.Fill(overlay);
+            overlay.style.alignItems = Align.Center;
+            overlay.style.justifyContent = Justify.Center;
+            overlay.style.backgroundColor = new Color(0.03f, 0.026f, 0.033f, 0.76f);
+            var panel = PrototypeStyle.Panel();
+            panel.name = "victory-panel";
+            panel.style.width = Length.Percent(90);
+            panel.style.maxWidth = 550;
+            panel.style.maxHeight = Length.Percent(88);
+            panel.style.paddingTop = panel.style.paddingBottom = 18;
+            panel.style.paddingLeft = panel.style.paddingRight = 18;
+            panel.style.marginTop = 0;
+            PrototypeStyle.Outline(panel, PrototypeStyle.Accent, 6);
+            var heading = PrototypeStyle.Text("胜利", 26, PrototypeStyle.Accent);
+            PrototypeStyle.Middle(heading);
+            panel.Add(heading);
+
+            var rewards = new ScrollView(ScrollViewMode.Vertical);
+            rewards.style.flexShrink = 1;
+            panel.Add(rewards);
+            var row = RewardRow();
+            for (int i = 0; i < pendingLoot.Length; i++)
+            {
+                int index = i;
+                if (pendingLoot[index] == null)
+                    continue;
+                ItemButton(row, pendingLoot[index], "claim-loot-" + index, () =>
+                {
+                    if (pendingLoot[index] == null) return;
+                    run.AddEquipment(pendingLoot[index]);
+                    pendingLoot[index] = null;
+                    ContinueVictory();
+                });
+            }
+            if (pendingGold > 0)
+            {
+                var amount = pendingGold;
+                row.Add(RewardButton($"{amount} 金币", "claim-gold", new GoldRewardIcon(), () =>
+                {
+                    if (pendingGold <= 0) return;
+                    run.AddGold(pendingGold);
+                    pendingGold = 0;
+                    ContinueVictory();
+                }));
+            }
+            var choices = LootChoices;
+            var choiceRow = choices.Count > 1 ? RewardRow() : row;
+            for (int i = 0; i < choices.Count; i++)
+            {
+                int index = i;
+                ItemButton(choiceRow, choices[index], "claim-route-loot-" + index, () =>
+                {
+                    if (adventure.ClaimReward(index))
+                        ContinueVictory();
+                });
+            }
+            if (row.childCount > 0)
+                rewards.Add(row);
+            if (choices.Count > 1)
+            {
+                var label = PrototypeStyle.Text($"战利品 · {choices.Count} 选 1", 14, PrototypeStyle.Muted);
+                label.name = "loot-choice-count";
+                PrototypeStyle.Middle(label);
+                rewards.Add(label);
+                rewards.Add(choiceRow);
+            }
+
+            overlay.Add(panel);
+            root.Add(overlay);
+            overlay.Q<Button>()?.Focus();
+
+            void ItemButton(VisualElement parent, EquipmentDefinition item, string id, Action claim)
+            {
+                var texture = content.IconFor(item.Id);
+                string caption = item is SkillBookDefinition ? $"技能书 · {item.Name}" : item.Name;
+                var button = RewardButton(caption, id, new EquipmentIcon(item, texture), claim);
+                RegisterEquipmentTooltip(button, item, texture);
+                parent.Add(button);
+            }
+        }
+
+        private static VisualElement RewardRow()
+        {
+            var row = PrototypeStyle.Row();
+            row.style.justifyContent = Justify.Center;
+            row.style.flexWrap = Wrap.Wrap;
+            row.style.marginTop = 8;
+            return row;
+        }
+
+        private static Button RewardButton(string caption, string id, VisualElement icon, Action claim)
+        {
+            var button = PrototypeStyle.Button("", id, claim);
+            button.style.backgroundColor = Color.clear;
+            button.style.borderTopWidth = button.style.borderBottomWidth = 0;
+            button.style.borderLeftWidth = button.style.borderRightWidth = 0;
+            button.style.width = 110;
+            button.style.minHeight = 106;
+            button.style.marginLeft = button.style.marginRight = 4;
+            button.style.marginBottom = 6;
+            button.style.paddingLeft = button.style.paddingRight = 6;
+            icon.style.alignSelf = Align.Center;
+            icon.style.width = icon.style.height = 70;
+            icon.style.flexGrow = 0;
+            button.Add(icon);
+            var label = PrototypeStyle.Text(caption, 13, PrototypeStyle.Accent);
+            label.pickingMode = PickingMode.Ignore;
+            PrototypeStyle.Middle(label);
+            button.Add(label);
+            return button;
+        }
+
+        private void RenderDefeat(VisualElement page)
         {
             var summary = PrototypeStyle.Panel();
+            summary.name = "defeat-summary";
             summary.Add(PrototypeStyle.Text(OutcomeText(result.Outcome), 20, PrototypeStyle.Accent));
             summary.Add(PrototypeStyle.Text("剩余生命  " + string.Join("  ·  ", run.Members.Select(member =>
                 $"{member.Character.Name} {HealthText(member.Health, member.EffectiveStats.Health)}")), 14));
-            var rewardLabel = PrototypeStyle.Text(reward == null ? "本场无装备掉落" :
-                $"战利品：{reward.Definition.Name}（{BonusText(reward.Definition.Bonus)}），已放入共享背包", 14);
-            rewardLabel.name = "reward";
-            summary.Add(rewardLabel);
             if (result.GoldEarned > 0)
                 summary.Add(PrototypeStyle.Text($"获得 {result.GoldEarned} 金币 · 当前 {run.Gold} 金币", 13, PrototypeStyle.Accent));
             if (result.AccessoriesEarned > 0)
                 summary.Add(PrototypeStyle.Text($"获得 {result.AccessoriesEarned} 件饰品，已放入共享背包", 13, PrototypeStyle.Accent));
-            if (adventure != null)
-                AdventureWidgets.BattleRewards(summary, adventure, content, Render);
+            if (adventure?.Current is { } visit)
+                summary.Add(PrototypeStyle.Text(visit.Message, 15, PrototypeStyle.Accent));
             page.Add(summary);
         }
 
@@ -952,24 +1192,34 @@ namespace RaidPartyManager.Presentation
             panel.style.flexGrow = 3;
             panel.style.flexBasis = 0;
             panel.style.minWidth = 0;
-            panel.Add(PrototypeStyle.Text("战斗日志", 17));
+            panel.name = "battle-log-paper";
+            panel.style.maxWidth = 426;
+            panel.style.paddingTop = panel.style.paddingBottom = 5;
+            panel.style.backgroundColor = (Color)new Color32(234, 208, 165, 255);
+            if (battleLogParchment != null)
+            {
+                panel.style.backgroundImage = new StyleBackground(battleLogParchment);
+                panel.style.backgroundSize = new BackgroundSize(Length.Percent(100), Length.Percent(100));
+            }
+            PrototypeStyle.Outline(panel, new Color32(130, 85, 51, 255), 5);
+            panel.Add(PrototypeStyle.Text("战斗日志", 14, AdventureEventWindow.PaperAccent));
             logView = new ScrollView { name = "battle-log" };
-            logView.style.height = 150;
-            logView.style.marginTop = 6;
+            logView.style.height = 86;
+            logView.style.marginTop = 3;
             var scroller = logView.verticalScroller;
             scroller.style.width = 11;
             scroller.lowButton.style.display = scroller.highButton.style.display = DisplayStyle.None;
             var track = scroller.slider.Q("unity-tracker");
             var thumb = scroller.slider.Q("unity-dragger");
             if (track != null)
-                track.style.backgroundColor = PrototypeStyle.Inset;
+                track.style.backgroundColor = (Color)new Color32(131, 91, 53, 75);
             if (thumb != null)
-                thumb.style.backgroundColor = PrototypeStyle.Edge;
+                thumb.style.backgroundColor = (Color)new Color32(119, 75, 41, 190);
             panel.Add(logView);
             if (battleLog.Count == 0 && phase == Phase.Preparation)
-                logView.Add(PrototypeStyle.Text("战斗开始后显示行动记录。", 12, PrototypeStyle.Muted));
+                logView.Add(PrototypeStyle.Text("战斗开始后显示行动记录。", 12, AdventureEventWindow.PaperMuted));
             foreach (string line in battleLog)
-                logView.Add(PrototypeStyle.Text(line, 12));
+                logView.Add(PrototypeStyle.Text(line, 12, AdventureEventWindow.PaperInk));
             if (battleLog.Count > 0)
                 ScrollLogTo(logView, logView.contentContainer.ElementAt(logView.contentContainer.childCount - 1));
             return panel;
@@ -977,7 +1227,7 @@ namespace RaidPartyManager.Presentation
 
         private void AppendLog(string line, BattleEventKind kind)
         {
-            var label = PrototypeStyle.Text(line, 13);
+            var label = PrototypeStyle.Text(line, 12, AdventureEventWindow.PaperInk);
             if (kind == BattleEventKind.Action)
                 label.name = "battle-action";
             logView.Add(label);
@@ -995,7 +1245,7 @@ namespace RaidPartyManager.Presentation
             DecisionReason.FavorAttack => "（鲁莽：先攻）", DecisionReason.WoundedAlly => "（温柔：救援）",
             DecisionReason.FollowAlly => "（配合：追击）", DecisionReason.LowestHealth => "（冷静：低血量目标）",
             DecisionReason.Retaliate => "（记仇：还击）", DecisionReason.FinishWounded => "（谨慎：低生命目标）",
-            DecisionReason.StayOnTarget => "（专注：继续集火）", DecisionReason.UseSkill => "（急躁：技能优先）",
+            DecisionReason.StayOnTarget => "（专注：继续集火）", DecisionReason.UseSkill => "（技能优先）",
             DecisionReason.SaveSkill => "（隐忍：保留技能）", DecisionReason.AvoidOverkill => "（贪心：有效伤害）",
             DecisionReason.EmergencyHeal => "（贪心：紧急救援）",
             _ => ""

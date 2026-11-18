@@ -44,7 +44,8 @@ namespace RaidPartyManager.Presentation
             var words = new VisualElement { pickingMode = PickingMode.Ignore };
             words.style.flexGrow = 1;
             words.style.flexBasis = 0;
-            words.Add(PrototypeStyle.Text(caption?.Name ?? item.Name, 16,
+            string itemName = item is SkillBookDefinition ? $"技能书 · {item.Name}" : item.Name;
+            words.Add(PrototypeStyle.Text(caption?.Name ?? itemName, 16,
                 onPaper ? AdventureEventWindow.PaperAccent : PrototypeStyle.Accent));
             words.Add(PrototypeStyle.Text(caption?.Description ?? item.Description ?? "", 12,
                 onPaper ? AdventureEventWindow.PaperMuted : PrototypeStyle.Muted));

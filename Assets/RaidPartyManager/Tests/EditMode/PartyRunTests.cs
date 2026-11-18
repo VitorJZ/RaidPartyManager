@@ -34,6 +34,35 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void EditorSuppliesRefillTheBackpackAndKeepEquippedGearAndLearnedSkills()
+        {
+            var run = MakeRun();
+            var original = run.Inventory.Single();
+            Assert.That(run.TryEquip("a", 0, original.Id), Is.True);
+            var book = new SkillBookDefinition("roar", "战争咆哮", "", SkillRequirement.None, 1, 2);
+            var catalog = new EquipmentDefinition[] { Armor, Armor, book };
+
+            var release = run.SupplyEditorBackpack(catalog, 4);
+            Assert.That(run.Inventory.Count(item => item.Id != original.Id), Is.EqualTo(4));
+            Assert.That(run.SkillBooks.Count, Is.EqualTo(4));
+            var borrowed = run.Inventory.First(item => item.Id != original.Id);
+            Assert.That(run.TryEquip("b", 0, borrowed.Id), Is.True);
+            Assert.That(run.TryLearnSkill("b", 0, run.SkillBooks[0].Id), Is.True);
+            release();
+
+            Assert.That(run.Inventory, Is.EquivalentTo(new[] { original, borrowed }));
+            Assert.That(run.SkillBooks, Is.Empty);
+            Assert.That(run.Members.Single(member => member.Id == "b").EquipmentIds[0], Is.EqualTo(borrowed.Id));
+            Assert.That(run.Members.Single(member => member.Id == "b").LearnedSkills[0], Is.SameAs(book));
+
+            release = run.SupplyEditorBackpack(catalog, 4);
+            Assert.That(run.Inventory.Count, Is.EqualTo(6));
+            Assert.That(run.SkillBooks.Count, Is.EqualTo(4));
+            release();
+            Assert.That(run.Inventory, Is.EquivalentTo(new[] { original, borrowed }));
+        }
+
+        [Test]
         public void FormationSwapsAndRequiresAllLivingMembersToBePlaced()
         {
             var run = MakeRun();
@@ -51,10 +80,14 @@ namespace RaidPartyManager.Tests
         {
             var run = MakeRun();
             var character = run.Members[0].Character;
+            var armor = run.Inventory.Single();
+            Assert.That(run.TryEquip("b", 0, armor.Id), Is.True);
             var battle = run.BeginBattle(Enemies(), 10, Loot);
-            Assert.That(run.TryEquip("a", 0, run.Inventory.Single().Id), Is.False);
+            Assert.That(run.TryEquip("a", 0, armor.Id), Is.False);
             Assert.That(run.TryPlace("a", 3), Is.False);
-            var result = Result(battle.Id, BattleOutcome.Victory, 7, 0, 0);
+            var result = new BattleResult(battle.Id, BattleOutcome.Victory,
+                new Dictionary<string, int> { { "a", 7 }, { "b", 0 }, { "enemy", 0 } }, Array.Empty<BattleEvent>(),
+                new Dictionary<string, int> { { "a", 2 }, { "b", 1 } });
             Assert.That(run.TrySettle(result, out var reward), Is.True);
             Assert.That(reward.Definition, Is.SameAs(Loot));
             Assert.That(run.TrySettle(result, out _), Is.False);
@@ -62,10 +95,14 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Members[0].Character, Is.SameAs(character));
             Assert.That(run.Members[0].EffectiveStats.Attack, Is.EqualTo(character.BaseStats.Attack));
             Assert.That(run.Members[0].Health, Is.EqualTo(7));
-            Assert.That(run.Members[1].Position, Is.Null);
+            Assert.That(run.Members[1].Health, Is.EqualTo(1));
+            Assert.That(run.Members[1].Position, Is.EqualTo(1));
+            Assert.That(run.Members[1].EquipmentIds[0], Is.EqualTo(armor.Id));
+            Assert.That(result.HealthById["b"], Is.Zero);
 
             var next = run.BeginBattle(Enemies(), 10, Loot);
-            Assert.That(next.Combatants.Where(unit => unit.Side == Side.Party).Single().Health, Is.EqualTo(7));
+            Assert.That(next.Combatants.Single(unit => unit.Id == "a").Health, Is.EqualTo(7));
+            Assert.That(next.Combatants.Single(unit => unit.Id == "b").Health, Is.EqualTo(1));
             Assert.That(run.TrySettle(result, out _), Is.False);
         }
 
@@ -97,6 +134,45 @@ namespace RaidPartyManager.Tests
             Assert.That(run.TrySettle(Result(battle.Id, BattleOutcome.PartyDefeated, 0, 0, 1), out var reward), Is.True);
             Assert.That(reward, Is.Null);
             Assert.That(run.Inventory.Count, Is.EqualTo(1));
+            Assert.That(run.Members.Select(member => member.Health), Is.EqualTo(new[] { 1, 1 }));
+            Assert.That(run.Members.Select(member => member.Position), Is.EqualTo(new[] { 1, 2 }));
+        }
+
+        [Test]
+        public void SkillBooksAreConsumedOnlyWhenACompatibleEmptySlotLearnsAndSurviveEvolution()
+        {
+            var run = MakeRun();
+            var roar = new SkillBookDefinition("roar", "战争咆哮", "", SkillRequirement.None, 1, 2);
+            var guard = new SkillBookDefinition("shield", "坚如磐石", "", SkillRequirement.Warrior, 1, 3);
+            var fire = new SkillBookDefinition("fire", "熊熊烈火", "", SkillRequirement.Mage, 2, 1);
+            var first = run.AddEquipment(roar);
+            var duplicate = run.AddEquipment(roar);
+            var second = run.AddEquipment(guard);
+            var restricted = run.AddEquipment(fire);
+            Assert.That(run.Inventory.Count, Is.EqualTo(1));
+            Assert.That(run.Members[0].SkillSlotCount, Is.EqualTo(1));
+            Assert.That(run.TryEquip("a", 0, first.Id), Is.False);
+            Assert.That(run.TryConsumeItems(new[] { first.Id }), Is.False);
+            Assert.That(run.TryLearnSkill("a", 1, first.Id), Is.False);
+            Assert.That(run.TryLearnSkill("a", 0, restricted.Id), Is.False);
+            Assert.That(run.SkillBooks.Count, Is.EqualTo(4));
+            var battle = run.BeginBattle(Enemies(), 10, Loot);
+            Assert.That(run.TryLearnSkill("a", 0, first.Id), Is.False);
+            Assert.That(run.TrySettle(Result(battle.Id, BattleOutcome.Victory, 7, 0, 0), out _), Is.True);
+            Assert.That(run.TryLearnSkill("a", 0, first.Id), Is.True);
+            Assert.That(run.TryLearnSkill("b", 0, first.Id), Is.False);
+            Assert.That(run.TryLearnSkill("a", 0, second.Id), Is.False);
+
+            var basic = run.Members[0].Character.BasicAttack;
+            var evolved = new CharacterDefinition("evolved", "evolved", Profession.Warrior, Personality.Reckless,
+                new Stats(8, 1, 1, 12), 1, basic, stage: 2);
+            Assert.That(run.TryChangeForm("a", evolved), Is.True);
+            Assert.That(run.Members[0].SkillSlotCount, Is.EqualTo(2));
+            Assert.That(run.TryLearnSkill("a", 1, duplicate.Id), Is.False);
+            Assert.That(run.TryLearnSkill("a", 1, second.Id), Is.True);
+            run.ResetEncounter();
+            Assert.That(run.Members[0].LearnedSkills, Is.EqualTo(new[] { roar, guard }));
+            Assert.That(run.SkillBooks, Is.EquivalentTo(new[] { duplicate, restricted }));
         }
 
         [Test]

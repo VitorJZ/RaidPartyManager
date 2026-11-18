@@ -47,12 +47,13 @@ namespace RaidPartyManager.Presentation
                     return pool[random.Next(pool.Length)];
                 }).Select((c, i) =>
                         new PartyMemberStart("crew-" + (i + 1), c, i + 1, c.BaseStats.Health)).ToArray();
-                var gear = content.StartingEquipment.GroupBy(e => e.Id).Select(g => g.First()).ToArray();
-                var bag = gear.Where(e => e.Tier == 3).OrderBy(_ => random.Next()).Take(2)
-                    .Concat(gear.Where(e => e.Tier == 2).OrderBy(_ => random.Next()).Take(2)).ToArray();
+                var gear = content.StartingEquipment.GroupBy(e => e.Id).Select(g => g.First());
+                var pricedGear = gear.Where(e => e.Price > 0).ToArray();
+                var bag = pricedGear.Where(e => e.Tier == 3).OrderBy(_ => random.Next()).Take(2)
+                    .Concat(pricedGear.Where(e => e.Tier == 2).OrderBy(_ => random.Next()).Take(2)).ToArray();
                 var party = new PartyRun(members, bag);
                 party.AddGold(inspectionMode ? 100 : 30);
-                var created = new AdventureRun(party, content.CharacterCatalog, gear, inspectionMode, random);
+                var created = new AdventureRun(party, content.CharacterCatalog, gear.Concat(content.SkillBooks), inspectionMode, random);
                 if (inspectionMode) inspection = created; else route = created;
             }
             Active = inspectionMode ? inspection : route;
@@ -79,20 +80,22 @@ namespace RaidPartyManager.Presentation
 
         internal static Button ReturnButton()
         {
-            bool town = origin == "Town";
-            return PrototypeStyle.Button(town ? "返回城镇" : "返回事件选择", "return-event-select", () =>
+            string caption = origin == "Town" ? "返回城镇" : "返回事件选择";
+            return PrototypeStyle.Button(caption, "return-event-select", ReturnFromNode);
+        }
+
+        internal static void ReturnFromNode()
+        {
+            if (origin == "Town")
             {
-                if (town)
-                {
-                    destination = "Town"; origin = "EventSelect";
-                    PrototypeSceneMenu.OpenScene("Town");
-                    return;
-                }
-                if (destination != "BattlePrototype") Active.Leave();
-                else if (Active.Current?.Resolved == true) Active.CloseVisit();
-                destination = "EventSelect"; origin = null;
-                PrototypeSceneMenu.OpenScene("EventSelect");
-            });
+                destination = "Town"; origin = "EventSelect";
+                PrototypeSceneMenu.OpenScene("Town");
+                return;
+            }
+            if (destination != "BattlePrototype") Active.Leave();
+            else if (Active.Current?.Resolved == true) Active.CloseVisit();
+            destination = "EventSelect"; origin = null;
+            PrototypeSceneMenu.OpenScene("EventSelect");
         }
 
         internal static string NodeName(NodeKind kind) => kind switch
@@ -127,7 +130,7 @@ namespace RaidPartyManager.Presentation
             AdventureEventKind.Forge =>
                 "铁匠从炉膛里拨开一层白灰，底下的炭还红着。\n“翻翻背包。找两件舍得熔掉的旧物，说不定还能打出点新花样。”",
             AdventureEventKind.LockedChest =>
-                "锁孔叫海盐堵了个严实，箱子一晃，里面倒有东西在响。\n一名队员蹲下来端详了片刻。“得留个人慢慢弄。你们先赶路，我开了锁再追上来。”",
+                "锁孔叫海盐堵了个严实，箱子一晃，里面倒有东西在响。\n一名队员蹲下来端详了片刻。“想开的话，得留个人慢慢弄。等锁开了，留下的人再追上来。”",
             AdventureEventKind.AscensionTrial =>
                 "守门人把一包东西搁在台阶上。门缝里透出火光，里头有人拖着一柄重剑走过石地。\n“礼物在这儿。你们也可以往里走，看看自己还有什么本事没使出来。”",
             _ =>

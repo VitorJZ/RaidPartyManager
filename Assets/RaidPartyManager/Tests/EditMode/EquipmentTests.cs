@@ -19,10 +19,10 @@ namespace RaidPartyManager.Tests
             var encounter = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
                 "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
             var stacks = encounter.StartingEquipment.GroupBy(item => item.Id).ToArray();
-            Assert.That(stacks, Has.Length.EqualTo(49));
+            Assert.That(stacks, Has.Length.EqualTo(50));
             Assert.That(stacks.All(stack => stack.Count() == 4 && encounter.IconFor(stack.Key) != null), Is.True);
             Assert.That(stacks.Select(stack => stack.First().Effect).Where(effect => effect != None),
-                Is.EquivalentTo(Enum.GetValues(typeof(EquipmentEffect)).Cast<EquipmentEffect>().Where(effect => effect is not (None or CoinDevourer or EchoChalice))));
+                Is.EquivalentTo(Enum.GetValues(typeof(EquipmentEffect)).Cast<EquipmentEffect>().Where(effect => effect is not (None or CoinDevourer))));
         }
 
         [TestCase(VigorPotion, "盛气 3", "盛气 2")]

@@ -42,6 +42,21 @@ namespace RaidPartyManager.Presentation
             description.pickingMode = PickingMode.Ignore;
             description.style.marginTop = 5;
             Add(description);
+            if (item is SkillBookDefinition book)
+            {
+                var requirement = book.Requirement switch
+                {
+                    SkillRequirement.Mage => "法师", SkillRequirement.Support => "后勤",
+                    SkillRequirement.Archer => "射手", SkillRequirement.Melee => "近战",
+                    SkillRequirement.Warrior => "战士", _ => "不限职业"
+                };
+                var rules = PrototypeStyle.Text($"{requirement} · 消耗 {book.Cost} 点能量", 12, PrototypeStyle.Muted);
+                rules.name = "skill-book-requirements";
+                rules.style.marginTop = 6;
+                Add(rules);
+                var permanence = PrototypeStyle.Text("学会后无法拆卸或替换", 12, PrototypeStyle.Muted);
+                Add(permanence);
+            }
         }
 
         public void ShowAbove(VisualElement root, VisualElement anchor)

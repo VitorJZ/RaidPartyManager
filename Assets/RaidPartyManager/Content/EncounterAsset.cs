@@ -12,8 +12,10 @@ namespace RaidPartyManager.Content
         public IReadOnlyList<Combatant> Party { get; }
         public IReadOnlyList<Combatant> Enemies { get; }
         public IReadOnlyList<EquipmentDefinition> StartingEquipment { get; }
+        public IReadOnlyList<SkillBookDefinition> SkillBooks { get; }
         public EquipmentDefinition VictoryReward { get; }
         public int TickLimit { get; }
+        public Texture2D BackpackIcon { get; }
         public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
         public IReadOnlyList<CharacterDefinition> CharacterCatalog { get; }
         public IReadOnlyList<CharacterDefinition> EnemyRoster { get; }
@@ -39,12 +41,14 @@ namespace RaidPartyManager.Content
             CharacterDefinition[] enemyRoster,
             IReadOnlyDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)> battleExtras,
             IReadOnlyDictionary<string, Texture2D> battleProjectiles,
-            IReadOnlyDictionary<string, Texture2D> campSprites)
+            IReadOnlyDictionary<string, Texture2D> campSprites, SkillBookDefinition[] skillBooks, Texture2D backpackIcon)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
             Enemies = Array.AsReadOnly(enemies);
             StartingEquipment = Array.AsReadOnly(startingEquipment);
+            SkillBooks = Array.AsReadOnly(skillBooks);
+            BackpackIcon = backpackIcon;
             VictoryReward = victoryReward;
             TickLimit = tickLimit;
             this.portraits = portraits;
@@ -176,8 +180,10 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D[] statusIcons = Array.Empty<Texture2D>();
         [SerializeField] private Texture2D arrowProjectile;
         [SerializeField] private Texture2D magicProjectile;
+        [SerializeField] private Texture2D backpackIcon;
         [SerializeField] private EquipmentAsset[] startingEquipment = Array.Empty<EquipmentAsset>();
         [SerializeField, Min(1)] private int startingCopies = 1;
+        [SerializeField] private SkillCatalogAsset skillCatalog;
         [SerializeField] private EquipmentAsset victoryReward;
         [SerializeField, Min(1)] private int tickLimit = 200;
 
@@ -213,6 +219,10 @@ namespace RaidPartyManager.Content
                 .Where(item => item != null && item.Icon != null)
                 .GroupBy(item => item.ToDefinition().Id, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.First().Icon, StringComparer.Ordinal);
+            var skills = skillCatalog?.Skills ?? Array.Empty<SkillEntry>();
+            var books = skills.Select(skill => skill.ToBook()).ToArray();
+            for (int i = 0; i < books.Length; i++)
+                equipmentIcons.Add(books[i].Id, skills[i].Icon);
             return new EncounterData(displayName, partyInputs, enemyInputs,
                 startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies)).ToArray(),
                 victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits, equipmentIcons,
@@ -224,7 +234,7 @@ namespace RaidPartyManager.Content
                 catalog.Values.Where(character => character.BattleProjectile != null)
                     .ToDictionary(character => character.Id, character => character.BattleProjectile, StringComparer.Ordinal),
                 catalog.Values.Where(character => character.CampSeatedSprite != null)
-                    .ToDictionary(character => character.Id, character => character.CampSeatedSprite, StringComparer.Ordinal));
+                    .ToDictionary(character => character.Id, character => character.CampSeatedSprite, StringComparer.Ordinal), books, backpackIcon);
         }
     }
 }

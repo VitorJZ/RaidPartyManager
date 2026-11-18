@@ -44,9 +44,15 @@ namespace RaidPartyManager.Run
         public int Health { get; }
         public Stats EffectiveStats { get; }
         public IReadOnlyList<string> EquipmentIds { get; }
+        public IReadOnlyList<SkillBookDefinition> LearnedSkills { get; }
+        public int SkillSlotCount => SkillSlotsFor(Character);
+
         public bool IsAway { get; }
 
-        internal MemberView(string id, CharacterDefinition character, int? position, int health, Stats stats, string[] slots, bool isAway = false)
+        internal static int SkillSlotsFor(CharacterDefinition character) => character.Stage >= 2 ? 2 : 1;
+
+        internal MemberView(string id, CharacterDefinition character, int? position, int health, Stats stats, string[] slots,
+            SkillBookDefinition[] learnedSkills, bool isAway)
         {
             Id = id;
             Character = character;
@@ -54,6 +60,7 @@ namespace RaidPartyManager.Run
             Health = health;
             EffectiveStats = stats;
             EquipmentIds = Array.AsReadOnly((string[])slots.Clone());
+            LearnedSkills = Array.AsReadOnly((SkillBookDefinition[])learnedSkills.Clone());
             IsAway = isAway;
         }
     }
@@ -71,6 +78,7 @@ namespace RaidPartyManager.Run
             public bool IsAway;
             public IReadOnlyDictionary<StatusKind, int> StartingStatuses;
             public readonly string[] Slots = new string[Rules.EquipmentSlots];
+            public readonly SkillBookDefinition[] LearnedSkills = new SkillBookDefinition[2];
 
             public Member(PartyMemberStart start)
             {
@@ -89,6 +97,8 @@ namespace RaidPartyManager.Run
         private BattleRequest activeBattle;
         private EquipmentDefinition activeReward;
         private int nextItemId;
+        private int nextBookId;
+        private int nextEditorItemId;
         private int nextBattleId;
         private readonly Random rewardRandom = new Random();
 
@@ -163,11 +173,13 @@ namespace RaidPartyManager.Run
             {
                 var formationStats = EquipmentFormation.Resolve(CaptureFormation(Side.Party));
                 return members.Select(member => new MemberView(member.Id, member.Character, member.Position, member.Health,
-                    formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member), member.Slots, member.IsAway)).ToArray();
+                    formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member), member.Slots,
+                    member.LearnedSkills, member.IsAway)).ToArray();
             }
         }
 
-        public IReadOnlyList<EquipmentInstance> Inventory => inventory.Values.ToArray();
+        public IReadOnlyList<EquipmentInstance> Inventory => inventory.Values.Where(item => item.Definition is not SkillBookDefinition).ToArray();
+        public IReadOnlyList<EquipmentInstance> SkillBooks => inventory.Values.Where(item => item.Definition is SkillBookDefinition).ToArray();
         public int Gold { get; private set; }
 
         public IReadOnlyList<Combatant> CaptureFormation(Side side) =>
@@ -208,7 +220,7 @@ namespace RaidPartyManager.Run
         {
             var receiver = FindMember(memberId);
             if (activeBattle != null || receiver == null || receiver.IsAway || slot < 0 || slot >= Rules.EquipmentSlots ||
-                (equipmentId != null && !inventory.ContainsKey(equipmentId)))
+                (equipmentId != null && (!inventory.TryGetValue(equipmentId, out var item) || item.Definition is SkillBookDefinition)))
                 return false;
 
             var prior = receiver.Slots[slot];
@@ -227,6 +239,25 @@ namespace RaidPartyManager.Run
             receiver.Slots[slot] = equipmentId;
             foreach (var member in members)
                 member.Health = Math.Min(member.Health, PersonalStats(member).Health);
+            return true;
+        }
+
+        public bool CanLearnSkill(string memberId, int slot, string bookId)
+        {
+            var member = FindMember(memberId);
+            return activeBattle == null && member != null && !member.IsAway && member.Health > 0 &&
+                slot >= 0 && slot < MemberView.SkillSlotsFor(member.Character) && member.LearnedSkills[slot] == null &&
+                bookId != null && inventory.TryGetValue(bookId, out var item) && item.Definition is SkillBookDefinition book &&
+                book.CanLearn(member.Character) && !member.LearnedSkills.Any(known => known?.Id == book.Id);
+        }
+
+        public bool TryLearnSkill(string memberId, int slot, string bookId)
+        {
+            if (!CanLearnSkill(memberId, slot, bookId))
+                return false;
+
+            FindMember(memberId).LearnedSkills[slot] = (SkillBookDefinition)inventory[bookId].Definition;
+            inventory.Remove(bookId);
             return true;
         }
 
@@ -319,6 +350,23 @@ namespace RaidPartyManager.Run
         public bool TrySettle(BattleResult result, out EquipmentInstance reward)
         {
             reward = null;
+            var guaranteed = result?.Outcome == BattleOutcome.Victory ? activeReward : null;
+            if (!TryFinishBattle(result, out var loot))
+                return false;
+            Gold += result.GoldEarned;
+            for (int i = 0; i < loot.Count; i++)
+            {
+                var item = AddEquipment(loot[i]);
+                if (i == 0 && guaranteed != null)
+                    reward = item;
+            }
+            return true;
+        }
+
+        // Commit the outcome before presenting the rewards for collection.
+        public bool TryFinishBattle(BattleResult result, out IReadOnlyList<EquipmentDefinition> loot)
+        {
+            loot = Array.Empty<EquipmentDefinition>();
             if (activeBattle == null || result == null || result.Id != activeBattle.Id)
                 return false;
 
@@ -359,12 +407,10 @@ namespace RaidPartyManager.Run
                 .Select(unit => unit.Id));
             foreach (var member in members.Where(member => deployedIds.Contains(member.Id)))
             {
-                member.Health = Math.Min(result.HealthById[member.Id], PersonalStats(member).Health);
+                member.Health = Math.Max(1, Math.Min(result.HealthById[member.Id], PersonalStats(member).Health));
                 member.PermanentAttack += result.PermanentAttackGains.GetValueOrDefault(member.Id);
                 member.StartingStatuses = null;
-                if (member.Health == 0)
-                    member.Position = null;
-                else if (positions.TryGetValue(member.Id, out int position))
+                if (positions.TryGetValue(member.Id, out int position))
                     member.Position = position;
             }
 
@@ -390,11 +436,15 @@ namespace RaidPartyManager.Run
                 members.Add(member);
             }
 
+            var rewards = new List<EquipmentDefinition>();
             if (result.Outcome == BattleOutcome.Victory && activeReward != null)
-                reward = AddEquipment(activeReward);
-            Gold += result.GoldEarned;
-            AddRandomRewards(potionDefinitions, result.PotionsEarned);
-            AddRandomRewards(accessoryDefinitions, result.AccessoriesEarned);
+            {
+                rewards.Add(activeReward);
+                RegisterReward(activeReward);
+            }
+            RollRandomRewards(potionDefinitions, result.PotionsEarned, rewards);
+            RollRandomRewards(accessoryDefinitions, result.AccessoriesEarned, rewards);
+            loot = rewards.AsReadOnly();
             activeBattle = null;
             activeReward = null;
             return true;
@@ -441,7 +491,8 @@ namespace RaidPartyManager.Run
         public bool TryConsumeItems(IReadOnlyList<string> ids)
         {
             if (activeBattle != null || ids == null || ids.Count == 0 || ids.Distinct().Count() != ids.Count ||
-                ids.Any(id => !inventory.ContainsKey(id) || members.Any(member => member.Slots.Contains(id))))
+                ids.Any(id => id == null || !inventory.TryGetValue(id, out var item) || item.Definition is SkillBookDefinition ||
+                    members.Any(member => member.Slots.Contains(id))))
                 return false;
             foreach (var id in ids)
                 inventory.Remove(id);
@@ -466,11 +517,15 @@ namespace RaidPartyManager.Run
             return true;
         }
 
+        public bool CanSendAway(string memberId) => CanSendAway(FindMember(memberId));
+
+        private bool CanSendAway(Member member) => activeBattle == null && member != null && !member.IsAway &&
+            IsDeployed(member) && !IsRooted(member) && members.Count(IsDeployed) > 1;
+
         public bool TrySendAway(string memberId)
         {
             var member = FindMember(memberId);
-            if (activeBattle != null || member == null || member.IsAway || !IsDeployed(member) || IsRooted(member) ||
-                members.Count(IsDeployed) <= 1)
+            if (!CanSendAway(member))
                 return false;
             member.IsAway = true;
             member.Position = null;
@@ -491,11 +546,46 @@ namespace RaidPartyManager.Run
             return true;
         }
 
+        // The returned action removes unused supplies when the editor closes.
+        public Action SupplyEditorBackpack(IEnumerable<EquipmentDefinition> catalog, int copies)
+        {
+            if (activeBattle != null)
+                return null;
+
+            var assigned = AssignedEquipmentIds();
+            var available = inventory.Values.Where(item => !assigned.Contains(item.Id))
+                .GroupBy(item => item.Definition.Id).ToDictionary(group => group.Key, group => group.Count());
+            var supplied = new List<string>();
+            foreach (var definition in catalog.Where(item => item != null).GroupBy(item => item.Id).Select(group => group.First()))
+            {
+                int missing = copies - available.GetValueOrDefault(definition.Id);
+                for (int i = 0; i < missing; i++)
+                {
+                    string id = $"editor-{++nextEditorItemId}";
+                    inventory.Add(id, new EquipmentInstance(id, definition));
+                    supplied.Add(id);
+                }
+            }
+            return supplied.Count == 0 ? null : ReleaseUnused;
+
+            void ReleaseUnused()
+            {
+                var equipped = AssignedEquipmentIds();
+                foreach (string id in supplied)
+                    if (!equipped.Contains(id))
+                        inventory.Remove(id);
+            }
+        }
+
+        private HashSet<string> AssignedEquipmentIds() =>
+            new HashSet<string>(members.SelectMany(member => member.Slots).Where(id => id != null));
+
         public EquipmentInstance AddEquipment(EquipmentDefinition definition)
         {
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
-            var item = new EquipmentInstance($"gear-{++nextItemId}", definition);
+            string id = definition is SkillBookDefinition ? $"book-{++nextBookId}" : $"gear-{++nextItemId}";
+            var item = new EquipmentInstance(id, definition);
             inventory.Add(item.Id, item);
             RegisterReward(definition);
             return item;
@@ -518,13 +608,13 @@ namespace RaidPartyManager.Run
                 accessoryDefinitions.TryAdd(definition.Id, definition);
         }
 
-        private void AddRandomRewards(Dictionary<string, EquipmentDefinition> pool, int count)
+        private void RollRandomRewards(Dictionary<string, EquipmentDefinition> pool, int count, List<EquipmentDefinition> rewards)
         {
             if (count <= 0 || pool.Count == 0)
                 return;
             var choices = pool.Values.ToArray();
             for (int i = 0; i < count; i++)
-                AddEquipment(choices[rewardRandom.Next(choices.Length)]);
+                rewards.Add(choices[rewardRandom.Next(choices.Length)]);
         }
 
         private static bool IsDeployed(Member member) => member.Health > 0 && member.Position.HasValue;
@@ -539,6 +629,7 @@ namespace RaidPartyManager.Run
                 (stats, item) => stats + item.Bonus);
 
         private Combatant ToCombatant(Member member, Side side) => new Combatant(member.Id, member.Character, side,
-            member.Position.Value, PersonalStats(member), member.Health, EquipmentOf(member), member.StartingStatuses, member.Slots);
+            member.Position.Value, PersonalStats(member), member.Health, EquipmentOf(member), member.StartingStatuses, member.Slots,
+            member.LearnedSkills.Take(MemberView.SkillSlotsFor(member.Character)));
     }
 }

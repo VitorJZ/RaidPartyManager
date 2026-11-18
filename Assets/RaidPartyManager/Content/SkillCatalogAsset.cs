@@ -5,8 +5,6 @@ using UnityEngine;
 
 namespace RaidPartyManager.Content
 {
-    public enum SkillRequirement { None, Mage, Support, Archer, Melee, Warrior }
-
     [Serializable]
     public sealed class SkillEntry
     {
@@ -15,6 +13,8 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D icon;
         [SerializeField] private SkillRequirement requirement;
         [SerializeField, Min(1)] private int cost;
+        [SerializeField] private SkillEffect skillEffect;
+        [SerializeField, Range(1, 3)] private int tier = 2;
         [SerializeField, TextArea] private string description;
 
         public int Number => number;
@@ -24,16 +24,10 @@ namespace RaidPartyManager.Content
         public int Cost => cost;
         public string Description => description;
 
-        public bool CanLearn(CharacterDefinition character) => requirement switch
-        {
-            SkillRequirement.None => true,
-            SkillRequirement.Mage => character.Profession == Profession.Mage,
-            SkillRequirement.Support => character.Profession == Profession.Support,
-            SkillRequirement.Archer => character.Profession == Profession.Archer,
-            SkillRequirement.Melee => character.Reach == AttackReach.Melee,
-            SkillRequirement.Warrior => character.Profession == Profession.Warrior,
-            _ => false
-        };
+        public SkillBookDefinition ToBook() => new SkillBookDefinition($"skill-book-{number:00}", displayName,
+            description, requirement, cost, tier, skillEffect);
+
+        public bool CanLearn(CharacterDefinition character) => ToBook().CanLearn(character);
     }
 
     [CreateAssetMenu(menuName = "Raid Party Manager/Skill Catalog")]

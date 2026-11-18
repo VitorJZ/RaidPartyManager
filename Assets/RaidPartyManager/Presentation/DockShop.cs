@@ -33,7 +33,8 @@ namespace RaidPartyManager.Presentation
         private VisualElement merchant;
         private Image merchantImage;
         private VisualElement checkout;
-        private Label coinsLabel;
+        private RunTopBar topBar;
+        private PartyRun party;
         private Label feedback;
         private Font localFont;
         private FontAsset localFontAsset;
@@ -57,6 +58,7 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
             content = encounter.ToData();
             adventure = AdventureFlow.ForScene("DockShop");
+            party = adventure?.Party ?? BattlePrototype.GetPlaySession(content);
             coins = 999;
             expression = -1;
             hovered = null;
@@ -151,23 +153,19 @@ namespace RaidPartyManager.Presentation
 
             var header = PrototypeStyle.Row("shop-header");
             header.style.position = Position.Absolute;
-            header.style.top = 16;
+            header.style.top = RunTopBar.Height + 7;
             header.style.left = header.style.right = 22;
             header.style.alignItems = Align.Center;
-            header.Add(adventure != null ? AdventureFlow.ReturnButton() : PrototypeSceneMenu.ReturnButton());
+            if (adventure != null)
+                header.Add(AdventureFlow.ReturnButton());
             var title = PrototypeStyle.Text("弥雾码头 · 商店", 23, PrototypeStyle.Accent);
             title.style.flexGrow = 1;
             title.style.marginLeft = 18;
             header.Add(title);
-            coinsLabel = PrototypeStyle.Text("", 23, PrototypeStyle.Accent);
-            coinsLabel.name = "shop-gold";
-            coinsLabel.style.backgroundColor = new Color(0.05f, 0.06f, 0.065f, 0.9f);
-            coinsLabel.style.paddingLeft = coinsLabel.style.paddingRight = 18;
-            coinsLabel.style.paddingTop = coinsLabel.style.paddingBottom = 8;
-            PrototypeStyle.Outline(coinsLabel, PrototypeStyle.Edge, 5);
-            header.Add(coinsLabel);
             root.Add(header);
-            RefreshGold();
+            topBar = new RunTopBar(root, party, content, OpenEditor, "open-shop-editor",
+                () => adventure?.Party.Gold ?? coins, "shop-gold");
+            RunTopBar.PlaceAtTop(root, topBar);
 
             feedback = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
             feedback.name = "shop-feedback";
@@ -265,6 +263,8 @@ namespace RaidPartyManager.Presentation
 
         private void OnPointerMove(PointerMoveEvent evt)
         {
+            if (!merchant.enabledInHierarchy)
+                return;
             pointer = evt.position;
             if (dragging == null)
             {
@@ -307,7 +307,7 @@ namespace RaidPartyManager.Presentation
             }
             else
             {
-                BattlePrototype.ReceiveShopEquipment(content, offer.Item.ToDefinition());
+                party.AddEquipment(offer.Item.ToDefinition());
                 coins -= offer.Price;
             }
             offer.Sold = true;
@@ -409,7 +409,14 @@ namespace RaidPartyManager.Presentation
             feedbackUntil = Time.unscaledTimeAsDouble + 3;
         }
 
-        private void RefreshGold() => coinsLabel.text = $"金币  {adventure?.Party.Gold ?? coins}";
+        private void RefreshGold() => topBar.Refresh();
+
+        private void OpenEditor()
+        {
+            CancelDrag();
+            RunTopBar.EditParty(root, party, content, RefreshGold,
+                adventure == null ? BattlePrototype.MarkPartyEdited : null);
+        }
 
         private static Image Picture(Texture2D texture, string name) => new Image
         {

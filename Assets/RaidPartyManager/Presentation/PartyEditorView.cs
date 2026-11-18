@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using RaidPartyManager.Content;
 using RaidPartyManager.Domain;
 using RaidPartyManager.Run;
 using UnityEngine;
@@ -15,7 +16,6 @@ namespace RaidPartyManager.Presentation
         private readonly Side side;
         private readonly Action edited;
         private readonly IReadOnlyList<CharacterDefinition> roster;
-        private readonly Func<MemberView, int?> positionOf;
         private readonly Func<string, Texture2D> portraitFor;
         private readonly Func<string, Texture2D> iconFor;
         private readonly VisualElement overview;
@@ -23,19 +23,24 @@ namespace RaidPartyManager.Presentation
         private string memberId;
         private readonly List<string> backpackCells = new List<string>();
 
-        public PartyEditorView(PartyRun run, IReadOnlyList<CharacterDefinition> catalog, Func<MemberView, int?> positionOf,
-            Func<string, Texture2D> portraitFor, Func<string, Texture2D> iconFor, Action back, Side side = Side.Party,
-            Action edited = null)
+        public PartyEditorView(PartyRun run, EncounterData content, Action back, Side side = Side.Party, Action edited = null)
         {
             this.run = run;
             this.side = side;
             this.edited = edited;
             roster = side == Side.Party
-                ? catalog.Where(character => character.RosterNumber > 0).OrderBy(character => character.RosterNumber).ToArray()
-                : catalog;
-            this.positionOf = positionOf;
-            this.portraitFor = portraitFor;
-            this.iconFor = iconFor;
+                ? content.CharacterCatalog.Where(character => character.RosterNumber > 0)
+                    .OrderBy(character => character.RosterNumber).ToArray()
+                : content.EnemyRoster;
+            portraitFor = content.PortraitFor;
+            iconFor = content.IconFor;
+            if (side == Side.Party)
+            {
+                var catalog = content.StartingEquipment.Concat(content.SkillBooks).Append(content.VictoryReward);
+                Action releaseSupply = null;
+                RegisterCallback<AttachToPanelEvent>(_ => releaseSupply = run.SupplyEditorBackpack(catalog, 4));
+                RegisterCallback<DetachFromPanelEvent>(_ => releaseSupply?.Invoke());
+            }
             name = "party-editor";
             style.flexGrow = 1;
             style.backgroundColor = PrototypeStyle.Background;
@@ -102,8 +107,7 @@ namespace RaidPartyManager.Presentation
             for (int index = 0; index < Rules.Positions; index++)
             {
                 int position = side == Side.Party ? Rules.Positions - index : index + 1;
-                var member = members.FirstOrDefault(entry => entry.Position == position)
-                    ?? members.FirstOrDefault(entry => positionOf(entry) == position);
+                var member = members.FirstOrDefault(entry => entry.Position == position);
                 if (member != null)
                     displayed.Add(member.Id);
                 row.Add(BuildCard(position, member, drag));
@@ -259,7 +263,7 @@ namespace RaidPartyManager.Presentation
             var inParty = new HashSet<string>(run.Members.Select(entry => entry.Character.Id));
             var popup = new PartyReplacementPopup(member.Character, roster, inParty, portraitFor, replacement =>
             {
-                if (run.TryReplaceMember(member.Id, replacement, positionOf(member)))
+                if (run.TryReplaceMember(member.Id, replacement, member.Position))
                 {
                     RenderEditedRoster();
                     CloseModal();

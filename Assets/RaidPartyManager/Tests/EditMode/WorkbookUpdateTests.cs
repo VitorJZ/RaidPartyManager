@@ -18,7 +18,7 @@ namespace RaidPartyManager.Tests
             Assert.That(catalog.Skills.Select(skill => skill.Number), Is.EqualTo(Enumerable.Range(1, 20)));
             Assert.That(catalog.Skills.Select(skill => skill.DisplayName).Distinct().Count(), Is.EqualTo(20));
             Assert.That(catalog.Skills.All(skill => skill.Cost is 1 or 2 && skill.Description.Length > 0 &&
-                skill.Icon != null && skill.Icon.width == skill.Icon.height), Is.True);
+                skill.ToBook().SkillEffect != SkillEffect.None && skill.Icon != null && skill.Icon.width == skill.Icon.height), Is.True);
             Assert.That(catalog.Skills.Single(skill => skill.DisplayName == "熊熊烈火")
                 .CanLearn(Fighter("guard", Side.Party, 1, Personality.Stubborn).Character), Is.False);
         }

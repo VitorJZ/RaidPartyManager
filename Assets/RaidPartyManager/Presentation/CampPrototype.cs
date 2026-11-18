@@ -95,16 +95,17 @@ namespace RaidPartyManager.Presentation
 
             var header = PrototypeStyle.Row("camp-header");
             header.style.position = Position.Absolute;
-            header.style.top = 16;
+            header.style.top = RunTopBar.Height + 7;
             header.style.left = header.style.right = 22;
             header.style.alignItems = Align.Center;
-            header.Add(adventure != null ? AdventureFlow.ReturnButton() : PrototypeSceneMenu.ReturnButton());
+            if (adventure != null)
+                header.Add(AdventureFlow.ReturnButton());
             var title = PrototypeStyle.Text("营地", 24, PrototypeStyle.Accent);
             title.style.marginLeft = 18;
             title.style.flexGrow = 1;
             header.Add(title);
-            header.Add(PrototypeStyle.Button("角色编辑", "open-camp-editor", OpenEditor));
             root.Add(header);
+            RunTopBar.PlaceAtTop(root, new RunTopBar(root, run, content, OpenEditor, "open-camp-editor"));
             var rest = new VisualElement { name = "camp-rest-actions" };
             rest.style.position = Position.Absolute; rest.style.bottom = 20;
             rest.style.left = Length.Percent(30); rest.style.right = Length.Percent(30);
@@ -125,11 +126,7 @@ namespace RaidPartyManager.Presentation
 
         private void OpenEditor()
         {
-            stage = null;
-            fire = null;
-            root.Clear();
-            root.Add(new PartyEditorView(run, content.CharacterCatalog, member => member.Position,
-                content.PortraitFor, content.IconFor, Render, edited: adventure == null ? BattlePrototype.MarkPartyEdited : null));
+            RunTopBar.EditParty(root, run, content, Render, adventure == null ? BattlePrototype.MarkPartyEdited : null);
         }
 
         private void OnGeometryChanged(GeometryChangedEvent evt) => FitStage();

@@ -21,12 +21,14 @@ namespace RaidPartyManager.Presentation
         private readonly EncounterData content;
         private readonly Action close;
         private readonly ScrollView choices;
-        private readonly Label wallet;
+        private readonly Action refreshTopBar;
         private readonly List<string> forge = new List<string>();
+        private bool choosingChestCompanion;
 
-        internal AdventureEventWindow(AdventureRun run, AdventureContentAsset art, Action close)
+        internal AdventureEventWindow(AdventureRun run, AdventureContentAsset art, Action close, Action refreshTopBar)
         {
             this.run = run; this.art = art; this.close = close; content = art.Encounter;
+            this.refreshTopBar = refreshTopBar;
             name = "event-window";
             PrototypeStyle.Fill(this);
             style.backgroundColor = new Color(0, 0, 0, 0.78f);
@@ -86,10 +88,6 @@ namespace RaidPartyManager.Presentation
             heading.style.minWidth = 0;
             heading.style.marginRight = 8;
             header.Add(heading);
-            wallet = PaperText("", 16, PaperMuted); wallet.name = "event-gold";
-            wallet.style.marginRight = 10;
-            wallet.style.whiteSpace = WhiteSpace.NoWrap;
-            header.Add(wallet);
             var leave = PrototypeStyle.Button("离开", "close-event", Leave);
             StylePaperButton(leave);
             leave.style.minWidth = 58;
@@ -176,9 +174,23 @@ namespace RaidPartyManager.Presentation
             close();
         }
 
+        internal void RefreshAfterPartyEdit()
+        {
+            var visit = run.Current;
+            if (visit.Event == AdventureEventKind.Forge)
+            {
+                var available = run.ForgeInputs.Select(item => item.Id).ToHashSet();
+                forge.RemoveAll(id => !available.Contains(id));
+            }
+            if (visit.PendingRecruit != null || visit.Event is AdventureEventKind.Forge or AdventureEventKind.LockedChest or
+                AdventureEventKind.Ambush or AdventureEventKind.AscensionTrial)
+                RenderChoices();
+        }
+
         private void RenderChoices()
         {
-            choices.Clear(); wallet.text = $"金币  {run.Party.Gold}";
+            choices.Clear();
+            refreshTopBar();
             var visit = run.Current;
             if (visit.Event == AdventureEventKind.HatTrick)
                 choices.Add(new HatGameView(run, art.Hat, content, RenderChoices));
@@ -246,15 +258,25 @@ namespace RaidPartyManager.Presentation
                         }, forge.Contains(item.Id));
                     break;
                 case AdventureEventKind.LockedChest:
-                    choices.Add(PaperText("谁留下开锁，晚些再跟上？", 18, PaperAccent));
-                    foreach (var member in run.Party.Members.Where(m => !m.IsAway && m.Health > 0 && m.Position.HasValue))
+                {
+                    var present = run.Party.Members.Where(m => !m.IsAway && m.Health > 0 && m.Position.HasValue).ToArray();
+                    if (!choosingChestCompanion)
                     {
-                        bool rooted = member.EquipmentIds.Where(id => id != null).Any(id =>
-                            run.Party.Inventory.First(e => e.Id == id).Definition.Effect == EquipmentEffect.TreeRoot);
-                        AdventureWidgets.Character(choices, member.Character, content, "leave-companion-" + member.Id, () =>
-                        { run.LeaveCompanion(member.Id); RenderChoices(); }, !rooted && run.Party.CaptureFormation(Side.Party).Count > 1);
+                        choices.Add(PaperText("要留一位同伴试试这把锁吗？", 18, PaperAccent));
+                        AdventureWidgets.Action(choices, "留一人开宝箱", "chest-choose-companion", () =>
+                        { choosingChestCompanion = true; RenderChoices(); }, present.Any(m => run.Party.CanSendAway(m.Id)));
+                        AdventureWidgets.Action(choices, "把箱子留在原处", "chest-skip", Leave);
+                        break;
                     }
+
+                    choices.Add(PaperText("谁留下开锁，晚些再跟上？", 18, PaperAccent));
+                    foreach (var member in present)
+                        AdventureWidgets.Character(choices, member.Character, content, "leave-companion-" + member.Id, () =>
+                        { run.LeaveCompanion(member.Id); RenderChoices(); }, run.Party.CanSendAway(member.Id));
+                    AdventureWidgets.Action(choices, "返回", "chest-back", () =>
+                    { choosingChestCompanion = false; RenderChoices(); });
                     break;
+                }
                 case AdventureEventKind.AscensionTrial:
                     AdventureWidgets.Action(choices, "收下台阶上的包裹", "event-trial-gift", () =>
                     { run.TakeTrialGift(); RenderChoices(); });

@@ -160,14 +160,14 @@ namespace RaidPartyManager.Battle
         }
 
         private void GrantStatus(Unit actor, Unit target, StatusKind status, int layers,
-            string actionName = null, BattleVisualCue visual = BattleVisualCue.None)
+            string actionName = null, BattleVisualCue visual = BattleVisualCue.None, BattleEventKind? kind = null)
         {
-            var kind = actionName == null ? BattleEventKind.Effect : BattleEventKind.Action;
+            var eventKind = kind ?? (actionName == null ? BattleEventKind.Effect : BattleEventKind.Action);
             if (target.Health == 0 || (status != Purity && target.Layers(Purity) > 0) ||
                 (status == Chill && target.Layers(Frozen) > 0))
             {
                 if (actionName != null)
-                    Report(kind, actor, target, actionName, ActionKind.Shield, detail: "状态未生效", visual: visual);
+                    Report(eventKind, actor, target, actionName, ActionKind.Shield, detail: "状态未生效", visual: visual);
                 return;
             }
 
@@ -185,7 +185,7 @@ namespace RaidPartyManager.Battle
 
             target.Statuses[status] = total;
             var statusName = StatusRules.For(status).Name;
-            Report(kind, actor, target, actionName ?? statusName, ActionKind.Shield,
+            Report(eventKind, actor, target, actionName ?? statusName, ActionKind.Shield,
                 detail: $"{(actionName == null ? "" : statusName + " ")}达到 {total} 层", visual: visual);
         }
 
@@ -273,6 +273,23 @@ namespace RaidPartyManager.Battle
                         GrantStatus(actor, target, Injured, 1);
             }
 
+            if (actor.SweepNextAttack)
+            {
+                int multiplier = actor.DoubleNextAttack ? 2 : 1;
+                actor.DoubleNextAttack = actor.SweepNextAttack = false;
+                var sweepKind = BattleEventKind.Action;
+                foreach (var enemy in Opponents(actor).ToArray())
+                {
+                    if (actor.Health == 0)
+                        break;
+                    if (enemy.Health == 0)
+                        continue;
+                    Hit(actor, enemy, action, sweepKind, reason, multiplier: multiplier, firstTarget: sweepKind == BattleEventKind.Action);
+                    sweepKind = BattleEventKind.Effect;
+                }
+                return;
+            }
+
             if (actor.Trait == CharacterTrait.PiercingArrow && !UsesShortbow(actor))
             {
                 var forward = units.Where(unit => unit.Health > 0 && unit.Input.Side == actor.Input.Side &&
@@ -313,6 +330,11 @@ namespace RaidPartyManager.Battle
             BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true)
         {
             string name = equipmentName ?? action.Name;
+            if (actor.DoubleNextAttack)
+            {
+                actor.DoubleNextAttack = false;
+                multiplier *= 2;
+            }
             bool missed = (actor.Layers(Injured) > 0 && random.NextDouble() < 0.20) ||
                 (target.Layers(Swift) > 0 && random.NextDouble() < 0.20);
             bool execution = actor.Has(ExecutionMask) && actor.LastAttackRound != Round;
@@ -381,6 +403,8 @@ namespace RaidPartyManager.Battle
 
         private void CounterAttack(Unit defender, Unit attacker)
         {
+            if (defender.LastSkillRound == Round)
+                return;
             int counters = defender.Count(CounterHorn);
             for (int count = 0; count < counters && defender.Health > 0 && attacker.Health > 0; count++)
                 Hit(defender, attacker, defender.Input.Character.BasicAttack, BattleEventKind.Effect,
@@ -461,7 +485,8 @@ namespace RaidPartyManager.Battle
                 int amount = (int)Math.Min(int.MaxValue, (long)Damage(actor, target, part.Power, type, ignoreDefense) * multiplier);
                 return (Type: type, Amount: amount);
             }).ToArray();
-            int damage = SumDamage(resolved.Select(part => part.Amount));
+            int damage = actor != null && actor.Input.Side != target.Input.Side && Round > 0 && target.ProtectedRound == Round
+                ? 0 : SumDamage(resolved.Select(part => part.Amount));
             if (damage > 0)
             {
                 RemoveLayers(target, Exposed, 1);
@@ -489,6 +514,8 @@ namespace RaidPartyManager.Battle
             {
                 if (dealt <= 0)
                     break;
+                if (actor != null && actor.Input.Side != ally.Input.Side && Round > 0 && ally.ProtectedRound == Round)
+                    continue;
                 int linkedDamage = ally.Has(InsulatingOrb) ? lifeLost.Physical : dealt;
                 if (linkedDamage == 0)
                     continue;
@@ -584,6 +611,13 @@ namespace RaidPartyManager.Battle
             protection = null;
             if (damage <= 0)
                 return 0;
+
+            if (target.StoneGuard && damage > 7)
+            {
+                target.StoneGuard = false;
+                protection = "坚如磐石抵挡了伤害";
+                return 0;
+            }
 
             int before = target.Health;
             int minimum = target.Layers(Undying) > 0 ? 1 : 0;

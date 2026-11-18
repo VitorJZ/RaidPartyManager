@@ -12,6 +12,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D icon;
         [SerializeField, Range(-1, 3)] private int shopTier = 2;
         [SerializeField, Min(0)] private int shopPrice = 20;
+        [SerializeField] private bool excludeFromBattleLoot;
 
         public Texture2D Icon => icon;
         public int ShopTier => shopTier;
@@ -23,6 +24,6 @@ namespace RaidPartyManager.Content
         [SerializeField, Min(0)] private int healthBonus;
 
         public EquipmentDefinition ToDefinition() =>
-            new EquipmentDefinition(id, displayName, new Stats(attackBonus, defenseBonus, specialDefenseBonus, healthBonus), description, effect, shopTier, shopPrice);
+            new EquipmentDefinition(id, displayName, new Stats(attackBonus, defenseBonus, specialDefenseBonus, healthBonus), description, effect, shopTier, shopPrice, !excludeFromBattleLoot);
     }
 }

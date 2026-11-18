@@ -6,7 +6,6 @@ using UnityEngine.UIElements;
 
 namespace RaidPartyManager.Presentation
 {
-    // One combat position with overhead health and active status icons below the character.
     internal sealed class BattleUnitCard : VisualElement
     {
         private readonly int maximumHealth;
@@ -27,29 +26,26 @@ namespace RaidPartyManager.Presentation
         public Rect BodyBounds => battleSprite?.Figure.worldBound ?? portrait.worldBound;
 
         public BattleUnitCard(Side side, int position, string unitId, CharacterDefinition character,
-            Texture2D art, int maximumHealth, int health, int shield, string subtitle, bool hidden = false,
+            Texture2D art, int maximumHealth, int health, int shield, double now,
             Func<StatusKind, Texture2D> statusIcon = null, BattleSpriteView battleSprite = null,
             BattleStatusTooltip statusTooltip = null)
         {
-            name = $"{(side == Side.Party ? "party" : "enemy")}-position-{position}";
             Slot = position;
             CanSwap = side == Side.Party && health > 0;
             Artwork = art;
-            CharacterName = character?.Name;
+            CharacterName = character.Name;
             this.maximumHealth = maximumHealth;
             this.statusIcon = statusIcon;
             this.statusTooltip = statusTooltip;
             this.battleSprite = battleSprite;
             sideColor = side == Side.Party ? PrototypeStyle.Ally : PrototypeStyle.Enemy;
-            style.flexGrow = 1;
-            style.flexBasis = 0;
-            style.minWidth = 0;
-            style.marginLeft = style.marginRight = 4;
 
             var life = new VisualElement { name = "health-bar", pickingMode = PickingMode.Ignore };
-            life.style.position = Position.Absolute;
-            life.style.left = life.style.right = Length.Percent(16);
+            life.style.width = Length.Percent(76);
+            life.style.maxWidth = 104;
+            life.style.alignSelf = Align.Center;
             life.style.height = 17;
+            life.style.visibility = maximumHealth > 0 ? Visibility.Visible : Visibility.Hidden;
             life.style.overflow = Overflow.Hidden;
             life.style.backgroundColor = (Color)new Color32(34, 21, 25, 245);
             PrototypeStyle.Outline(life, new Color32(121, 54, 57, 255), 3);
@@ -68,40 +64,27 @@ namespace RaidPartyManager.Presentation
             life.Add(healthLabel);
 
             portrait = new VisualElement { name = "combatant-portrait" };
-            portrait.style.height = 226;
+            portrait.style.height = 185;
             portrait.style.marginTop = portrait.style.marginBottom = 4;
             portrait.style.overflow = Overflow.Hidden;
             if (battleSprite == null)
             {
-                portrait.style.backgroundColor = character == null ? PrototypeStyle.Inset
-                    : Color.Lerp(PrototypeStyle.PanelColor, sideColor, 0.14f);
+                portrait.style.backgroundColor = Color.Lerp(PrototypeStyle.PanelColor, sideColor, 0.14f);
                 PrototypeStyle.Outline(portrait, PrototypeStyle.Edge, 4);
             }
-            Add(portrait);
 
             if (art == null && battleSprite == null)
             {
-                var mark = PrototypeStyle.Text(hidden ? "?" : character == null ? "·" : ProfessionMark(character.Profession),
-                    character == null ? 26 : 44, character == null ? PrototypeStyle.Edge : sideColor);
+                var mark = PrototypeStyle.Text(ProfessionMark(character.Profession), 44, sideColor);
                 mark.style.flexGrow = 1;
                 PrototypeStyle.Middle(mark);
                 portrait.Add(mark);
             }
 
             if (battleSprite != null)
-            {
                 portrait.Add(battleSprite);
-                battleSprite.SetOverhead(life);
-            }
             else
-            {
-                ProfessionFrame.AddTo(portrait, character?.Profession, art);
-                if (maximumHealth > 0)
-                {
-                    life.style.top = 7;
-                    portrait.Add(life);
-                }
-            }
+                ProfessionFrame.AddTo(portrait, character.Profession, art);
 
             var positionTag = PrototypeStyle.Text(position.ToString("00"), 11, side == Side.Party ? PrototypeStyle.Ally : PrototypeStyle.Enemy);
             positionTag.style.position = Position.Absolute;
@@ -111,33 +94,24 @@ namespace RaidPartyManager.Presentation
             portrait.Add(positionTag);
 
             var caption = PrototypeStyle.Row("combatant-caption");
-            caption.style.position = Position.Absolute;
-            caption.style.left = caption.style.right = caption.style.bottom = 5;
             caption.style.paddingLeft = caption.style.paddingRight = 5;
             caption.style.paddingTop = caption.style.paddingBottom = 4;
             caption.style.minHeight = 27;
             caption.style.alignItems = Align.Center;
-            caption.style.backgroundColor = new Color(0.064f, 0.069f, 0.086f, 0.88f);
-            var characterName = PrototypeStyle.Text(hidden ? "未知" : character?.Name ?? "空位", 14);
+            var characterName = PrototypeStyle.Text(character.Name, 14);
             characterName.name = "combatant-name";
             characterName.style.flexGrow = 1;
             characterName.style.minWidth = 0;
             characterName.style.whiteSpace = WhiteSpace.NoWrap;
             characterName.style.overflow = Overflow.Hidden;
             characterName.style.textOverflow = TextOverflow.Ellipsis;
+            characterName.style.textShadow = new TextShadow { offset = new Vector2(0, 1.5f), blurRadius = 4, color = Color.black };
             caption.Add(characterName);
-            if (!string.IsNullOrEmpty(subtitle))
-            {
-                var personality = PrototypeStyle.Text(subtitle, 11, PrototypeStyle.Muted);
-                personality.name = "combatant-subtitle";
-                personality.style.flexShrink = 0;
-                personality.style.marginLeft = 5;
-                personality.style.whiteSpace = WhiteSpace.NoWrap;
-                caption.Add(personality);
-            }
-            portrait.Add(caption);
+            Add(caption);
+            Add(portrait);
+            Add(life);
 
-            var conditions = new VisualElement { name = unitId == null ? "status-row-empty" : $"status-row-{unitId}" };
+            var conditions = new VisualElement { name = $"status-row-{unitId}" };
             conditions.style.minHeight = 29;
             conditions.style.marginTop = 3;
             Add(conditions);
@@ -146,10 +120,18 @@ namespace RaidPartyManager.Presentation
             badges.style.justifyContent = Justify.Center;
             conditions.Add(badges);
 
-            Refresh(health, shield);
+            Refresh(health, shield, now);
         }
 
-        public void Refresh(int health, int shield, IReadOnlyList<StatusStack> statuses = null)
+        public void SetEntranceVisible(bool visible)
+        {
+            if (battleSprite != null)
+                battleSprite.SetBodyVisible(visible);
+            else
+                portrait.visible = visible;
+        }
+
+        public void Refresh(int health, int shield, double now, IReadOnlyList<StatusStack> statuses = null)
         {
             if (maximumHealth == 0)
                 return;
@@ -158,7 +140,7 @@ namespace RaidPartyManager.Presentation
             healthLabel.text = alive ? $"{health} / {maximumHealth}" : $"倒下  0 / {maximumHealth}";
             healthFill.style.width = Length.Percent(Mathf.Clamp(100f * health / maximumHealth, 0f, 100f));
             if (battleSprite != null)
-                battleSprite.SetAlive(alive, Time.unscaledTimeAsDouble);
+                battleSprite.SetAlive(alive, now);
             else
                 portrait.style.opacity = alive ? 1f : 0.55f;
 

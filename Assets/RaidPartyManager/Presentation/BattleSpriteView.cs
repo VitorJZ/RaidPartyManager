@@ -19,7 +19,6 @@ namespace RaidPartyManager.Presentation
 
         private readonly Image figure;
         private readonly VisualElement effects;
-        private VisualElement overhead;
         private readonly Profession profession;
         private readonly Texture2D attackSheet;
         private Texture2D specialSheet;
@@ -60,8 +59,8 @@ namespace RaidPartyManager.Presentation
             impactTime = ends[(facesLeft ? 4 : contactFrame) - 1];
             pickingMode = PickingMode.Ignore;
             style.position = Position.Absolute;
-            style.top = 26;
-            style.bottom = 36;
+            style.top = 5;
+            style.bottom = 3;
             style.left = style.right = 5;
 
             figure = new Image
@@ -84,14 +83,6 @@ namespace RaidPartyManager.Presentation
             ShowFrame(0);
         }
 
-        public void SetOverhead(VisualElement content)
-        {
-            overhead?.RemoveFromHierarchy();
-            overhead = content;
-            Add(overhead);
-            PositionFigure(contentRect.size);
-        }
-
         private void PositionFigure(Vector2 size)
         {
             if (!(size.x > 0f && size.y > 0f))
@@ -103,11 +94,6 @@ namespace RaidPartyManager.Presentation
             figure.style.left = (size.x - width) * 0.5f;
             figure.style.width = width;
             figure.style.height = height;
-            if (overhead != null)
-            {
-                overhead.style.bottom = height + 2f;
-                overhead.style.left = overhead.style.right = (size.x - Mathf.Min(104f, width * 0.72f)) * 0.5f;
-            }
         }
 
         private bool SimpleGuard => action == ActionKind.Shield && specialSheet == null;

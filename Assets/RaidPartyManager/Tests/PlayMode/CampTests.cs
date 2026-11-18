@@ -61,6 +61,7 @@ namespace RaidPartyManager.Tests
             var replacement = root.Q<Image>("camp-seat-1").image;
             Assert.That(replacement, Is.Not.SameAs(before));
             Assert.That(replacement.name, Does.Contain(characterId));
+            Press(root, "open-settings");
             Press(root, "return-main-menu");
             yield return WaitForScene("MainMenu");
             Press(Object.FindAnyObjectByType<PrototypeSceneMenu>().GetComponent<UIDocument>().rootVisualElement,

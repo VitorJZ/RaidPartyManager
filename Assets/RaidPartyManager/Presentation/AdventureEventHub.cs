@@ -13,6 +13,10 @@ namespace RaidPartyManager.Presentation
     {
         [SerializeField] private AdventureContentAsset assets;
         private VisualElement root;
+        private VisualElement body;
+        private VisualElement screen;
+        private RunTopBar topBar;
+        private AdventureEventWindow eventWindow;
         private AdventureRun run;
         private Font localFont;
         private FontAsset localFontAsset;
@@ -30,23 +34,33 @@ namespace RaidPartyManager.Presentation
         private void Render()
         {
             root.Clear();
+            eventWindow = null;
             root.style.backgroundColor = PrototypeStyle.Background;
             root.style.backgroundImage = new StyleBackground(assets.Backdrop);
             root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
             root.style.unityBackgroundImageTintColor = new Color(0.25f, 0.28f, 0.32f, 1);
             root.style.paddingLeft = root.style.paddingRight = 22;
-            root.style.paddingTop = root.style.paddingBottom = 14;
+            root.style.paddingTop = 0;
+            root.style.paddingBottom = 14;
+            topBar = new RunTopBar(root, run.Party, assets.Encounter, OpenEditor, "event-party-editor", goldName: "adventure-gold");
+            root.Add(topBar);
+            body = new VisualElement();
+            body.style.flexGrow = 1;
+            body.style.minHeight = 0;
+            screen = new VisualElement { name = "adventure-screen" };
+            screen.style.flexGrow = 1;
+            screen.style.minHeight = 0;
+            body.Add(screen);
+            root.Add(body);
             var header = PrototypeStyle.Row(); header.style.alignItems = Align.Center;
-            header.Add(PrototypeSceneMenu.ReturnButton());
             var title = PrototypeStyle.Text("弥雾码头", 27, PrototypeStyle.Accent);
             title.style.marginLeft = 14; title.style.flexGrow = 1; header.Add(title);
             header.Add(PrototypeStyle.Text($"第 {run.Floor} 层  ·  已完成 {run.CompletedNodes} 个关卡", 14));
-            var gold = PrototypeStyle.Text($"金币  {run.Party.Gold}", 21, PrototypeStyle.Accent);
-            gold.name = "adventure-gold"; gold.style.marginLeft = 20; header.Add(gold); root.Add(header);
+            header.style.marginTop = 8;
+            screen.Add(header);
             var toolbar = PrototypeStyle.Row(); toolbar.style.marginTop = 14; toolbar.style.alignItems = Align.Center;
             toolbar.Add(PrototypeStyle.Button("事件检查", "event-tab-inspect", () => Switch(true), run.IsInspection));
             toolbar.Add(PrototypeStyle.Button("关卡试游", "event-tab-route", () => Switch(false), !run.IsInspection));
-            toolbar.Add(PrototypeStyle.Button("角色编辑", "event-party-editor", OpenEditor));
             toolbar.Add(PrototypeStyle.Button("重置当前试游", "reset-adventure", () =>
             { run = AdventureFlow.Select(assets, run.IsInspection, true); Render(); }));
             if (run.IsInspection)
@@ -54,9 +68,9 @@ namespace RaidPartyManager.Presentation
                 toolbar.Add(PrototypeStyle.Button("推进 1 个关卡", "inspection-advance", () => { run.AdvanceInspection(); Render(); }));
                 toolbar.Add(PrototypeStyle.Button("下一层", "inspection-next-floor", () => { run.NextFloor(); Render(); }));
             }
-            root.Add(toolbar);
+            screen.Add(toolbar);
             if (!string.IsNullOrEmpty(run.ReturnMessage))
-                root.Add(PrototypeStyle.Text(run.ReturnMessage, 17, PrototypeStyle.Accent));
+                screen.Add(PrototypeStyle.Text(run.ReturnMessage, 17, PrototypeStyle.Accent));
             if (run.IsInspection) RenderInspection(); else RenderRoute();
             RenderParty();
             if (run.Current != null) PresentVisit();
@@ -68,9 +82,9 @@ namespace RaidPartyManager.Presentation
         private void RenderInspection()
         {
             var hint = PrototypeStyle.Text("直接选择任意事件或场景。检查队伍与战斗演练独立；上方按钮可推进宝箱归队计时或切换楼层。", 13, PrototypeStyle.Muted);
-            hint.style.marginTop = hint.style.marginBottom = 10; root.Add(hint);
+            hint.style.marginTop = hint.style.marginBottom = 10; screen.Add(hint);
             var scroll = new ScrollView { name = "event-catalog" }; scroll.style.flexGrow = 1; scroll.style.minHeight = 0;
-            var grid = PrototypeStyle.Row(); grid.style.flexWrap = Wrap.Wrap; scroll.Add(grid); root.Add(scroll);
+            var grid = PrototypeStyle.Row(); grid.style.flexWrap = Wrap.Wrap; scroll.Add(grid); screen.Add(scroll);
             foreach (AdventureEventKind kind in Enum.GetValues(typeof(AdventureEventKind)))
             {
                 var captured = kind;
@@ -97,8 +111,8 @@ namespace RaidPartyManager.Presentation
                 marker.style.backgroundColor = PrototypeStyle.PanelColor; marker.style.marginRight = 5;
                 PrototypeStyle.Middle(marker); PrototypeStyle.Outline(marker, PrototypeStyle.Edge, 4); map.Add(marker);
             }
-            root.Add(map);
-            var panel = PrototypeStyle.Panel(); panel.style.flexGrow = 1; root.Add(panel);
+            screen.Add(map);
+            var panel = PrototypeStyle.Panel(); panel.style.flexGrow = 1; screen.Add(panel);
             if (run.Failed)
             {
                 panel.Add(PrototypeStyle.Text("本次讨伐结束", 28, PrototypeStyle.Accent));
@@ -137,7 +151,7 @@ namespace RaidPartyManager.Presentation
                     $"生命 {member.Health}／{member.EffectiveStats.Health}", 13, PrototypeStyle.Muted));
                 row.Add(panel);
             }
-            root.Add(row);
+            screen.Add(row);
         }
 
         private void PresentVisit()
@@ -145,17 +159,26 @@ namespace RaidPartyManager.Presentation
             if (run.Current == null) return;
             var current = run.Current;
             if (current.Kind == NodeKind.Event || current.Battle?.Settled == true)
-                root.Add(new AdventureEventWindow(run, assets, Render));
+            {
+                screen.SetEnabled(false);
+                eventWindow = new AdventureEventWindow(run, assets, Render, topBar.Refresh);
+                body.Add(eventWindow);
+            }
             else AdventureFlow.OpenNodeScene(current.Kind switch
             { NodeKind.Town => "Town", NodeKind.Camp => "Camp", NodeKind.Shop => "DockShop", _ => "BattlePrototype" });
         }
 
         private void OpenEditor()
         {
-            root.Clear();
-            var content = assets.Encounter;
-            root.Add(new PartyEditorView(run.Party, content.CharacterCatalog, m => m.Position,
-                content.PortraitFor, content.IconFor, Render));
+            bool changed = false;
+            RunTopBar.EditParty(root, run.Party, assets.Encounter, () =>
+            {
+                if (!changed) return;
+                topBar.Refresh();
+                screen.Q("adventure-party")?.RemoveFromHierarchy();
+                RenderParty();
+                eventWindow?.RefreshAfterPartyEdit();
+            }, () => changed = true);
         }
 
         private static Button Card(VisualElement parent, string title, string description, string name, Texture2D art, Action action)

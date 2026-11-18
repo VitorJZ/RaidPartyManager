@@ -37,8 +37,28 @@ namespace RaidPartyManager.Domain
     {
         public const int Positions = 4;
         public const int EquipmentSlots = 3;
+        public const int DefaultEnergy = 2;
+        public const int MaximumEnergy = 8;
 
         public static bool IsPosition(int position) => position >= 1 && position <= Positions;
+    }
+
+    public readonly struct BattleEnergy
+    {
+        public int Capacity { get; }
+        public int Remaining { get; }
+
+        public BattleEnergy(int capacity, int remaining)
+        {
+            Capacity = Math.Clamp(capacity, Rules.DefaultEnergy, Rules.MaximumEnergy);
+            Remaining = Math.Clamp(remaining, 0, Capacity);
+        }
+
+        public static BattleEnergy Full(IEnumerable<EquipmentDefinition> equipment)
+        {
+            int capacity = equipment.Any(item => item.Effect == EquipmentEffect.EchoChalice) ? 4 : Rules.DefaultEnergy;
+            return new BattleEnergy(capacity, capacity);
+        }
     }
 
     public readonly struct Stats
@@ -163,7 +183,7 @@ namespace RaidPartyManager.Domain
         }
     }
 
-    public sealed class EquipmentDefinition
+    public class EquipmentDefinition
     {
         public string Id { get; }
         public string Name { get; }
@@ -172,12 +192,13 @@ namespace RaidPartyManager.Domain
         public EquipmentEffect Effect { get; }
         public int Tier { get; }
         public int Price { get; }
+        public bool CanDropInBattle { get; }
         public bool IsPotion => Effect is EquipmentEffect.VigorPotion or EquipmentEffect.SwiftPotion or
             EquipmentEffect.ResolvePotion or EquipmentEffect.GreedPotion or EquipmentEffect.ThornsPotion or
             EquipmentEffect.PurityPotion;
 
         public EquipmentDefinition(string id, string name, Stats bonus, string description = null,
-            EquipmentEffect effect = EquipmentEffect.None, int tier = 2, int price = 20)
+            EquipmentEffect effect = EquipmentEffect.None, int tier = 2, int price = 20, bool canDropInBattle = true)
         {
             if (string.IsNullOrWhiteSpace(id) || bonus.Attack < 0 || bonus.Defense < 0 ||
                 bonus.SpecialDefense < 0 || bonus.Health < 0)
@@ -189,7 +210,45 @@ namespace RaidPartyManager.Domain
             Effect = effect;
             Tier = tier;
             Price = price;
+            CanDropInBattle = canDropInBattle && tier is >= 1 and <= 3;
         }
+    }
+
+    public enum SkillRequirement { None, Mage, Support, Archer, Melee, Warrior }
+    public enum SkillEffect
+    {
+        None, WarCry, BlazingFire, AbsoluteZero, Sunshine, StoneGuard, HealingHands, SweepNextAttack,
+        LightningWhip, ToxicMist, FleshFeast, Sidestep, GoldenBell, FieryEyes, CrimsonReap,
+        HeroicAnthem, Intimidate, Earthquake, CloudPiercer
+    }
+
+    public sealed class SkillBookDefinition : EquipmentDefinition
+    {
+        public SkillRequirement Requirement { get; }
+        public int Cost { get; }
+        public SkillEffect SkillEffect { get; }
+
+        public SkillBookDefinition(string id, string name, string description, SkillRequirement requirement, int cost, int tier,
+            SkillEffect skillEffect = SkillEffect.None)
+            : base(id, name, default, description, tier: tier, price: 0)
+        {
+            if (cost < 1 || cost > Rules.MaximumEnergy)
+                throw new ArgumentOutOfRangeException(nameof(cost));
+            Requirement = requirement;
+            Cost = cost;
+            SkillEffect = skillEffect;
+        }
+
+        public bool CanLearn(CharacterDefinition character) => Requirement switch
+        {
+            SkillRequirement.None => true,
+            SkillRequirement.Mage => character.Profession == Profession.Mage,
+            SkillRequirement.Support => character.Profession == Profession.Support,
+            SkillRequirement.Archer => character.Profession == Profession.Archer,
+            SkillRequirement.Melee => character.Reach == AttackReach.Melee,
+            SkillRequirement.Warrior => character.Profession == Profession.Warrior,
+            _ => false
+        };
     }
 
     public sealed class Combatant
@@ -204,10 +263,12 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<EquipmentDefinition> Equipment { get; }
         public IReadOnlyList<string> EquipmentSlots { get; }
         public IReadOnlyDictionary<StatusKind, int> StartingStatuses { get; }
+        public IReadOnlyList<SkillBookDefinition> LearnedSkills { get; }
 
         public Combatant(string id, CharacterDefinition character, Side side, int position, Stats stats, int health,
             IEnumerable<EquipmentDefinition> equipment = null,
-            IReadOnlyDictionary<StatusKind, int> startingStatuses = null, IEnumerable<string> equipmentSlots = null)
+            IReadOnlyDictionary<StatusKind, int> startingStatuses = null, IEnumerable<string> equipmentSlots = null,
+            IEnumerable<SkillBookDefinition> learnedSkills = null)
         {
             if (string.IsNullOrWhiteSpace(id) || !Rules.IsPosition(position) ||
                 stats.Health <= 0 || health < 0 || health > stats.Health)
@@ -220,6 +281,7 @@ namespace RaidPartyManager.Domain
             Health = health;
             Equipment = Array.AsReadOnly(equipment?.ToArray() ?? Array.Empty<EquipmentDefinition>());
             EquipmentSlots = Array.AsReadOnly(equipmentSlots?.ToArray() ?? Array.Empty<string>());
+            LearnedSkills = Array.AsReadOnly(learnedSkills?.Where(skill => skill != null).ToArray() ?? Array.Empty<SkillBookDefinition>());
             if (EquipmentSlots.Count != 0 && (EquipmentSlots.Count != Rules.EquipmentSlots ||
                 EquipmentSlots.Count(slot => slot != null) != Equipment.Count))
                 throw new ArgumentException("Combat equipment slots must match the supplied equipped instances.", nameof(equipmentSlots));
@@ -297,6 +359,7 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<KeyValuePair<string, Stats>> PartyStatChanges { get; }
         public AttackReach AttackReach { get; }
         public BattleVisualCue VisualCue { get; }
+        public BattleEnergy? ActorEnergy { get; }
 
         public BattleEvent(int tick, BattleEventKind kind, string actorId = null, string targetId = null,
             string actionName = null, ActionKind actionKind = ActionKind.Attack,
@@ -304,7 +367,7 @@ namespace RaidPartyManager.Domain
             string targetStatuses = null, string detail = null, CharacterDefinition form = null, int maximumHealth = 0,
             IReadOnlyList<StatusStack> statusStacks = null, BattleLoadout loadout = null,
             IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified,
-            BattleVisualCue visualCue = BattleVisualCue.None)
+            BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null)
         {
             Tick = tick;
             Kind = kind;
@@ -325,6 +388,7 @@ namespace RaidPartyManager.Domain
             PartyStatChanges = partyStatChanges;
             AttackReach = attackReach;
             VisualCue = visualCue;
+            ActorEnergy = actorEnergy;
         }
     }
 
