@@ -16,6 +16,7 @@ MonoBehaviour:
   - number: 1
     displayName: "战争咆哮"
     icon: {fileID: 2800000, guid: 4ba7b58c8e3b44ddaaa84497543f3446, type: 3}
+    battleEffect: {fileID: 2800000, guid: df5124b2e1444bfdaca0607aaa8d92b2, type: 3}
     requirement: 0
     cost: 1
     skillEffect: 1
@@ -24,6 +25,7 @@ MonoBehaviour:
   - number: 2
     displayName: "熊熊烈火"
     icon: {fileID: 2800000, guid: 909cb0486b08453d911183649594a74e, type: 3}
+    battleEffect: {fileID: 2800000, guid: 0f633d3d22ff494884e56f7d58fba905, type: 3}
     requirement: 1
     cost: 2
     skillEffect: 2
@@ -32,6 +34,7 @@ MonoBehaviour:
   - number: 3
     displayName: "极度冰点"
     icon: {fileID: 2800000, guid: e4fc14c9b63b4a019913213b1d0771f7, type: 3}
+    battleEffect: {fileID: 2800000, guid: d88f35bc6dc64e21877fc9937333c88f, type: 3}
     requirement: 1
     cost: 2
     skillEffect: 3
@@ -40,6 +43,7 @@ MonoBehaviour:
   - number: 4
     displayName: "阳光普照"
     icon: {fileID: 2800000, guid: 5b3226e79c354d2490b2afb679ad1988, type: 3}
+    battleEffect: {fileID: 2800000, guid: 5152df7344bc47afaed0339850ae491c, type: 3}
     requirement: 2
     cost: 1
     skillEffect: 4
@@ -48,6 +52,7 @@ MonoBehaviour:
   - number: 5
     displayName: "坚如磐石"
     icon: {fileID: 2800000, guid: 8d31be5d590440b9ab910f5e6bc744b3, type: 3}
+    battleEffect: {fileID: 2800000, guid: c5b9ba1515df42abbe3f2dcffbd098d5, type: 3}
     requirement: 0
     cost: 1
     skillEffect: 5
@@ -56,6 +61,7 @@ MonoBehaviour:
   - number: 6
     displayName: "妙手回春"
     icon: {fileID: 2800000, guid: f4e3a103cc034515bcd95bd8af3bb0c2, type: 3}
+    battleEffect: {fileID: 2800000, guid: 9796deca136d4dfd9e70d57d178b1007, type: 3}
     requirement: 0
     cost: 1
     skillEffect: 6
@@ -64,6 +70,7 @@ MonoBehaviour:
   - number: 7
     displayName: "万箭齐发"
     icon: {fileID: 2800000, guid: f26422bac9534a92be183541c4a328e7, type: 3}
+    battleEffect: {fileID: 2800000, guid: 4d4cbea12bb1446bbdc98f2f6d102bdd, type: 3}
     requirement: 3
     cost: 1
     skillEffect: 7
@@ -72,6 +79,7 @@ MonoBehaviour:
   - number: 8
     displayName: "星陨术"
     icon: {fileID: 2800000, guid: 084cd3a6a53b40eda9704dcb625babd8, type: 3}
+    battleEffect: {fileID: 2800000, guid: 72f27523372a4c70bc0dd25fbbe6b1ca, type: 3}
     requirement: 1
     cost: 1
     skillEffect: 7
@@ -80,6 +88,7 @@ MonoBehaviour:
   - number: 9
     displayName: "横扫千军"
     icon: {fileID: 2800000, guid: f72c205566294d89a088858e42a73b6f, type: 3}
+    battleEffect: {fileID: 2800000, guid: 4a83e22615414f509f52a2d538e5e7bb, type: 3}
     requirement: 4
     cost: 1
     skillEffect: 7
@@ -88,6 +97,7 @@ MonoBehaviour:
   - number: 10
     displayName: "闪电鞭"
     icon: {fileID: 2800000, guid: 748df8415c704fb1a5b6d3a64117f21a, type: 3}
+    battleEffect: {fileID: 2800000, guid: 25d6985e46224ea8b1b0bf1536d50727, type: 3}
     requirement: 1
     cost: 2
     skillEffect: 8
@@ -96,6 +106,7 @@ MonoBehaviour:
   - number: 11
     displayName: "毒瘴爆发"
     icon: {fileID: 2800000, guid: 37856a01d2ab458c875017d5ba4c4f97, type: 3}
+    battleEffect: {fileID: 2800000, guid: 7ea2a98f15154bc0a52dcae456765225, type: 3}
     requirement: 0
     cost: 2
     skillEffect: 9
@@ -104,6 +115,7 @@ MonoBehaviour:
   - number: 12
     displayName: "血肉盛宴"
     icon: {fileID: 2800000, guid: c20660494a964527b692878af3aeb530, type: 3}
+    battleEffect: {fileID: 2800000, guid: a2e28957e48f41c388bb22801cf0f061, type: 3}
     requirement: 5
     cost: 2
     skillEffect: 10
@@ -112,6 +124,7 @@ MonoBehaviour:
   - number: 13
     displayName: "闪身步"
     icon: {fileID: 2800000, guid: 846e8c1aa4c743048df70dd7a77ffbeb, type: 3}
+    battleEffect: {fileID: 2800000, guid: 8cbf79a2684e40a389854b3185d899c2, type: 3}
     requirement: 3
     cost: 1
     skillEffect: 11
@@ -120,6 +133,7 @@ MonoBehaviour:
   - number: 14
     displayName: "金钟罩"
     icon: {fileID: 2800000, guid: 19e3444facb24303a8f46ed1ed045336, type: 3}
+    battleEffect: {fileID: 2800000, guid: 3dc3dc8a122c43b09387057ca65ce051, type: 3}
     requirement: 0
     cost: 2
     skillEffect: 12
@@ -128,6 +142,7 @@ MonoBehaviour:
   - number: 15
     displayName: "火眼金睛"
     icon: {fileID: 2800000, guid: 3cedf78a239248009a1b783c5136e245, type: 3}
+    battleEffect: {fileID: 2800000, guid: 1e39a875e9114d54b5538f74886a93e5, type: 3}
     requirement: 2
     cost: 1
     skillEffect: 13
@@ -136,6 +151,7 @@ MonoBehaviour:
   - number: 16
     displayName: "猩红收割"
     icon: {fileID: 2800000, guid: e113141cb0ec40608da82a52593a0e9b, type: 3}
+    battleEffect: {fileID: 2800000, guid: 323fc9cf3da3441a92e41e966c582453, type: 3}
     requirement: 0
     cost: 2
     skillEffect: 14
@@ -144,6 +160,7 @@ MonoBehaviour:
   - number: 17
     displayName: "英雄赞歌"
     icon: {fileID: 2800000, guid: 3425bdd337bd44d1948c06a652235be2, type: 3}
+    battleEffect: {fileID: 2800000, guid: 23de607d469b4fb08acebf5b2afe82f7, type: 3}
     requirement: 2
     cost: 1
     skillEffect: 15
@@ -152,6 +169,7 @@ MonoBehaviour:
   - number: 18
     displayName: "震慑八方"
     icon: {fileID: 2800000, guid: 077d684f60b5438697500672b81e501e, type: 3}
+    battleEffect: {fileID: 2800000, guid: 0089c442e0bc4355be507c11aa5b2c96, type: 3}
     requirement: 5
     cost: 2
     skillEffect: 16
@@ -160,6 +178,7 @@ MonoBehaviour:
   - number: 19
     displayName: "裂地震击"
     icon: {fileID: 2800000, guid: af54efc1fb5542cdadc656bbda335f4b, type: 3}
+    battleEffect: {fileID: 2800000, guid: 23598e3a250a420cb17eb07794a8b73c, type: 3}
     requirement: 5
     cost: 2
     skillEffect: 17
@@ -168,6 +187,7 @@ MonoBehaviour:
   - number: 20
     displayName: "穿云箭"
     icon: {fileID: 2800000, guid: b7d69feceeb4421086ec5e3f50006654, type: 3}
+    battleEffect: {fileID: 2800000, guid: d6fa550683a44fd391e78f23e6374053, type: 3}
     requirement: 3
     cost: 1
     skillEffect: 18

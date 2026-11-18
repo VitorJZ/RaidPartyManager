@@ -348,6 +348,12 @@ namespace RaidPartyManager.Presentation
                     return;
                 eventIndex++;
 
+                if (entry.Kind == BattleEventKind.SkillVisual)
+                {
+                    QueueSkillEffect(entry, now);
+                    continue;
+                }
+
                 if (entry.Kind == BattleEventKind.Finished)
                 {
                     SettleBattle();
@@ -401,6 +407,7 @@ namespace RaidPartyManager.Presentation
                         unitCards[entry.TargetId].Refresh(entry.TargetHealth, entry.TargetShield, now, entry.StatusStacks);
                     if (entry.Detail != "未命中" && EffectArt(entry) is Texture2D effect)
                         impactEffects.Add(new BattleEffectPlayback(entry.TargetId, effect, now, AnimationScale));
+                    QueueSkillEffect(entry, now);
                 }
 
                 if (!actionLogged)
@@ -448,6 +455,17 @@ namespace RaidPartyManager.Presentation
         private Texture2D EffectArt(BattleEvent entry) =>
             entry.VisualCue != BattleVisualCue.None && entry.ActorId != null && appearances.TryGetValue(entry.ActorId, out var actor)
                 ? content.BattleEffectFor(actor.Character.Id, entry.VisualCue) : null;
+
+        private void QueueSkillEffect(BattleEvent entry, double now)
+        {
+            if (entry.SkillBookId == null || entry.TargetId == null ||
+                content.SkillEffectFor(entry.SkillBookId) is not Texture2D atlas)
+                return;
+            if (impactEffects.Any(effect => effect.SkillBookId == entry.SkillBookId &&
+                effect.TargetId == entry.TargetId && effect.ActiveAt(now)))
+                return;
+            impactEffects.Add(new BattleEffectPlayback(entry.TargetId, atlas, now, AnimationScale, entry.SkillBookId));
+        }
 
         private bool BeginAction(BattleEvent entry, double now)
         {

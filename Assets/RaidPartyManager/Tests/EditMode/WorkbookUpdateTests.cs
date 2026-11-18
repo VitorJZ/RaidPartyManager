@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using RaidPartyManager.Battle;
@@ -21,6 +22,61 @@ namespace RaidPartyManager.Tests
                 skill.ToBook().SkillEffect != SkillEffect.None && skill.Icon != null && skill.Icon.width == skill.Icon.height), Is.True);
             Assert.That(catalog.Skills.Single(skill => skill.DisplayName == "熊熊烈火")
                 .CanLearn(Fighter("guard", Side.Party, 1, Personality.Stubborn).Character), Is.False);
+        }
+
+        [Test]
+        public void EveryLearnedSkillHasAUniqueImportedEffectStrip()
+        {
+            var effects = LoadSkills().Skills.Select(skill => skill.BattleEffect).ToArray();
+            Assert.That(effects, Has.Length.EqualTo(20));
+            Assert.That(effects.Distinct().Count(), Is.EqualTo(20));
+            foreach (var sheet in effects)
+            {
+                Assert.That(sheet, Is.Not.Null);
+                Assert.That(sheet.height, Is.EqualTo(96));
+                Assert.That(sheet.width, Is.EqualTo(12 * sheet.height));
+                var importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(sheet));
+                Assert.That(importer.DoesSourceTextureHaveAlpha(), Is.True);
+                Assert.That(importer.mipmapEnabled, Is.False);
+            }
+        }
+
+        [Test]
+        public void GroupDamageMarksOnlyResolvedEnemyTargetsWithItsSkillId()
+        {
+            var book = LoadSkills().Skills.Single(skill => skill.Number == 2).ToBook();
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stubborn, book: book);
+            var ally = Fighter("ally", Side.Party, 2, Personality.Stubborn);
+            var front = Fighter("front", Side.Enemy, 1, Personality.Reckless);
+            var rear = Fighter("rear", Side.Enemy, 4, Personality.Reckless);
+            var session = new BattleSimulator(new PreferBooks()).Start(new BattleRequest(
+                "group-skill", new[] { caster, ally, front, rear }, 200));
+
+            var events = session.AdvanceRound();
+
+            Assert.That(events.Where(entry => entry.SkillBookId == book.Id).Select(entry => entry.TargetId),
+                Is.EqualTo(new[] { front.Id, rear.Id }));
+        }
+
+        [TestCase(7)]
+        [TestCase(8)]
+        [TestCase(9)]
+        public void SweepVariantsRetainTheBookIdentityUntilTheNextAttack(int number)
+        {
+            var book = LoadSkills().Skills.Single(skill => skill.Number == number).ToBook();
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stubborn, book: book);
+            var front = Fighter("front", Side.Enemy, 1, Personality.Reckless);
+            var rear = Fighter("rear", Side.Enemy, 4, Personality.Reckless);
+            var session = new BattleSimulator(new PreferBooks()).Start(new BattleRequest(
+                "sweep-skill", new[] { caster, front, rear }, 200));
+
+            var firstRound = session.AdvanceRound();
+            Assert.That(firstRound.Any(entry => entry.ActorId == caster.Id && entry.ActionName == book.Name), Is.True);
+            Assert.That(firstRound.Any(entry => entry.SkillBookId == book.Id), Is.False);
+            var secondRound = session.AdvanceRound();
+
+            Assert.That(secondRound.Where(entry => entry.SkillBookId == book.Id).Select(entry => entry.TargetId),
+                Is.EqualTo(new[] { front.Id, rear.Id }));
         }
 
         [Test]
@@ -60,11 +116,27 @@ namespace RaidPartyManager.Tests
             }
         }
 
-        private static Combatant Fighter(string id, Side side, int position, Personality personality, int health = 30)
+        private static SkillCatalogAsset LoadSkills() => AssetDatabase.LoadAssetAtPath<SkillCatalogAsset>(
+            "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset");
+
+        private static Combatant Fighter(string id, Side side, int position, Personality personality,
+            int health = 30, SkillBookDefinition book = null)
         {
             var basic = new ActionDefinition("basic", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0);
             var definition = new CharacterDefinition(id, id, Profession.Warrior, personality, new Stats(2, 0, 0, 30), 1, basic);
-            return new Combatant(id, definition, side, position, definition.BaseStats, health);
+            return new Combatant(id, definition, side, position, definition.BaseStats, health,
+                learnedSkills: book == null ? null : new[] { book });
+        }
+
+        private sealed class PreferBooks : IDecisionPolicy
+        {
+            public Decision Choose(DecisionContext context, IReadOnlyList<ActionOption> options)
+            {
+                for (int i = 0; i < options.Count; i++)
+                    if (options[i].Book != null)
+                        return new Decision(i, DecisionReason.UseSkill);
+                return new Decision(0, DecisionReason.Default);
+            }
         }
     }
 }

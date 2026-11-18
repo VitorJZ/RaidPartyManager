@@ -28,6 +28,7 @@ namespace RaidPartyManager.Content
         private readonly IReadOnlyDictionary<string, Texture2D> battleProjectiles;
         private readonly IReadOnlyDictionary<string, Texture2D> campSprites;
         private readonly IReadOnlyDictionary<string, Texture2D> equipmentIcons;
+        private readonly IReadOnlyDictionary<string, Texture2D> skillEffects;
         private readonly Texture2D[] statusIcons;
         private readonly Texture2D arrowProjectile;
         private readonly Texture2D magicProjectile;
@@ -41,7 +42,8 @@ namespace RaidPartyManager.Content
             CharacterDefinition[] enemyRoster,
             IReadOnlyDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)> battleExtras,
             IReadOnlyDictionary<string, Texture2D> battleProjectiles,
-            IReadOnlyDictionary<string, Texture2D> campSprites, SkillBookDefinition[] skillBooks, Texture2D backpackIcon)
+            IReadOnlyDictionary<string, Texture2D> campSprites, SkillBookDefinition[] skillBooks, Texture2D backpackIcon,
+            IReadOnlyDictionary<string, Texture2D> skillEffects)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
@@ -59,6 +61,7 @@ namespace RaidPartyManager.Content
             this.battleProjectiles = battleProjectiles;
             this.campSprites = campSprites;
             this.equipmentIcons = equipmentIcons;
+            this.skillEffects = skillEffects;
             this.statusIcons = statusIcons;
             this.arrowProjectile = arrowProjectile;
             this.magicProjectile = magicProjectile;
@@ -88,6 +91,9 @@ namespace RaidPartyManager.Content
 
         public Texture2D IconFor(string itemId) =>
             itemId != null && equipmentIcons.TryGetValue(itemId, out var icon) ? icon : null;
+
+        public Texture2D SkillEffectFor(string skillBookId) =>
+            skillBookId != null && skillEffects.TryGetValue(skillBookId, out var artwork) ? artwork : null;
 
         public Texture2D StatusIcon(StatusKind kind) =>
             (int)kind >= 0 && (int)kind < statusIcons.Length ? statusIcons[(int)kind] : null;
@@ -221,8 +227,13 @@ namespace RaidPartyManager.Content
                 .ToDictionary(group => group.Key, group => group.First().Icon, StringComparer.Ordinal);
             var skills = skillCatalog?.Skills ?? Array.Empty<SkillEntry>();
             var books = skills.Select(skill => skill.ToBook()).ToArray();
+            var skillEffects = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
             for (int i = 0; i < books.Length; i++)
+            {
                 equipmentIcons.Add(books[i].Id, skills[i].Icon);
+                if (skills[i].BattleEffect != null)
+                    skillEffects.Add(books[i].Id, skills[i].BattleEffect);
+            }
             return new EncounterData(displayName, partyInputs, enemyInputs,
                 startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies)).ToArray(),
                 victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits, equipmentIcons,
@@ -234,7 +245,8 @@ namespace RaidPartyManager.Content
                 catalog.Values.Where(character => character.BattleProjectile != null)
                     .ToDictionary(character => character.Id, character => character.BattleProjectile, StringComparer.Ordinal),
                 catalog.Values.Where(character => character.CampSeatedSprite != null)
-                    .ToDictionary(character => character.Id, character => character.CampSeatedSprite, StringComparer.Ordinal), books, backpackIcon);
+                    .ToDictionary(character => character.Id, character => character.CampSeatedSprite, StringComparer.Ordinal),
+                books, backpackIcon, skillEffects);
         }
     }
 }

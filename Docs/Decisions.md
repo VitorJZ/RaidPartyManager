@@ -17,3 +17,4 @@
 | 2026-11-18 | 弥雾码头改为十关含 Boss，三处分叉的每条路径保留五次普通／精英战及三次服务 | 最新需求替代 7+1 布局；九个非 Boss 槽位只容纳一个额外事件，因此按选择动态限制事件与精英数量 | `AdventureTests.EveryForkPathPreservesTenNodesFiveFightsAndServiceQuotas` |
 | 2026-11-18 | 事件检查与旧演练各用独立队伍；事件、城镇、营地、商店、战斗之间共用一份试游状态 | 方便自由检查全部事件，同时保留旧演练配装和试游中的当前生命、金币与装备 | `AdventureSceneTests` |
 | 2026-11-18 | 宝箱伙伴按三个后续关卡归队，名额与装备保留；营地恢复存活在场队员最大生命的 30% | 用户确认推进单位和恢复量，避免暂离伙伴被第五名队员挤占 | 宝箱、招募名额与营地用例 |
+| 2026-11-18 | 技能特效按技能书 ID 和实际结算目标播放，蓄势群攻保留技能书 ID 到下一击 | 区分共用结算规则的万箭齐发、星陨术与横扫千军，使动画跟随实际目标 | `WorkbookUpdateTests` 的图集、范围与延后触发用例，`LearnedSkillSpendsAPurpleEnergyCellAndSettlementRefillsIt` 的实战换帧检查 |

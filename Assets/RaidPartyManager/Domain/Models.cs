@@ -26,7 +26,7 @@ namespace RaidPartyManager.Domain
     public enum TargetRule { AnyEnemy, FrontEnemy, RearEnemy, WoundedAlly, Self }
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
     public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth, Retaliate, FinishWounded, StayOnTarget, UseSkill, SaveSkill, AvoidOverkill, EmergencyHeal }
-    public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged }
+    public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual }
     public enum BattleVisualCue
     {
         None, WarCry, CeramicPierce, CeramicSplash, BellRing, BellWave, RearAmbush,
@@ -360,6 +360,7 @@ namespace RaidPartyManager.Domain
         public AttackReach AttackReach { get; }
         public BattleVisualCue VisualCue { get; }
         public BattleEnergy? ActorEnergy { get; }
+        public string SkillBookId { get; }
 
         public BattleEvent(int tick, BattleEventKind kind, string actorId = null, string targetId = null,
             string actionName = null, ActionKind actionKind = ActionKind.Attack,
@@ -367,7 +368,7 @@ namespace RaidPartyManager.Domain
             string targetStatuses = null, string detail = null, CharacterDefinition form = null, int maximumHealth = 0,
             IReadOnlyList<StatusStack> statusStacks = null, BattleLoadout loadout = null,
             IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified,
-            BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null)
+            BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null)
         {
             Tick = tick;
             Kind = kind;
@@ -389,6 +390,7 @@ namespace RaidPartyManager.Domain
             AttackReach = attackReach;
             VisualCue = visualCue;
             ActorEnergy = actorEnergy;
+            SkillBookId = skillBookId;
         }
     }
 

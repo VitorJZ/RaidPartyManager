@@ -160,7 +160,8 @@ namespace RaidPartyManager.Battle
         }
 
         private void GrantStatus(Unit actor, Unit target, StatusKind status, int layers,
-            string actionName = null, BattleVisualCue visual = BattleVisualCue.None, BattleEventKind? kind = null)
+            string actionName = null, BattleVisualCue visual = BattleVisualCue.None, BattleEventKind? kind = null,
+            string skillBookId = null)
         {
             var eventKind = kind ?? (actionName == null ? BattleEventKind.Effect : BattleEventKind.Action);
             if (target.Health == 0 || (status != Purity && target.Layers(Purity) > 0) ||
@@ -186,7 +187,8 @@ namespace RaidPartyManager.Battle
             target.Statuses[status] = total;
             var statusName = StatusRules.For(status).Name;
             Report(eventKind, actor, target, actionName ?? statusName, ActionKind.Shield,
-                detail: $"{(actionName == null ? "" : statusName + " ")}达到 {total} 层", visual: visual);
+                detail: $"{(actionName == null ? "" : statusName + " ")}达到 {total} 层", visual: visual,
+                skillBookId: skillBookId);
         }
 
         private static bool RemoveLayers(Unit unit, StatusKind status, int amount)
@@ -273,10 +275,11 @@ namespace RaidPartyManager.Battle
                         GrantStatus(actor, target, Injured, 1);
             }
 
-            if (actor.SweepNextAttack)
+            if (actor.SweepSkillId is string sweepSkillId)
             {
                 int multiplier = actor.DoubleNextAttack ? 2 : 1;
-                actor.DoubleNextAttack = actor.SweepNextAttack = false;
+                actor.DoubleNextAttack = false;
+                actor.SweepSkillId = null;
                 var sweepKind = BattleEventKind.Action;
                 foreach (var enemy in Opponents(actor).ToArray())
                 {
@@ -284,7 +287,8 @@ namespace RaidPartyManager.Battle
                         break;
                     if (enemy.Health == 0)
                         continue;
-                    Hit(actor, enemy, action, sweepKind, reason, multiplier: multiplier, firstTarget: sweepKind == BattleEventKind.Action);
+                    Hit(actor, enemy, action, sweepKind, reason, multiplier: multiplier,
+                        firstTarget: sweepKind == BattleEventKind.Action, skillBookId: sweepSkillId);
                     sweepKind = BattleEventKind.Effect;
                 }
                 return;
@@ -327,7 +331,7 @@ namespace RaidPartyManager.Battle
 
         private bool Hit(Unit actor, Unit target, ActionDefinition action, BattleEventKind kind,
             DecisionReason reason, string equipmentName = null, int falloff = 0, bool canCounter = true,
-            BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true)
+            BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true, string skillBookId = null)
         {
             string name = equipmentName ?? action.Name;
             if (actor.DoubleNextAttack)
@@ -357,7 +361,8 @@ namespace RaidPartyManager.Battle
                 int thorns = target.Layers(Thorns);
                 int ember = actor.Layers(Ember);
                 var damage = ResolveStrike(actor, target, parts, name, kind, reason,
-                    ignoreDefense: UsesShortbow(actor), weaponAttack: true, visual: visual, multiplier: multiplier);
+                    ignoreDefense: UsesShortbow(actor), weaponAttack: true, visual: visual, multiplier: multiplier,
+                    skillBookId: skillBookId);
                 actor.LastHitTarget = target.Input.Id;
                 if (damage.Total > 0 && actor.Trait == CharacterTrait.PoisonOnHit)
                     GrantStatus(actor, target, Poison, actor.TraitPower);
@@ -471,12 +476,14 @@ namespace RaidPartyManager.Battle
             (int)Math.Min(int.MaxValue, amounts.Sum(amount => (long)amount));
 
         private void Strike(Unit actor, Unit target, int power, DamageType type, string name, BattleEventKind kind,
-            DecisionReason reason = DecisionReason.Default, BattleVisualCue visual = BattleVisualCue.None) =>
-            ResolveStrike(actor, target, new[] { (type, power) }, name, kind, reason, visual: visual);
+            DecisionReason reason = DecisionReason.Default, BattleVisualCue visual = BattleVisualCue.None,
+            string skillBookId = null) =>
+            ResolveStrike(actor, target, new[] { (type, power) }, name, kind, reason, visual: visual, skillBookId: skillBookId);
 
         private (int Total, int Physical) ResolveStrike(Unit actor, Unit target,
             IReadOnlyList<(DamageType Type, int Power)> parts, string name, BattleEventKind kind, DecisionReason reason,
-            bool ignoreDefense = false, bool weaponAttack = false, BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1)
+            bool ignoreDefense = false, bool weaponAttack = false, BattleVisualCue visual = BattleVisualCue.None,
+            int multiplier = 1, string skillBookId = null)
         {
             // All components read the same defensive state before the combined hit consumes it.
             var resolved = parts.Select(part =>
@@ -501,7 +508,8 @@ namespace RaidPartyManager.Battle
             var linked = healthDamage > 0 ? LinkedAllies(target) : new List<Unit>();
             int dealt = LoseHealth(target, LimitDamage(target, healthDamage), out string protection);
             string detail = protection ?? DamageDetail(resolved);
-            Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack, visual: visual);
+            Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack,
+                visual: visual, skillBookId: skillBookId);
             if (target.Health == 0)
                 Report(BattleEventKind.Defeated, actor, target, name, ActionKind.Attack);
             var lifeLost = LifeLossByType(resolved, absorbed, dealt);
@@ -645,7 +653,8 @@ namespace RaidPartyManager.Battle
             (int)Math.Min(int.MaxValue, (long)power * (1 << target.Count(HealingRing)));
 
         private void Heal(Unit actor, Unit target, int power, string name, BattleEventKind kind,
-            DecisionReason reason = DecisionReason.Default, Unit hostileTarget = null, BattleVisualCue visual = BattleVisualCue.None)
+            DecisionReason reason = DecisionReason.Default, Unit hostileTarget = null, BattleVisualCue visual = BattleVisualCue.None,
+            string skillBookId = null)
         {
             if (actor.Has(RebelEarring))
             {
@@ -654,7 +663,7 @@ namespace RaidPartyManager.Battle
                     enemy = TargetableOpponents(actor).FirstOrDefault();
                 if (enemy != null && power > 0)
                 {
-                    Strike(actor, enemy, power, DamageType.Magic, name, kind, reason, visual);
+                    Strike(actor, enemy, power, DamageType.Magic, name, kind, reason, visual, skillBookId);
                     if (kind == BattleEventKind.Action)
                         CounterAttack(enemy, actor);
                 }
@@ -665,7 +674,7 @@ namespace RaidPartyManager.Battle
                 Math.Min(HealingPower(target, power), target.Stats.Health - target.Health);
             target.Health += amount;
             if (amount > 0 || kind == BattleEventKind.Action)
-                Report(kind, actor, target, name, ActionKind.Heal, amount, reason, visual: visual);
+                Report(kind, actor, target, name, ActionKind.Heal, amount, reason, visual: visual, skillBookId: skillBookId);
             int roots = target.Count(TreeRoot);
             if (amount > 0 && roots > 0)
                 foreach (var enemy in Opponents(target).ToArray())

@@ -45,7 +45,7 @@ namespace RaidPartyManager.Battle
                             foreach (var target in allies)
                                 Add(target, HealingGain(target, 10));
                         break;
-                    case SweepNextAttack when !actor.SweepNextAttack && enemies.Length > 1 && attack > 0:
+                    case SweepNextAttack when actor.SweepSkillId == null && enemies.Length > 1 && attack > 0:
                         Add(actor, (long)(enemies.Length - 1) * attack);
                         break;
                     case LightningWhip:
@@ -128,6 +128,7 @@ namespace RaidPartyManager.Battle
             {
                 case WarCry:
                     actor.DoubleNextAttack = true;
+                    Show(actor);
                     break;
                 case BlazingFire:
                     foreach (var enemy in Opponents(actor).ToArray())
@@ -144,12 +145,13 @@ namespace RaidPartyManager.Battle
                     break;
                 case StoneGuard:
                     actor.StoneGuard = true;
+                    Show(actor);
                     break;
                 case HealingHands:
                     Restore(target, 10);
                     break;
                 case SweepNextAttack:
-                    actor.SweepNextAttack = true;
+                    actor.SweepSkillId = book.Id;
                     break;
                 case LightningWhip:
                     int strikes = 1 + Opponents(actor).Count();
@@ -164,8 +166,9 @@ namespace RaidPartyManager.Battle
                     actor.BonusMaximumHealth += 3;
                     actor.Health += 3;
                     UpdateEquipment();
+                    Show(target);
                     Report(BattleEventKind.Effect, actor, actor, book.Name, ActionKind.Heal, 3,
-                        detail: "生命上限 +3", form: actor.Input.Character);
+                        detail: "生命上限 +3", form: actor.Input.Character, skillBookId: book.Id);
                     break;
                 case Sidestep:
                     Apply(actor, Swift, 2);
@@ -173,7 +176,10 @@ namespace RaidPartyManager.Battle
                     break;
                 case GoldenBell:
                     foreach (var ally in Allies())
+                    {
                         ally.ProtectedRound = Round;
+                        Show(ally);
+                    }
                     break;
                 case FieryEyes:
                     foreach (var enemy in Opponents(actor))
@@ -182,7 +188,7 @@ namespace RaidPartyManager.Battle
                 case CrimsonReap:
                     int dealt = DamageEnemy(target, attack, DamageType.True);
                     if (actor.Health > 0 && dealt > 0)
-                        Heal(actor, actor, dealt, book.Name, BattleEventKind.Effect, hostileTarget: target);
+                        Heal(actor, actor, dealt, book.Name, BattleEventKind.Effect, hostileTarget: target, skillBookId: book.Id);
                     break;
                 case HeroicAnthem:
                     foreach (var ally in Allies())
@@ -203,14 +209,18 @@ namespace RaidPartyManager.Battle
 
             IEnumerable<Unit> Allies() => units.Where(unit => unit.Input.Side == actor.Input.Side && unit.Health > 0);
 
+            void Show(Unit unit) => events.Add(new BattleEvent(Tick, BattleEventKind.SkillVisual,
+                actor.Input.Id, unit.Input.Id, actionKind: ActionKind.Shield, skillBookId: book.Id));
+
             void Apply(Unit unit, StatusKind status, int amount = 1) =>
-                GrantStatus(actor, unit, status, amount, book.Name, kind: BattleEventKind.Effect);
+                GrantStatus(actor, unit, status, amount, book.Name, kind: BattleEventKind.Effect, skillBookId: book.Id);
 
             int DamageEnemy(Unit enemy, int power, DamageType type) => enemy.Health > 0
-                ? ResolveStrike(actor, enemy, new[] { (type, power) }, book.Name, BattleEventKind.Effect, reason).Total : 0;
+                ? ResolveStrike(actor, enemy, new[] { (type, power) }, book.Name, BattleEventKind.Effect, reason,
+                    skillBookId: book.Id).Total : 0;
 
             void Restore(Unit unit, int power) => Heal(actor, unit, power, book.Name, BattleEventKind.Effect,
-                hostileTarget: unit.Input.Side != actor.Input.Side ? unit : null);
+                hostileTarget: unit.Input.Side != actor.Input.Side ? unit : null, skillBookId: book.Id);
         }
     }
 }

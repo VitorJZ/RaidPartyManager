@@ -494,9 +494,26 @@ namespace RaidPartyManager.Tests
             Color full = bar.Q("energy-cell-1").resolvedStyle.backgroundColor;
             Assert.That(full.b, Is.GreaterThan(full.g));
             Assert.That(bar.Q("energy-cell-2").resolvedStyle.backgroundColor, Is.EqualTo(full));
+            SetAttackAnimationTimeScale(scene, 0.30f);
             Press(root, "start");
+            Image warCry = null;
+            float effectDeadline = Time.realtimeSinceStartup + 5f;
+            while (warCry == null && Time.realtimeSinceStartup < effectDeadline)
+            {
+                yield return null;
+                warCry = root.Q<Image>("battle-skill-effect", "skill-book-01");
+            }
+            Assert.That(warCry, Is.Not.Null, "War Cry should display its own effect on the battlefield.");
+            Assert.That(warCry.sourceRect.width, Is.EqualTo(96f));
+            float firstFrame = warCry.sourceRect.x;
+            while (warCry.panel != null && warCry.sourceRect.x == firstFrame &&
+                Time.realtimeSinceStartup < effectDeadline)
+                yield return null;
+            Assert.That(warCry.sourceRect.x, Is.GreaterThan(firstFrame));
+            UseFastAttacks(scene);
             yield return WaitForRoundBreak(root);
             yield return null;
+            Assert.That(root.Q("battle-skill-effect"), Is.Null);
 
             bar = root.Q("equipment-position-1").Q("equipment-energy");
             Assert.That(bar.Q("energy-cell-1").resolvedStyle.backgroundColor, Is.EqualTo(full));

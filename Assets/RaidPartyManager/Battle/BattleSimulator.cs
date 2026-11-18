@@ -60,7 +60,7 @@ namespace RaidPartyManager.Battle
             public int ProtectedRound;
             public int BonusMaximumHealth;
             public bool DoubleNextAttack;
-            public bool SweepNextAttack;
+            public string SweepSkillId;
             public bool StoneGuard;
             public bool CorpseConsumed;
             public BattleEnergy Energy;
@@ -552,7 +552,7 @@ namespace RaidPartyManager.Battle
         private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,
             int amount = 0, DecisionReason reason = DecisionReason.Default, string detail = null,
             CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false,
-            BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null)
+            BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
@@ -561,7 +561,7 @@ namespace RaidPartyManager.Battle
                 ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
                 target.Health, target.Shield, StatusText(target), detail, form, form != null ? target.Stats.Health : 0, statuses,
-                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy));
+                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId));
         }
     }
 }
