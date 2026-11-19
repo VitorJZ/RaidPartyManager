@@ -18,3 +18,8 @@
 | 2026-11-18 | 事件检查与旧演练各用独立队伍；事件、城镇、营地、商店、战斗之间共用一份试游状态 | 方便自由检查全部事件，同时保留旧演练配装和试游中的当前生命、金币与装备 | `AdventureSceneTests` |
 | 2026-11-18 | 宝箱伙伴按三个后续关卡归队，名额与装备保留；营地恢复存活在场队员最大生命的 30% | 用户确认推进单位和恢复量，避免暂离伙伴被第五名队员挤占 | 宝箱、招募名额与营地用例 |
 | 2026-11-18 | 技能特效按技能书 ID 和实际结算目标播放，蓄势群攻保留技能书 ID 到下一击 | 区分共用结算规则的万箭齐发、星陨术与横扫千军，使动画跟随实际目标 | `WorkbookUpdateTests` 的图集、范围与延后触发用例，`LearnedSkillSpendsAPurpleEnergyCellAndSettlementRefillsIt` 的实战换帧检查 |
+| 2026-11-19 | 墓园新增 23 普通、5 精英、2 Boss，采用可选的纯数据行为配置 | 允许按权重、目标、伤害和状态组合新敌人，原有码头行为保持兼容 | `GraveyardHasExactlyThirtyDistinctEnemiesWithCorrectRanksAndSlotBudgets`、`EveryAuthoredActionCanBeSelectedAndResolvedUsingItsRealProfile` |
+| 2026-11-19 | 墓园重击先预警，下次可行动时重选目标并释放；半血阶段永久增加 1 攻击修正 | 高强度攻击保留换位、治疗和护盾应对窗口，阶段变化可追溯 | `ChargedAttackTakesTwoActionsAndReevaluatesRearTargetAfterASwap`、`BossPhaseTriggersOnceAtHalfHealthAndAddsOneAttackPower` |
+| 2026-11-19 | 墓园通过独立场景试玩，敌阵按遭遇资源分别缓存；正式路线暂沿用码头 | 避免切换演练后混入其他区域敌人，不扩展尚未确认的墓园关卡路线 | `MainMenuOpensGraveyardAndSwitchingRegionsKeepsTheirEnemyPoolsSeparate` |
+| 2026-11-19 | 原共享 Excel 不可访问时输出独立墓园增补表并注明未合并 | 提交完整可检查的数据与插图，避免误称已写入原在线图鉴 | 工作簿 30 条敌人、62 条行动、30 个概率合计和 2200 场试算核对 |
+| 2026-11-19 | 取得用户提供的本地图鉴后，在敌人表末尾追加墓园，并保留原 8 个工作表及原生音效表 | 合并为 53 名敌人的完整图鉴；保留旧数据与格式，避免导出时丢失未修改的原生内容 | `MergeGraveyardWorkbook.mjs --verify`、`PreserveGraveyardWorkbook.py`，记录见 `WhisperingGraveyardValidation.json` |

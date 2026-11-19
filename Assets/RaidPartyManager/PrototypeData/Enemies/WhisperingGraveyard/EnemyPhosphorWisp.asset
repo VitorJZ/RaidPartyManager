@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyPhosphorWisp
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyPhosphorWisp
+  displayName: "磷火游魂"
+  portrait: {fileID: 2800000, guid: edd5d9b49ffd5a21b13c0710620b1f37, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: cb3cf08e8a32504d8d3b946301f169f3, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: c06770fab767596c9b989468b36e66f4, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 409ea3156af65c028fff558c1400b894, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: d8ba34654b335c20b99afcd1264d36fc, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: c6038d4f3ff953f189695f2674befb32, type: 3}
+  usePortraitInBattle: 0
+  profession: 1
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "磷火弹（70%） / 火种附身（30%）"
+  personality: 1
+  attack: 5
+  defense: 0
+  specialDefense: 4
+  health: 17
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 2
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "磷火弹"
+      weight: 70
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 2
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "火种附身"
+      weight: 30
+      kind: 1
+      target: 5
+      power: 0
+      damageType: 0
+      status: 6
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

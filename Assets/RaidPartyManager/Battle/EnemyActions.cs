@@ -7,6 +7,7 @@ namespace RaidPartyManager.Battle
     {
         private bool TryEnemyTurn(Unit actor)
         {
+            if (TryConfiguredEnemyTurn(actor)) return true;
             switch (actor.Trait)
             {
                 case CharacterTrait.EnemyWarCry when random.NextDouble() < 0.5:

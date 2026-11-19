@@ -14,6 +14,8 @@ namespace RaidPartyManager.Presentation
                 "回合", new Color32(255, 195, 109, 255)),
             BattleCountdownKind.AdmiralBroadside => ("封港炮击", "下一次行动时炮击对方最后两名存活队员。眩晕会推迟行动。",
                 "次行动", new Color32(255, 135, 117, 255)),
+            BattleCountdownKind.EnemyCharge => ("墓园蓄力", "下次可行动时释放重击。眩晕会推迟释放，目标按释放时的站位重新选择。",
+                "次行动", new Color32(155, 221, 207, 255)),
             _ => ("金钟罩", "本回合抵挡敌方攻击，回合结束后解除。",
                 "回合", new Color32(247, 218, 139, 255))
         };
@@ -42,6 +44,7 @@ namespace RaidPartyManager.Presentation
                         Path(true, new(-.12f, -.73f), new(-.55f, .05f), new(-.07f, .05f),
                             new(-.26f, .73f), new(.56f, -.20f), new(.12f, -.20f), new(.31f, -.73f));
                         break;
+                    case BattleCountdownKind.EnemyCharge:
                     case BattleCountdownKind.ScavengerEscape:
                         Path(true, new(-.49f, -.56f), new(.49f, -.56f), new(.12f, 0),
                             new(.49f, .56f), new(-.49f, .56f), new(-.12f, 0));

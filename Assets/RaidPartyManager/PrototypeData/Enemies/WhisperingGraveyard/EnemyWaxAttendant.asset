@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyWaxAttendant
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyWaxAttendant
+  displayName: "白蜡侍者"
+  portrait: {fileID: 2800000, guid: 29c1ed39e1c3544e8555a5ca302416a6, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 4173b33ac62751ec9d9879c05af76a1e, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 809cdafb85a951e1855fa84711bdf99a, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 2ff472b21cca5913a40d0875db07bc40, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 4d851289d55e539886431ef0545753ff, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 3808174894475f91815fa0499a2a70dc, type: 3}
+  usePortraitInBattle: 0
+  profession: 1
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "送魂烛火（75%） / 熔蜡遮目（25%）"
+  personality: 1
+  attack: 5
+  defense: 0
+  specialDefense: 3
+  health: 18
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 2
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "送魂烛火"
+      weight: 75
+      kind: 0
+      target: 1
+      power: 0
+      damageType: 2
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "熔蜡遮目"
+      weight: 25
+      kind: 1
+      target: 1
+      power: 0
+      damageType: 0
+      status: 12
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

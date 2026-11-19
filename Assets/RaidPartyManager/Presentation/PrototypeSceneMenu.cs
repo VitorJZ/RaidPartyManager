@@ -75,6 +75,11 @@ namespace RaidPartyManager.Presentation
             battleButton.style.marginTop = 10;
             panel.Add(battleButton);
 
+            var graveyardButton = PrototypeStyle.Button("低语墓园", "open-graveyard", () => OpenStandalone("WhisperingGraveyard"));
+            graveyardButton.style.minHeight = 46;
+            graveyardButton.style.marginTop = 10;
+            panel.Add(graveyardButton);
+
             var shopButton = PrototypeStyle.Button("商店", "open-shop", () => OpenStandalone("DockShop"));
             shopButton.style.minHeight = 46;
             shopButton.style.marginTop = 10;

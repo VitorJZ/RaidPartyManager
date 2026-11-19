@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyWeepingGargoyle
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyWeepingGargoyle
+  displayName: "哭墙石像"
+  portrait: {fileID: 2800000, guid: 2d612ebd663c5d33b4e0becc29df905b, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 5842a56c76c9516095e6e66109a072d9, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 44e6effc0dd156118a422c6da4b4c609, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 62db6b6adb7a54ddae6db902a7a0368e, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 0c70b2e4c8ee597f83ea7cea61f0bac9, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: c14b1f7b160656148ef24fe05480e811, type: 3}
+  usePortraitInBattle: 0
+  profession: 4
+  enemyRank: 2
+  positionSlots: 2
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "哭墙碎石（65%） / 寒泪落幕（35%）"
+  personality: 1
+  attack: 8
+  defense: 4
+  specialDefense: 1
+  health: 54
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "哭墙碎石"
+      weight: 65
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "寒泪落幕"
+      weight: 35
+      kind: 1
+      target: 7
+      power: 0
+      damageType: 0
+      status: 14
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

@@ -31,7 +31,7 @@ namespace RaidPartyManager.Domain
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
     public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth, Retaliate, FinishWounded, StayOnTarget, UseSkill, SaveSkill, AvoidOverkill, EmergencyHeal }
     public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual, Retreated, EnemyVisual, RoundStarted, Countdown }
-    public enum BattleCountdownKind { CalamityChant, ScavengerEscape, AdmiralBroadside, GoldenBell }
+    public enum BattleCountdownKind { CalamityChant, ScavengerEscape, AdmiralBroadside, GoldenBell, EnemyCharge }
 
     public readonly struct BattleCountdown
     {
@@ -54,7 +54,8 @@ namespace RaidPartyManager.Domain
         AdmiralWhistle, AdmiralWarning, AdmiralBroadside, RayTail, RayMist, RaySurge,
         RoundEndEmber, RoundEndHeal, RoundEndPoison, RoundEndPoisonHeal, RoundEndGrowth,
         RoundEndLightning, RoundEndFormShift, RoundEndTransfer,
-        RoundStartExposed, RoundStartPoison, RoundStartBlessing, RoundStartBonus, PiercingArrow
+        RoundStartExposed, RoundStartPoison, RoundStartBlessing, RoundStartBonus, PiercingArrow,
+        GraveyardSpecial, GraveyardCharge, GraveyardPhase
     }
 
     public static class Rules
@@ -180,13 +181,14 @@ namespace RaidPartyManager.Domain
         public string TraitText { get; }
         public string BattleFormId { get; }
         public IReadOnlyList<string> EvolutionIds { get; }
+        public EnemyBehaviorDefinition EnemyBehavior { get; }
 
         public CharacterDefinition(string id, string name, Profession profession, Personality personality,
             Stats baseStats, int actionInterval, ActionDefinition basicAttack, ActionDefinition skill = null,
             int rosterNumber = 0, int stage = 1, AttackReach reach = AttackReach.Unspecified,
             CharacterTrait trait = CharacterTrait.None, int traitPower = 0, string traitText = null,
             string battleFormId = null, IEnumerable<string> evolutionIds = null, EnemyRank rank = EnemyRank.Unspecified,
-            int positionSlots = 1)
+            int positionSlots = 1, EnemyBehaviorDefinition enemyBehavior = null)
         {
             if (string.IsNullOrWhiteSpace(id) || baseStats.Health <= 0 || actionInterval <= 0 || !Rules.Fits(1, positionSlots))
                 throw new ArgumentException("A character needs an ID, positive health and an action interval.");
@@ -212,6 +214,7 @@ namespace RaidPartyManager.Domain
             TraitText = traitText;
             BattleFormId = battleFormId;
             EvolutionIds = Array.AsReadOnly(evolutionIds?.ToArray() ?? Array.Empty<string>());
+            EnemyBehavior = enemyBehavior;
         }
     }
 

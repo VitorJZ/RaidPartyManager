@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyPallbearer
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyPallbearer
+  displayName: "抬棺四侍"
+  portrait: {fileID: 2800000, guid: d929a0cbba52581e8fb38089e6bbf7d0, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 17c578787b0c5f5495cbcf65f523545b, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 0acac7332b33586caed4b095196228dc, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 2a1dd0dd7f6250caad54dfa1f6dda70f, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 67a27575b1295415a9e2593c85cddfaf, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: fa0c86d7002a5a379aba4a597999fc59, type: 3}
+  usePortraitInBattle: 0
+  profession: 4
+  enemyRank: 2
+  positionSlots: 2
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "棺杠撞击（70%） / 合棺镇压（30%）"
+  personality: 1
+  attack: 8
+  defense: 3
+  specialDefense: 2
+  health: 50
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "棺杠撞击"
+      weight: 70
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "合棺镇压"
+      weight: 30
+      kind: 0
+      target: 7
+      power: 2
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 1
+      delayDecay: 0
+    openingShield: 6
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyBoneLantern
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyBoneLantern
+  displayName: "灯骨引路人"
+  portrait: {fileID: 2800000, guid: 0226667151585510a90399599d83db08, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: b93f325464d053dca6331e425d79a616, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: fcabcd6cb2aa575793e7ccd19ac60e8c, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: ad2df6d0ce535b9cad429ce847bf5817, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: fd8f4d3c5f09516b9c766878554a2f37, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 7c9e091c15405644b4fa85492ac47fd6, type: 3}
+  usePortraitInBattle: 0
+  profession: 1
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "引魂灯火（70%） / 禁生低语（30%）"
+  personality: 1
+  attack: 5
+  defense: 0
+  specialDefense: 3
+  health: 18
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 1
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "引魂灯火"
+      weight: 70
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 1
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "禁生低语"
+      weight: 30
+      kind: 1
+      target: 2
+      power: 0
+      damageType: 0
+      status: 13
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 1
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

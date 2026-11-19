@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyCoffinHound
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyCoffinHound
+  displayName: "守柩獒"
+  portrait: {fileID: 2800000, guid: f06c08508f5255808c29e6b7c2a4d6ee, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 07e324bf6bcd5db284106f8d09bbc13b, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 359730bbfc1252bfbea09a66e290bf98, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 152a5b2e8e1a5889a720bbc4de000dea, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 9343650bd5075790af739b13af37b1d4, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: e72fe35bd7ae54368036c5044c1160f2, type: 3}
+  usePortraitInBattle: 0
+  profession: 4
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "守柩撕咬（75%） / 伏柩坚守（25%）"
+  personality: 1
+  attack: 5
+  defense: 2
+  specialDefense: 1
+  health: 25
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "守柩撕咬"
+      weight: 75
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "伏柩坚守"
+      weight: 25
+      kind: 1
+      target: 5
+      power: 0
+      damageType: 0
+      status: 2
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

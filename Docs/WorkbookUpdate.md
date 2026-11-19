@@ -50,3 +50,15 @@
 
 - [35 张个性化角色立绘](Previews/ExpressivePortraits.jpg) · [立绘提示词](CharacterPortraitPrompts.json)
 - [装备与技能图标提示词](WorkbookArtPrompts.json)
+
+## 2026-11-19 低语墓园增补
+
+新增 23 普通、5 精英、2 Boss，序号 24–53，包含属性、占格、62 项行动的概率、目标与效果，以及对应立绘与六类动作。配置源与逐名说明见[低语墓园](WhisperingGraveyard.md)。两套固定队伍的 2200 场试算另存为 `WhisperingGraveyardBalance.csv`。
+
+首次制作时无法访问原共享 Excel，因此先生成独立的增补表，含怪物图鉴、行动图鉴、规则与难度、难度试算四个工作表。仓库归档为 [WhisperingGraveyard.xlsx](WhisperingGraveyard.xlsx)。
+
+用户随后提供了《讨伐队经理-图鉴 副本.xlsx》。已在其「敌人图鉴」第 25–54 行追加序号 24–53，合并版见 [Bestiary-WithGraveyard.xlsx](Bestiary-WithGraveyard.xlsx)，并放入同步 Obsidian 的 `敌人图鉴/低语墓园/`。共 53 名敌人：40 普通、9 精英、4 Boss。新增第三行为及概率、所属区域、占格和立绘列，共 62 项墓园行动与 30 张内嵌立绘。
+
+原 8 个工作表的名称和顺序保留，原有敌人 A1:O24 的单元格内容与格式保留。其他 7 个工作表、音效原生表、原有共享字符串及工作簿设置按原文件部件保留并核对。重新导入后确认原有值和公式无变化、新增行动概率分别合计 100%，并核对新增范围和立绘显示。本次更新的是本地合并副本，未回写在线共享原表。
+
+复现入口：在独立输出目录备份原件和生成的中文形象说明，使用 `Tools/MergeGraveyardWorkbook.mjs --inspect` 检查并预览；用 `--merge` 写入；运行 `Tools/PreserveGraveyardWorkbook.py` 保留未修改的原生部件；最后用 `--verify` 重新导入核对。JavaScript 与 lxml 使用 Codex 的捆绑运行时。

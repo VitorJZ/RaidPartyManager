@@ -72,6 +72,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private ActionSpec basicAttack = new ActionSpec();
         [SerializeField] private bool hasSkill;
         [SerializeField] private ActionSpec skill = new ActionSpec();
+        [SerializeField] private EnemyBehaviorSpec enemyBehavior;
 
         internal Texture2D Portrait => portrait;
         internal bool UsePortraitInBattle => usePortraitInBattle;
@@ -92,6 +93,6 @@ namespace RaidPartyManager.Content
                 basicAttack.ToDefinition(), hasSkill ? skill.ToDefinition() : null,
                 rosterNumber, stage, reach, fixedTrait, traitPower, traitText,
                 battleForm != null ? battleForm.Id : null, evolutions.Where(form => form != null).Select(form => form.Id),
-                enemyRank, Math.Clamp(positionSlots, 1, Rules.Positions));
+                enemyRank, Math.Clamp(positionSlots, 1, Rules.Positions), enemyBehavior?.ToDefinition());
     }
 }

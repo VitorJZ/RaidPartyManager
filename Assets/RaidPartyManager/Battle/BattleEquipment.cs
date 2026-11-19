@@ -27,6 +27,7 @@ namespace RaidPartyManager.Battle
         private void StartBattle()
         {
             SetOpeningEnemyShields();
+            SetConfiguredEnemyOpeningShields();
             foreach (var actor in units.Where(unit => unit.Health > 0).ToArray())
                 ResolveOpeningGear(actor, canSummon: true);
             foreach (var recruit in recruits)

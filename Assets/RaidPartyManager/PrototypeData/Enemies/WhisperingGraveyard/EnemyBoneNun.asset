@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyBoneNun
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyBoneNun
+  displayName: "祷骨修女"
+  portrait: {fileID: 2800000, guid: 7bfee3fdcb0d5498a0e6618c12311f1e, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 30ea013a058f5bd49c1536ff6019b544, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 703a2a2037f85f2fb35cc8b251824a92, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 51099ff30f8154fe850d1de181dba529, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 6f694756f33054c6af17ee0929bf2592, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 0dd204499b815d66b0e230f11673cf2b, type: 3}
+  usePortraitInBattle: 0
+  profession: 3
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "骨珠击（60%） / 悼亡祈愿（40%）"
+  personality: 1
+  attack: 4
+  defense: 1
+  specialDefense: 3
+  health: 20
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 1
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "骨珠击"
+      weight: 60
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 1
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "悼亡祈愿"
+      weight: 40
+      kind: 2
+      target: 6
+      power: 6
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

@@ -135,7 +135,7 @@ namespace RaidPartyManager.Content
                 BattleVisualCue.RearAmbush or BattleVisualCue.ResolveGuard or BattleVisualCue.CrossbowCritical or
                 BattleVisualCue.QuackHeal or BattleVisualCue.AnchorExpose or BattleVisualCue.AnglerCurse or
                 BattleVisualCue.WardenBrace or BattleVisualCue.AdmiralWhistle or BattleVisualCue.RayMist or
-                BattleVisualCue.RaySurge => art.Body,
+                BattleVisualCue.RaySurge or BattleVisualCue.GraveyardSpecial or BattleVisualCue.GraveyardCharge => art.Body,
                 _ => null
             };
         }

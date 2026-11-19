@@ -47,6 +47,12 @@ bool settled = run.TrySettle(result, out var reward);
 - 道具描述在 `EquipmentAsset` 配置，悬停详情从运行时定义读取。未配置描述时显示属性加成。指针离开物品、开始拖拽或关闭弹窗后，会清理物品详情和拖拽状态。
 - `ProfessionFrame` 使用同一套轮廓生成外框与立绘裁切。职业配置仍来自角色数据，装饰和缩放由表现层处理。
 
+## 配置化敌人行为
+
+低语墓园的 30 名敌人通过 `CharacterDefinition.EnemyBehavior` 携带可选的 `EnemyBehaviorDefinition`。定义归 Domain，包括权重、目标规则、伤害修正、状态、蓄力、开场护盾和半血阶段；Content 的 `EnemyBehaviorSpec` 负责序列化与转换。Battle 的 `ConfiguredEnemyActions` 只读取定义并输出原有战斗事件，Presentation 通过新增的视觉提示选择特技图集，不计算伤害。未配置行为的码头敌人沿用原逻辑。
+
+`Docs/WhisperingGraveyard.json` 是本批内容源。修改后运行 `python Tools/BuildWhisperingGraveyard.py --data-only` 更新 Unity 数值资源；美术变更则运行完整命令重新装配图集。修改行为契约时同步转换器、装配脚本、文档和 `GraveyardTests`。每个区域的敌阵与是否手动编辑按 `EncounterAsset` 缓存，玩家队伍仍在同一次 Play 中共享。详见[墓园设计与验证](WhisperingGraveyard.md)。
+
 ## 合作约定
 
 战斗程序、阵容与物品、内容配置、界面可以分别在各自目录开发。各自的测试先使用内存数据，实际场景只做装配与验收。Unity 场景和遭遇资源中的引用依赖 GUID，提交时一并提交资源和 `.meta` 文件。在同一阶段需要改演练场景时，由一条工作线统一合并场景改动。

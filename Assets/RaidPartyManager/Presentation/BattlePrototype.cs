@@ -6,6 +6,7 @@ using RaidPartyManager.Content;
 using RaidPartyManager.Domain;
 using RaidPartyManager.Run;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.TextCore.Text;
 using UnityEngine.UIElements;
 using static RaidPartyManager.Presentation.PrototypeText;
@@ -25,9 +26,9 @@ namespace RaidPartyManager.Presentation
         [SerializeField, Min(0.05f)] private float attackAnimationTimeScale = 1f;
 
         private static PartyRun playModeRun;
-        private static PartyRun playModeEnemies;
+        private static readonly Dictionary<EncounterAsset, PartyRun> enemySessions = new();
+        private static readonly HashSet<EncounterAsset> editedEnemyEncounters = new();
         private static bool partyEdited;
-        private static bool enemiesEdited;
         private readonly System.Random draftRandom = new System.Random();
         private bool initialized;
 
@@ -95,8 +96,10 @@ namespace RaidPartyManager.Presentation
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetPlaySession()
         {
-            playModeRun = playModeEnemies = null;
-            partyEdited = enemiesEdited = false;
+            playModeRun = null;
+            enemySessions.Clear();
+            editedEnemyEncounters.Clear();
+            partyEdited = false;
         }
 
         internal static PartyRun GetPlaySession(EncounterData content)
@@ -138,10 +141,11 @@ namespace RaidPartyManager.Presentation
             statusTooltip = new BattleStatusTooltip(root);
 
             content = encounter.ToData();
-            adventure = AdventureFlow.ForScene("BattlePrototype");
+            adventure = AdventureFlow.ForScene(SceneManager.GetActiveScene().name);
             run = adventure?.Party ?? (playModeRun ??= new PartyRun(RosterStart(Side.Party),
                 content.StartingEquipment.Concat(content.SkillBooks)));
-            enemyRun = playModeEnemies ??= new PartyRun(RosterStart(Side.Enemy), Array.Empty<EquipmentDefinition>());
+            if (!enemySessions.TryGetValue(encounter, out enemyRun))
+                enemySessions.Add(encounter, enemyRun = new PartyRun(RosterStart(Side.Enemy), Array.Empty<EquipmentDefinition>()));
             ResetDemo();
         }
 
@@ -177,7 +181,7 @@ namespace RaidPartyManager.Presentation
                 run.ResetRoster(RosterStart(Side.Party));
             else
                 run.ResetEncounter();
-            if (reroll && randomizeLineups && !enemiesEdited)
+            if (reroll && randomizeLineups && !editedEnemyEncounters.Contains(encounter))
                 enemyRun.ResetRoster(RosterStart(Side.Enemy));
             victoryRewards = adventure?.Current?.Battle?.Reward;
             preparedEnemies = victoryRewards != null ? Array.Empty<Combatant>() :
@@ -1006,7 +1010,7 @@ namespace RaidPartyManager.Presentation
                 RenderPreparation();
             }, () =>
             {
-                enemiesEdited = true;
+                editedEnemyEncounters.Add(encounter);
                 enemyEntranceScheduled = false;
             }, enemyRun);
         }

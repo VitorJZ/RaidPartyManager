@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyGraveShoveler
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyGraveShoveler
+  displayName: "腐锹尸"
+  portrait: {fileID: 2800000, guid: 43a9a3f30b155de38ee96f28c963bbda, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 6d52f2115906591088f1743ba8605203, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 09a6762449d9575abab15f9a1a5d2819, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 8d16934476e453b4a760fc71f2745bcb, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: b1e4b6b184f75eea8c4ea2de779b768f, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: b353482832e450018732a801cec532dd, type: 3}
+  usePortraitInBattle: 0
+  profession: 0
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "腐锹拍击（70%） / 泥骨溅射（30%）"
+  personality: 1
+  attack: 6
+  defense: 0
+  specialDefense: 1
+  health: 22
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "腐锹拍击"
+      weight: 70
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "泥骨溅射"
+      weight: 30
+      kind: 0
+      target: 7
+      power: -2
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

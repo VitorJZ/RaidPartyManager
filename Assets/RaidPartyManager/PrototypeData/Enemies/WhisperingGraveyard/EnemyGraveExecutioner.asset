@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyGraveExecutioner
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyGraveExecutioner
+  displayName: "巡墓刽子手"
+  portrait: {fileID: 2800000, guid: 153660d2a47b58308a31106243a86423, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 1c2ed0891bdc5ac58b57efb8d6584686, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 07fcb427f6e95363bcb0a2d9857b0bd9, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 3bcd77136cf850e8a1e0ae583dfaeeed, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: f683e2066d18501bbfc5e91cce1c648c, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 7b12d604de4458a49859159019e025d0, type: 3}
+  usePortraitInBattle: 0
+  profession: 0
+  enemyRank: 2
+  positionSlots: 2
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "巡墓横斩（70%） / 点名斩首（30%）"
+  personality: 1
+  attack: 9
+  defense: 2
+  specialDefense: 2
+  health: 48
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "巡墓横斩"
+      weight: 70
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "点名斩首"
+      weight: 30
+      kind: 0
+      target: 2
+      power: 3
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 1
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

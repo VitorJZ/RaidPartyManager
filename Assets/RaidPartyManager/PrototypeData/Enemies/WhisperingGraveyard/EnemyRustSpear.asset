@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyRustSpear
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyRustSpear
+  displayName: "锈棘枪骸"
+  portrait: {fileID: 2800000, guid: 5a882eaf769a54beb4ce99dc42d465ce, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 309dbb827dd55f0883dd6d1739a1d20f, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 5f9ef764245552458dddef1523051345, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 15390e55e24e58729b35b7b30d2b0b99, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: b97dbab869305d8ab5cbfd8cc09e4cfb, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: d2f4299c738d5a01b8ae06789fec5a04, type: 3}
+  usePortraitInBattle: 0
+  profession: 0
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "棘枪直刺（70%） / 挑开护甲（30%）"
+  personality: 1
+  attack: 5
+  defense: 2
+  specialDefense: 1
+  health: 20
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "棘枪直刺"
+      weight: 70
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "挑开护甲"
+      weight: 30
+      kind: 0
+      target: 0
+      power: -1
+      damageType: 0
+      status: 8
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

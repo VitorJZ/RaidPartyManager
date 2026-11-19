@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyGraveBell
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyGraveBell
+  displayName: "墓钟敲击者"
+  portrait: {fileID: 2800000, guid: 52f38e58195c56d2b9198ecf66eb1cbd, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 7fd5691191df5038aa782ce464a7deaa, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 33ab064e3f0a5e21a7bb0a56e312019b, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 2cb2a6b75770537b8fc4501aedcba04a, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: f2bff7e713ab5cc2994ac92a619eaa26, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: e52daf658f9a5e95a75a1d6f89cde564, type: 3}
+  usePortraitInBattle: 0
+  profession: 0
+  enemyRank: 2
+  positionSlots: 2
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "铜槌砸击（65%） / 丧钟回荡（35%）"
+  personality: 1
+  attack: 8
+  defense: 3
+  specialDefense: 2
+  health: 50
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "铜槌砸击"
+      weight: 65
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "丧钟回荡"
+      weight: 35
+      kind: 0
+      target: 9
+      power: -3
+      damageType: 1
+      status: -1
+      layers: 0
+      requiresCharge: 1
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0
