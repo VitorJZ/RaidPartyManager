@@ -12,6 +12,8 @@ namespace RaidPartyManager.Content
         [SerializeField] private string displayName;
         [SerializeField] private Texture2D icon;
         [SerializeField] private Texture2D battleEffect;
+        [SerializeField] private Texture2D projectile;
+        [SerializeField] private Texture2D projectileFragments;
         [SerializeField] private SkillRequirement requirement;
         [SerializeField, Min(1)] private int cost;
         [SerializeField] private SkillEffect skillEffect;
@@ -22,6 +24,8 @@ namespace RaidPartyManager.Content
         public string DisplayName => displayName;
         public Texture2D Icon => icon;
         public Texture2D BattleEffect => battleEffect;
+        public Texture2D Projectile => projectile;
+        public Texture2D ProjectileFragments => projectileFragments;
         public SkillRequirement Requirement => requirement;
         public int Cost => cost;
         public string Description => description;

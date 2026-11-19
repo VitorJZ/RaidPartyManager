@@ -60,7 +60,9 @@ namespace RaidPartyManager.Tests
             var encounter = LoadEncounter();
             Assert.That(encounter.EnemyRoster.Select(unit => unit.Name), Is.EquivalentTo(new[]
             {
-                "拨线枪手", "灰灯术徒", "拦路蛮兵", "裂陶术士", "敲钟判官", "绕后猎手", "誓线护卫", "收尸弩手", "铜铃庸医"
+                "拨线枪手", "灰灯术徒", "拦路蛮兵", "裂陶术士", "敲钟判官", "绕后猎手", "誓线护卫", "收尸弩手", "铜铃庸医",
+                "持叉渔夫", "逐潮人", "沉船拾荒者", "甲板水手", "水线泥鳗", "盐壳蟹", "吞灯海蛾", "雾哨火枪手", "补船匠",
+                "沉锚寄居蟹", "雾胃灯笼鱼", "缆桩看守长", "封港提督", "沉灯巨魟"
             }));
 
             foreach (var side in new[] { Side.Party, Side.Enemy })
@@ -72,11 +74,15 @@ namespace RaidPartyManager.Tests
                     Assert.That(lineup.Select(unit => unit.Position), Is.EqualTo(new[] { 1, 2, 3, 4 }));
                     Assert.That(lineup.Select(unit => unit.Character.Id).Distinct().Count(), Is.EqualTo(4));
                     Assert.That(lineup.All(unit => unit.Side == side && unit.Health == unit.Stats.Health), Is.True);
+                    Assert.That(lineup.All(unit => unit.Character.Rank != EnemyRank.Boss), Is.True);
                 }
                 Assert.That(draws.Select(lineup => string.Join(",", lineup.Select(unit => unit.Character.Id)))
                     .Distinct().Count(), Is.GreaterThan(1));
             }
 
+            var animated = encounter.EnemyRoster.Where(enemy => enemy.Rank != EnemyRank.Unspecified &&
+                encounter.BattleWalkFor(enemy.Id) != null && encounter.PortraitFor(enemy.Id)?.name.EndsWith("-Portrait") == true)
+                .ToArray();
             foreach (var enemy in encounter.EnemyRoster)
             {
                 Assert.That(encounter.PortraitFor(enemy.Id), Is.Not.Null, enemy.Name);
@@ -85,6 +91,169 @@ namespace RaidPartyManager.Tests
                 if (enemy.Reach == AttackReach.Melee)
                     Assert.That(encounter.BattleWalkFor(enemy.Id), Is.Not.Null, enemy.Name);
             }
+            Assert.That(animated.Count(enemy => enemy.Trait is >= CharacterTrait.EnemyTideFollower ||
+                enemy.Id == "EnemyForkFisher"), Is.EqualTo(14));
+            Assert.That(encounter.EnemyRoster.Count(enemy => enemy.Profession == Profession.Monster), Is.EqualTo(6));
+            Assert.That(encounter.RecruitmentPool.All(character => character.Rank == EnemyRank.Unspecified), Is.True);
+        }
+
+        [TestCase(NodeKind.NormalBattle, EnemyRank.Normal, 17)]
+        [TestCase(NodeKind.EliteBattle, EnemyRank.Elite, 4)]
+        [TestCase(NodeKind.Boss, EnemyRank.Boss, 2)]
+        public void DockEncountersSelectAuthoredRanksAndKeepWorkbookStats(NodeKind node, EnemyRank rank, int expected)
+        {
+            var encounter = LoadEncounter();
+            Assert.That(encounter.EnemyRoster.Count(enemy => enemy.Rank == rank), Is.EqualTo(expected));
+            var seen = new System.Collections.Generic.HashSet<string>();
+            for (int seed = 0; seed < 100; seed++)
+            {
+                var members = encounter.Party.Select(ally => new PartyMemberStart(ally.Id, ally.Character, ally.Position, ally.Health));
+                var party = new PartyRun(members, Array.Empty<EquipmentDefinition>());
+                var run = new AdventureRun(party, encounter.CharacterCatalog, encounter.StartingEquipment, true, new Random(seed));
+                Assert.That(run.Inspect(node), Is.True);
+                var enemies = run.PrepareEnemies(encounter.EnemyRoster);
+                var primary = enemies.First();
+                Assert.That(primary.Character.Rank, Is.EqualTo(rank));
+                Assert.That(primary.Character.PositionSlots, Is.EqualTo((int)rank));
+                Assert.That(enemies.Skip(1).All(enemy => enemy.Character.Rank == EnemyRank.Normal), Is.True);
+                Assert.That(primary.Stats, Is.EqualTo(primary.Character.BaseStats));
+                var slots = enemies.SelectMany(enemy => Enumerable.Range(enemy.Position, enemy.Character.PositionSlots)).ToArray();
+                Assert.That(slots, Is.EqualTo(Enumerable.Range(1, slots.Length)));
+                Assert.That(slots.Length, Is.LessThanOrEqualTo(Rules.Positions));
+                foreach (var enemy in enemies.Where(enemy => enemy.Character.Rank == rank))
+                    seen.Add(enemy.Character.Id);
+            }
+            Assert.That(seen, Has.Count.EqualTo(expected));
+        }
+
+        [Test]
+        public void OversizedEnemyUsesContiguousPositionsInEditorAndBattleValidation()
+        {
+            var encounter = LoadEncounter();
+            var starts = encounter.Draft(Side.Enemy, new Random(37)).Select(
+                enemy => new PartyMemberStart(enemy.Id, enemy.Character, enemy.Position, enemy.Health)).ToArray();
+            var editor = new PartyRun(starts, Array.Empty<EquipmentDefinition>());
+            var boss = DockEnemy(encounter, "DrownedLanternRay");
+            Assert.That(editor.TryReplaceMember(starts[0].Id, boss.Character), Is.True);
+            Assert.That(editor.Members.Count(member => member.Position == null), Is.EqualTo(2));
+            Assert.That(editor.CaptureFormation(Side.Enemy).Select(enemy => enemy.Position), Is.EqualTo(new[] { 1, 4 }));
+            Assert.That(editor.TryPlace(starts[0].Id, 3), Is.False);
+            Assert.That(editor.TryPlace(starts[0].Id, 2), Is.True);
+            Assert.That(editor.CaptureFormation(Side.Enemy).Select(enemy => enemy.Position), Is.EquivalentTo(new[] { 1, 2 }));
+
+            var ally = Fighter("hero", Side.Party, 1);
+            var overlapping = Fighter("overlap", Side.Enemy, 2);
+            Assert.Throws<ArgumentException>(() => new BattleRequest("overlap", new[] { ally, boss, overlapping }, 30));
+        }
+
+        [TestCase(1, true)]
+        [TestCase(6, false)]
+        public void ScavengerOnlyKeepsTheStolenItemWhenItEscapes(int attack, bool escapes)
+        {
+            var encounter = LoadEncounter();
+            var hero = Fighter("hero", Side.Party, 1, attack);
+            var item = new EquipmentDefinition("supply", "测试圣杯", new Stats(0, 1, 0, 0), effect: EquipmentEffect.EchoChalice);
+            var party = new PartyRun(new[] { new PartyMemberStart(hero.Id, hero.Character, 1, 100) }, new[] { item });
+            var instance = party.Inventory.Single();
+            Assert.That(party.TryEquip(hero.Id, 0, instance.Id), Is.True);
+            var thief = DockEnemy(encounter, "WreckScavenger");
+            var request = party.BeginBattle(new[] { thief }, 80, null);
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(request);
+            var theft = result.Events.Single(entry => entry.ActionName == "顺手牵羊");
+            Assert.That(theft.Loadout.Stolen, Is.EqualTo(new[] { instance.Id }));
+            Assert.That(theft.TargetEnergy.Value.Capacity, Is.EqualTo(2));
+            var escapeTimer = result.Events.Where(entry => entry.Countdown?.Kind == BattleCountdownKind.ScavengerEscape)
+                .Select(entry => entry.Countdown.Value.Remaining).ToArray();
+            Assert.That(escapeTimer.First(), Is.EqualTo(3));
+            Assert.That(escapeTimer.Last(), Is.Zero);
+            if (escapes)
+                Assert.That(escapeTimer, Is.EqualTo(new[] { 3, 2, 1, 0 }));
+            Assert.That(party.TryApplyBattleLoadout(request.Id, theft.Loadout), Is.True);
+            Assert.That(party.Inventory, Is.Empty);
+            Assert.That(result.Outcome, Is.EqualTo(BattleOutcome.Victory));
+            Assert.That(result.Events.Any(entry => entry.ActionName == "拿回装备"), Is.EqualTo(!escapes));
+            if (escapes)
+                Assert.That(result.Events.Single(entry => entry.Kind == BattleEventKind.Retreated).Tick, Is.EqualTo(40));
+            else
+                Assert.That(result.Events.Single(entry => entry.ActionName == "拿回装备").TargetEnergy.Value.Capacity, Is.EqualTo(4));
+            Assert.That(AdventureRun.RollKillGold(result, new[] { thief }, new Random(0)), escapes ? Is.Zero : Is.GreaterThan(0));
+            Assert.That(party.TrySettle(result, out _), Is.True);
+            Assert.That(party.Inventory.Count, Is.EqualTo(escapes ? 0 : 1));
+        }
+
+        [Test]
+        public void LanternMothWeakensTheNextPlayerAttack()
+        {
+            var moth = DockEnemy(LoadEncounter(), "LanternMoth");
+            var hero = Fighter("hero", Side.Party, 1, attack: 4);
+            var result = new BattleSimulator(random: new FixedOrder(0.8))
+                .Simulate(new BattleRequest("moth", new[] { hero, moth }, 20));
+            Assert.That(result.Events.Where(entry => entry.ActorId == hero.Id && entry.ActionKind == ActionKind.Attack)
+                .Select(entry => entry.Amount), Is.EqualTo(new[] { 4, 2 }));
+        }
+
+        [Test]
+        public void AnchorArmorBreaksAfterSixShieldAndLowersDefenseForRemainingHits()
+        {
+            var crab = DockEnemy(LoadEncounter(), "AnchorHermit");
+            var hero = Fighter("hero", Side.Party, 1, attack: 9);
+            var result = new BattleSimulator(random: new FixedOrder())
+                .Simulate(new BattleRequest("anchor-armor", new[] { hero, crab }, 30));
+            Assert.That(result.Events.Single(entry => entry.ActionName == "沉锚护甲").TargetShield, Is.EqualTo(6));
+            Assert.That(result.Events.Count(entry => entry.ActionName == "沉锚护甲碎裂"), Is.EqualTo(1));
+            Assert.That(result.Events.Single(entry => entry.ActionName == "沉锚护甲碎裂").VisualCue,
+                Is.EqualTo(BattleVisualCue.AnchorShatter));
+            Assert.That(result.Events.Where(entry => entry.ActorId == hero.Id && entry.ActionKind == ActionKind.Attack)
+                .Select(entry => entry.Amount), Is.EqualTo(new[] { 0, 4, 7 }));
+        }
+
+        [TestCase("AnchorHermit", BattleVisualCue.AnchorExpose)]
+        [TestCase("FogAngler", BattleVisualCue.AnglerCurse)]
+        [TestCase("MooringWarden", BattleVisualCue.WardenBrace)]
+        [TestCase("BlockadeAdmiral", BattleVisualCue.AdmiralWhistle)]
+        [TestCase("DrownedLanternRay", BattleVisualCue.RayMist)]
+        [TestCase("DrownedLanternRay", BattleVisualCue.RaySurge)]
+        public void EliteAndBossAbilitiesUseTheirOwnBodyAnimation(string enemy, BattleVisualCue cue)
+        {
+            var encounter = LoadEncounter();
+            var special = encounter.BattleSpecialFor("Enemy" + enemy, cue);
+            Assert.That(special, Is.Not.Null);
+            Assert.That(special.name, Is.EqualTo(enemy + "-Special"));
+            Assert.That(special, Is.Not.SameAs(encounter.BattleAttackFor("Enemy" + enemy)));
+        }
+
+        [Test]
+        public void AdmiralWhistlesThenBombardsTheLastTwoLivingHeroes()
+        {
+            var admiral = DockEnemy(LoadEncounter(), "BlockadeAdmiral");
+            var heroes = new[] { Fighter("front", Side.Party, 1), Fighter("middle", Side.Party, 2), Fighter("rear", Side.Party, 4) };
+            var result = new BattleSimulator(random: new FixedOrder(0.8))
+                .Simulate(new BattleRequest("blockade", heroes.Append(admiral), 20));
+            Assert.That(result.Events.Single(entry => entry.ActionName == "鸣笛预警").Tick, Is.EqualTo(10));
+            Assert.That(result.Events.Where(entry => entry.VisualCue == BattleVisualCue.AdmiralWarning).Select(entry => entry.TargetId),
+                Is.EqualTo(new[] { "rear", "middle" }));
+            var shots = result.Events.Where(entry => entry.ActionName == "封港炮击").ToArray();
+            Assert.That(shots.Select(entry => entry.TargetId), Is.EqualTo(new[] { "rear", "middle" }));
+            Assert.That(shots.All(entry => entry.Tick == 20 && entry.Amount == 6), Is.True);
+            Assert.That(shots.All(entry => entry.VisualCue == BattleVisualCue.AdmiralBroadside), Is.True);
+            Assert.That(result.Events.Where(entry => entry.Countdown?.Kind == BattleCountdownKind.AdmiralBroadside)
+                .Select(entry => (entry.Tick, entry.Countdown.Value.Remaining)), Is.EqualTo(new[] { (10, 1), (20, 0) }));
+        }
+
+        [Test]
+        public void RayFreezesHeroesWhenCrossingHalfHealthAndUpgradesItsFog()
+        {
+            var ray = DockEnemy(LoadEncounter(), "DrownedLanternRay");
+            var front = Fighter("front", Side.Party, 1, attack: 30);
+            var rear = Fighter("rear", Side.Party, 4);
+            var result = new BattleSimulator(random: new FixedOrder(0.8))
+                .Simulate(new BattleRequest("lantern-ray", new[] { front, rear, ray }, 10));
+            Assert.That(result.Events.Count(entry => entry.ActionName == "沉灯翻涌"), Is.EqualTo(1));
+            Assert.That(result.Events.Where(entry => entry.Kind == BattleEventKind.EnemyVisual && entry.VisualCue == BattleVisualCue.RaySurge)
+                .Select(entry => entry.TargetId), Is.EquivalentTo(new[] { "front", "rear" }));
+            Assert.That(result.Events.Single(entry => entry.ActionName == "沉灯寒雾").Detail, Does.Contain("2 层寒冷"));
+            Assert.That(result.Events.Where(entry => entry.ActionName == "冰冻").Select(entry => entry.TargetId),
+                Is.EquivalentTo(new[] { "front", "rear" }));
         }
 
         [Test]
@@ -159,6 +328,9 @@ namespace RaidPartyManager.Tests
             var arrows = first.Where(entry => entry.ActorId == archer.Id && entry.ActionKind == ActionKind.Attack).ToArray();
             Assert.That(arrows.Select(entry => entry.TargetId), Is.EqualTo(new[] { front.Id, enemy.Id, backEnemy.Id }));
             Assert.That(arrows.Select(entry => entry.Amount), Is.EqualTo(new[] { 7, 6, 5 }));
+            Assert.That(arrows.Select(entry => entry.VisualCue), Is.All.EqualTo(BattleVisualCue.PiercingArrow));
+            Assert.That(arrows.Select(entry => entry.Kind),
+                Is.EqualTo(new[] { BattleEventKind.Action, BattleEventKind.Effect, BattleEventKind.Effect }));
             Assert.That(first.Single(entry => entry.Kind == BattleEventKind.FormChanged).Form.Id, Is.EqualTo(darkForm.Id));
 
             var second = battle.AdvanceRound();
@@ -183,6 +355,8 @@ namespace RaidPartyManager.Tests
             var lightning = result.Events.Where(entry => entry.ActionName == "灾厄吟唱").ToArray();
             Assert.That(lightning.Select(entry => entry.TargetId), Is.EqualTo(new[] { front.Id, rear.Id }));
             Assert.That(lightning.All(entry => entry.Tick == 33 && entry.Amount == 30 && entry.Detail == "雷电"), Is.True);
+            Assert.That(result.Events.Where(entry => entry.Countdown?.Kind == BattleCountdownKind.CalamityChant)
+                .Select(entry => entry.Countdown.Value.Remaining), Is.EqualTo(new[] { 3, 2, 1, 3 }));
         }
 
         [Test]
@@ -215,6 +389,12 @@ namespace RaidPartyManager.Tests
         private static CharacterDefinition Load(string asset) => AssetDatabase.LoadAssetAtPath<CharacterAsset>(
             $"Assets/RaidPartyManager/PrototypeData/{asset}.asset").ToDefinition();
 
+        private static Combatant DockEnemy(EncounterData data, string id)
+        {
+            var enemy = data.EnemyRoster.Single(character => character.Id == "Enemy" + id);
+            return new Combatant(id, enemy, Side.Enemy, 1, enemy.BaseStats, enemy.BaseStats.Health);
+        }
+
         private static Combatant Unit(CharacterDefinition character, string id, int position) =>
             new Combatant(id, character, Side.Party, position, character.BaseStats, character.BaseStats.Health);
 
@@ -228,8 +408,10 @@ namespace RaidPartyManager.Tests
 
         private sealed class FixedOrder : Random
         {
+            private readonly double roll;
+            public FixedOrder(double roll = 0.1) => this.roll = roll;
             public override int Next(int maxValue) => maxValue - 1;
-            public override double NextDouble() => 0.1;
+            public override double NextDouble() => roll;
         }
     }
 }

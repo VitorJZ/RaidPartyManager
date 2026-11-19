@@ -34,7 +34,7 @@ namespace RaidPartyManager.Tests
             {
                 Assert.That(sheet, Is.Not.Null);
                 Assert.That(sheet.height, Is.EqualTo(96));
-                Assert.That(sheet.width, Is.EqualTo(12 * sheet.height));
+                Assert.That(sheet.width, Is.EqualTo(16 * sheet.height));
                 var importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(sheet));
                 Assert.That(importer.DoesSourceTextureHaveAlpha(), Is.True);
                 Assert.That(importer.mipmapEnabled, Is.False);
@@ -54,7 +54,7 @@ namespace RaidPartyManager.Tests
 
             var events = session.AdvanceRound();
 
-            Assert.That(events.Where(entry => entry.SkillBookId == book.Id).Select(entry => entry.TargetId),
+            Assert.That(events.Where(entry => entry.SkillBookId == book.Id && !entry.ActorEnergy.HasValue).Select(entry => entry.TargetId),
                 Is.EqualTo(new[] { front.Id, rear.Id }));
         }
 
@@ -65,18 +65,27 @@ namespace RaidPartyManager.Tests
         {
             var book = LoadSkills().Skills.Single(skill => skill.Number == number).ToBook();
             var caster = Fighter("caster", Side.Party, 1, Personality.Stubborn, book: book);
-            var front = Fighter("front", Side.Enemy, 1, Personality.Reckless);
+            var front = Fighter("front", Side.Enemy, 1, Personality.Reckless, gear: new[]
+            {
+                new EquipmentDefinition("horn", "反击的号角", default, effect: EquipmentEffect.CounterHorn)
+            });
             var rear = Fighter("rear", Side.Enemy, 4, Personality.Reckless);
             var session = new BattleSimulator(new PreferBooks()).Start(new BattleRequest(
                 "sweep-skill", new[] { caster, front, rear }, 200));
 
             var firstRound = session.AdvanceRound();
             Assert.That(firstRound.Any(entry => entry.ActorId == caster.Id && entry.ActionName == book.Name), Is.True);
-            Assert.That(firstRound.Any(entry => entry.SkillBookId == book.Id), Is.False);
+            Assert.That(firstRound.Any(entry => entry.SkillBookId == book.Id && !entry.ActorEnergy.HasValue), Is.False);
             var secondRound = session.AdvanceRound();
 
-            Assert.That(secondRound.Where(entry => entry.SkillBookId == book.Id).Select(entry => entry.TargetId),
-                Is.EqualTo(new[] { front.Id, rear.Id }));
+            var sweep = secondRound.Where(entry => entry.SkillBookId == book.Id).ToArray();
+            Assert.That(sweep.Select(entry => entry.TargetId), Is.EqualTo(new[] { front.Id, rear.Id }));
+            Assert.That(sweep.Select(entry => entry.Kind), Is.EqualTo(new[] { BattleEventKind.Action, BattleEventKind.Effect }));
+            Assert.That(sweep.Select(entry => entry.Amount), Is.All.EqualTo(2));
+            Assert.That(sweep.Select(entry => entry.ActionName), Is.All.EqualTo(book.Name));
+            var log = secondRound.ToList();
+            Assert.That(log.FindIndex(entry => entry.ActionName == "反击的号角"),
+                Is.GreaterThan(log.FindLastIndex(entry => entry.SkillBookId == book.Id)));
         }
 
         [Test]
@@ -91,6 +100,7 @@ namespace RaidPartyManager.Tests
 
             Assert.That(session.Formation.Single(unit => unit.Id == timid.Id).Position, Is.EqualTo(3));
             Assert.That(session.IsPositionLocked(4), Is.True);
+            Assert.That(session.PositionLockReason(4), Is.EqualTo("固执"));
             Assert.That(session.TrySwapPartyPositions(3, 4), Is.False);
         }
 
@@ -120,11 +130,11 @@ namespace RaidPartyManager.Tests
             "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset");
 
         private static Combatant Fighter(string id, Side side, int position, Personality personality,
-            int health = 30, SkillBookDefinition book = null)
+            int health = 30, SkillBookDefinition book = null, IEnumerable<EquipmentDefinition> gear = null)
         {
             var basic = new ActionDefinition("basic", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0);
             var definition = new CharacterDefinition(id, id, Profession.Warrior, personality, new Stats(2, 0, 0, 30), 1, basic);
-            return new Combatant(id, definition, side, position, definition.BaseStats, health,
+            return new Combatant(id, definition, side, position, definition.BaseStats, health, gear,
                 learnedSkills: book == null ? null : new[] { book });
         }
 

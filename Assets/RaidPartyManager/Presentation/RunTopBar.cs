@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RaidPartyManager.Content;
+using RaidPartyManager.Domain;
 using RaidPartyManager.Run;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -12,21 +13,35 @@ namespace RaidPartyManager.Presentation
     {
         public const int Height = 48;
         private const int VisibleItemLimit = 16;
+        private const int ItemWidth = 33;
+        private const int ItemGap = 4;
         private readonly VisualElement root;
         private readonly PartyRun party;
         private readonly EncounterData content;
         private readonly Func<int> readGold;
         private readonly Label gold;
+        private readonly VisualElement coin;
+        private readonly VisualElement bag;
+        private readonly VisualElement rewardLayer;
+        private readonly HashSet<string> flyingItems = new HashSet<string>();
+        private Action afterLastFlight;
+        private int flyingGold;
+        private int visibleItemLimit = VisibleItemLimit;
         private readonly VisualElement items;
+        private readonly VisualElement actions;
+        private readonly Button teamButton;
+        private PartyEditorView editor;
         private EquipmentTooltip tooltip;
 
         public RunTopBar(VisualElement root, PartyRun party, EncounterData content, Action openEditor = null,
             string editorName = "open-party-editor", Func<int> goldOverride = null, string goldName = "run-gold",
-            VisualElement actions = null, Action<bool> settingsChanged = null, Action openEnemyEditor = null)
+            VisualElement actions = null, Action<bool> settingsChanged = null, Action openEnemyEditor = null,
+            Action resetAdventure = null)
         {
             this.root = root;
             this.party = party;
             this.content = content;
+            this.actions = actions;
             readGold = goldOverride ?? (() => party.Gold);
             name = "run-top-bar";
             style.flexDirection = FlexDirection.Row;
@@ -42,7 +57,7 @@ namespace RaidPartyManager.Presentation
             wallet.style.alignItems = Align.Center;
             wallet.style.flexShrink = 0;
             wallet.style.marginRight = 13;
-            var coin = new GoldRewardIcon { name = "run-gold-icon" };
+            coin = new GoldRewardIcon { name = "run-gold-icon" };
             coin.style.width = coin.style.height = 31;
             wallet.Add(coin);
             gold = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
@@ -53,16 +68,16 @@ namespace RaidPartyManager.Presentation
 
             if (openEditor != null)
             {
-                var team = IconButton("team-icon", editorName, "队伍编辑", DrawTeam, () =>
+                teamButton = IconButton("team-icon", editorName, "队伍编辑", DrawTeam, () =>
                 {
                     HideTooltip();
                     openEditor();
                 });
-                team.style.marginRight = 8;
-                Add(team);
+                teamButton.style.marginRight = 8;
+                Add(teamButton);
             }
 
-            var bag = new Image { name = "run-backpack-icon", image = content.BackpackIcon, pickingMode = PickingMode.Ignore,
+            bag = new Image { name = "run-backpack-icon", image = content.BackpackIcon, pickingMode = PickingMode.Ignore,
                 scaleMode = ScaleMode.ScaleToFit };
             bag.style.width = bag.style.height = 29;
             bag.style.flexShrink = 0;
@@ -72,8 +87,21 @@ namespace RaidPartyManager.Presentation
             items.style.alignItems = Align.Center;
             items.style.flexGrow = 1;
             items.style.minWidth = 0;
+            items.style.flexBasis = 0;
             items.style.overflow = Overflow.Hidden;
             Add(items);
+            items.RegisterCallback<GeometryChangedEvent>(evt =>
+            {
+                if (evt.newRect.width <= 0)
+                    return;
+                int fit = Mathf.Clamp(Mathf.FloorToInt(evt.newRect.width / (ItemWidth + ItemGap)), 0, VisibleItemLimit);
+                if (fit == visibleItemLimit)
+                    return;
+                visibleItemLimit = fit;
+                Refresh();
+            });
+            rewardLayer = new VisualElement { name = "reward-flight-layer", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(rewardLayer);
 
             if (actions != null)
                 Add(actions);
@@ -106,8 +134,28 @@ namespace RaidPartyManager.Presentation
                 PrototypeStyle.Middle(title);
                 panel.Add(title);
 
-                if (openEnemyEditor != null)
+                if (openEnemyEditor != null && editor == null)
                     AddOption("敌方编辑", "open-enemy-editor", () => { Close(); openEnemyEditor(); });
+                if (resetAdventure != null)
+                    AddOption("重置讨伐", "reset-adventure", () => { Close(); resetAdventure(); });
+                if (AdventureFlow.CanSave(party))
+                {
+                    var feedback = PrototypeStyle.Text("", 13, PrototypeStyle.Accent);
+                    feedback.style.display = DisplayStyle.None;
+                    AddOption("保存并退出", "save-and-exit", () => ShowError(AdventureFlow.SaveAndExit(party)));
+                    var abandon = AddOption("放弃", "abandon-run", () => ShowError(AdventureFlow.Abandon(party)));
+                    abandon.style.color = PrototypeStyle.Enemy;
+                    abandon.tooltip = "结束当前讨伐并删除续玩进度";
+                    panel.Add(feedback);
+
+                    void ShowError(string error)
+                    {
+                        if (error == null)
+                            return;
+                        feedback.text = error;
+                        feedback.style.display = DisplayStyle.Flex;
+                    }
+                }
                 AddOption("返回主菜单", "return-main-menu", () => PrototypeSceneMenu.OpenStandalone("MainMenu"));
                 var close = AddOption("关闭", "close-settings", Close);
                 overlay.RegisterCallback<KeyDownEvent>(evt =>
@@ -165,26 +213,54 @@ namespace RaidPartyManager.Presentation
             parent.Add(bar);
         }
 
-        public static void EditParty(VisualElement root, PartyRun party, EncounterData content, Action refresh, Action edited = null)
+        public void EditParty(Action closed = null, Action edited = null, PartyRun enemyParty = null)
         {
-            var underlying = DisableScreen(root);
-            PartyEditorView editor = null;
-            editor = new PartyEditorView(party, content, Close, edited: edited);
+            if (editor != null)
+                return;
+
+            var underlying = DisableScreen(root, this);
+            StyleEnum<DisplayStyle> actionDisplay = actions?.style.display ?? default;
+            bool actionsEnabled = actions?.enabledSelf == true;
+            if (actions != null)
+            {
+                actions.style.display = DisplayStyle.None;
+                actions.SetEnabled(false);
+            }
+            teamButton?.SetEnabled(false);
+
+            editor = new PartyEditorView(enemyParty ?? party, content, Close,
+                enemyParty == null ? Side.Party : Side.Enemy, OnEdited, supplyTestItems: !AdventureFlow.CanSave(party));
             PrototypeStyle.Fill(editor);
+            editor.style.top = Height;
             root.Add(editor);
+            Refresh();
             editor.Q<Button>("back-party-editor").Focus();
+
+            void OnEdited()
+            {
+                Refresh();
+                edited?.Invoke();
+            }
 
             void Close()
             {
                 editor.RemoveFromHierarchy();
+                editor = null;
+                if (actions != null)
+                {
+                    actions.style.display = actionDisplay;
+                    actions.SetEnabled(actionsEnabled);
+                }
+                teamButton?.SetEnabled(true);
                 EnableScreen(underlying);
-                refresh();
+                Refresh();
+                closed?.Invoke();
             }
         }
 
-        private static VisualElement[] DisableScreen(VisualElement root)
+        private static VisualElement[] DisableScreen(VisualElement root, VisualElement keepEnabled = null)
         {
-            var underlying = root.Children().Where(element => element.enabledSelf).ToArray();
+            var underlying = root.Children().Where(element => element != keepEnabled && element.enabledSelf).ToArray();
             foreach (var element in underlying)
                 element.SetEnabled(false);
             return underlying;
@@ -196,22 +272,106 @@ namespace RaidPartyManager.Presentation
                 element.SetEnabled(true);
         }
 
+        public bool HasRewardFlights => rewardLayer.childCount > 0;
+
+        public void WhenRewardsArrive(Action action)
+        {
+            if (HasRewardFlights)
+                afterLastFlight = action;
+            else
+                action();
+        }
+
+        public void BringRewardFlightsToFront()
+        {
+            if (rewardLayer.parent != null)
+                rewardLayer.BringToFront();
+        }
+
+        public bool CollectReward(VisualElement source, Func<bool> grant)
+        {
+            var artwork = source?.Q("equipment-icon") ?? source?.Q("reward-gold-icon") ??
+                (VisualElement)source?.Q<Image>() ?? source;
+            Rect origin = artwork?.worldBound ?? default;
+            int previousGold = readGold();
+            var previousItems = party.BackpackItems.Select(item => item.Id).ToHashSet();
+            if (!grant())
+                return false;
+
+            int coins = Mathf.Max(0, readGold() - previousGold);
+            var received = party.BackpackItems.Where(item => !previousItems.Contains(item.Id)).ToArray();
+            flyingGold += coins;
+            foreach (var item in received)
+                flyingItems.Add(item.Id);
+            Refresh();
+            if (coins == 0 && received.Length == 0)
+                return true;
+
+            if (rewardLayer.parent == null)
+                root.Add(rewardLayer);
+            BringRewardFlightsToFront();
+            float delay = 0;
+            if (coins > 0)
+            {
+                _ = new RewardFlight(rewardLayer, origin, () => coin, new GoldRewardIcon(), delay, () =>
+                {
+                    flyingGold -= coins;
+                    RefreshGold();
+                    FinishFlight();
+                });
+                delay += 0.06f;
+            }
+            foreach (var item in received)
+            {
+                string tileName = "run-backpack-item-" + item.Id;
+                var icon = new EquipmentIcon(item.Definition, content.IconFor(item.Definition.Id));
+                _ = new RewardFlight(rewardLayer, origin, () => items.Q(tileName) ?? bag, icon, delay, () =>
+                {
+                    flyingItems.Remove(item.Id);
+                    if (items.Q(tileName) is { } tile)
+                    {
+                        tile.style.opacity = 1;
+                        tile.pickingMode = PickingMode.Position;
+                    }
+                    FinishFlight();
+                });
+                delay += 0.06f;
+            }
+            return true;
+        }
+
+        private void FinishFlight()
+        {
+            if (HasRewardFlights)
+                return;
+            rewardLayer.RemoveFromHierarchy();
+            var arrived = afterLastFlight;
+            afterLastFlight = null;
+            arrived?.Invoke();
+        }
+
+        private void RefreshGold() => gold.text = $"金币  {Mathf.Max(0, readGold() - flyingGold)}";
+
         public void Refresh()
         {
-            gold.text = $"金币  {readGold()}";
+            RefreshGold();
             HideTooltip();
             items.Clear();
-            var assigned = new HashSet<string>(party.Members.SelectMany(member => member.EquipmentIds));
-            foreach (var instance in party.Inventory.Where(item => !assigned.Contains(item.Id)).Concat(party.SkillBooks)
-                .Take(VisibleItemLimit))
+            var backpack = party.BackpackItems;
+            foreach (var instance in backpack.Skip(Math.Max(0, backpack.Count - visibleItemLimit)))
             {
                 var item = instance.Definition;
                 var art = content.IconFor(item.Id);
                 var tile = new VisualElement { name = "run-backpack-item-" + instance.Id };
-                tile.style.width = 33;
+                tile.style.width = ItemWidth;
                 tile.style.height = 32;
                 tile.style.flexShrink = 0;
-                tile.style.marginRight = 4;
+                tile.style.marginRight = ItemGap;
+                if (flyingItems.Contains(instance.Id))
+                {
+                    tile.style.opacity = 0;
+                    tile.pickingMode = PickingMode.Ignore;
+                }
                 tile.style.backgroundColor = PrototypeStyle.Inset;
                 PrototypeStyle.Outline(tile, PrototypeStyle.Edge, 3);
                 tile.Add(new EquipmentIcon(item, art));

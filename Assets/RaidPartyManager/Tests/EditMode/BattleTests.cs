@@ -161,7 +161,7 @@ namespace RaidPartyManager.Tests
             Assert.That(victory.Outcome, Is.EqualTo(BattleOutcome.Victory));
             Assert.That(victory.HealthById["party"], Is.EqualTo(20));
             Assert.That(victory.Events.Select(entry => entry.Kind),
-                Is.EqualTo(new[] { BattleEventKind.Action, BattleEventKind.Defeated, BattleEventKind.Finished }));
+                Is.EqualTo(new[] { BattleEventKind.RoundStarted, BattleEventKind.Action, BattleEventKind.Defeated, BattleEventKind.Finished }));
 
             var defeat = Fight(Unit("weak", Side.Party, 1, hp: 1), Unit("strong", Side.Enemy, 1));
             Assert.That(defeat.Outcome, Is.EqualTo(BattleOutcome.PartyDefeated));

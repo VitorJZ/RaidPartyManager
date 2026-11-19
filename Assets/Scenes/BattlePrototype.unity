@@ -243,6 +243,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.BattlePrototype
   encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
   battleLogParchment: {fileID: 2800000, guid: 4e047520344d41258ad09562525ee5fb, type: 3}
+  piercingArrowParticle: {fileID: 2800000, guid: 6a0a3a3ba12e4829a4524b68cc749620, type: 3}
   battleBackgrounds:
   - {fileID: 2800000, guid: d1538346d12e4d88888e19ea36f54969, type: 3}
   - {fileID: 2800000, guid: 959ef6380f0a43a49442d609a5ac103d, type: 3}

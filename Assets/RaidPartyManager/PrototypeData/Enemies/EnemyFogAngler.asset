@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyFogAngler
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyFogAngler
+  displayName: "雾胃灯笼鱼"
+  portrait: {fileID: 2800000, guid: c9c43efecd214367a15a78ebd7653a46, type: 3}
+  usePortraitInBattle: 0
+  battleSpecialSheet: {fileID: 2800000, guid: f1689f8e7dba4c278418664f0492a815, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: cd4163b09b4e4ffaa6a4402ea9e4eb56, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 6f2279af3ebc4e8c9f22410818f909fe, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 744a5c2329cd47329403b49433c2e8ce, type: 3}
+  profession: 4
+  enemyRank: 2
+  positionSlots: 2
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 44
+  traitPower: 0
+  traitText: "直接攻击（60%） / 对玩家当前生命最高者施加1层诅咒（40%）。直接攻击造成魔法伤害。"
+  personality: 1
+  attack: 5
+  defense: 1
+  specialDefense: 4
+  health: 23
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 1
+  hasSkill: 0

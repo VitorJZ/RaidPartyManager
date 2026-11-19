@@ -6,7 +6,10 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class EquipmentIcon : VisualElement
     {
-        public EquipmentIcon(EquipmentDefinition item, Texture2D artwork = null)
+        private const float SkillArtworkScale = 0.61f;
+        private static Texture2D skillBookScroll;
+
+        public EquipmentIcon(EquipmentDefinition item, Texture2D artwork = null, bool showScroll = true)
         {
             name = "equipment-icon";
             pickingMode = PickingMode.Ignore;
@@ -14,11 +17,33 @@ namespace RaidPartyManager.Presentation
             if (artwork == null)
                 generateVisualContent += context => Paint(context.painter2D, contentRect, item);
             else
+                Add(CreateArtwork(item, artwork, showScroll));
+        }
+
+        internal static Image CreateArtwork(EquipmentDefinition item, Texture2D artwork, bool showScroll = true)
+        {
+            var image = new Image
             {
-                var image = new Image { image = artwork, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
-                image.style.flexGrow = 1;
-                Add(image);
-            }
+                image = artwork, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore
+            };
+            image.style.flexGrow = 1;
+            if (!showScroll || item is not SkillBookDefinition || artwork == null)
+                return image;
+
+            skillBookScroll ??= Resources.Load<Texture2D>("SkillBookScroll");
+            if (skillBookScroll == null)
+                return image;
+
+            image.image = skillBookScroll;
+            var symbol = new Image
+            {
+                name = "skill-scroll-symbol", image = artwork,
+                scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore
+            };
+            PrototypeStyle.Fill(symbol);
+            symbol.style.scale = new Scale(new Vector2(SkillArtworkScale, SkillArtworkScale));
+            image.Add(symbol);
+            return image;
         }
 
         private static void Paint(Painter2D pen, Rect area, EquipmentDefinition item)

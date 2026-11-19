@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyAnchorHermit
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyAnchorHermit
+  displayName: "沉锚寄居蟹"
+  portrait: {fileID: 2800000, guid: 5992733d9e7848f08c352156fc45c218, type: 3}
+  usePortraitInBattle: 0
+  battleSpecialSheet: {fileID: 2800000, guid: ebfc9bd813be4919962824eed18e8e31, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 85bd870e37084d5ea4dc84409c73251c, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 190cbd69535947939e9d840f46395f8b, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: e58b26ef025d44dcb3e89b29c43ceb49, type: 3}
+  profession: 4
+  enemyRank: 2
+  positionSlots: 2
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 43
+  traitPower: 0
+  traitText: "直接攻击（65%） / 对玩家最前方角色施加1层破绽（35%）。开战时获得6点护盾。护盾首次耗尽后，本场战斗防御力减少2点。"
+  personality: 1
+  attack: 5
+  defense: 4
+  specialDefense: 1
+  health: 28
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0

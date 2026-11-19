@@ -39,6 +39,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private string id;
         [SerializeField] private string displayName;
         [SerializeField] private Texture2D portrait;
+        [SerializeField] private bool usePortraitInBattle;
         [SerializeField] private Texture2D campSeatedSprite;
         [Tooltip("Eight columns. Rows contain 8 idle, 8 action, 4 hit and 8 death poses.")]
         [SerializeField] private Texture2D battleSpriteSheet;
@@ -52,6 +53,8 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D battleStrikeEffect;
         [SerializeField] private Texture2D battleProjectile;
         [SerializeField] private Profession profession;
+        [SerializeField] private EnemyRank enemyRank;
+        [SerializeField, Range(1, Rules.Positions)] private int positionSlots = 1;
         [SerializeField, Min(0)] private int rosterNumber;
         [SerializeField, Min(1)] private int stage = 1;
         [SerializeField] private AttackReach reach;
@@ -71,6 +74,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private ActionSpec skill = new ActionSpec();
 
         internal Texture2D Portrait => portrait;
+        internal bool UsePortraitInBattle => usePortraitInBattle;
         internal Texture2D CampSeatedSprite => campSeatedSprite;
         internal Texture2D BattleSpriteSheet => battleSpriteSheet;
         internal Texture2D BattleAttackSheet => battleAttackSheet;
@@ -87,6 +91,7 @@ namespace RaidPartyManager.Content
                 new Stats(attack, defense, specialDefense, health), actionInterval,
                 basicAttack.ToDefinition(), hasSkill ? skill.ToDefinition() : null,
                 rosterNumber, stage, reach, fixedTrait, traitPower, traitText,
-                battleForm != null ? battleForm.Id : null, evolutions.Where(form => form != null).Select(form => form.Id));
+                battleForm != null ? battleForm.Id : null, evolutions.Where(form => form != null).Select(form => form.Id),
+                enemyRank, Math.Clamp(positionSlots, 1, Rules.Positions));
     }
 }

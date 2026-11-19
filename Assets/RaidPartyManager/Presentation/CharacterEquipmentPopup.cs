@@ -26,6 +26,7 @@ namespace RaidPartyManager.Presentation
             public VisualElement View;
             public EquipmentInstance Item;
             public SkillBookDefinition LearnedSkill;
+            public string EquippedBy;
             public CellKind Kind;
             public int Index;
             public EquipmentDefinition Definition => Item?.Definition ?? LearnedSkill;
@@ -83,12 +84,12 @@ namespace RaidPartyManager.Presentation
         // The positions are view state. PartyRun continues to own every item and its equipment assignment.
         private void SyncBackpack()
         {
-            var equipped = new HashSet<string>(run.Members.SelectMany(member => member.EquipmentIds));
-            var unused = new HashSet<string>(run.Inventory.Select(item => item.Id).Where(id => !equipped.Contains(id)));
+            var inventory = run.Inventory;
+            var unplaced = inventory.Select(item => item.Id).ToHashSet();
             for (int index = 0; index < bag.Count; index++)
-                if (bag[index] != null && !unused.Remove(bag[index]))
+                if (bag[index] != null && !unplaced.Remove(bag[index]))
                     bag[index] = null;
-            foreach (var item in run.Inventory.Where(item => unused.Contains(item.Id)))
+            foreach (var item in inventory.Where(item => unplaced.Contains(item.Id)))
             {
                 int empty = bag.IndexOf(null);
                 if (empty >= 0)
@@ -292,6 +293,10 @@ namespace RaidPartyManager.Presentation
             header.Add(PrototypeStyle.Text("共享背包", 17, PrototypeStyle.Accent));
 
             var books = showSkillBooks ? run.SkillBooks : null;
+            var wearers = showSkillBooks ? null : run.Members
+                .SelectMany(member => member.EquipmentIds.Select((id, slot) =>
+                    (Id: id, Label: $"{member.Character.Name} · 装备槽 {slot + 1}")))
+                .Where(entry => entry.Id != null).ToDictionary(entry => entry.Id, entry => entry.Label);
             int occupiedSpan = showSkillBooks ? books.Count : bag.FindLastIndex(id => id != null) + 1;
             int pageCount = Math.Max(1, (occupiedSpan + PageSize - 1) / PageSize);
             if (!showSkillBooks && canUnequip && occupiedSpan == pageCount * PageSize && !bag.Take(occupiedSpan).Contains(null))
@@ -323,7 +328,8 @@ namespace RaidPartyManager.Presentation
                     int index = Page * PageSize + row * Columns + col;
                     var item = showSkillBooks ? (index < books.Count ? books[index] : null)
                         : (index < bag.Count && bag[index] != null ? inventory[bag[index]] : null);
-                    line.Add(BuildCell(showSkillBooks ? CellKind.BookBag : CellKind.EquipmentBag, index, item));
+                    string wearer = item == null ? null : wearers?.GetValueOrDefault(item.Id);
+                    line.Add(BuildCell(showSkillBooks ? CellKind.BookBag : CellKind.EquipmentBag, index, item, equippedBy: wearer));
                 }
                 grid.Add(line);
             }
@@ -347,11 +353,12 @@ namespace RaidPartyManager.Presentation
             _ => $"skill-slot-{index}"
         };
 
-        private VisualElement BuildCell(CellKind kind, int index, EquipmentInstance item = null, SkillBookDefinition learned = null)
+        private VisualElement BuildCell(CellKind kind, int index, EquipmentInstance item = null,
+            SkillBookDefinition learned = null, string equippedBy = null)
         {
             bool selectable = item != null || kind == CellKind.EquipmentSlot || kind == CellKind.SkillSlot && learned == null;
             var view = new VisualElement { name = CellName(kind, index), focusable = selectable, tabIndex = selectable ? 0 : -1 };
-            var cell = new Cell { View = view, Kind = kind, Index = index, Item = item, LearnedSkill = learned };
+            var cell = new Cell { View = view, Kind = kind, Index = index, Item = item, LearnedSkill = learned, EquippedBy = equippedBy };
             view.userData = cell;
             view.style.width = view.style.height = cell.IsSlot ? SlotSize : TileSize;
             view.style.flexShrink = cell.IsSlot ? 0 : 1;
@@ -364,7 +371,8 @@ namespace RaidPartyManager.Presentation
             RestoreCellOutline(cell);
             if (cell.Definition != null)
             {
-                var art = new EquipmentIcon(cell.Definition, iconFor(cell.Definition.Id))
+                var art = new EquipmentIcon(cell.Definition, iconFor(cell.Definition.Id),
+                    showScroll: kind != CellKind.SkillSlot)
                 {
                     name = kind switch
                     {
@@ -375,6 +383,8 @@ namespace RaidPartyManager.Presentation
                     }
                 };
                 view.Add(art);
+                if (equippedBy != null)
+                    view.Add(new EquippedItemBorder());
                 view.RegisterCallback<PointerEnterEvent>(evt =>
                 {
                     if (evt.pointerType == UnityEngine.UIElements.PointerType.mouse && source == null)
@@ -552,12 +562,19 @@ namespace RaidPartyManager.Presentation
             {
                 var bagCell = from.Kind == CellKind.EquipmentBag ? from : target;
                 slot = from.Kind == CellKind.EquipmentSlot ? from : target;
-                if (!run.TryEquip(memberId, slot.Index, bagCell.Item?.Id))
+                bool unequipping = from == slot && (bagCell.Item == null || bagCell.Item.Id == slot.Item.Id);
+                if (!run.TryEquip(memberId, slot.Index, unequipping ? null : bagCell.Item?.Id))
                     return;
 
-                while (bag.Count <= bagCell.Index)
-                    bag.Add(null);
-                bag[bagCell.Index] = slot.Item?.Id;
+                if (unequipping && bagCell.Item == null)
+                {
+                    int oldCell = bag.IndexOf(slot.Item.Id);
+                    if (oldCell >= 0)
+                        bag[oldCell] = null;
+                    while (bag.Count <= bagCell.Index)
+                        bag.Add(null);
+                    bag[bagCell.Index] = slot.Item.Id;
+                }
             }
 
             keyboardSlot = null;
@@ -572,14 +589,22 @@ namespace RaidPartyManager.Presentation
             HideTooltip();
             hovered = cell;
             var item = cell.Definition;
-            tooltipPanel = new EquipmentTooltip(item, iconFor(item.Id));
+            tooltipPanel = new EquipmentTooltip(item, iconFor(item.Id), showScroll: cell.Kind != CellKind.SkillSlot);
+            if (cell.EquippedBy != null)
+            {
+                var wearer = PrototypeStyle.Text($"已穿戴 · {cell.EquippedBy}", 12, PrototypeStyle.Ally);
+                wearer.name = "equipped-item-wearer";
+                wearer.pickingMode = PickingMode.Ignore;
+                wearer.style.marginTop = 5;
+                tooltipPanel.Add(wearer);
+            }
 
             var bounds = this.WorldToLocal(cell.View.worldBound);
             float x = bounds.xMax + 8;
             if (x + EquipmentTooltip.Width > layout.width)
                 x = bounds.xMin - EquipmentTooltip.Width - 8;
             tooltipPanel.style.left = Mathf.Clamp(x, 4, Mathf.Max(4, layout.width - EquipmentTooltip.Width - 4));
-            tooltipPanel.style.top = Mathf.Clamp(bounds.yMin, 4, Mathf.Max(4, layout.height - (item is SkillBookDefinition ? 249 : 195)));
+            tooltipPanel.style.top = Mathf.Clamp(bounds.yMin, 4, Mathf.Max(4, layout.height - (item is SkillBookDefinition ? 249 : cell.EquippedBy != null ? 220 : 195)));
             Add(tooltipPanel);
         }
 

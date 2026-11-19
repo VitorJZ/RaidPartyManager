@@ -12,6 +12,10 @@ namespace RaidPartyManager.Presentation
     [RequireComponent(typeof(UIDocument))]
     public sealed class DockShop : MonoBehaviour
     {
+        private const float CelebrationDuration = 1.05f;
+
+        private enum MerchantExpression { Idle, Happy, Delighted, Laugh }
+
         private sealed class Offer
         {
             public EquipmentAsset Item;
@@ -24,6 +28,7 @@ namespace RaidPartyManager.Presentation
         [SerializeField] private EquipmentAsset[] stockPool = Array.Empty<EquipmentAsset>();
         [SerializeField] private Texture2D backdrop;
         [SerializeField] private Texture2D merchantSheet;
+        [SerializeField] private Texture2D merchantLaugh;
         [SerializeField] private Texture2D shelfArtwork;
         [SerializeField] private Texture2D counterArtwork;
 
@@ -40,14 +45,13 @@ namespace RaidPartyManager.Presentation
         private FontAsset localFontAsset;
         private EncounterData content;
         private int coins;
-        private int expression = -1;
+        private MerchantExpression? expression;
         private Offer hovered;
         private Offer dragging;
         private int pointerId = -1;
         private Vector2 pointer;
         private EquipmentIcon dragPreview;
         private EquipmentTooltip tooltip;
-        private int purchaseExpression;
         private double celebrationUntil;
         private double feedbackUntil;
         private AdventureRun adventure;
@@ -60,7 +64,7 @@ namespace RaidPartyManager.Presentation
             adventure = AdventureFlow.ForScene("DockShop");
             party = adventure?.Party ?? BattlePrototype.GetPlaySession(content);
             coins = 999;
-            expression = -1;
+            expression = null;
             hovered = null;
             celebrationUntil = 0;
             offers.Clear();
@@ -322,8 +326,7 @@ namespace RaidPartyManager.Presentation
             hovered = null;
             HideTooltip();
             RefreshGold();
-            purchaseExpression = ExpressionFor(offer.Item.ShopTier);
-            celebrationUntil = Time.unscaledTimeAsDouble + 1.05;
+            celebrationUntil = Time.unscaledTimeAsDouble + CelebrationDuration;
             RefreshExpression();
             ShowFeedback($"已购买 {offer.Item.ToDefinition().Name}，已放入共享背包");
         }
@@ -342,17 +345,32 @@ namespace RaidPartyManager.Presentation
             tooltip.ShowAbove(root, offer.View);
         }
 
-        private static int ExpressionFor(int tier) => tier == 1 ? 2 : tier == 2 ? 1 : 0;
-
         private void RefreshExpression()
         {
-            int next = Time.unscaledTimeAsDouble < celebrationUntil ? purchaseExpression :
-                ExpressionFor(dragging?.Item.ShopTier ?? hovered?.Item.ShopTier ?? 3);
+            var offer = dragging ?? hovered;
+            var next = Time.unscaledTimeAsDouble < celebrationUntil ? MerchantExpression.Laugh :
+                offer?.Item.ShopTier switch
+                {
+                    null => MerchantExpression.Idle,
+                    1 => MerchantExpression.Delighted,
+                    _ => MerchantExpression.Happy
+                };
             if (next == expression || merchantSheet == null)
                 return;
+
             expression = next;
-            float width = merchantSheet.width / 3f;
-            merchantImage.sourceRect = new Rect(next * width, 0, width, merchantSheet.height);
+            if (next == MerchantExpression.Laugh && merchantLaugh != null)
+            {
+                merchantImage.image = merchantLaugh;
+                merchantImage.sourceRect = new Rect(0, 0, merchantLaugh.width, merchantLaugh.height);
+            }
+            else
+            {
+                merchantImage.image = merchantSheet;
+                var frame = next == MerchantExpression.Laugh ? MerchantExpression.Delighted : next;
+                float width = merchantSheet.width / 3f;
+                merchantImage.sourceRect = new Rect((int)frame * width, 0, width, merchantSheet.height);
+            }
             merchantImage.MarkDirtyRepaint();
         }
 
@@ -360,7 +378,7 @@ namespace RaidPartyManager.Presentation
         {
             if (merchant == null)
                 return;
-            float remaining = Mathf.Clamp01((float)((celebrationUntil - Time.unscaledTimeAsDouble) / 1.05));
+            float remaining = Mathf.Clamp01((float)((celebrationUntil - Time.unscaledTimeAsDouble) / CelebrationDuration));
             float offset = Mathf.Sin((1f - remaining) * Mathf.PI * 6f) * 12f * remaining;
             merchant.style.translate = new Translate(0, offset);
             RefreshExpression();
@@ -414,8 +432,7 @@ namespace RaidPartyManager.Presentation
         private void OpenEditor()
         {
             CancelDrag();
-            RunTopBar.EditParty(root, party, content, RefreshGold,
-                adventure == null ? BattlePrototype.MarkPartyEdited : null);
+            topBar.EditParty(edited: adventure == null ? BattlePrototype.MarkPartyEdited : null);
         }
 
         private static Image Picture(Texture2D texture, string name) => new Image

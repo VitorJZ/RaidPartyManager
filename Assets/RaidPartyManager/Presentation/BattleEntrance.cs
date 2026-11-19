@@ -19,6 +19,7 @@ namespace RaidPartyManager.Presentation
             public readonly VisualElement Figure;
             public readonly double Start;
             public readonly Texture2D WalkSheet;
+            public readonly bool UsesPortrait;
             public int DisplayedFrame = -1;
 
             public Arrival(Combatant unit, EncounterData content, double start)
@@ -27,6 +28,7 @@ namespace RaidPartyManager.Presentation
                 Start = start;
                 WalkSheet = content.BattleWalkFor(unit.Character.Id);
                 var art = content.BattleSpriteFor(unit.Character.Id);
+                UsesPortrait = content.BattlePortraitFor(unit.Character.Id) != null;
                 if (WalkSheet == null && art != null)
                     Figure = new EntranceWalkPose(art, unit.Character.Profession, unit.Side == Side.Enemy);
                 else
@@ -45,6 +47,7 @@ namespace RaidPartyManager.Presentation
         private double clock;
         private double? previousFrame;
         public bool Active => arrivals.Count > 0;
+        public bool EnemyEntrancePending => arrivals.Any(arrival => arrival.Unit.Side == Side.Enemy);
 
         public void Add(IEnumerable<Combatant> team, EncounterData content)
         {
@@ -105,7 +108,8 @@ namespace RaidPartyManager.Presentation
                 float startX = arrival.Unit.Side == Side.Party ? -body.width : layer.layout.width;
                 float progress = Mathf.SmoothStep(0, 1, (float)(elapsed / TravelTime));
                 arrival.Figure.style.left = Mathf.Lerp(startX, body.xMin, progress);
-                arrival.Figure.style.top = body.yMin;
+                float lift = arrival.UsesPortrait ? Mathf.Sin(progress * 3f * Mathf.PI) * 4f : 0f;
+                arrival.Figure.style.top = body.yMin - Mathf.Abs(lift);
                 arrival.Figure.style.width = body.width;
                 arrival.Figure.style.height = body.height;
             }

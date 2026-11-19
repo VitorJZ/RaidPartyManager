@@ -22,6 +22,8 @@ MonoBehaviour:
   battleSpecialEffect: {fileID: 2800000, guid: 2c48ac3ae04e435eb7346df7525f8b26, type: 3}
   battleFinaleEffect: {fileID: 2800000, guid: 714227928c7d43ccb09eb67622bea0d9, type: 3}
   profession: 0
+  enemyRank: 2
+  positionSlots: 2
   rosterNumber: 0
   stage: 1
   reach: 1

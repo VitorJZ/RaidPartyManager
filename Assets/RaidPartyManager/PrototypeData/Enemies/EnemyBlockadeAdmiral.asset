@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyBlockadeAdmiral
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyBlockadeAdmiral
+  displayName: "封港提督"
+  portrait: {fileID: 2800000, guid: c39bfe04406c4b12ac4e2e4ad37c10ec, type: 3}
+  usePortraitInBattle: 0
+  battleSpecialSheet: {fileID: 2800000, guid: 62258c2b4c954cf69126467c148bb3a9, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: d6423f05252b49cfa6767db73372626e, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 5dc96a7d819241db9ad72849466d301d, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: bbc79c585ecd4a62b96db96bd91153a8, type: 3}
+  profession: 2
+  enemyRank: 3
+  positionSlots: 3
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 46
+  traitPower: 0
+  traitText: "直接攻击（65%） / 鸣笛预警（35%）。鸣笛后下次行动必定炮击最后两名存活的玩家角色，各造成等同于攻击力的物理伤害。"
+  personality: 1
+  attack: 6
+  defense: 3
+  specialDefense: 3
+  health: 48
+  actionInterval: 10
+  battleProjectile: {fileID: 2800000, guid: 79b8f4c2ee054dffb6084d961056be4c, type: 3}
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0

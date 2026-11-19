@@ -48,6 +48,7 @@ namespace RaidPartyManager.Battle
             public Combatant Input { get; private set; }
             public readonly Combatant Original;
             public readonly Dictionary<StatusKind, int> Statuses;
+            public HashSet<StatusKind> DelayStatusDecay;
             public CharacterTrait? CopiedTrait;
             public int CopiedTraitPower;
             public int AttackGrowth;
@@ -60,10 +61,11 @@ namespace RaidPartyManager.Battle
             public int ProtectedRound;
             public int BonusMaximumHealth;
             public bool DoubleNextAttack;
-            public string SweepSkillId;
+            public SkillBookDefinition SweepSkill;
             public bool StoneGuard;
             public bool CorpseConsumed;
             public BattleEnergy Energy;
+            private int spentEnergy;
             public readonly EquippedItem[] Slots;
             public string LastHitTarget;
             public string LastAttacker;
@@ -74,6 +76,7 @@ namespace RaidPartyManager.Battle
             public bool ResolvingDamageHeal;
             public bool ResolvingCrystalHeal;
             public int BellRings;
+            public bool EnemyTriggered;
 
             public CharacterTrait Trait => CopiedTrait ?? Input.Character.Trait;
             public int TraitPower => CopiedTrait.HasValue ? CopiedTraitPower : Input.Character.TraitPower;
@@ -141,11 +144,20 @@ namespace RaidPartyManager.Battle
                     previous.Health - oldBonus.Health + newBonus.Health);
                 Health = Math.Min(Health, stats.Health + BonusMaximumHealth);
                 Input = new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), equipment);
+                int capacity = BattleEnergy.Full(equipment).Capacity;
+                Energy = new BattleEnergy(capacity, capacity - spentEnergy);
+            }
+
+            public void SpendEnergy(int cost)
+            {
+                spentEnergy += cost;
+                Energy = new BattleEnergy(Energy.Capacity, Energy.Capacity - spentEnergy);
             }
 
             public Combatant EquipmentInput() =>
                 new Combatant(Input.Id, Input.Character, Input.Side, Input.Position,
-                    Input.Stats + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack, 0, 0, BonusMaximumHealth), Health, Input.Equipment);
+                    Input.Stats + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack,
+                        Trait == CharacterTrait.EnemyAnchorHermit && EnemyTriggered ? -2 : 0, 0, BonusMaximumHealth), Health, Input.Equipment);
 
             public Combatant RecruitmentResult() =>
                 new Combatant(Original.Id, Original.Character, Original.Side, Input.Position, Original.Stats,
@@ -164,6 +176,7 @@ namespace RaidPartyManager.Battle
         private readonly Random random;
         private readonly Dictionary<string, Unit> unitsById;
         private readonly List<BattleEvent> events = new List<BattleEvent>();
+        private readonly Dictionary<(string Unit, BattleCountdownKind Kind), int> countdowns = new();
         private readonly List<Unit> recruits = new List<Unit>();
         private readonly List<(Side Side, string Actor, string Target)> attackHistory =
             new List<(Side Side, string Actor, string Target)>();
@@ -241,14 +254,19 @@ namespace RaidPartyManager.Battle
             return true;
         }
 
-        public bool IsPositionLocked(int position)
+        public bool IsPositionLocked(int position) => PositionLockReason(position) != null;
+
+        public string PositionLockReason(int position)
         {
             var unit = LivingPartyUnitAt(position);
-            return unit != null && IsLockedInBattle(unit);
+            return unit == null ? null : PositionLockReason(unit);
         }
 
-        private static bool IsLockedInBattle(Unit unit) => unit.Has(EquipmentEffect.TreeRoot) ||
-            (unit.Input.Side == Side.Party && unit.Input.Character.Personality == Personality.Stubborn);
+        private static bool IsLockedInBattle(Unit unit) => PositionLockReason(unit) != null;
+
+        private static string PositionLockReason(Unit unit) =>
+            unit.Gear.FirstOrDefault(item => item.Effect == EquipmentEffect.TreeRoot)?.Name ??
+            (unit.Input.Side == Side.Party && unit.Input.Character.Personality == Personality.Stubborn ? "固执" : null);
 
         private void ResolveRetreats()
         {
@@ -288,6 +306,10 @@ namespace RaidPartyManager.Battle
 
             if (!FinishIfDecided() && AdvanceClock())
             {
+                events.Add(new BattleEvent(Tick, BattleEventKind.RoundStarted));
+                if (Round == 1)
+                    foreach (var unit in units.Where(unit => unit.Health > 0 && unit.Trait == CharacterTrait.LightningChant))
+                        ReportCountdown(unit, BattleCountdownKind.CalamityChant, 3);
                 StartRound();
                 if (FinishIfDecided())
                     return events.GetRange(firstEvent, events.Count - firstEvent);
@@ -306,6 +328,16 @@ namespace RaidPartyManager.Battle
                 }
 
                 EndRound();
+                foreach (var unit in units.Where(unit => unit.Health > 0))
+                {
+                    if (unit.Trait == CharacterTrait.LightningChant)
+                        ReportCountdown(unit, BattleCountdownKind.CalamityChant, 3 - Round % 3);
+                    if (unit.ProtectedRound == Round)
+                        ReportCountdown(unit, BattleCountdownKind.GoldenBell, 0);
+                }
+                foreach (var (scavenger, stash) in scavengedItems)
+                    ReportCountdown(scavenger, BattleCountdownKind.ScavengerEscape, stash.EscapeRound - Round);
+
                 if (!FinishIfDecided())
                 {
                     ResolveRetreats();
@@ -365,7 +397,8 @@ namespace RaidPartyManager.Battle
             var tracked = units.Where(unit => unit.Input.Side == Side.Party &&
                 (unit.Original.EquipmentSlots.Count > 0 || recruits.Contains(unit)));
             return new BattleLoadout(tracked.Select(unit => new KeyValuePair<string, IReadOnlyList<string>>(
-                unit.Input.Id, unit.Slots.Select(item => item?.Id).ToArray())), consumedEquipment);
+                unit.Input.Id, unit.Slots.Select(item => item?.Id).ToArray())), consumedEquipment,
+                escapedWithEquipment.Concat(scavengedItems.Values.Select(stash => stash.Item.Id).Where(id => id != null)));
         }
 
         private void UpdateFormation()
@@ -384,7 +417,7 @@ namespace RaidPartyManager.Battle
             foreach (var unit in living)
             {
                 var front = unit.Input.Equipment.Any(item => item.Effect == EquipmentEffect.RedCord)
-                    ? EquipmentFormation.FrontOf(current, unit.Input) : null;
+                    ? EquipmentFormation.AdjacentFrontOf(current, unit.Input) : null;
                 unit.LinkedFront = front == null ? null : unitsById[front.Id];
                 unit.Stats = stats[unit.Input.Id];
             }
@@ -530,6 +563,8 @@ namespace RaidPartyManager.Battle
         private void Finish(BattleOutcome outcome, int tick)
         {
             Tick = tick;
+            foreach (var scavenger in scavengedItems.Keys.ToArray())
+                RecoverScavengedItem(scavenger);
             events.Add(new BattleEvent(tick, BattleEventKind.Finished));
             var health = units.Select(unit =>
                 new KeyValuePair<string, int>(unit.Input.Id, Math.Min(unit.Health, unit.Original.Stats.Health)));
@@ -549,10 +584,25 @@ namespace RaidPartyManager.Battle
                 recruits.Select(unit => unit.RecruitmentResult()), attackGains, potions, currentLoadout, gold, accessories);
         }
 
+        private void ReportCountdown(Unit unit, BattleCountdownKind kind, int remaining)
+        {
+            var key = (unit.Input.Id, kind);
+            if (countdowns.GetValueOrDefault(key) == remaining)
+                return;
+            if (remaining == 0)
+                countdowns.Remove(key);
+            else
+                countdowns[key] = remaining;
+            events.Add(new BattleEvent(Tick, BattleEventKind.Countdown, targetId: unit.Input.Id,
+                countdown: new BattleCountdown(kind, remaining)));
+        }
+
         private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,
             int amount = 0, DecisionReason reason = DecisionReason.Default, string detail = null,
             CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false,
-            BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null)
+            BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
+            BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
+            bool poisonDamage = false)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
@@ -561,7 +611,7 @@ namespace RaidPartyManager.Battle
                 ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
                 target.Health, target.Shield, StatusText(target), detail, form, form != null ? target.Stats.Health : 0, statuses,
-                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId));
+                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage));
         }
     }
 }

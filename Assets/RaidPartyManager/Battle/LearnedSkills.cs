@@ -45,7 +45,7 @@ namespace RaidPartyManager.Battle
                             foreach (var target in allies)
                                 Add(target, HealingGain(target, 10));
                         break;
-                    case SweepNextAttack when actor.SweepSkillId == null && enemies.Length > 1 && attack > 0:
+                    case SweepNextAttack when actor.SweepSkill == null && enemies.Length > 1 && attack > 0:
                         Add(actor, (long)(enemies.Length - 1) * attack);
                         break;
                     case LightningWhip:
@@ -118,10 +118,10 @@ namespace RaidPartyManager.Battle
 
         private void CastLearnedSkill(Unit actor, Unit target, SkillBookDefinition book, DecisionReason reason)
         {
-            actor.Energy = new BattleEnergy(actor.Energy.Capacity, actor.Energy.Remaining - book.Cost);
+            actor.SpendEnergy(book.Cost);
             actor.LastSkillRound = Round;
             Report(BattleEventKind.Action, actor, actor, book.Name, ActionKind.Shield,
-                detail: $"消耗 {book.Cost} 点能量", actorEnergy: actor.Energy);
+                detail: $"消耗 {book.Cost} 点能量", actorEnergy: actor.Energy, skillBookId: book.Id);
 
             int attack = CurrentAttack(actor);
             switch (book.SkillEffect)
@@ -151,7 +151,7 @@ namespace RaidPartyManager.Battle
                     Restore(target, 10);
                     break;
                 case SweepNextAttack:
-                    actor.SweepSkillId = book.Id;
+                    actor.SweepSkill = book;
                     break;
                 case LightningWhip:
                     int strikes = 1 + Opponents(actor).Count();
@@ -179,6 +179,7 @@ namespace RaidPartyManager.Battle
                     {
                         ally.ProtectedRound = Round;
                         Show(ally);
+                        ReportCountdown(ally, BattleCountdownKind.GoldenBell, 1);
                     }
                     break;
                 case FieryEyes:

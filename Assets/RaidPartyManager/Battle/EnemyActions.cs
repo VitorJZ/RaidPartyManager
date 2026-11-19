@@ -10,7 +10,8 @@ namespace RaidPartyManager.Battle
             switch (actor.Trait)
             {
                 case CharacterTrait.EnemyWarCry when random.NextDouble() < 0.5:
-                    GrantStatus(actor, actor, StatusKind.Vigor, 3, "盛气咆哮", BattleVisualCue.WarCry);
+                    var cry = actor.Input.Character.Id == "EnemyForkFisher" ? BattleVisualCue.DockWarCry : BattleVisualCue.WarCry;
+                    GrantStatus(actor, actor, StatusKind.Vigor, 3, "盛气咆哮", cry);
                     return true;
                 case CharacterTrait.EnemyResolve when random.NextDouble() < 0.5:
                     GrantStatus(actor, actor, StatusKind.Resolve, 1, "扎盾坚毅", BattleVisualCue.ResolveGuard);
@@ -36,7 +37,7 @@ namespace RaidPartyManager.Battle
                     QuackTurn(actor);
                     return true;
                 default:
-                    return false;
+                    return TryDockEnemyTurn(actor);
             }
         }
 

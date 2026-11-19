@@ -1,6 +1,10 @@
 {
   "mode": "Built-in ImageGen",
   "source": "讨伐队经理-图鉴.xlsx",
+  "skillBookScroll": {
+    "art": "Assets/RaidPartyManager/Art/Skills/Resources/SkillBookScroll.png",
+    "prompt": "Use case: stylized-concept. Asset type: a reusable transparent 1:1 RPG inventory icon base for Raid Party Manager. Generate exactly one open medieval magic scroll, straight-on view and centered. It is an upright rectangular sheet of light warm ochre parchment with rolled top and bottom ends, tan shadowed edges, dark walnut rollers with small aged bronze end caps. Keep a large flat and evenly lit completely blank cream parchment area in the middle, large enough to place a colored skill illustration later. A strong bold silhouette, restrained detailed fantasy pixel-art rendering with hand-painted shading, clean at the size of an inventory item, warm highlights from upper left. The entire silhouette occupies 85 percent of the square canvas with breathing room on all sides. Use a genuinely transparent outside background and crisp clean alpha. No letters, no decorative symbols, no seals, no illustrations, no border around the canvas, no floor, no drop shadow outside the scroll, no props."
+  },
   "icons": {
     "equipment": [
       {

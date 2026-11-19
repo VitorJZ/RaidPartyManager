@@ -23,7 +23,8 @@ namespace RaidPartyManager.Presentation
         private string memberId;
         private readonly List<string> backpackCells = new List<string>();
 
-        public PartyEditorView(PartyRun run, EncounterData content, Action back, Side side = Side.Party, Action edited = null)
+        public PartyEditorView(PartyRun run, EncounterData content, Action back, Side side = Side.Party, Action edited = null,
+            bool supplyTestItems = true)
         {
             this.run = run;
             this.side = side;
@@ -34,7 +35,7 @@ namespace RaidPartyManager.Presentation
                 : content.EnemyRoster;
             portraitFor = content.PortraitFor;
             iconFor = content.IconFor;
-            if (side == Side.Party)
+            if (side == Side.Party && supplyTestItems)
             {
                 var catalog = content.StartingEquipment.Concat(content.SkillBooks).Append(content.VictoryReward);
                 Action releaseSupply = null;
@@ -95,7 +96,15 @@ namespace RaidPartyManager.Presentation
 
             var drag = new FormationSwap(layout, (from, to) =>
             {
-                if (run.TryPlace(from.MemberId, to.Position))
+                if (side == Side.Enemy && !to.Position.HasValue && run.Members.Count(member => member.Position.HasValue) == 1)
+                    return;
+                var destination = to.Position;
+                if (side == Side.Enemy && destination.HasValue)
+                {
+                    int width = run.Members.Single(member => member.Id == from.MemberId).Character.PositionSlots;
+                    destination = Math.Min(destination.Value, Rules.Positions - width + 1);
+                }
+                if (run.TryPlace(from.MemberId, destination))
                     RenderEditedRoster();
             }, slot => OpenMember(slot.MemberId));
             layout.Add(PrototypeStyle.Text(side == Side.Party ? "长按立绘换位，左键查看装备，右键替换队员。"
@@ -111,9 +120,11 @@ namespace RaidPartyManager.Presentation
                 if (member != null)
                     displayed.Add(member.Id);
                 row.Add(BuildCard(position, member, drag));
+                if (side == Side.Enemy && member != null)
+                    index += member.Character.PositionSlots - 1;
             }
             layout.Add(row);
-            if (side == Side.Enemy)
+            if (side == Side.Enemy && members.All(member => displayed.Contains(member.Id)))
             {
                 overview.Add(layout);
                 return;
@@ -133,7 +144,7 @@ namespace RaidPartyManager.Presentation
             foreach (var member in members.Where(entry => !displayed.Contains(entry.Id)))
             {
                 var button = PrototypeStyle.Button(member.Character.Name + (member.IsAway ? " · 守候宝箱" : ""), $"edit-member-{member.Id}",
-                    () => OpenDetails(member.Id));
+                    () => OpenMember(member.Id));
                 button.SetEnabled(!member.IsAway);
                 RegisterReplacement(button, member);
                 bench.Add(button);
@@ -150,8 +161,9 @@ namespace RaidPartyManager.Presentation
         private VisualElement BuildCard(int position, MemberView member, FormationSwap drag)
         {
             var card = new VisualElement { name = $"edit-position-{position}" };
-            card.style.width = Length.Percent(17);
-            card.style.maxWidth = 224;
+            int span = member?.Character.PositionSlots ?? 1;
+            card.style.width = Length.Percent(17 * span);
+            card.style.maxWidth = 224 * span;
             var namePlate = PrototypeStyle.Text(member?.Character.Name ?? "空位", 18,
                 member != null ? PrototypeStyle.Ink : PrototypeStyle.Muted);
             namePlate.name = "character-name";
@@ -179,6 +191,7 @@ namespace RaidPartyManager.Presentation
             ProfessionFrame.AddTo(portrait, member?.Character.Profession, art);
 
             var tag = PrototypeStyle.Text($"{position} 号位", 11, PrototypeStyle.Accent);
+            tag.name = "position-tag";
             tag.style.position = Position.Absolute;
             tag.style.top = tag.style.left = 6;
             tag.style.paddingLeft = tag.style.paddingRight = 5;

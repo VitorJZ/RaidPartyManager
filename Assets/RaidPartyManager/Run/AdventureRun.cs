@@ -5,7 +5,7 @@ using RaidPartyManager.Domain;
 
 namespace RaidPartyManager.Run
 {
-    public enum NodeKind { Event, Camp, Shop, Town, NormalBattle, EliteBattle, Boss }
+    public enum NodeKind { Event, Camp, Shop, Town, NormalBattle, EliteBattle, Boss, TreasureChest }
     public enum AdventureEventKind { Investor, Ambush, LostTraveler, FoundCoins, HatTrick, Forge, LockedChest, AscensionTrial, Alchemist }
     public enum TownService { Recruit, Shop, Camp, Quest }
 
@@ -15,38 +15,65 @@ namespace RaidPartyManager.Run
         public NodeKind Kind { get; internal set; }
         public NodeKind? Replaces { get; internal set; }
         public bool IsFork { get; internal set; }
+        public NodeKind? Alternative { get; internal set; }
         internal RouteNode(int number, NodeKind kind) { Number = number; Kind = kind; }
     }
 
-    // Six possible combat slots leave room for a single event choice while preserving five combats on every path.
     public sealed class DockRoute
     {
+        public const int Stages = 10;
         public IReadOnlyList<RouteNode> Nodes { get; }
+
         public DockRoute(Random random)
         {
-            var nodes = Enumerable.Range(1, 10).Select(n => new RouteNode(n,
-                n == 10 ? NodeKind.Boss : NodeKind.NormalBattle)).ToArray();
-            int earlyCamp = random.Next(4, 7), lateCamp = random.Next(7, 10), shop;
-            do { shop = random.Next(1, 10); }
-            while (shop == earlyCamp || shop == lateCamp ||
-                Enumerable.Range(5, 5).Count(n => n != earlyCamp && n != lateCamp && n != shop) < 3);
+            var nodes = Enumerable.Range(1, Stages).Select(n => new RouteNode(n,
+                n == Stages ? NodeKind.Boss : NodeKind.NormalBattle)).ToArray();
+            int chest = random.Next(3, 9);
+            nodes[chest - 1].Kind = NodeKind.TreasureChest;
+
+            int earlyCamp = Pick(4, 6, chest);
+            int lateCamp = Pick(7, 9, chest);
             nodes[earlyCamp - 1].Kind = nodes[lateCamp - 1].Kind = NodeKind.Camp;
+            int elite = Pick(5, 9, chest, earlyCamp, lateCamp);
+            nodes[elite - 1].Kind = NodeKind.EliteBattle;
+            int shop = Pick(2, 9, chest, earlyCamp, lateCamp, elite);
             nodes[shop - 1].Kind = NodeKind.Shop;
-            var lateFights = nodes.Where(n => n.Number >= 5 && n.Number <= 9 && n.Kind == NodeKind.NormalBattle).ToArray();
-            lateFights[random.Next(lateFights.Length)].Kind = NodeKind.EliteBattle;
-            var early = nodes.Where(n => n.Number <= 3 && n.Kind == NodeKind.NormalBattle).ToArray();
-            early[random.Next(early.Length)].IsFork = true;
-            foreach (var fork in lateFights.Where(n => n.Kind == NodeKind.NormalBattle).OrderBy(_ => random.Next()).Take(2))
-                fork.IsFork = true;
-            var services = nodes.Where(n => n.Number >= 6 && n.Number <= 9 &&
-                (n.Kind == NodeKind.Camp || n.Kind == NodeKind.Shop)).ToArray();
-            if (services.Length > 0 && random.NextDouble() < 0.35)
+            int secondNormal = Pick(3, 9, chest, earlyCamp, lateCamp, elite, shop);
+
+            int[] services = { earlyCamp, lateCamp, shop };
+            var townSites = services.Where(number => number >= 6).ToArray();
+            if (townSites.Length > 0 && random.NextDouble() < 0.35)
             {
-                var town = services[random.Next(services.Length)];
+                var town = nodes[townSites[random.Next(townSites.Length)] - 1];
                 town.Replaces = town.Kind;
                 town.Kind = NodeKind.Town;
             }
+
+            foreach (var node in nodes.Where(node => node.Number > 1 && node.Number < Stages &&
+                node.Number != secondNormal && node.Number != elite && node.Number != chest))
+            {
+                node.IsFork = true;
+                node.Alternative = node.Kind == NodeKind.NormalBattle
+                    ? (node.Number >= 5 && random.NextDouble() < 0.5 ? NodeKind.EliteBattle : NodeKind.Event)
+                    : (node.Number <= 3 || random.NextDouble() < 0.5 ? NodeKind.Event : NodeKind.NormalBattle);
+            }
             Nodes = Array.AsReadOnly(nodes);
+
+            int Pick(int first, int last, params int[] exclude)
+            {
+                var candidates = Enumerable.Range(first, last - first + 1).Except(exclude).ToArray();
+                return candidates[random.Next(candidates.Length)];
+            }
+        }
+
+        internal DockRoute(RouteCheckpointNode[] saved)
+        {
+            Nodes = Array.AsReadOnly(saved.Select((node, index) => new RouteNode(index + 1, node.Kind)
+            {
+                IsFork = node.Fork,
+                Alternative = node.AlternativePlusOne == 0 ? (NodeKind?)null : (NodeKind)(node.AlternativePlusOne - 1),
+                Replaces = node.Replaces < 0 ? (NodeKind?)null : (NodeKind)node.Replaces
+            }).ToArray());
         }
 
         public IReadOnlyList<NodeKind> Options(int number, int eventsTaken, int elitesTaken, Random random)
@@ -54,9 +81,27 @@ namespace RaidPartyManager.Run
             var node = Nodes[number - 1];
             if (!node.IsFork)
                 return new[] { node.Kind };
+            if (node.Alternative is NodeKind alternative)
+                return new[] { node.Kind, alternative };
+
+            // Older saves keep their generated floor until the next floor.
             NodeKind other = eventsTaken == 0 && (number < 5 || elitesTaken >= 3 || random.NextDouble() < 0.5)
                 ? NodeKind.Event : NodeKind.EliteBattle;
             return new[] { NodeKind.NormalBattle, other };
+        }
+    }
+
+    public readonly struct RouteStop
+    {
+        public int Number { get; }
+        public int Lane { get; }
+        public NodeKind? Kind { get; }
+
+        internal RouteStop(int number, int lane, NodeKind kind)
+        {
+            Number = number;
+            Lane = lane;
+            Kind = kind;
         }
     }
 
@@ -76,11 +121,43 @@ namespace RaidPartyManager.Run
         internal AwayCompanion(string id, int position, int at) { MemberId = id; Position = position; ReturnAt = at; }
     }
 
+    public sealed class BattleRewards
+    {
+        private readonly EquipmentDefinition[] items;
+        public IReadOnlyList<EquipmentDefinition> Items { get; }
+        public int Gold { get; private set; }
+        public bool HasUnclaimed => Gold > 0 || items.Any(item => item != null);
+
+        public BattleRewards(int gold, IEnumerable<EquipmentDefinition> items)
+        {
+            Gold = gold;
+            this.items = items.ToArray();
+            Items = Array.AsReadOnly(this.items);
+        }
+
+        public bool ClaimGold(PartyRun party)
+        {
+            if (Gold <= 0) return false;
+            party.AddGold(Gold);
+            Gold = 0;
+            return true;
+        }
+
+        public bool ClaimItem(PartyRun party, int index)
+        {
+            if (index < 0 || index >= items.Length || items[index] == null) return false;
+            party.AddEquipment(items[index]);
+            items[index] = null;
+            return true;
+        }
+    }
+
     public sealed class AdventureBattle
     {
         public NodeKind Kind { get; }
         public string RequestId { get; internal set; }
         public bool Settled { get; internal set; }
+        public BattleRewards Reward { get; internal set; }
         public IReadOnlyList<Combatant> Enemies { get; internal set; }
         public HashSet<string> EliteIds { get; } = new HashSet<string>();
         internal AdventureBattle(NodeKind kind) { Kind = kind; }
@@ -92,6 +169,7 @@ namespace RaidPartyManager.Run
         public AdventureEventKind? Event { get; }
         public bool Resolved { get; internal set; }
         public bool Rested { get; internal set; }
+        public bool TreasureOpened { get; internal set; }
         public string Message { get; internal set; } = "";
         public IReadOnlyList<EquipmentDefinition> Rewards { get; internal set; } = Array.Empty<EquipmentDefinition>();
         public IReadOnlyList<EquipmentDefinition> Potions { get; internal set; } = Array.Empty<EquipmentDefinition>();
@@ -116,14 +194,16 @@ namespace RaidPartyManager.Run
 
     public sealed class AdventureRun
     {
-        private readonly Random random;
+        private Random random;
         private readonly CharacterDefinition[] characters;
         private readonly EquipmentDefinition[] equipment;
         private readonly EquipmentDefinition[] battleLoot;
+        private readonly EquipmentDefinition[] treasureLoot;
         private readonly HashSet<int> investorFloors = new HashSet<int>();
         private readonly List<AwayCompanion> away = new List<AwayCompanion>();
         private int eventsTaken, elitesTaken;
         private IReadOnlyList<NodeKind> routeOptions;
+        private AdventureCheckpoint nodeCheckpoint;
 
         public PartyRun Party { get; }
         public bool IsInspection { get; }
@@ -136,7 +216,13 @@ namespace RaidPartyManager.Run
         public bool FloorCleared { get; private set; }
         public bool Failed { get; private set; }
         public DockRoute Route { get; private set; }
+        public RouteStop RouteCurrent { get; private set; }
+        public RouteStop? RoutePrevious { get; private set; }
+        public RouteStop? RouteDestination { get; private set; }
+        public int? SuspendedChoice { get; private set; }
         public AdventureVisit Current { get; private set; }
+        public bool HasBattleRewardScreen => Current?.Battle?.Reward is { } reward &&
+            (reward.HasUnclaimed || !Current.Resolved && Current.Rewards.Count > 0);
         public IReadOnlyList<AwayCompanion> Away => away.ToArray();
         public string ReturnMessage { get; private set; } = "";
         public bool QuestActive { get; private set; }
@@ -150,20 +236,150 @@ namespace RaidPartyManager.Run
             var items = equipment.GroupBy(e => e.Id).Select(g => g.First()).ToArray();
             this.equipment = items.Where(e => e.Tier >= 0 && e.Price > 0).ToArray();
             battleLoot = items.Where(e => e.CanDropInBattle).ToArray();
+            treasureLoot = items.Where(e => !e.IsPotion && e.Tier is >= 1 and <= 3).ToArray();
             Party.RegisterRewardCatalog(this.equipment);
             this.random = random ?? new Random();
             IsInspection = inspection;
             Route = new DockRoute(this.random);
         }
 
+        public AdventureCheckpoint CheckpointForExit()
+        {
+            if (IsInspection)
+                throw new InvalidOperationException("An inspection cannot be saved.");
+
+            if (Current?.Battle?.Reward is { } reward && (HasBattleRewardScreen || !Current.Resolved))
+            {
+                var saved = CaptureCheckpoint(random.Next(), nodeCheckpoint.Choice);
+                saved.HasBattleReward = true;
+                saved.BattleReward = new BattleRewardCheckpoint
+                {
+                    Kind = Current.Battle.Kind,
+                    Event = Current.Event.HasValue ? (int)Current.Event.Value : -1,
+                    Resolved = Current.Resolved, Message = Current.Message,
+                    NeedsEvolution = Current.NeedsEvolution, EvolutionMember = Current.EvolutionMemberId,
+                    Gold = reward.Gold, Items = reward.Items.Select(item => item?.Id).ToArray(),
+                    Choices = Current.Resolved ? Array.Empty<string>() : Current.Rewards.Select(item => item.Id).ToArray()
+                };
+                return saved;
+            }
+
+            if (Current is { Resolved: false })
+                return nodeCheckpoint;
+
+            return CaptureCheckpoint(SuspendedChoice.HasValue ? nodeCheckpoint.Seed : random.Next(),
+                SuspendedChoice ?? (Current != null ? nodeCheckpoint.Choice : -1), Current?.Resolved == true);
+        }
+
+        private AdventureCheckpoint CaptureCheckpoint(int seed, int choice, bool finishVisit = false) =>
+            new AdventureCheckpoint
+            {
+                Party = Party.CaptureCheckpoint(), Seed = seed, Floor = Floor, Stage = Stage, CompletedNodes = CompletedNodes,
+                EventsTaken = eventsTaken, ElitesTaken = elitesTaken, Investment = Investment, InvestmentPaid = InvestmentPaid,
+                InvestorFloors = investorFloors.ToArray(), FloorCleared = FloorCleared, Failed = Failed,
+                QuestActive = QuestActive, QuestWins = QuestWins, ReturnMessage = ReturnMessage,
+                Nodes = Route.Nodes.Select(node => new RouteCheckpointNode
+                {
+                    Kind = node.Kind, Fork = node.IsFork, Replaces = node.Replaces.HasValue ? (int)node.Replaces.Value : -1,
+                    AlternativePlusOne = node.Alternative.HasValue ? (int)node.Alternative.Value + 1 : 0
+                }).ToArray(),
+                Options = routeOptions?.ToArray(), Current = new CheckpointStop(RouteCurrent),
+                Previous = new CheckpointStop(RoutePrevious.GetValueOrDefault()), HasPrevious = RoutePrevious.HasValue,
+                Choice = choice, FinishVisit = finishVisit,
+                Away = away.Select(companion => new CheckpointCompanion
+                {
+                    MemberId = companion.MemberId, Position = companion.Position, ReturnAt = companion.ReturnAt
+                }).ToArray()
+            };
+
+        public static AdventureRun RestoreCheckpoint(AdventureCheckpoint saved, IEnumerable<CharacterDefinition> characters,
+            IEnumerable<EquipmentDefinition> equipment)
+        {
+            if (saved == null || saved.Version != AdventureCheckpoint.CurrentVersion || saved.Nodes?.Length != DockRoute.Stages ||
+                saved.Stage is < 1 or > DockRoute.Stages || saved.Floor < 1 || saved.CompletedNodes < 0 ||
+                saved.Choice < -1 || (saved.Choice >= 0 && (saved.Options == null || saved.Choice >= saved.Options.Length)) ||
+                ((saved.FinishVisit || saved.HasBattleReward) && saved.Choice < 0))
+                throw new ArgumentException("Invalid adventure checkpoint.");
+
+            var catalog = characters.ToArray();
+            var items = equipment.GroupBy(item => item.Id).ToDictionary(group => group.Key, group => group.First());
+            var party = PartyRun.RestoreCheckpoint(saved.Party, catalog.ToDictionary(character => character.Id), items);
+            var run = new AdventureRun(party, catalog, items.Values, false, new Random(saved.Seed))
+            {
+                Floor = saved.Floor, Stage = saved.Stage, CompletedNodes = saved.CompletedNodes, eventsTaken = saved.EventsTaken,
+                elitesTaken = saved.ElitesTaken, Investment = saved.Investment, InvestmentPaid = saved.InvestmentPaid,
+                FloorCleared = saved.FloorCleared, Failed = saved.Failed, QuestActive = saved.QuestActive, QuestWins = saved.QuestWins,
+                ReturnMessage = saved.ReturnMessage ?? "", Route = new DockRoute(saved.Nodes),
+                RouteCurrent = saved.Current.Restore(), RoutePrevious = saved.HasPrevious ? saved.Previous.Restore() : (RouteStop?)null,
+                routeOptions = saved.Options is { Length: > 0 } ? saved.Options : null,
+                random = new Random(saved.Seed)
+            };
+            run.investorFloors.UnionWith(saved.InvestorFloors ?? Array.Empty<int>());
+            run.away.AddRange((saved.Away ?? Array.Empty<CheckpointCompanion>()).Select(companion =>
+                new AwayCompanion(companion.MemberId, companion.Position, companion.ReturnAt)));
+            if (saved.HasBattleReward)
+            {
+                var reward = saved.BattleReward;
+                if (reward == null || reward.Gold < 0 || reward.Gold > int.MaxValue - party.Gold ||
+                    reward.Items == null || reward.Choices == null)
+                    throw new ArgumentException("Invalid battle rewards.");
+                run.RouteDestination = run.RouteChoice(saved.Choice);
+                run.nodeCheckpoint = saved;
+                run.Current = new AdventureVisit(run.RouteDestination.Value.Kind.Value,
+                    reward.Event < 0 ? (AdventureEventKind?)null : (AdventureEventKind)reward.Event)
+                {
+                    Resolved = reward.Resolved, Message = reward.Message ?? "", NeedsEvolution = reward.NeedsEvolution,
+                    EvolutionMemberId = string.IsNullOrEmpty(reward.EvolutionMember) ? null : reward.EvolutionMember,
+                    Rewards = reward.Choices.Select(id => items[id]).ToArray(),
+                    Battle = new AdventureBattle(reward.Kind)
+                    {
+                        Settled = true,
+                        Reward = new BattleRewards(reward.Gold,
+                            reward.Items.Select(id => string.IsNullOrEmpty(id) ? null : items[id]))
+                    }
+                };
+            }
+            else if (saved.FinishVisit)
+            {
+                run.RouteDestination = run.RouteChoice(saved.Choice);
+                run.AdvanceCompletedVisit();
+            }
+            else if (saved.Choice >= 0)
+            {
+                run.SuspendedChoice = saved.Choice;
+                run.nodeCheckpoint = saved;
+            }
+            return run;
+        }
+
         public IReadOnlyList<NodeKind> RouteOptions => routeOptions ??=
             Route.Options(Stage, eventsTaken, elitesTaken, random);
 
+        public RouteStop RouteChoice(int index)
+        {
+            var options = RouteOptions;
+            int lane = RouteCurrent.Lane;
+            if (options.Count > 1)
+                lane += index == 0 ? -1 : 1;
+            return new RouteStop(Stage, lane, options[index]);
+        }
+
         public bool EnterRoute(int choice)
         {
-            if (IsInspection || Current != null || Failed || FloorCleared || choice < 0 || choice >= RouteOptions.Count)
+            if (IsInspection || Current != null || Failed || FloorCleared || choice < 0 || choice >= RouteOptions.Count ||
+                (SuspendedChoice.HasValue && choice != SuspendedChoice.Value))
                 return false;
-            var kind = RouteOptions[choice];
+            var destination = RouteChoice(choice);
+            var kind = destination.Kind.Value;
+            if ((kind is NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss) && !Party.CanStartBattle)
+                return false;
+
+            // Keep the generated node stable when a checkpoint is reentered.
+            int seed = SuspendedChoice.HasValue ? nodeCheckpoint.Seed : random.Next();
+            nodeCheckpoint = CaptureCheckpoint(seed, choice);
+            random = new Random(seed);
+            SuspendedChoice = null;
+            RouteDestination = destination;
             if (kind == NodeKind.Event) eventsTaken++;
             if (kind == NodeKind.EliteBattle) elitesTaken++;
             Open(kind, kind == NodeKind.Event ? RollEvent() : (AdventureEventKind?)null);
@@ -189,15 +405,21 @@ namespace RaidPartyManager.Run
                 visit.InvestorAvailable = !InvestmentPaid && !InvestorVisitedThisFloor;
                 investorFloors.Add(Floor);
             }
+            if (kind == NodeKind.TreasureChest)
+                visit.Rewards = treasureLoot.OrderBy(_ => random.Next()).Take(3).ToArray();
             if (kind == NodeKind.Shop || kind == NodeKind.Town)
                 visit.Stock = CreateStock();
-            if (kind == NodeKind.Town)
+            if (kind is NodeKind.Camp or NodeKind.Town)
                 visit.Recruits = RecruitCandidates().OrderBy(_ => random.Next()).Take(2).ToArray();
             if (kind is NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss)
                 visit.Battle = new AdventureBattle(kind);
             if (eventKind == AdventureEventKind.LostTraveler)
-                visit.Professions = RecruitCandidates().Select(c => c.Profession).Distinct()
+            {
+                var groups = RecruitCandidates().GroupBy(character => character.Profession)
                     .OrderBy(_ => random.Next()).Take(2).ToArray();
+                visit.Recruits = groups.Select(group => group.ElementAt(random.Next(group.Count()))).ToArray();
+                visit.Professions = visit.Recruits.Select(character => character.Profession).ToArray();
+            }
             if (eventKind == AdventureEventKind.Alchemist)
                 visit.Potions = equipment.Where(e => e.IsPotion).OrderBy(_ => random.Next()).Take(3).ToArray();
             if (eventKind == AdventureEventKind.AscensionTrial)
@@ -265,9 +487,10 @@ namespace RaidPartyManager.Run
         {
             if (!At(AdventureEventKind.LostTraveler) || !Current.Professions.Contains(profession) || Current.PendingRecruit != null)
                 return false;
-            var pool = RecruitCandidates().Where(c => c.Profession == profession).ToArray();
-            if (pool.Length == 0) return false;
-            Current.PendingRecruit = pool[random.Next(pool.Length)];
+            var recruit = Current.Recruits.FirstOrDefault(character => character.Profession == profession);
+            if (recruit == null || Party.Members.Any(member => member.Character.Id == recruit.Id))
+                return false;
+            Current.PendingRecruit = recruit;
             return CompleteRecruit(null);
         }
 
@@ -376,22 +599,35 @@ namespace RaidPartyManager.Run
         {
             var ticket = Current?.Battle ?? throw new InvalidOperationException("No encounter selected.");
             if (ticket.Enemies != null) return ticket.Enemies;
-            var normal = roster.Where(c => c.Trait != CharacterTrait.EnemyBell && c.Trait != CharacterTrait.EnemyRearAmbush &&
-                c.Trait != CharacterTrait.EnemyResolve).OrderBy(_ => random.Next()).ToArray();
-            var elite = roster.Where(c => c.Trait is CharacterTrait.EnemyBell or CharacterTrait.EnemyRearAmbush or CharacterTrait.EnemyResolve).ToArray();
+            EnemyRank RankOf(CharacterDefinition character) => character.Rank != EnemyRank.Unspecified
+                ? character.Rank
+                : character.Trait is CharacterTrait.EnemyBell or CharacterTrait.EnemyRearAmbush or CharacterTrait.EnemyResolve
+                    ? EnemyRank.Elite : EnemyRank.Normal;
+            var normal = roster.Where(c => RankOf(c) == EnemyRank.Normal).OrderBy(_ => random.Next()).ToArray();
             var selected = new List<(CharacterDefinition Character, bool Elite)>();
             if (ticket.Kind != NodeKind.NormalBattle)
             {
-                var primary = ticket.Kind == NodeKind.Boss ? elite.FirstOrDefault(c => c.Trait == CharacterTrait.EnemyBell) :
-                    elite.ElementAtOrDefault(random.Next(Math.Max(1, elite.Length)));
-                primary ??= roster.First();
+                var rank = ticket.Kind == NodeKind.Boss ? EnemyRank.Boss : EnemyRank.Elite;
+                var candidates = roster.Where(c => RankOf(c) == rank).ToArray();
+                var primary = candidates.Length > 0 ? candidates[random.Next(candidates.Length)] :
+                    roster.FirstOrDefault(c => c.Trait == CharacterTrait.EnemyBell) ?? roster.First();
                 selected.Add((primary, true));
             }
             int allies = Party.CaptureFormation(Side.Party).Count;
             int count = ticket.Kind == NodeKind.NormalBattle ? Math.Max(1, allies) :
                 Current.Event == AdventureEventKind.AscensionTrial ? 1 : Math.Min(3, Math.Max(1, allies - 1));
-            selected.AddRange(normal.Where(c => selected.All(e => e.Character.Id != c.Id)).Take(count - selected.Count).Select(c => (c, false)));
+            int usedSlots = selected.Sum(entry => entry.Character.PositionSlots);
+            foreach (var candidate in normal.Where(c => selected.All(entry => entry.Character.Id != c.Id)))
+            {
+                if (selected.Count >= count)
+                    break;
+                if (usedSlots + candidate.PositionSlots > Rules.Positions)
+                    continue;
+                selected.Add((candidate, false));
+                usedSlots += candidate.PositionSlots;
+            }
             var units = new List<Combatant>();
+            int position = 1;
             for (int i = 0; i < selected.Count; i++)
             {
                 var entry = selected[i];
@@ -400,10 +636,12 @@ namespace RaidPartyManager.Run
                 if (entry.Elite)
                 {
                     ticket.EliteIds.Add(id);
-                    stats = new Stats(stats.Attack + (ticket.Kind == NodeKind.Boss ? 2 : 1), stats.Defense + 1,
-                        stats.SpecialDefense + 1, (int)Math.Ceiling(stats.Health * (ticket.Kind == NodeKind.Boss ? 2 : 1.4)));
+                    if (entry.Character.Rank == EnemyRank.Unspecified)
+                        stats = new Stats(stats.Attack + (ticket.Kind == NodeKind.Boss ? 2 : 1), stats.Defense + 1,
+                            stats.SpecialDefense + 1, (int)Math.Ceiling(stats.Health * (ticket.Kind == NodeKind.Boss ? 2 : 1.4)));
                 }
-                units.Add(new Combatant(id, entry.Character, Side.Enemy, i + 1, stats, stats.Health));
+                units.Add(new Combatant(id, entry.Character, Side.Enemy, position, stats, stats.Health));
+                position += entry.Character.PositionSlots;
             }
             ticket.Enemies = units.ToArray();
             return ticket.Enemies;
@@ -451,8 +689,13 @@ namespace RaidPartyManager.Run
         }
 
         public static int RollKillGold(BattleResult result, IEnumerable<Combatant> enemies, Random random,
-            ISet<string> elites = null) => enemies.Where(enemy => result.HealthById[enemy.Id] == 0)
+            ISet<string> elites = null)
+        {
+            var escaped = new HashSet<string>(result.Events.Where(entry => entry.Kind == BattleEventKind.Retreated)
+                .Select(entry => entry.TargetId));
+            return enemies.Where(enemy => result.HealthById[enemy.Id] == 0 && !escaped.Contains(enemy.Id))
                 .Sum(enemy => elites?.Contains(enemy.Id) == true ? random.Next(8, 13) : random.Next(3, 6));
+        }
 
         private EquipmentDefinition RollBattleReward(bool elite, IEnumerable<string> excluded = null)
         {
@@ -461,9 +704,26 @@ namespace RaidPartyManager.Run
             return PickItem(battleLoot.Where(item => item.Tier == tier), excluded);
         }
 
+        public BattleRewards RecordBattleRewards(int gold, IEnumerable<EquipmentDefinition> items)
+        {
+            if (Current?.Battle is not { Settled: true } ticket || ticket.Reward != null)
+                throw new InvalidOperationException("Rewards need a newly settled battle.");
+            return ticket.Reward = new BattleRewards(gold, items);
+        }
+
+        public bool OpenTreasureChest()
+        {
+            if (Current is not { Kind: NodeKind.TreasureChest, Resolved: false, TreasureOpened: false })
+                return false;
+            Current.TreasureOpened = true;
+            return true;
+        }
+
         public bool ClaimReward(int index)
         {
-            if (Current == null || Current.Resolved || index < 0 || index >= Current.Rewards.Count) return false;
+            if (Current == null || Current.Resolved || index < 0 || index >= Current.Rewards.Count ||
+                Current.Kind == NodeKind.TreasureChest && !Current.TreasureOpened)
+                return false;
             var reward = Current.Rewards[index]; Party.AddEquipment(reward);
             Finish(Current.Message + $"你选择了{reward.Name}，已放入背包。"); return true;
         }
@@ -491,24 +751,62 @@ namespace RaidPartyManager.Run
         {
             if (Current == null || Current.Resolved || !Current.NeedsEvolution ||
                 Current.EvolutionMemberId != null && Current.EvolutionMemberId != memberId) return false;
-            var form = EvolutionForms(memberId).FirstOrDefault(c => c.Id == formId);
-            if (form == null || !Party.TryChangeForm(memberId, form)) return false;
+            var form = TryEvolve(memberId, formId);
+            if (form == null) return false;
             Current.EvolutionMemberId = null;
             Current.NeedsEvolution = false; Finish($"试炼完成，队员进阶为{form.Name}。原有装备保留。"); return true;
         }
 
+        private CharacterDefinition TryEvolve(string memberId, string formId)
+        {
+            var form = EvolutionForms(memberId).FirstOrDefault(c => c.Id == formId);
+            return form != null && Party.TryChangeForm(memberId, form) ? form : null;
+        }
+
+        public bool CanUseCamp => Current is { Kind: NodeKind.Camp, Resolved: false } || CanUseTown(TownService.Camp);
+
+        public IReadOnlyList<CharacterDefinition> CampRecruits => CanUseCamp
+            ? Current.Recruits.Intersect(RecruitCandidates()).ToArray() : Array.Empty<CharacterDefinition>();
+
+        public bool RecruitAtCamp(string characterId, string replaceMemberId = null)
+        {
+            var recruit = CampRecruits.FirstOrDefault(candidate => candidate.Id == characterId);
+            if (recruit == null) return false;
+            bool recruited = replaceMemberId == null ? Party.TryRecruit(recruit) : Party.TryReplaceMember(replaceMemberId, recruit);
+            if (!recruited) return false;
+            FinishCamp($"{recruit.Name}加入了讨伐队。");
+            return true;
+        }
+
+        public bool EvolveAtCamp(string memberId, string formId)
+        {
+            if (!CanUseCamp) return false;
+            var form = TryEvolve(memberId, formId);
+            if (form == null) return false;
+            FinishCamp($"篝火旁，队员升阶为{form.Name}。原有装备保留。");
+            return true;
+        }
+
         public bool Rest()
         {
-            if (Current == null || Current.Resolved || Current.Rested ||
-                Current.Kind != NodeKind.Camp && !CanUseTown(TownService.Camp)) return false;
-            int healed = Party.Rest(0.3); Current.Rested = true;
+            if (!CanUseCamp || Current.Rested) return false;
+            int healed = Party.Rest(0.3);
+            Current.Rested = true;
+            FinishCamp($"队伍休息完毕，合计恢复 {healed} 点生命。");
+            return true;
+        }
+
+        private void FinishCamp(string message)
+        {
             if (Current.Kind == NodeKind.Town)
             {
                 Current.UsedServices.Add(TownService.Camp);
-                Current.Message = $"队伍休息完毕，合计恢复 {healed} 点生命。";
+                Current.Message = message;
             }
-            else Finish($"队伍休息完毕。每名在场存活队员恢复最大生命的 30%，合计恢复 {healed} 点。");
-            return true;
+            else
+            {
+                Finish(message);
+            }
         }
 
         public bool CanUseTown(TownService service) => Current?.Kind == NodeKind.Town && !Current.Resolved &&
@@ -552,7 +850,9 @@ namespace RaidPartyManager.Run
 
         public bool Leave()
         {
-            if (Current == null || Current.Battle != null && !Current.Battle.Settled) return false;
+            if (Current == null || Current.Battle != null && !Current.Battle.Settled ||
+                Current.Kind == NodeKind.TreasureChest && !Current.Resolved && !IsInspection)
+                return false;
             if (!Current.Resolved) Finish("你整顿行囊，继续前进。");
             return CloseVisit();
         }
@@ -560,26 +860,40 @@ namespace RaidPartyManager.Run
         public bool CloseVisit()
         {
             if (Current == null || !Current.Resolved) return false;
-            Current = null; CompletedNodes++; ProcessReturns();
-            if (!IsInspection)
+            Current = null;
+            AdvanceCompletedVisit();
+            return true;
+        }
+
+        private void AdvanceCompletedVisit()
+        {
+            CompletedNodes++;
+            ProcessReturns();
+            if (RouteDestination is RouteStop destination)
             {
-                if (Stage == 10) FloorCleared = !Failed;
+                RoutePrevious = RouteCurrent;
+                RouteCurrent = destination;
+                RouteDestination = null;
+                if (Stage == DockRoute.Stages) FloorCleared = !Failed;
                 else Stage++;
             }
-            routeOptions = null; return true;
+            nodeCheckpoint = null;
+            routeOptions = null;
         }
 
         public void AdvanceInspection()
         {
             if (!IsInspection || Current?.Battle != null && !Current.Battle.Settled) return;
             if (Current != null) { Leave(); return; }
-            CompletedNodes++; Stage = Stage == 10 ? 1 : Stage + 1; ProcessReturns();
+            CompletedNodes++; Stage = Stage == DockRoute.Stages ? 1 : Stage + 1; ProcessReturns();
         }
 
         public bool NextFloor()
         {
             if (!IsInspection && !FloorCleared || Current != null) return false;
             Floor++; Stage = 1; FloorCleared = Failed = false; eventsTaken = elitesTaken = 0;
+            RouteCurrent = default;
+            RoutePrevious = RouteDestination = null;
             routeOptions = null; Route = new DockRoute(random); return true;
         }
 

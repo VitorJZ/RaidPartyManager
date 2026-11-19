@@ -31,36 +31,74 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void EveryForkPathPreservesTenNodesFiveFightsAndServiceQuotas()
+        public void EveryForkPathHasThreeMandatoryBattlesAndOneTreasureChest()
         {
-            var layouts = new HashSet<string>();
+            var chestLocations = new HashSet<int>();
             for (int seed = 0; seed < 120; seed++)
-            for (int path = 0; path < 8; path++)
             {
                 var route = new DockRoute(new Random(seed));
-                Assert.That(route.Nodes.Count(n => n.IsFork), Is.EqualTo(3));
-                layouts.Add(string.Join(",", route.Nodes.Where(n => n.IsFork).Select(n => n.Number)));
+                Assert.That(route.Nodes.Select(n => n.Number), Is.EqualTo(Enumerable.Range(1, 10)));
+                Assert.That(route.Nodes[0].Kind, Is.EqualTo(NodeKind.NormalBattle));
                 Assert.That(route.Nodes[9].Kind, Is.EqualTo(NodeKind.Boss));
-                Assert.That(route.Nodes.Where(n => (n.Replaces ?? n.Kind) == NodeKind.Camp && n.Number >= 4 && n.Number <= 6).Count(), Is.EqualTo(1));
-                Assert.That(route.Nodes.Where(n => (n.Replaces ?? n.Kind) == NodeKind.Camp && n.Number >= 7 && n.Number <= 9).Count(), Is.EqualTo(1));
+                Assert.That(route.Nodes.Count(n => n.IsFork), Is.EqualTo(5));
+                Assert.That(route.Nodes.Count(n => !n.IsFork && n.Kind is NodeKind.NormalBattle or NodeKind.EliteBattle), Is.EqualTo(3));
+                var chest = route.Nodes.Single(n => n.Kind == NodeKind.TreasureChest);
+                Assert.That(chest.IsFork, Is.False);
+                Assert.That(chest.Number, Is.InRange(3, 8));
+                chestLocations.Add(chest.Number);
+                Assert.That(route.Nodes.Count(n => (n.Replaces ?? n.Kind) == NodeKind.Camp && n.Number is >= 4 and <= 6), Is.EqualTo(1));
+                Assert.That(route.Nodes.Count(n => (n.Replaces ?? n.Kind) == NodeKind.Camp && n.Number is >= 7 and <= 9), Is.EqualTo(1));
                 Assert.That(route.Nodes.Count(n => (n.Replaces ?? n.Kind) == NodeKind.Shop), Is.EqualTo(1));
                 Assert.That(route.Nodes.Where(n => n.Kind == NodeKind.Town).All(n => n.Number > 5), Is.True);
-                int events = 0, elites = 0, fights = 0, fork = 0;
                 var random = new Random(seed * 13 + 4);
-                for (int stage = 1; stage < 10; stage++)
+                for (int path = 0; path < 32; path++)
                 {
-                    var options = route.Options(stage, events, elites, random);
-                    Assert.That(options.Distinct().Count(), Is.EqualTo(options.Count));
-                    var chosen = options[options.Count == 2 ? (path >> fork++) & 1 : 0];
-                    if (chosen == NodeKind.Event) events++;
-                    if (chosen == NodeKind.EliteBattle) { elites++; Assert.That(stage, Is.InRange(5, 9)); }
-                    if (chosen is NodeKind.NormalBattle or NodeKind.EliteBattle) fights++;
+                    int elites = 0, fights = 0, fork = 0, chests = 0;
+                    for (int stage = 1; stage <= 10; stage++)
+                    {
+                        var options = route.Options(stage, 0, elites, random);
+                        Assert.That(options.Count, Is.EqualTo(route.Nodes[stage - 1].IsFork ? 2 : 1));
+                        Assert.That(options.Distinct().Count(), Is.EqualTo(options.Count));
+                        Assert.That(options.Count(n => n is NodeKind.Camp or NodeKind.Shop or NodeKind.Town), Is.LessThanOrEqualTo(1));
+                        if (options.Contains(NodeKind.TreasureChest))
+                            Assert.That(options.Count, Is.EqualTo(1));
+                        var chosen = options[options.Count == 2 ? (path >> fork++) & 1 : 0];
+                        if (chosen == NodeKind.TreasureChest) chests++;
+                        if (chosen == NodeKind.EliteBattle) { elites++; Assert.That(stage, Is.InRange(5, 9)); }
+                        if (chosen is NodeKind.NormalBattle or NodeKind.EliteBattle) fights++;
+                    }
+                    Assert.That(fights, Is.GreaterThanOrEqualTo(3));
+                    Assert.That(elites, Is.InRange(1, 3));
+                    Assert.That(chests, Is.EqualTo(1));
                 }
-                Assert.That(fights, Is.GreaterThanOrEqualTo(5), $"seed {seed}, path {path}");
-                Assert.That(elites, Is.InRange(1, 3));
-                Assert.That(events, Is.LessThanOrEqualTo(1));
             }
-            Assert.That(layouts.Count, Is.GreaterThan(3));
+            Assert.That(chestLocations, Is.EquivalentTo(Enumerable.Range(3, 6)));
+        }
+
+        [Test]
+        public void TreasureChestOffersThreeDistinctNonPotionItemsAfterOpening()
+        {
+            var drawn = new List<EquipmentDefinition>();
+            for (int seed = 0; seed < 40; seed++)
+            {
+                var party = Create(seed).Party;
+                var run = new AdventureRun(party, content.CharacterCatalog, gear.Concat(content.SkillBooks), true, new Random(seed));
+                Assert.That(run.Inspect(NodeKind.TreasureChest), Is.True);
+                var choices = run.Current.Rewards;
+                drawn.AddRange(choices);
+                Assert.That(choices.Select(item => item.Id).Distinct().Count(), Is.EqualTo(3));
+                Assert.That(choices.All(item => !item.IsPotion && item.Tier is >= 1 and <= 3), Is.True);
+                Assert.That(run.ClaimReward(0), Is.False);
+                Assert.That(run.OpenTreasureChest(), Is.True);
+                Assert.That(run.OpenTreasureChest(), Is.False);
+                var expected = choices[1];
+                Assert.That(run.ClaimReward(1), Is.True);
+                Assert.That(run.ClaimReward(0), Is.False);
+                Assert.That(party.Inventory.Concat(party.SkillBooks).Last(item => item.Definition.Id == expected.Id).Definition,
+                    Is.SameAs(expected));
+                Assert.That(run.CloseVisit(), Is.True);
+            }
+            Assert.That(drawn.Any(item => item is SkillBookDefinition), Is.True);
         }
 
         [Test]
@@ -164,8 +202,11 @@ namespace RaidPartyManager.Tests
             string item = run.Party.Inventory.First().Id; run.Party.TryEquip(old.Id, 0, item);
             run.Inspect(NodeKind.Event, AdventureEventKind.LostTraveler);
             Assert.That(run.Current.Professions.Count, Is.EqualTo(2));
-            var profession = run.Current.Professions.First(); run.ChooseProfession(profession);
+            var profession = run.Current.Professions.First();
+            var preview = run.Current.Recruits.Single(candidate => candidate.Profession == profession);
+            run.ChooseProfession(profession);
             var recruit = run.Current.PendingRecruit;
+            Assert.That(recruit, Is.SameAs(preview));
             Assert.That(recruit.Profession, Is.EqualTo(profession)); Assert.That(recruit.Stage, Is.EqualTo(1));
             Assert.That(run.CompleteRecruit(old.Id), Is.True);
             Assert.That(run.Party.Members.Count, Is.EqualTo(4));
@@ -275,7 +316,10 @@ namespace RaidPartyManager.Tests
             Assert.That(art.EventInkShader, Is.Not.Null);
             Assert.That(art.Hat, Is.Not.Null); Assert.That(art.TownBackdrop, Is.Not.Null);
             Assert.That(art.EventParchment, Is.Not.Null);
-            foreach (NodeKind kind in Enum.GetValues(typeof(NodeKind))) Assert.That(art.NodeIcon(kind), Is.Not.Null);
+            Assert.That(art.RouteSignpost, Is.Not.Null);
+            var icons = Enum.GetValues(typeof(NodeKind)).Cast<NodeKind>().Select(art.NodeIcon).ToArray();
+            Assert.That(icons, Is.All.Not.Null);
+            Assert.That(icons.Distinct().Count(), Is.EqualTo(icons.Length));
         }
 
         [Test]

@@ -6,7 +6,6 @@ namespace RaidPartyManager.Presentation
     internal sealed class BattleEffectPlayback
     {
         private const int EnemyFrames = 8;
-        private const int SkillFrames = 12;
         private readonly Texture2D atlas;
         private readonly Image image;
         private readonly int frameCount;
@@ -22,9 +21,9 @@ namespace RaidPartyManager.Presentation
             SkillBookId = skillBookId;
             this.atlas = atlas;
             bool isSkill = skillBookId != null;
-            frameCount = isSkill ? SkillFrames : EnemyFrames;
+            frameCount = isSkill ? Mathf.Max(1, atlas.width / atlas.height) : EnemyFrames;
             startedAt = now;
-            endsAt = now + (isSkill ? 0.64f : 0.45f) * scale;
+            endsAt = now + (isSkill ? 0.72f : 0.45f) * scale;
             image = new Image
             {
                 name = isSkill ? "battle-skill-effect" : "battle-impact-effect",

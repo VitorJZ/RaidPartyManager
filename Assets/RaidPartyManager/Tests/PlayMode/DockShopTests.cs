@@ -57,11 +57,15 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("shop-offer-2").worldBound.center.y,
                 Is.GreaterThan(root.Q("shop-offer-0").worldBound.center.y));
 
-            ConfigureOneOfEachLowerTier(shop);
+            ConfigureLowerTierStock(shop);
             root = shop.GetComponent<UIDocument>().rootVisualElement;
             yield return null;
             var merchant = root.Q<Image>("shop-merchant");
-            Assert.That(merchant.image, Is.Not.Null);
+            var sheet = merchant.image;
+            var laugh = (Texture2D)typeof(DockShop).GetField("merchantLaugh", Private).GetValue(shop);
+            Assert.That(sheet, Is.Not.Null);
+            Assert.That(laugh, Is.Not.Null);
+            Assert.That(laugh, Is.Not.SameAs(sheet));
             Assert.That(merchant.sourceRect.x, Is.Zero);
             var high = OfferViews(root).First(view => OfferTier(shop, view) == 1);
             var medium = OfferViews(root).Single(view => OfferTier(shop, view) == 2);
@@ -72,7 +76,7 @@ namespace RaidPartyManager.Tests
             Enter(medium);
             Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
             Enter(low);
-            Assert.That(merchant.sourceRect.x, Is.Zero);
+            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
 
             Down(high);
             Assert.That(root.Q("shop-drag-preview"), Is.Not.Null);
@@ -93,18 +97,22 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo($"金币  {999 - price}"));
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 1));
             Assert.That(root.Q<Label>("shop-feedback").text, Does.Contain("共享背包"));
-            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width * 2).Within(0.1f));
+            Assert.That(merchant.image, Is.SameAs(laugh));
+            Assert.That(merchant.sourceRect, Is.EqualTo(new Rect(0, 0, laugh.width, laugh.height)));
+            Enter(medium);
+            Assert.That(merchant.image, Is.SameAs(laugh));
 
             yield return new WaitForSecondsRealtime(0.12f);
             Assert.That(Mathf.Abs(root.Q("shop-merchant-stage").resolvedStyle.translate.y), Is.GreaterThan(0.05f));
             yield return new WaitForSecondsRealtime(1.1f);
             Assert.That(root.Q("shop-merchant-stage").resolvedStyle.translate.y, Is.EqualTo(0f).Within(0.01f));
-            Assert.That(merchant.sourceRect.x, Is.Zero);
+            Assert.That(merchant.image, Is.SameAs(sheet));
+            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
 
-            Down(medium);
+            Down(low);
             Move(root, counter);
             Up(root, counter);
-            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
+            Assert.That(merchant.image, Is.SameAs(laugh));
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 2));
             Press(root, "open-settings");
             Press(root, "return-main-menu");
@@ -120,7 +128,7 @@ namespace RaidPartyManager.Tests
             yield return SceneManager.LoadSceneAsync("DockShop");
             yield return null;
             var shop = Object.FindAnyObjectByType<DockShop>();
-            ConfigureOneOfEachLowerTier(shop);
+            ConfigureLowerTierStock(shop, "MurkyWater", "Bludgeon");
             var document = shop.GetComponent<UIDocument>();
             var originalSettings = document.panelSettings;
             var settings = Object.Instantiate(originalSettings);
@@ -139,14 +147,20 @@ namespace RaidPartyManager.Tests
                 var face = new Rect(bounds.x + bounds.width * 0.25f,
                     bounds.y + bounds.height * 0.08f, bounds.width * 0.5f, bounds.height * 0.42f);
                 var idle = ReadFace(target, face);
-                var medium = OfferViews(root).Single(view => OfferTier(shop, view) == 2);
                 var high = OfferViews(root).First(view => OfferTier(shop, view) == 1);
-                Enter(medium);
-                yield return new WaitForSecondsRealtime(0.1f);
-                Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
-                var happy = ReadFace(target, face);
-                Assert.That(ChangedPixels(idle, happy), Is.GreaterThan(idle.Length / 50),
-                    "Hover must repaint the merchant's face on screen.");
+                Color32[] happy = null;
+                foreach (string item in new[] { "浑浊的水", "打狗棒" })
+                {
+                    var offer = OfferViews(root).Single(view => view.Q<Label>("shop-item-name").text == item);
+                    Move(root, offer.worldBound.center);
+                    yield return new WaitForSecondsRealtime(0.1f);
+                    Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f), item);
+                    happy = ReadFace(target, face);
+                    Assert.That(ChangedPixels(idle, happy), Is.GreaterThan(idle.Length / 50), item);
+                    Move(root, new Vector2(650, 690));
+                    yield return new WaitForSecondsRealtime(0.1f);
+                    Assert.That(ChangedPixels(idle, ReadFace(target, face)), Is.LessThan(idle.Length / 200), item);
+                }
                 Enter(high);
                 yield return new WaitForSecondsRealtime(0.1f);
                 Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width * 2).Within(0.1f));
@@ -204,6 +218,8 @@ namespace RaidPartyManager.Tests
             Assert.That(offer.Q("shop-sold"), Is.Null);
             Assert.That(root.Q<Label>("shop-feedback").text, Is.EqualTo("金币不足"));
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  0"));
+            Assert.That(root.Q<Image>("shop-merchant").image,
+                Is.SameAs(typeof(DockShop).GetField("merchantSheet", Private).GetValue(shop)));
 
             funds.SetValue(shop, 999);
             typeof(DockShop).GetMethod("RefreshGold", Private).Invoke(shop, null);
@@ -238,15 +254,16 @@ namespace RaidPartyManager.Tests
         private static int Price(VisualElement view) =>
             int.Parse(Regex.Match(view.Q<Label>("shop-item-price").text, @"\d+").Value);
 
-        private static void ConfigureOneOfEachLowerTier(DockShop shop)
+        private static void ConfigureLowerTierStock(DockShop shop, params string[] assetNames)
         {
             var field = typeof(DockShop).GetField("stockPool", Private);
             var pool = (System.Array)field.GetValue(shop);
             var assets = pool.Cast<Object>().ToArray();
             int Tier(Object asset) => (int)asset.GetType().GetProperty("ShopTier").GetValue(asset);
-            var selected = assets.Where(asset => Tier(asset) == 1).Take(2)
-                .Concat(assets.Where(asset => Tier(asset) == 2).Take(1))
-                .Concat(assets.Where(asset => Tier(asset) == 3).Take(1)).ToArray();
+            var lower = assetNames.Length == 0
+                ? new[] { assets.First(asset => Tier(asset) == 2), assets.First(asset => Tier(asset) == 3) }
+                : assetNames.Select(name => assets.Single(asset => asset.name == name)).ToArray();
+            var selected = assets.Where(asset => Tier(asset) == 1).Take(2).Concat(lower).ToArray();
             var fixture = System.Array.CreateInstance(pool.GetType().GetElementType(), selected.Length);
             for (int i = 0; i < selected.Length; i++)
                 fixture.SetValue(selected[i], i);

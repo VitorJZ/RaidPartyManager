@@ -21,14 +21,16 @@ namespace RaidPartyManager.Presentation
         private readonly EncounterData content;
         private readonly Action close;
         private readonly ScrollView choices;
-        private readonly Action refreshTopBar;
+        private readonly RunTopBar topBar;
         private readonly List<string> forge = new List<string>();
         private bool choosingChestCompanion;
+        private readonly TreasureChestView treasureChest;
+        private bool openingTreasureChest;
 
-        internal AdventureEventWindow(AdventureRun run, AdventureContentAsset art, Action close, Action refreshTopBar)
+        internal AdventureEventWindow(AdventureRun run, AdventureContentAsset art, Action close, RunTopBar topBar)
         {
             this.run = run; this.art = art; this.close = close; content = art.Encounter;
-            this.refreshTopBar = refreshTopBar;
+            this.topBar = topBar;
             name = "event-window";
             PrototypeStyle.Fill(this);
             style.backgroundColor = new Color(0, 0, 0, 0.78f);
@@ -54,21 +56,29 @@ namespace RaidPartyManager.Presentation
             panel.Add(spread);
 
             var eventKind = run.Current.Event;
-            var inkArt = eventKind.HasValue ? art.EventInkArt(eventKind.Value) : null;
-            var image = new Image
+            if (run.Current.Kind == NodeKind.TreasureChest)
             {
-                name = "event-illustration",
-                image = inkArt ?? (eventKind.HasValue ? art.EventArt(eventKind.Value) : art.Backdrop),
-                scaleMode = ScaleMode.ScaleToFit,
-                pickingMode = PickingMode.Ignore
-            };
-            image.style.flexGrow = 1;
-            image.style.flexBasis = 0;
-            image.style.minWidth = 0;
-            image.style.marginRight = 14;
-            if (inkArt != null && art.EventInkShader != null)
-                ApplyInkLayer(image, inkArt, art.EventInkShader);
-            spread.Add(image);
+                treasureChest = new TreasureChestView(art, run.Current.TreasureOpened);
+                spread.Add(treasureChest);
+            }
+            else
+            {
+                var inkArt = eventKind.HasValue ? art.EventInkArt(eventKind.Value) : null;
+                var image = new Image
+                {
+                    name = "event-illustration",
+                    image = inkArt ?? (eventKind.HasValue ? art.EventArt(eventKind.Value) : art.Backdrop),
+                    scaleMode = ScaleMode.ScaleToFit,
+                    pickingMode = PickingMode.Ignore
+                };
+                image.style.flexGrow = 1;
+                image.style.flexBasis = 0;
+                image.style.minWidth = 0;
+                image.style.marginRight = 14;
+                if (inkArt != null && art.EventInkShader != null)
+                    ApplyInkLayer(image, inkArt, art.EventInkShader);
+                spread.Add(image);
+            }
 
             var right = new VisualElement { name = "event-right-page" };
             right.style.flexGrow = 1;
@@ -91,7 +101,8 @@ namespace RaidPartyManager.Presentation
             var leave = PrototypeStyle.Button("离开", "close-event", Leave);
             StylePaperButton(leave);
             leave.style.minWidth = 58;
-            header.Add(leave);
+            if (treasureChest == null)
+                header.Add(leave);
             right.Add(header);
 
             var story = new ScrollView(ScrollViewMode.Vertical) { name = "event-story" };
@@ -105,8 +116,10 @@ namespace RaidPartyManager.Presentation
             story.style.borderBottomWidth = 1;
             story.style.borderBottomColor = PaperRule;
             right.Add(story);
-            var text = PaperText(eventKind.HasValue ? AdventureFlow.Narrative(eventKind.Value) :
-                "战斗结束。收好战利品，整顿队伍，再去下一站。", 16);
+            var text = PaperText(treasureChest != null
+                ? "潮水退去，一只海箱搁在缆桩旁。搭扣早被盐蚀松了，轻轻一拨就能掀开。"
+                : eventKind.HasValue ? AdventureFlow.Narrative(eventKind.Value)
+                : "战斗结束。收好战利品，整顿队伍，再去下一站。", 16);
             text.name = "event-description";
             story.Add(text);
 
@@ -121,7 +134,7 @@ namespace RaidPartyManager.Presentation
             RenderChoices();
         }
 
-        private static void ApplyInkLayer(Image image, Texture2D source, Shader shader)
+        internal static void ApplyInkLayer(Image image, Texture2D source, Shader shader)
         {
             RenderTexture ink = null;
             image.RegisterCallback<AttachToPanelEvent>(_ =>
@@ -168,8 +181,53 @@ namespace RaidPartyManager.Presentation
             button.RegisterCallback<FocusOutEvent>(_ => button.style.borderBottomColor = selected ? PaperAccent : PaperRule);
         }
 
+        private void RenderTreasureRewards(AdventureVisit visit)
+        {
+            if (openingTreasureChest)
+                return;
+            if (!visit.TreasureOpened)
+            {
+                AdventureWidgets.Action(choices, "拨开搭扣", "open-treasure-chest", () =>
+                {
+                    if (!run.OpenTreasureChest())
+                        return;
+                    openingTreasureChest = true;
+                    RenderChoices();
+                    treasureChest.Play(() =>
+                    {
+                        openingTreasureChest = false;
+                        RenderChoices();
+                    });
+                });
+                return;
+            }
+
+            choices.Add(PaperText("从箱中挑一件带走", 18, PaperAccent));
+            for (int index = 0; index < visit.Rewards.Count; index++)
+            {
+                int rewardIndex = index;
+                string id = "chest-reward-" + index;
+                AdventureWidgets.Item(choices, visit.Rewards[index], content, id,
+                    () => Collect(id, () => run.ClaimReward(rewardIndex)));
+            }
+        }
+
+        private void Collect(string id, Func<bool> grant) => CollectFrom(choices.Q<Button>(id), grant);
+
+        private void CollectFrom(VisualElement source, Func<bool> grant)
+        {
+            if (topBar.CollectReward(source, grant))
+                RenderChoices();
+        }
+
         private void Leave()
         {
+            if (topBar.HasRewardFlights)
+            {
+                topBar.WhenRewardsArrive(Leave);
+                return;
+            }
+
             if (run.Current.Resolved) run.CloseVisit(); else run.Leave();
             close();
         }
@@ -183,26 +241,31 @@ namespace RaidPartyManager.Presentation
                 forge.RemoveAll(id => !available.Contains(id));
             }
             if (visit.PendingRecruit != null || visit.Event is AdventureEventKind.Forge or AdventureEventKind.LockedChest or
-                AdventureEventKind.Ambush or AdventureEventKind.AscensionTrial)
+                AdventureEventKind.Ambush or AdventureEventKind.AscensionTrial or AdventureEventKind.LostTraveler)
                 RenderChoices();
         }
 
         private void RenderChoices()
         {
             choices.Clear();
-            refreshTopBar();
+            topBar.Refresh();
             var visit = run.Current;
             if (visit.Event == AdventureEventKind.HatTrick)
-                choices.Add(new HatGameView(run, art.Hat, content, RenderChoices));
+                choices.Add(new HatGameView(run, art.Hat, content, CollectFrom));
             if (visit.Resolved)
             {
                 choices.Add(PaperText(visit.Message, 17, PaperAccent));
                 AdventureWidgets.Action(choices, "继续前进", "finish-event", Leave);
                 return;
             }
+            if (treasureChest != null)
+            {
+                RenderTreasureRewards(visit);
+                return;
+            }
             if (visit.Battle?.Settled == true)
             {
-                AdventureWidgets.BattleRewards(choices, run, content, RenderChoices);
+                AdventureWidgets.BattleRewards(choices, run, content, RenderChoices, Collect);
                 return;
             }
             if (visit.PendingRecruit != null)
@@ -230,25 +293,30 @@ namespace RaidPartyManager.Presentation
                     amount.labelElement.style.width = 110;
                     choices.Add(amount);
                     choices.Add(PaperText($"可投入 1～{run.Party.Gold} 金币", 13, PaperMuted));
-                    AdventureWidgets.Action(choices, "出一份力", "event-invest", () =>
-                    { run.Donate(amount.value); RenderChoices(); }, run.Party.Gold > 0);
-                    AdventureWidgets.Action(choices, "把金币全留给他", "event-invest-all", () =>
-                    { run.Donate(run.Party.Gold); RenderChoices(); }, run.Party.Gold > 0);
+                    AdventureWidgets.Action(choices, "出一份力", "event-invest",
+                        () => Collect("event-invest", () => run.Donate(amount.value)), run.Party.Gold > 0);
+                    AdventureWidgets.Action(choices, "把金币全留给他", "event-invest-all",
+                        () => Collect("event-invest-all", () => run.Donate(run.Party.Gold)), run.Party.Gold > 0);
                     break;
                 case AdventureEventKind.FoundCoins:
-                    AdventureWidgets.Action(choices, "拾起钱袋", "event-collect-coins", () => { run.CollectCoins(); RenderChoices(); });
+                    AdventureWidgets.Action(choices, "拾起钱袋", "event-collect-coins", () => Collect("event-collect-coins", run.CollectCoins));
                     break;
                 case AdventureEventKind.LostTraveler:
                     choices.Add(PaperText("你打算怎么搭话？", 18, PaperAccent));
-                    foreach (var profession in visit.Professions)
-                        AdventureWidgets.Action(choices, $"“你是{AdventureFlow.ProfessionName(profession)}？”", "event-profession-" + profession,
-                            () => { run.ChooseProfession(profession); RenderChoices(); });
+                    foreach (var recruit in visit.Recruits)
+                    {
+                        var profession = recruit.Profession;
+                        var option = AdventureWidgets.Action(choices, $"“你是{AdventureFlow.ProfessionName(profession)}？”",
+                            "event-profession-" + profession, () => { run.ChooseProfession(profession); RenderChoices(); },
+                            !run.Party.Members.Any(member => member.Character.Id == recruit.Id));
+                        CharacterChoicePreview.Attach(option, recruit, content.PortraitFor(recruit.Id));
+                    }
                     if (visit.Professions.Count == 0) choices.Add(PaperText("旅行者问清了路，笑着向你们道别。", 15));
                     break;
                 case AdventureEventKind.Forge:
                     choices.Add(PaperText($"挑两件背包里的旧物  {forge.Count}／2", 17, PaperAccent));
-                    AdventureWidgets.Action(choices, "把旧物交给铁匠", "event-forge-confirm", () =>
-                    { run.Forge(forge[0], forge[1]); RenderChoices(); }, forge.Count == 2);
+                    AdventureWidgets.Action(choices, "把旧物交给铁匠", "event-forge-confirm",
+                        () => Collect("event-forge-confirm", () => run.Forge(forge[0], forge[1])), forge.Count == 2);
                     foreach (var item in run.ForgeInputs)
                         AdventureWidgets.Item(choices, item.Definition, content, "forge-item-" + item.Id, () =>
                         {
@@ -272,14 +340,14 @@ namespace RaidPartyManager.Presentation
                     choices.Add(PaperText("谁留下开锁，晚些再跟上？", 18, PaperAccent));
                     foreach (var member in present)
                         AdventureWidgets.Character(choices, member.Character, content, "leave-companion-" + member.Id, () =>
-                        { run.LeaveCompanion(member.Id); RenderChoices(); }, run.Party.CanSendAway(member.Id));
+                        { run.LeaveCompanion(member.Id); RenderChoices(); }, run.Party.CanSendAway(member.Id), member);
                     AdventureWidgets.Action(choices, "返回", "chest-back", () =>
                     { choosingChestCompanion = false; RenderChoices(); });
                     break;
                 }
                 case AdventureEventKind.AscensionTrial:
-                    AdventureWidgets.Action(choices, "收下台阶上的包裹", "event-trial-gift", () =>
-                    { run.TakeTrialGift(); RenderChoices(); });
+                    AdventureWidgets.Action(choices, "收下台阶上的包裹", "event-trial-gift",
+                        () => Collect("event-trial-gift", run.TakeTrialGift));
                     AdventureWidgets.Action(choices, "跨过门槛，接受挑战", "event-trial-battle", StartBattle,
                         run.Party.CanStartBattle && run.EvolutionCandidates.Count > 0);
                     break;
@@ -290,8 +358,9 @@ namespace RaidPartyManager.Presentation
                     for (int i = 0; i < visit.Potions.Count; i++)
                     {
                         int index = i;
-                        AdventureWidgets.Item(choices, visit.Potions[i], content, "event-potion-" + i, () =>
-                        { run.ChoosePotion(index); RenderChoices(); }, caption: PotionClue(visit.Potions[i].Effect));
+                        string id = "event-potion-" + i;
+                        AdventureWidgets.Item(choices, visit.Potions[i], content, id,
+                            () => Collect(id, () => run.ChoosePotion(index)), caption: PotionClue(visit.Potions[i].Effect));
                     }
                     break;
             }

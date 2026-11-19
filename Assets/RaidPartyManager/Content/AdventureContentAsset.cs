@@ -15,12 +15,20 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D[] eventInkArtwork;
         [SerializeField] private Shader eventInkShader;
         [SerializeField] private Texture2D[] nodeIcons;
+        [SerializeField] private Texture2D routeSignpost;
+        [SerializeField] private Texture2D chestClosed;
+        [SerializeField] private Texture2D chestAjar;
+        [SerializeField] private Texture2D chestOpen;
 
         public EncounterData Encounter => encounter.ToData();
         public Texture2D Backdrop => backdrop;
+        public Texture2D RouteSignpost => routeSignpost;
         public Texture2D TownBackdrop => townBackdrop;
         public Texture2D EventParchment => eventParchment;
         public Texture2D Hat => hat;
+        public Texture2D ChestClosed => chestClosed;
+        public Texture2D ChestAjar => chestAjar;
+        public Texture2D ChestOpen => chestOpen;
         public Texture2D EventArt(AdventureEventKind kind) => (int)kind < eventArtwork.Length ? eventArtwork[(int)kind] : null;
         public Shader EventInkShader => eventInkShader;
         public Texture2D EventInkArt(AdventureEventKind kind)
@@ -31,8 +39,9 @@ namespace RaidPartyManager.Content
         public Texture2D NodeIcon(NodeKind kind)
         {
             int index = kind switch { NodeKind.Event => 0, NodeKind.Town => 1, NodeKind.Camp => 2,
-                NodeKind.Shop => 3, NodeKind.NormalBattle => 4, _ => 5 };
-            return index < nodeIcons.Length ? nodeIcons[index] : null;
+                NodeKind.Shop => 3, NodeKind.NormalBattle => 4, NodeKind.EliteBattle => 5, NodeKind.Boss => 6,
+                NodeKind.TreasureChest => 7, _ => -1 };
+            return index >= 0 && index < nodeIcons.Length ? nodeIcons[index] : null;
         }
     }
 }

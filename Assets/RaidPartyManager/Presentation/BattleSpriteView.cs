@@ -33,17 +33,23 @@ namespace RaidPartyManager.Presentation
         private int displayedFrame = -1;
         private float effectProgress = -1f;
         private bool usesExternalEffect;
+        private bool fullActionPose;
+        private bool retreating;
+        private Texture2D retreatWalk;
 
         public Texture2D Sheet { get; }
+        public bool UsesPortrait { get; }
         public Image Figure => figure;
         public bool IsAlive => alive == true;
         public bool HasWideAttack => attackSheet != null || specialSheet != null;
         public bool FacesLeft { get; }
 
-        public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position, bool facesLeft)
+        public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position, bool facesLeft,
+            bool usesPortrait = false)
         {
             name = "profession-portrait-art";
             Sheet = sheet;
+            UsesPortrait = usesPortrait;
             this.attackSheet = attackSheet;
             this.profession = profession;
             FacesLeft = facesLeft;
@@ -72,6 +78,8 @@ namespace RaidPartyManager.Presentation
             };
             figure.style.position = Position.Absolute;
             figure.style.bottom = 0;
+            if (UsesPortrait)
+                figure.sourceRect = new Rect(0, 0, sheet.width, sheet.height);
             Add(figure);
 
             effects = new VisualElement { name = "battle-sprite-effects", pickingMode = PickingMode.Ignore };
@@ -88,7 +96,8 @@ namespace RaidPartyManager.Presentation
             if (!(size.x > 0f && size.y > 0f))
                 return;
 
-            float ratio = (float)(Sheet.width / Columns) / (Sheet.height / Rows);
+            float ratio = UsesPortrait ? (float)Sheet.width / Sheet.height :
+                (float)(Sheet.width / Columns) / (Sheet.height / Rows);
             float width = Mathf.Min(size.x, size.y * ratio);
             float height = width / ratio;
             figure.style.left = (size.x - width) * 0.5f;
@@ -96,16 +105,18 @@ namespace RaidPartyManager.Presentation
             figure.style.height = height;
         }
 
-        private bool SimpleGuard => action == ActionKind.Shield && specialSheet == null;
+        private bool SimpleGuard => action == ActionKind.Shield && specialSheet == null && !fullActionPose;
         public float ActionLength => SimpleGuard ? 0.48f : actionEnds[^1];
 
-        public float PlayAction(ActionKind kind, double now, float scale, bool usesExternalEffect, Texture2D special)
+        public float PlayAction(ActionKind kind, double now, float scale, bool usesExternalEffect, Texture2D special,
+            bool fullPose = false)
         {
             action = kind;
             specialSheet = special;
             displayedFrame = -1;
             actionScale = scale;
             this.usesExternalEffect = usesExternalEffect;
+            fullActionPose = fullPose;
             SetMotion(Motion.Action, now);
             return (SimpleGuard ? 0.16f : impactTime) * scale;
         }
@@ -116,13 +127,20 @@ namespace RaidPartyManager.Presentation
             effects.visible = visible || keepLocalEffects;
         }
 
-        public Vector2 PoseSize(Vector2 idleSize) => Vector2.Scale(idleSize,
+        public Vector2 PoseSize(Vector2 idleSize) => UsesPortrait ? idleSize : Vector2.Scale(idleSize,
             new Vector2(Figure.sourceRect.width / (Sheet.width / Columns), Figure.sourceRect.height / (Sheet.height / Rows)));
 
         public void PlayHit(double now)
         {
             if (alive == true)
                 SetMotion(Motion.Hit, now);
+        }
+
+        public void PlayRetreat(double now, Texture2D walkSheet)
+        {
+            retreating = true;
+            retreatWalk = walkSheet;
+            SetAlive(false, now);
         }
 
         public bool IsReactingAt(double now) => motion switch
@@ -137,7 +155,13 @@ namespace RaidPartyManager.Presentation
             if (alive == isAlive)
                 return;
             if (isAlive)
+            {
+                retreating = false;
+                retreatWalk = null;
+                figure.style.scale = new Scale(Vector3.one);
+                figure.style.opacity = 1;
                 SetMotion(Motion.Idle, alive.HasValue ? now : now - idleOffset);
+            }
             else
                 SetMotion(Motion.Death, alive.HasValue ? now : now - DeathEnds[^1]);
             alive = isAlive;
@@ -152,6 +176,11 @@ namespace RaidPartyManager.Presentation
         public void UpdateFrame(double now)
         {
             float elapsed = Mathf.Max(0f, (float)(now - motionStart));
+            if (retreating)
+            {
+                DrawRetreat(elapsed);
+                return;
+            }
             float actionLength = ActionLength;
             if ((motion == Motion.Hit && elapsed >= HitEnds[^1]) ||
                 (motion == Motion.Action && elapsed >= actionLength * actionScale))
@@ -193,6 +222,8 @@ namespace RaidPartyManager.Presentation
                     break;
             }
             ShowFrame(frame);
+            if (UsesPortrait)
+                PosePortrait(elapsed, actionLength, ref offset, ref lift);
             figure.tintColor = tint;
             figure.style.translate = new Translate(FacesLeft ? -offset : offset, lift, 0f);
             if (effectProgress >= 0f || light >= 0f)
@@ -200,6 +231,69 @@ namespace RaidPartyManager.Presentation
                 effectProgress = light;
                 effects.MarkDirtyRepaint();
             }
+        }
+
+        private void DrawRetreat(float elapsed)
+        {
+            float progress = Mathf.Clamp01(elapsed / DeathEnds[^1]);
+            if (retreatWalk != null)
+            {
+                int frame = (int)(elapsed * 16f) % 6;
+                if (displayedFrame != frame || figure.image != retreatWalk)
+                {
+                    displayedFrame = frame;
+                    figure.image = retreatWalk;
+                    int width = retreatWalk.width / 3;
+                    int height = retreatWalk.height / 2;
+                    figure.sourceRect = new Rect(frame % 3 * width, frame / 3 * height, width, height);
+                    figure.MarkDirtyRepaint();
+                }
+            }
+            else
+                ShowFrame(0);
+
+            figure.tintColor = Color.white;
+            figure.style.scale = new Scale(new Vector3(-1, 1, 1));
+            figure.style.translate = new Translate((FacesLeft ? 1 : -1) * 78f * progress, 0);
+            figure.style.opacity = 1f - Mathf.SmoothStep(0, 1, progress);
+        }
+
+        private void PosePortrait(float elapsed, float actionLength, ref float offset, ref float lift)
+        {
+            float lean = 0;
+            float opacity = 1;
+            if (motion == Motion.Action)
+            {
+                float progress = Mathf.Clamp01(elapsed / actionLength);
+                float thrust = Mathf.Sin(progress * Mathf.PI);
+                if (action == ActionKind.Attack)
+                {
+                    offset += thrust * (profession == Profession.Monster ? 11f : 7f);
+                    lean = thrust * 7f;
+                }
+                else
+                {
+                    lift -= thrust * 4f;
+                    lean = -thrust * 5f;
+                }
+            }
+            else if (motion == Motion.Hit)
+            {
+                lean = -Mathf.Sin(elapsed / HitEnds[^1] * Mathf.PI) * 9f;
+            }
+            else if (motion == Motion.Death)
+            {
+                float progress = Mathf.Clamp01(elapsed / DeathEnds[^1]);
+                lift += 13f * progress;
+                lean = -22f * progress;
+                opacity = 1f - progress;
+            }
+            else if (profession == Profession.Monster)
+            {
+                lift *= 3f;
+            }
+            figure.style.rotate = new Rotate(new Angle(FacesLeft ? -lean : lean));
+            figure.style.opacity = opacity;
         }
 
         private static int FrameAt(float[] frameEnds, float elapsed)
@@ -212,6 +306,8 @@ namespace RaidPartyManager.Presentation
 
         private void ShowFrame(int frame)
         {
+            if (UsesPortrait)
+                return;
             if (displayedFrame == frame)
                 return;
             displayedFrame = frame;

@@ -6,7 +6,11 @@ namespace RaidPartyManager.Presentation
     internal static class PrototypeText
     {
         public static string HealthText(int current, int maximum) => current == 0 ? $"倒下 · 0/{maximum}" : $"{current}/{maximum}";
-        public static string StatText(int effective, int baseline) => effective == baseline ? $"{effective}" : $"{effective} (+{effective - baseline})";
+        public static string StatText(int effective, int baseline)
+        {
+            int change = effective - baseline;
+            return change == 0 ? $"{effective}" : $"{effective} ({change:+0;-0})";
+        }
 
         public static string BonusText(Stats stats)
         {

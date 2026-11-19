@@ -10,7 +10,7 @@ namespace RaidPartyManager.Presentation
     {
         private readonly AdventureRun run;
         private readonly EncounterData content;
-        private readonly Action changed;
+        private readonly Action<VisualElement, Func<bool>> collect;
         private readonly Button[] hats = new Button[3];
         private readonly VisualElement track;
         private readonly Label instruction;
@@ -22,9 +22,9 @@ namespace RaidPartyManager.Presentation
         private bool moving;
         private const double SwapSeconds = 0.78;
 
-        internal HatGameView(AdventureRun run, Texture2D artwork, EncounterData content, Action changed)
+        internal HatGameView(AdventureRun run, Texture2D artwork, EncounterData content, Action<VisualElement, Func<bool>> collect)
         {
-            this.run = run; this.content = content; this.changed = changed;
+            this.run = run; this.content = content; this.collect = collect;
             name = "hat-game";
             style.minHeight = 300;
             instruction = PrototypeStyle.Text("记住左侧帽子里的物品，再开始交换。", 15, AdventureEventWindow.PaperAccent);
@@ -112,13 +112,15 @@ namespace RaidPartyManager.Presentation
         {
             if (moving || run.Current.HatStep != run.Current.HatSwaps.Count || run.Current.Resolved) return;
             int slot = Array.IndexOf(run.Current.HatPositions, hatId);
-            if (run.PickHat(slot)) changed();
+            collect(hats[hatId], () => run.PickHat(slot));
         }
 
         private void ShowItem(int slot, int hatId)
         {
             var reward = run.Current.HatRewards[hatId];
-            var item = new Image { name = "hat-revealed-item", image = content.IconFor(reward.Id), scaleMode = ScaleMode.ScaleToFit };
+            var item = EquipmentIcon.CreateArtwork(reward, content.IconFor(reward.Id));
+            item.name = "hat-revealed-item";
+            item.pickingMode = PickingMode.Position;
             item.style.position = Position.Absolute; item.style.left = Length.Percent(slot * 33.333f + 3);
             item.style.width = Length.Percent(27); item.style.height = 62; item.style.top = 70;
             if (run.Current.Resolved)

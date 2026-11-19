@@ -1,6 +1,6 @@
 # 码头商店
 
-从主菜单选择「商店」进入 `Assets/Scenes/DockShop.unity`。每次进入测试场景以 999 金币开始，金币显示在右上角。
+从主菜单选择「商店」进入 `Assets/Scenes/DockShop.unity`。每次进入测试场景以 999 金币开始，金币显示在顶栏。
 
 右侧货架为 2 × 2，每次随机选择两件 T1 和两件 T2／T3 商品，同次访问的四件商品互不重复，四个货架位置随机排列。内部的 Shop Tier 和基础 Shop Price 来自 Excel「装备图鉴」当前的 T 位与价格列。商品界面显示名称、效果和本次售价，档位供内部配货和商人表情使用。
 
@@ -8,21 +8,22 @@
 
 | 指针或操作 | 商人反馈 |
 | --- | --- |
-| 空白处或 T3 商品 | 基础微笑 |
-| T2 商品 | 更开心的笑容 |
+| 空白处 | 基础微笑 |
+| T2 或 T3 商品 | 更开心的笑容 |
 | T1 商品 | 最开心的笑容 |
-| 购买成功 | 保持对应商品的笑容，约 1 秒内上下抖动，再恢复悬停状态 |
+| 购买成功 | 切换到张嘴大笑立绘，约 1 秒内上下抖动，再恢复当前悬停对应的表情 |
 
 按下商品并拖到左侧收银台区域，松开鼠标即可购买。拖到其他位置松开会返回货架，按 Esc 可取消。购买成功后扣除标价、将该格标为已售出，并把物品加入当前 Play 会话的共享背包。金币不足时保留商品与金币，并显示提示。
 
 ![商店预览](Previews/DockShop.png)
 
-背景、商人、货架和收银台分别存于 `Assets/RaidPartyManager/Art/Shop/`。商人图集为三列一行，从左往右依次是基础微笑、开心和最开心的笑容。三个表情共用人物尺度与身体姿势。
+背景、商人、货架和收银台分别存于 `Assets/RaidPartyManager/Art/Shop/`。商人图集为三列一行，从左往右依次是基础微笑、开心和最开心的笑容。三个表情共用人物尺度与身体姿势。成交时显示单独的透明立绘 `DockShop-Merchant-Laugh.png`。
 
 | 素材 | 用途 |
 | --- | --- |
 | [DockShop-Interior.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Interior.png) | 码头商店室内背景 |
 | [DockShop-Merchant.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Merchant.png) | 三表情透明图集 |
+| [DockShop-Merchant-Laugh.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Merchant-Laugh.png) | 成交时的张嘴大笑立绘 |
 | [DockShop-Shelf.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Shelf.png) | 四格透明货架 |
 | [DockShop-Counter.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Counter.png) | 透明收银台 |
 
@@ -31,7 +32,7 @@ Play Mode 用例 `DockShopTests` 覆盖菜单入口、随机商品构成、浮�
 <details>
 <summary>ImageGen 生成提示词</summary>
 
-以上四张图由内置 ImageGen 分别生成，以 `Art/BattleBackgrounds/01-MistboundDocks.png` 为风格参考。
+背景、三表情图集、货架和收银台由内置 ImageGen 分别生成，以 `Art/BattleBackgrounds/01-MistboundDocks.png` 为风格参考。大笑立绘以三表情图集的右侧一帧为参考，通过内置 ImageGen 编辑。
 
 ### DockShop-Interior
 
@@ -55,6 +56,12 @@ Use case: stylized-concept. Production art for the 2D dark fantasy game Raid Par
 
 ```text
 Use case: stylized-concept. Production art for the 2D dark fantasy game Raid Party Manager. Match the fine hand-painted pixel-art treatment of the provided fogbound medieval dock image, muted sea-green shadows, salt-darkened oak and old brass, restrained amber lantern light, clear readable silhouettes, coherent side-view game composition. No UI, letters, numbers, logos, borders, captions or watermark. A single isolated small harbor shop checkout counter as a genuinely transparent RGBA cutout. Wide horizontal 5:2 composition. Almost front facing, dark worn plank front, broad simple pale weathered oak countertop with a clearly visible top surface taking the upper quarter. Low sturdy proportions, a few square wrought iron corner brackets. One small unmarked brass coin tray at the far right edge, leaving most of the countertop empty for a player to drop purchased equipment. Restrained warm top-edge highlights. The whole front face and countertop are contained in frame with clear transparent margins. No merchant, room, background, floor, merchandise, text, symbols, signs or large decorative clutter.
+```
+
+### DockShop-Merchant-Laugh
+
+```text
+Use case: identity-preserve. Asset type: one square transparent PNG expression frame for Raid Party Manager's shopkeeper. Edit the reference to give this exact merchant a warm, hearty, clearly wide-open laugh, with upturned cheeks, crinkled eyes, distinct upper teeth and a visible dark open mouth. Match the original square framing, face placement, hat, gray curled moustache, stubble, clothes, hands, pose, colors and painterly pixel-art rendering pixel-for-pixel wherever possible. Face and jaw are the only changes. Keep the entire same waist-up silhouette and hands anchored so it can replace the reference in-game without jumping. Single portrait, genuine transparent background, no text or effects.
 ```
 
 </details>

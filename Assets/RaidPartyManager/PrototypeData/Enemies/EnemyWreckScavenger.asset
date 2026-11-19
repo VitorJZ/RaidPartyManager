@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyWreckScavenger
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyWreckScavenger
+  displayName: "沉船拾荒者"
+  portrait: {fileID: 2800000, guid: 82581d16e50147d7875baf4c387c39d1, type: 3}
+  usePortraitInBattle: 0
+  battleAttackSheet: {fileID: 2800000, guid: d77eac3fbf8346fbb66a20a144b0c265, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 40713ff574c24298a5c87a0e7e9da634, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 707c8d1303994efc94dfc1b82603577e, type: 3}
+  profession: 3
+  enemyRank: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 36
+  traitPower: 0
+  traitText: "直接攻击。首次命中时随机偷走目标的一件装备，3回合后带着装备逃跑。"
+  personality: 1
+  attack: 4
+  defense: 0
+  specialDefense: 0
+  health: 12
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0

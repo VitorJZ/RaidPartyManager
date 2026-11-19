@@ -24,13 +24,15 @@ namespace RaidPartyManager.Presentation
         public Texture2D Artwork { get; }
         public string CharacterName { get; }
         public Rect BodyBounds => battleSprite?.Figure.worldBound ?? portrait.worldBound;
+        public int PositionSlots { get; }
 
         public BattleUnitCard(Side side, int position, string unitId, CharacterDefinition character,
-            Texture2D art, int maximumHealth, int health, int shield, double now,
+            Texture2D art, int maximumHealth, int health, int shield, double now, float portraitHeight,
             Func<StatusKind, Texture2D> statusIcon = null, BattleSpriteView battleSprite = null,
             BattleStatusTooltip statusTooltip = null)
         {
             Slot = position;
+            PositionSlots = character.PositionSlots;
             CanSwap = side == Side.Party && health > 0;
             Artwork = art;
             CharacterName = character.Name;
@@ -42,7 +44,7 @@ namespace RaidPartyManager.Presentation
 
             var life = new VisualElement { name = "health-bar", pickingMode = PickingMode.Ignore };
             life.style.width = Length.Percent(76);
-            life.style.maxWidth = 104;
+            life.style.maxWidth = PositionSlots switch { 1 => 104, 2 => 150, _ => 188 };
             life.style.alignSelf = Align.Center;
             life.style.height = 17;
             life.style.visibility = maximumHealth > 0 ? Visibility.Visible : Visibility.Hidden;
@@ -64,7 +66,7 @@ namespace RaidPartyManager.Presentation
             life.Add(healthLabel);
 
             portrait = new VisualElement { name = "combatant-portrait" };
-            portrait.style.height = 185;
+            portrait.style.height = portraitHeight;
             portrait.style.marginTop = portrait.style.marginBottom = 4;
             portrait.style.overflow = Overflow.Hidden;
             if (battleSprite == null)
@@ -87,6 +89,7 @@ namespace RaidPartyManager.Presentation
                 ProfessionFrame.AddTo(portrait, character.Profession, art);
 
             var positionTag = PrototypeStyle.Text(position.ToString("00"), 11, side == Side.Party ? PrototypeStyle.Ally : PrototypeStyle.Enemy);
+            positionTag.name = "position-tag";
             positionTag.style.position = Position.Absolute;
             positionTag.style.top = positionTag.style.left = 5;
             positionTag.style.backgroundColor = PrototypeStyle.Background;
@@ -131,7 +134,8 @@ namespace RaidPartyManager.Presentation
                 portrait.visible = visible;
         }
 
-        public void Refresh(int health, int shield, double now, IReadOnlyList<StatusStack> statuses = null)
+        public void Refresh(int health, int shield, double now, IReadOnlyList<StatusStack> statuses = null,
+            IReadOnlyDictionary<BattleCountdownKind, int> countdowns = null)
         {
             if (maximumHealth == 0)
                 return;
@@ -156,20 +160,28 @@ namespace RaidPartyManager.Presentation
                         UpdateBadge(status.Kind.ToString(), status.Layers, rule.Name,
                             rule.Description, statusIcon?.Invoke(status.Kind), rule.Negative ? PrototypeStyle.Enemy : PrototypeStyle.Accent);
                     }
+                if (countdowns != null)
+                    foreach (var timer in countdowns)
+                    {
+                        var info = BattleCountdownIcon.Details(timer.Key);
+                        UpdateBadge("countdown-" + timer.Key, timer.Value, info.Name, info.Description, null, info.Color,
+                            countdown: timer.Key, unit: info.Unit);
+                    }
             }
 
             for (int index = badges.childCount - 1; index >= 0; index--)
                 if (!active.Contains(badges[index].name))
                     badges.RemoveAt(index);
 
-            void UpdateBadge(string id, int count, string title, string description, Texture2D icon, Color color, bool isShield = false)
+            void UpdateBadge(string id, int count, string title, string description, Texture2D icon, Color color, bool isShield = false,
+                BattleCountdownKind? countdown = null, string unit = null)
             {
                 string elementName = $"status-badge-{id}";
                 active.Add(elementName);
                 var badge = badges.Q<StatusBadge>(elementName);
                 if (badge == null)
                 {
-                    badge = new StatusBadge(elementName, title, description, icon, color, isShield, statusTooltip);
+                    badge = new StatusBadge(elementName, title, description, icon, color, isShield, statusTooltip, countdown, unit);
                     badges.Add(badge);
                 }
                 badge.SetCount(count);
@@ -180,21 +192,23 @@ namespace RaidPartyManager.Presentation
         {
             private readonly Label stacks;
             private readonly string title;
+            private readonly string unit;
             private readonly BattleStatusTooltip tooltip;
             private int count;
 
             public StatusBadge(string elementName, string title, string description, Texture2D icon,
-                Color edge, bool shield, BattleStatusTooltip tooltip)
+                Color edge, bool shield, BattleStatusTooltip tooltip, BattleCountdownKind? countdown, string unit)
             {
                 name = elementName;
                 this.title = title;
+                this.unit = unit;
                 this.tooltip = tooltip;
                 style.width = style.height = 27;
                 style.marginLeft = style.marginRight = 2;
                 style.marginBottom = 3;
                 style.backgroundColor = PrototypeStyle.Inset;
                 PrototypeStyle.Outline(this, edge, 4);
-                Add(BattleStatusTooltip.CreateIcon(icon, title, edge, shield));
+                Add(BattleStatusTooltip.CreateIcon(icon, title, edge, shield, countdown));
 
                 stacks = PrototypeStyle.Text("", 10);
                 stacks.name = "status-stack-count";
@@ -208,7 +222,7 @@ namespace RaidPartyManager.Presentation
                 RegisterCallback<PointerEnterEvent>(evt =>
                 {
                     if (evt.pointerType == UnityEngine.UIElements.PointerType.mouse)
-                        tooltip?.Show(this, title, count, description, icon, edge, shield);
+                        tooltip?.Show(this, title, count, description, icon, edge, shield, countdown, unit);
                 });
                 RegisterCallback<PointerLeaveEvent>(_ => tooltip?.Hide(this));
                 RegisterCallback<DetachFromPanelEvent>(_ => tooltip?.Hide(this));
@@ -220,7 +234,7 @@ namespace RaidPartyManager.Presentation
                     return;
                 count = next;
                 stacks.text = count.ToString();
-                tooltip?.SetCount(this, title, count);
+                tooltip?.SetCount(this, title, count, unit);
             }
         }
 
@@ -230,6 +244,7 @@ namespace RaidPartyManager.Presentation
             Profession.Mage => "术",
             Profession.Archer => "弓",
             Profession.Support => "援",
+            Profession.Monster => "怪",
             _ => "·"
         };
     }

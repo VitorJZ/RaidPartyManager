@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "红绳"
   effect: 25
   icon: {fileID: 2800000, guid: 1112461a13ff4c34b96a08ab01b0cd30, type: 3}
-  description: "前方队友共享装备效果，承受相同伤害"
+  description: "紧邻前一格的存活队友共享装备效果，并承受相同伤害。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

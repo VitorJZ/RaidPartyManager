@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemySaltCrab
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemySaltCrab
+  displayName: "盐壳蟹"
+  portrait: {fileID: 2800000, guid: 542d85230c464e55ba301c2f274cf9a9, type: 3}
+  usePortraitInBattle: 0
+  battleAttackSheet: {fileID: 2800000, guid: 6b76429b80b64af59fcd92bd29ef2b5f, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: a34441de2c8e434fb657dd7a2941e206, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 1f0205741e25458699a2995da5714f7a, type: 3}
+  profession: 4
+  enemyRank: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 39
+  traitPower: 0
+  traitText: "直接攻击。首次受到物理伤害后，获得1层坚毅。"
+  personality: 1
+  attack: 4
+  defense: 3
+  specialDefense: 0
+  health: 14
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0

@@ -1,4 +1,22 @@
 {
+  "treasureChest": {
+    "icon": {
+      "art": "Assets/RaidPartyManager/Art/UI/MapNodes/08-TreasureChest.png",
+      "prompt": "Use case: stylized-concept. Square 1:1 transparent PNG game map icon for a fogbound fantasy port. One compact closed treasure chest symbol centered, shape with a rounded lid, squat diamond-shaped lock, two dark aged-brass bands, warm oak/gold silhouette. Simple hand-painted pixel-style game icon with a bold dark outline and broad gold highlights for readability at 40 pixels. Chest fills about 80% of canvas, view from front and slightly above right side. Object only on genuinely transparent alpha, no background, circle, badge, frame, floor, lettering, or extra objects."
+    },
+    "closed": {
+      "art": "Assets/RaidPartyManager/Art/Events/Ink/10-TreasureChest-Closed.png",
+      "prompt": "Use case: stylized-concept. Square transparent game asset. Hand-drawn monochrome BLACK INK hatching and bold dry-brush outlines on genuinely transparent alpha, to be composited on in-game parchment. Show a single CLOSED seafarer's treasure chest in an original dark-fantasy fogbound harbor. Strong form: curved barrel lid, battered oak boards, two iron bands, a distinctive squat diamond escutcheon with circular keyhole, and a small knotted rope handle on the visible right side. View from the front and a little above the right side, framing the entire chest centered horizontally, with its footprint around y=77%; chest overall width roughly 71% of canvas, chest closed lid height around y=36%, deliberately leave extra blank room above for a later opening-lid pose. Ink strokes only, no opaque white, transparent holes between hatching, no gray backdrop, no people, lettering, borders, or cast shadow. Large readable shapes and crisp weathering, strong single subject."
+    },
+    "ajar": {
+      "art": "Assets/RaidPartyManager/Art/Events/Ink/10-TreasureChest-Ajar.png",
+      "prompt": "Use case: precise-object-edit. Image 1 is the closed pose of a treasure chest animation, viewed from the front and above the right side. Produce the SAME chest on the SAME square transparent alpha canvas. Fix the bottom half and footprint to their exact position, scale, viewing angle and dimensions in the reference. Preserve its squat diamond keyhole plate, rope handle, lower woodgrain and two iron bands in the exact same place. Rotate only the curved lid back around the rear hinge as a distinct rigid part, so it is clearly partway open, with the lid raised about 38 degrees and a modest opening gap. Preserve hand-drawn black ink outlines and hatching with transparent negative space (no opaque white). Leave blank transparent space around the object, no background or border. This is a pose that will crossfade with the original. No particles, other objects, coins, glow, lettering, or changes to the base. The mouth of the chest is a readable dark ink cavity."
+    },
+    "open": {
+      "art": "Assets/RaidPartyManager/Art/Events/Ink/10-TreasureChest-Open.png",
+      "prompt": "Use case: precise-object-edit. Image 1 is the closed pose of a treasure chest animation, viewed from the front and above the right side. Produce the SAME chest on the SAME square transparent alpha canvas. Fix the bottom half and footprint to their exact position, scale, viewing angle and dimensions in the reference. Preserve its squat diamond keyhole plate, rope handle, lower woodgrain and two iron bands in the exact same place. Rotate only the curved lid back around the rear hinge as a distinct rigid part, so it is clearly fully open, raised about 95 degrees, with the hinge edge exactly attached to the chest base. Preserve hand-drawn black ink outlines and hatching with transparent negative space (no opaque white). Leave blank transparent space around the object, no background or border. This is a pose that will crossfade with the original. No particles, other objects, coins, glow, lettering, or changes to the base. The mouth of the chest is a readable dark ink cavity."
+    }
+  },
   "tool": "image_gen.imagegen",
   "mode": "built-in generate with style reference; transparent hat prop",
   "style_reference": "Assets/RaidPartyManager/Art/Camp/Camp-Background.png",

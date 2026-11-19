@@ -30,7 +30,7 @@ namespace RaidPartyManager.Domain
             var stats = units.ToDictionary(unit => unit.Id, unit => unit.Stats);
             var sharing = living.ToDictionary(unit => unit.Id,
                 unit => living.Where(owner => owner.Equipment.Any(item => item.Effect == EquipmentEffect.RedCord)
-                        && FrontOf(living, owner) == unit)
+                        && AdjacentFrontOf(living, owner) == unit)
                     .SelectMany(owner => owner.Equipment.Where(item => item.Effect != EquipmentEffect.RedCord)).ToArray());
 
             int Count(Combatant unit, EquipmentEffect effect) =>
@@ -106,8 +106,8 @@ namespace RaidPartyManager.Domain
             return stats;
         }
 
-        public static Combatant FrontOf(IEnumerable<Combatant> units, Combatant owner) =>
-            units.Where(unit => unit.Side == owner.Side && unit.Health > 0 && unit.Position < owner.Position)
-                .OrderByDescending(unit => unit.Position).FirstOrDefault();
+        public static Combatant AdjacentFrontOf(IEnumerable<Combatant> units, Combatant owner) =>
+            units.FirstOrDefault(unit => unit.Side == owner.Side && unit.Health > 0 &&
+                unit.Position + unit.Character.PositionSlots == owner.Position);
     }
 }

@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyMudEel
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyMudEel
+  displayName: "水线泥鳗"
+  portrait: {fileID: 2800000, guid: bf65896288a344769ef9d7c818adb34f, type: 3}
+  usePortraitInBattle: 0
+  battleAttackSheet: {fileID: 2800000, guid: ada5e13420564e6b9e16afeca5c8e38d, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: d4cd6ca06e8740bdb6cd837c4959e554, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: fee6c1e1a8e841d7af5859d2c724823b, type: 3}
+  profession: 4
+  enemyRank: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 38
+  traitPower: 0
+  traitText: "直接攻击（70%） / 对玩家最前方角色施加1层寒冷（30%）"
+  personality: 1
+  attack: 3
+  defense: 0
+  specialDefense: 1
+  health: 11
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0

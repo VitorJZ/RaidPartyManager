@@ -4,7 +4,8 @@ using System.Linq;
 
 namespace RaidPartyManager.Domain
 {
-    public enum Profession { Warrior, Mage, Archer, Support }
+    public enum Profession { Warrior, Mage, Archer, Support, Monster }
+    public enum EnemyRank { Unspecified, Normal, Elite, Boss }
     public enum AttackReach { Unspecified, Melee, Ranged }
     public enum CharacterTrait
     {
@@ -13,7 +14,10 @@ namespace RaidPartyManager.Domain
         Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, BlessAlly, RevealEnemies,
         PiercingArrow, BorrowAllyAttack, HealAlly, FirstDamageToTarget, HealOnDamage, DrawAttacks,
         ExposeMeleeAttacker, GoldOnSurvival, AccessoryOnSurvival, ShopDiscount,
-        EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack
+        EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack,
+        EnemyTideFollower, EnemyWreckScavenger, EnemyDeckSailor,
+        EnemyMudEel, EnemySaltCrab, EnemyLanternMoth, EnemyFogSignalGunner, EnemyShipCaulker,
+        EnemyAnchorHermit, EnemyFogAngler, EnemyMooringWarden, EnemyBlockadeAdmiral, EnemyDrownedLanternRay
     }
     public enum Personality
     {
@@ -26,11 +30,31 @@ namespace RaidPartyManager.Domain
     public enum TargetRule { AnyEnemy, FrontEnemy, RearEnemy, WoundedAlly, Self }
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
     public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth, Retaliate, FinishWounded, StayOnTarget, UseSkill, SaveSkill, AvoidOverkill, EmergencyHeal }
-    public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual }
+    public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual, Retreated, EnemyVisual, RoundStarted, Countdown }
+    public enum BattleCountdownKind { CalamityChant, ScavengerEscape, AdmiralBroadside, GoldenBell }
+
+    public readonly struct BattleCountdown
+    {
+        public BattleCountdownKind Kind { get; }
+        public int Remaining { get; }
+
+        public BattleCountdown(BattleCountdownKind kind, int remaining)
+        {
+            Kind = kind;
+            Remaining = remaining;
+        }
+    }
+
     public enum BattleVisualCue
     {
         None, WarCry, CeramicPierce, CeramicSplash, BellRing, BellWave, RearAmbush,
-        ResolveGuard, CrossbowCritical, QuackHeal, QuackStrike
+        ResolveGuard, CrossbowCritical, QuackHeal, QuackStrike,
+        DockWarCry, TideMark, ScavengerSteal, EelFrost, SaltShell, MothAsh, CaulkerMend,
+        AnchorWard, AnchorExpose, AnchorShatter, AnglerCurse, WardenBrace,
+        AdmiralWhistle, AdmiralWarning, AdmiralBroadside, RayTail, RayMist, RaySurge,
+        RoundEndEmber, RoundEndHeal, RoundEndPoison, RoundEndPoisonHeal, RoundEndGrowth,
+        RoundEndLightning, RoundEndFormShift, RoundEndTransfer,
+        RoundStartExposed, RoundStartPoison, RoundStartBlessing, RoundStartBonus, PiercingArrow
     }
 
     public static class Rules
@@ -41,6 +65,9 @@ namespace RaidPartyManager.Domain
         public const int MaximumEnergy = 8;
 
         public static bool IsPosition(int position) => position >= 1 && position <= Positions;
+        public static bool Fits(int position, int slots) => IsPosition(position) && slots >= 1 && slots <= Positions - position + 1;
+        public static bool Overlaps(int start, int slots, int otherStart, int otherSlots) =>
+            start < otherStart + otherSlots && otherStart < start + slots;
     }
 
     public readonly struct BattleEnergy
@@ -138,6 +165,8 @@ namespace RaidPartyManager.Domain
         public string Id { get; }
         public string Name { get; }
         public Profession Profession { get; }
+        public EnemyRank Rank { get; }
+        public int PositionSlots { get; }
         public Personality Personality { get; }
         public Stats BaseStats { get; }
         public int ActionInterval { get; }
@@ -156,9 +185,10 @@ namespace RaidPartyManager.Domain
             Stats baseStats, int actionInterval, ActionDefinition basicAttack, ActionDefinition skill = null,
             int rosterNumber = 0, int stage = 1, AttackReach reach = AttackReach.Unspecified,
             CharacterTrait trait = CharacterTrait.None, int traitPower = 0, string traitText = null,
-            string battleFormId = null, IEnumerable<string> evolutionIds = null)
+            string battleFormId = null, IEnumerable<string> evolutionIds = null, EnemyRank rank = EnemyRank.Unspecified,
+            int positionSlots = 1)
         {
-            if (string.IsNullOrWhiteSpace(id) || baseStats.Health <= 0 || actionInterval <= 0)
+            if (string.IsNullOrWhiteSpace(id) || baseStats.Health <= 0 || actionInterval <= 0 || !Rules.Fits(1, positionSlots))
                 throw new ArgumentException("A character needs an ID, positive health and an action interval.");
             if (basicAttack == null || basicAttack.Kind != ActionKind.Attack || basicAttack.Cooldown != 0)
                 throw new ArgumentException("A basic attack must be an attack with no cooldown.", nameof(basicAttack));
@@ -167,6 +197,8 @@ namespace RaidPartyManager.Domain
             Id = id;
             Name = name;
             Profession = profession;
+            Rank = rank;
+            PositionSlots = positionSlots;
             Personality = personality;
             BaseStats = baseStats;
             ActionInterval = actionInterval;
@@ -270,11 +302,11 @@ namespace RaidPartyManager.Domain
             IReadOnlyDictionary<StatusKind, int> startingStatuses = null, IEnumerable<string> equipmentSlots = null,
             IEnumerable<SkillBookDefinition> learnedSkills = null)
         {
-            if (string.IsNullOrWhiteSpace(id) || !Rules.IsPosition(position) ||
+            Character = character ?? throw new ArgumentNullException(nameof(character));
+            if (string.IsNullOrWhiteSpace(id) || !Rules.Fits(position, Character.PositionSlots) ||
                 stats.Health <= 0 || health < 0 || health > stats.Health)
                 throw new ArgumentException("Invalid combatant ID, position or health.");
             Id = id;
-            Character = character ?? throw new ArgumentNullException(nameof(character));
             Side = side;
             Position = position;
             Stats = stats;
@@ -307,8 +339,10 @@ namespace RaidPartyManager.Domain
             if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0 || partyGold < 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
             var units = combatants.ToArray();
+            var positions = units.SelectMany(unit => Enumerable.Range(unit.Position, unit.Character.PositionSlots)
+                .Select(position => (unit.Side, position))).ToArray();
             if (units.Select(unit => unit.Id).Distinct(StringComparer.Ordinal).Count() != units.Length ||
-                units.Select(unit => (unit.Side, unit.Position)).Distinct().Count() != units.Length ||
+                positions.Distinct().Count() != positions.Length ||
                 !units.Any(unit => unit.Side == Side.Party && unit.Health > 0) ||
                 !units.Any(unit => unit.Side == Side.Enemy && unit.Health > 0))
                 throw new ArgumentException("Both sides need a living unit, with unique IDs and positions.", nameof(combatants));
@@ -328,12 +362,15 @@ namespace RaidPartyManager.Domain
     {
         public IReadOnlyDictionary<string, IReadOnlyList<string>> Slots { get; }
         public IReadOnlyList<string> Consumed { get; }
+        public IReadOnlyList<string> Stolen { get; }
 
-        public BattleLoadout(IEnumerable<KeyValuePair<string, IReadOnlyList<string>>> slots, IEnumerable<string> consumed)
+        public BattleLoadout(IEnumerable<KeyValuePair<string, IReadOnlyList<string>>> slots, IEnumerable<string> consumed,
+            IEnumerable<string> stolen = null)
         {
             Slots = new System.Collections.ObjectModel.ReadOnlyDictionary<string, IReadOnlyList<string>>(
                 slots.ToDictionary(entry => entry.Key, entry => (IReadOnlyList<string>)Array.AsReadOnly(entry.Value.ToArray())));
             Consumed = Array.AsReadOnly(consumed.ToArray());
+            Stolen = Array.AsReadOnly(stolen?.ToArray() ?? Array.Empty<string>());
         }
     }
 
@@ -360,7 +397,12 @@ namespace RaidPartyManager.Domain
         public AttackReach AttackReach { get; }
         public BattleVisualCue VisualCue { get; }
         public BattleEnergy? ActorEnergy { get; }
+        public BattleEnergy? TargetEnergy { get; }
         public string SkillBookId { get; }
+        private readonly DamageBreakdown damageTaken;
+        public IReadOnlyList<(DamageType Type, int Amount)> DamageTaken => damageTaken.Parts;
+        public bool PoisonDamage { get; }
+        public BattleCountdown? Countdown { get; }
 
         public BattleEvent(int tick, BattleEventKind kind, string actorId = null, string targetId = null,
             string actionName = null, ActionKind actionKind = ActionKind.Attack,
@@ -368,7 +410,9 @@ namespace RaidPartyManager.Domain
             string targetStatuses = null, string detail = null, CharacterDefinition form = null, int maximumHealth = 0,
             IReadOnlyList<StatusStack> statusStacks = null, BattleLoadout loadout = null,
             IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified,
-            BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null)
+            BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
+            BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
+            bool poisonDamage = false, BattleCountdown? countdown = null)
         {
             Tick = tick;
             Kind = kind;
@@ -391,6 +435,30 @@ namespace RaidPartyManager.Domain
             VisualCue = visualCue;
             ActorEnergy = actorEnergy;
             SkillBookId = skillBookId;
+            TargetEnergy = targetEnergy;
+            this.damageTaken = new DamageBreakdown(damageTaken);
+            PoisonDamage = poisonDamage;
+            Countdown = countdown;
+        }
+
+        private readonly struct DamageBreakdown : IEquatable<DamageBreakdown>
+        {
+            private readonly IReadOnlyList<(DamageType Type, int Amount)> parts;
+            public IReadOnlyList<(DamageType Type, int Amount)> Parts => parts ?? Array.Empty<(DamageType Type, int Amount)>();
+
+            public DamageBreakdown(IReadOnlyList<(DamageType Type, int Amount)> parts) => this.parts = parts;
+
+            public bool Equals(DamageBreakdown other) => Parts.SequenceEqual(other.Parts);
+
+            public override bool Equals(object obj) => obj is DamageBreakdown other && Equals(other);
+
+            public override int GetHashCode()
+            {
+                var hash = new HashCode();
+                foreach (var part in Parts)
+                    hash.Add(part);
+                return hash.ToHashCode();
+            }
         }
     }
 

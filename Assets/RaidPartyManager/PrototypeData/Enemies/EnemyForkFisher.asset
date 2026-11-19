@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyForkFisher
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyForkFisher
+  displayName: "持叉渔夫"
+  portrait: {fileID: 2800000, guid: c6a50fc72b754b0cb9aa0c9f534b998a, type: 3}
+  usePortraitInBattle: 0
+  battleAttackSheet: {fileID: 2800000, guid: 9da70cdc627c45fbb5a2655d25778934, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 7c0af32065c145d1bbab7724330d77b7, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 70d91b5a9ee04e6f8829abc8410a2da0, type: 3}
+  profession: 0
+  enemyRank: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 28
+  traitPower: 0
+  traitText: "直接攻击（50%） / 给自己叠加3层盛气（50%）"
+  personality: 1
+  attack: 5
+  defense: 0
+  specialDefense: 0
+  health: 10
+  actionInterval: 10
+  battleProjectile: {fileID: 2800000, guid: 5728277768774cc395be10f93849d019, type: 3}
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0

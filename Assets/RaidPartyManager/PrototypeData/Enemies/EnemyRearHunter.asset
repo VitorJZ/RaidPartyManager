@@ -21,6 +21,7 @@ MonoBehaviour:
   battleSpecialSheet: {fileID: 2800000, guid: 7023c7131cb04345a8237cf1695c30fd, type: 3}
   battleSpecialEffect: {fileID: 2800000, guid: 2e879b916c144f3a8622e4f85b6df973, type: 3}
   profession: 0
+  enemyRank: 1
   rosterNumber: 0
   stage: 1
   reach: 1

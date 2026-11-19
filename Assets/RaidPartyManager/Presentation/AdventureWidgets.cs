@@ -37,7 +37,8 @@ namespace RaidPartyManager.Presentation
             bool onPaper = OnPaper(parent);
             if (onPaper) AdventureEventWindow.StylePaperButton(button, selected);
             else if (selected) PrototypeStyle.Outline(button, PrototypeStyle.Accent, 4);
-            var icon = new Image { image = content.IconFor(item.Id), scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
+            var icon = EquipmentIcon.CreateArtwork(item, content.IconFor(item.Id));
+            icon.style.flexGrow = icon.style.flexShrink = 0;
             icon.style.width = icon.style.height = 64;
             icon.style.marginRight = 10;
             button.Add(icon);
@@ -56,19 +57,31 @@ namespace RaidPartyManager.Presentation
 
         internal static void RecruitReplacement(VisualElement parent, AdventureRun run, EncounterData content, Action refresh)
         {
-            var recruit = run.Current.PendingRecruit;
+            RecruitReplacement(parent, run.Current.PendingRecruit, run.Party, content, id =>
+            {
+                run.CompleteRecruit(id);
+                refresh();
+            });
+        }
+
+        internal static void RecruitReplacement(VisualElement parent, CharacterDefinition recruit, PartyRun party,
+            EncounterData content, Action<string> replace)
+        {
             bool onPaper = OnPaper(parent);
-            parent.Add(PrototypeStyle.Text($"{recruit.Name}愿意同行。队伍已满，请选择替换一名队员。", 17,
-                onPaper ? AdventureEventWindow.PaperAccent : PrototypeStyle.Accent));
+            var title = PrototypeStyle.Text($"{recruit.Name}愿意同行。队伍已满，请选择替换一名队员。", 17,
+                onPaper ? AdventureEventWindow.PaperAccent : PrototypeStyle.Accent);
+            title.name = "pending-recruit-preview";
+            parent.Add(title);
+            CharacterChoicePreview.Attach(title, recruit, content.PortraitFor(recruit.Id));
             parent.Add(PrototypeStyle.Text("原队员的装备会留在背包中；暂时离队的伙伴保留名额。", 13,
                 onPaper ? AdventureEventWindow.PaperMuted : PrototypeStyle.Muted));
-            foreach (var member in run.Party.Members)
-                Character(parent, member.Character, content, $"replace-recruit-{member.Id}", () =>
-                { run.CompleteRecruit(member.Id); refresh(); }, !member.IsAway);
+            foreach (var member in party.Members)
+                Character(parent, member.Character, content, $"replace-recruit-{member.Id}",
+                    () => replace(member.Id), !member.IsAway, member);
         }
 
         internal static void Character(VisualElement parent, CharacterDefinition character, EncounterData content,
-            string name, Action click, bool enabled = true)
+            string name, Action click, bool enabled = true, MemberView member = null)
         {
             var button = Action(parent, character.Name + "  ·  " + AdventureFlow.ProfessionName(character.Profession), name, click, enabled);
             var image = new Image { image = content.PortraitFor(character.Id), scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
@@ -77,9 +90,11 @@ namespace RaidPartyManager.Presentation
             button.style.justifyContent = Justify.SpaceBetween;
             button.style.alignItems = Align.Center;
             button.Add(image);
+            CharacterChoicePreview.Attach(button, character, content.PortraitFor(character.Id), member);
         }
 
-        internal static void BattleRewards(VisualElement parent, AdventureRun run, EncounterData content, Action refresh)
+        internal static void BattleRewards(VisualElement parent, AdventureRun run, EncounterData content, Action refresh,
+            Action<string, Func<bool>> collect)
         {
             Color accent = OnPaper(parent) ? AdventureEventWindow.PaperAccent : PrototypeStyle.Accent;
             if (!string.IsNullOrEmpty(run.Current.Message)) parent.Add(PrototypeStyle.Text(run.Current.Message, 15, accent));
@@ -87,11 +102,19 @@ namespace RaidPartyManager.Presentation
             for (int i = 0; i < run.Current.Rewards.Count; i++)
             {
                 int index = i;
-                Item(parent, run.Current.Rewards[i], content, "claim-loot-" + i, () => { run.ClaimReward(index); refresh(); });
+                string id = "claim-loot-" + i;
+                Item(parent, run.Current.Rewards[i], content, id, () => collect(id, () => run.ClaimReward(index)));
             }
-            if (!run.Current.NeedsEvolution) return;
+            if (run.Current.NeedsEvolution)
+                EvolutionChoices(parent, run, content, run.Evolve, refresh, run.Current.EvolutionMemberId, run.ChooseEvolutionMember);
+        }
+
+        internal static void EvolutionChoices(VisualElement parent, AdventureRun run, EncounterData content,
+            Func<string, string, bool> evolve, Action completed, string selectedId = null, Func<string, bool> persistSelection = null)
+        {
+            Color accent = OnPaper(parent) ? AdventureEventWindow.PaperAccent : PrototypeStyle.Accent;
             var candidates = run.EvolutionCandidates;
-            var selected = candidates.FirstOrDefault(member => member.Id == run.Current.EvolutionMemberId);
+            var selected = candidates.FirstOrDefault(member => member.Id == selectedId);
             var choices = new VisualElement { name = "evolution-choices" };
             choices.style.marginTop = 10;
             parent.Add(choices);
@@ -105,23 +128,26 @@ namespace RaidPartyManager.Presentation
                     foreach (var member in candidates)
                         Character(choices, member.Character, content, $"pick-evolution-member-{member.Id}", () =>
                         {
-                            if (!run.ChooseEvolutionMember(member.Id)) return;
+                            if (persistSelection?.Invoke(member.Id) == false) return;
                             selected = member;
                             RenderChoices();
-                        });
+                        }, member: member);
                     return;
                 }
 
-                choices.Add(PrototypeStyle.Text($"为{selected.Character.Name}选择进阶分支", 18, accent));
+                var heading = PrototypeStyle.Text($"为{selected.Character.Name}选择进阶分支", 18, accent);
+                heading.name = "evolution-current-preview";
+                choices.Add(heading);
+                CharacterChoicePreview.Attach(heading, selected.Character, content.PortraitFor(selected.Character.Id), selected);
                 string memberId = selected.Id;
                 foreach (var form in run.EvolutionForms(memberId))
                     Character(choices, form, content, $"evolve-{memberId}-{form.Id}", () =>
                     {
-                        if (run.Evolve(memberId, form.Id)) refresh();
+                        if (evolve(memberId, form.Id)) completed();
                     });
                 Action(choices, "返回队员选择", "back-to-evolution-members", () =>
                 {
-                    run.ChooseEvolutionMember(null);
+                    persistSelection?.Invoke(null);
                     selected = null;
                     RenderChoices();
                 });

@@ -21,6 +21,7 @@ namespace RaidPartyManager.Content
         public IReadOnlyList<CharacterDefinition> EnemyRoster { get; }
         private readonly CharacterDefinition[] partyRoster;
         private readonly IReadOnlyDictionary<string, Texture2D> portraits;
+        private readonly HashSet<string> battlePortraitIds;
         private readonly IReadOnlyDictionary<string, Texture2D> battleSpriteSheets;
         private readonly IReadOnlyDictionary<string, Texture2D> battleAttackSheets;
         private readonly IReadOnlyDictionary<string, Texture2D> battleWalkSheets;
@@ -29,6 +30,7 @@ namespace RaidPartyManager.Content
         private readonly IReadOnlyDictionary<string, Texture2D> campSprites;
         private readonly IReadOnlyDictionary<string, Texture2D> equipmentIcons;
         private readonly IReadOnlyDictionary<string, Texture2D> skillEffects;
+        private readonly IReadOnlyDictionary<string, (Texture2D Flight, Texture2D Fragments)> skillProjectiles;
         private readonly Texture2D[] statusIcons;
         private readonly Texture2D arrowProjectile;
         private readonly Texture2D magicProjectile;
@@ -43,7 +45,8 @@ namespace RaidPartyManager.Content
             IReadOnlyDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)> battleExtras,
             IReadOnlyDictionary<string, Texture2D> battleProjectiles,
             IReadOnlyDictionary<string, Texture2D> campSprites, SkillBookDefinition[] skillBooks, Texture2D backpackIcon,
-            IReadOnlyDictionary<string, Texture2D> skillEffects)
+            IReadOnlyDictionary<string, Texture2D> skillEffects, IReadOnlyDictionary<string, (Texture2D Flight, Texture2D Fragments)> skillProjectiles,
+            IEnumerable<string> battlePortraitIds)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
@@ -54,6 +57,7 @@ namespace RaidPartyManager.Content
             VictoryReward = victoryReward;
             TickLimit = tickLimit;
             this.portraits = portraits;
+            this.battlePortraitIds = new HashSet<string>(battlePortraitIds, StringComparer.Ordinal);
             this.battleSpriteSheets = battleSpriteSheets;
             this.battleAttackSheets = battleAttackSheets;
             this.battleWalkSheets = battleWalkSheets;
@@ -62,6 +66,7 @@ namespace RaidPartyManager.Content
             this.campSprites = campSprites;
             this.equipmentIcons = equipmentIcons;
             this.skillEffects = skillEffects;
+            this.skillProjectiles = skillProjectiles;
             this.statusIcons = statusIcons;
             this.arrowProjectile = arrowProjectile;
             this.magicProjectile = magicProjectile;
@@ -73,7 +78,8 @@ namespace RaidPartyManager.Content
 
         public IReadOnlyList<Combatant> Draft(Side side, System.Random random)
         {
-            var candidates = (side == Side.Party ? partyRoster : EnemyRoster).ToArray();
+            var candidates = (side == Side.Party ? partyRoster :
+                EnemyRoster.Where(character => character.Rank != EnemyRank.Boss && character.PositionSlots == 1)).ToArray();
             if (candidates.Length < Rules.Positions)
                 return side == Side.Party ? Party : Enemies;
 
@@ -95,6 +101,9 @@ namespace RaidPartyManager.Content
         public Texture2D SkillEffectFor(string skillBookId) =>
             skillBookId != null && skillEffects.TryGetValue(skillBookId, out var artwork) ? artwork : null;
 
+        public (Texture2D Flight, Texture2D Fragments) SkillProjectileFor(string skillBookId) =>
+            skillBookId != null && skillProjectiles.TryGetValue(skillBookId, out var artwork) ? artwork : default;
+
         public Texture2D StatusIcon(StatusKind kind) =>
             (int)kind >= 0 && (int)kind < statusIcons.Length ? statusIcons[(int)kind] : null;
 
@@ -107,15 +116,29 @@ namespace RaidPartyManager.Content
         public Texture2D BattleSpriteFor(string definitionId) =>
             definitionId != null && battleSpriteSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
 
+        public Texture2D BattlePortraitFor(string definitionId) =>
+            battlePortraitIds.Contains(definitionId) ? PortraitFor(definitionId) : null;
+
         public Texture2D BattleAttackFor(string definitionId) =>
             definitionId != null && battleAttackSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
 
         public Texture2D BattleWalkFor(string definitionId) =>
             definitionId != null && battleWalkSheets.TryGetValue(definitionId, out var sheet) ? sheet : null;
 
-        public Texture2D BattleSpecialFor(string definitionId, BattleVisualCue cue) =>
-            cue != BattleVisualCue.None && cue != BattleVisualCue.QuackStrike &&
-            battleExtras.TryGetValue(definitionId, out var art) ? art.Body : null;
+        public Texture2D BattleSpecialFor(string definitionId, BattleVisualCue cue)
+        {
+            if (!battleExtras.TryGetValue(definitionId, out var art))
+                return null;
+            return cue switch
+            {
+                BattleVisualCue.WarCry or BattleVisualCue.CeramicPierce or BattleVisualCue.BellRing or
+                BattleVisualCue.RearAmbush or BattleVisualCue.ResolveGuard or BattleVisualCue.CrossbowCritical or
+                BattleVisualCue.QuackHeal or BattleVisualCue.AnchorExpose or BattleVisualCue.AnglerCurse or
+                BattleVisualCue.WardenBrace or BattleVisualCue.AdmiralWhistle or BattleVisualCue.RayMist or
+                BattleVisualCue.RaySurge => art.Body,
+                _ => null
+            };
+        }
 
         public Texture2D BattleEffectFor(string definitionId, BattleVisualCue cue)
         {
@@ -138,6 +161,7 @@ namespace RaidPartyManager.Content
             {
                 Profession.Archer => arrowProjectile,
                 Profession.Mage => magicProjectile,
+                Profession.Monster when character.BasicAttack.DamageType == DamageType.Magic => magicProjectile,
                 _ => null
             };
         }
@@ -228,11 +252,14 @@ namespace RaidPartyManager.Content
             var skills = skillCatalog?.Skills ?? Array.Empty<SkillEntry>();
             var books = skills.Select(skill => skill.ToBook()).ToArray();
             var skillEffects = new Dictionary<string, Texture2D>(StringComparer.Ordinal);
+            var skillProjectiles = new Dictionary<string, (Texture2D Flight, Texture2D Fragments)>(StringComparer.Ordinal);
             for (int i = 0; i < books.Length; i++)
             {
                 equipmentIcons.Add(books[i].Id, skills[i].Icon);
                 if (skills[i].BattleEffect != null)
                     skillEffects.Add(books[i].Id, skills[i].BattleEffect);
+                if (skills[i].Projectile != null)
+                    skillProjectiles.Add(books[i].Id, (skills[i].Projectile, skills[i].ProjectileFragments));
             }
             return new EncounterData(displayName, partyInputs, enemyInputs,
                 startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies)).ToArray(),
@@ -246,7 +273,8 @@ namespace RaidPartyManager.Content
                     .ToDictionary(character => character.Id, character => character.BattleProjectile, StringComparer.Ordinal),
                 catalog.Values.Where(character => character.CampSeatedSprite != null)
                     .ToDictionary(character => character.Id, character => character.CampSeatedSprite, StringComparer.Ordinal),
-                books, backpackIcon, skillEffects);
+                books, backpackIcon, skillEffects, skillProjectiles,
+                catalog.Values.Where(character => character.UsePortraitInBattle).Select(character => character.Id));
         }
     }
 }

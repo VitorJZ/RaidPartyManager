@@ -12,6 +12,8 @@ namespace RaidPartyManager.Presentation
         [SerializeField] private AdventureContentAsset assets;
         private AdventureRun run;
         private VisualElement root;
+        private VisualElement town;
+        private RunTopBar topBar;
         private Font localFont;
         private FontAsset localFontAsset;
 
@@ -21,6 +23,14 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
             run = AdventureFlow.ForScene("Town") ?? AdventureFlow.Select(assets, true);
             if (run.Current?.Kind != NodeKind.Town) run.Inspect(NodeKind.Town);
+            root.style.backgroundImage = new StyleBackground(assets.TownBackdrop);
+            root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+            root.style.backgroundColor = PrototypeStyle.Background;
+            town = new VisualElement { name = "town-content" };
+            PrototypeStyle.Fill(town);
+            root.Add(town);
+            topBar = new RunTopBar(root, run.Party, assets.Encounter, () => topBar.EditParty(), "open-town-editor");
+            RunTopBar.PlaceAtTop(root, topBar);
             Render();
         }
 
@@ -28,40 +38,38 @@ namespace RaidPartyManager.Presentation
 
         private void Render()
         {
-            root.Clear();
-            root.style.backgroundImage = new StyleBackground(assets.TownBackdrop);
-            root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-            root.style.backgroundColor = PrototypeStyle.Background;
+            town.Clear();
+            topBar.Refresh();
             var header = PrototypeStyle.Row();
             header.style.position = Position.Absolute; header.style.top = RunTopBar.Height + 7; header.style.left = header.style.right = 22;
             header.style.alignItems = Align.Center;
-            header.Add(AdventureFlow.ReturnButton());
+            header.Add(AdventureFlow.ReturnButton(() => topBar.WhenRewardsArrive(AdventureFlow.ReturnFromNode)));
             var title = PrototypeStyle.Text("弥雾码头 · 城镇", 26, PrototypeStyle.Accent);
             title.style.marginLeft = 16; title.style.flexGrow = 1; header.Add(title);
             var status = PrototypeStyle.Text($"已使用 {run.Current.UsedServices.Count}／2 项服务", 17);
             status.name = "town-services-count"; status.style.backgroundColor = PrototypeStyle.PanelColor;
-            status.style.paddingLeft = status.style.paddingRight = 12; header.Add(status); root.Add(header);
+            status.style.paddingLeft = status.style.paddingRight = 12; header.Add(status); town.Add(header);
             var services = PrototypeStyle.Row("town-services");
             services.style.position = Position.Absolute; services.style.left = services.style.right = 22; services.style.bottom = 34;
-            root.Add(services);
+            town.Add(services);
             Service(services, "招募", "邀请一名初始形态伙伴", TownService.Recruit, NodeKind.Event, Recruit);
             Service(services, "商店", "进入商店，拖拽购买物品", TownService.Shop, NodeKind.Shop,
-                () => AdventureFlow.OpenNodeScene("DockShop", true));
-            Service(services, "休息", "恢复每名在场队员最大生命的 30%", TownService.Camp, NodeKind.Camp,
-                () => AdventureFlow.OpenNodeScene("Camp", true));
+                () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("DockShop", true)));
+            Service(services, "营地", "招募、升阶或休息，三选一", TownService.Camp, NodeKind.Camp,
+                () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("Camp", true)));
             Service(services, "委托", run.QuestActive ? $"战斗胜利 {run.QuestWins}／2 · 完成可领取 15 金币" : "接下两场战斗的委托", TownService.Quest, NodeKind.Event,
-                () => { run.TownQuest(); Render(); }, !run.QuestActive || run.QuestWins >= 2);
+                () =>
+                {
+                    if (topBar.CollectReward(town.Q("town-service-Quest"), run.TownQuest))
+                        Render();
+                }, !run.QuestActive || run.QuestWins >= 2);
             var notice = PrototypeStyle.Text(string.IsNullOrEmpty(run.Current.Message) ? "城镇里可以选择两项不同服务。完成后返回事件选择继续前进。" : run.Current.Message,
                 17, PrototypeStyle.Accent);
             notice.name = "town-message"; notice.style.position = Position.Absolute;
             notice.style.left = notice.style.right = 28; notice.style.bottom = 214;
             notice.style.backgroundColor = new Color(0.07f, 0.08f, 0.09f, 0.88f);
             notice.style.paddingLeft = notice.style.paddingRight = 12; notice.style.paddingTop = notice.style.paddingBottom = 9;
-            root.Add(notice);
-            var content = assets.Encounter;
-            var topBar = new RunTopBar(root, run.Party, content,
-                () => RunTopBar.EditParty(root, run.Party, content, () => root.Q<RunTopBar>().Refresh()), "open-town-editor");
-            RunTopBar.PlaceAtTop(root, topBar);
+            town.Add(notice);
         }
 
         private void Service(VisualElement parent, string title, string description, TownService service, NodeKind icon,
@@ -107,7 +115,7 @@ namespace RaidPartyManager.Presentation
                     { run.ChooseTownRecruit(recruit.Id); Refresh(); });
             }
             AdventureWidgets.Action(scroll, "返回城镇", "close-town-recruit", () => overlay.RemoveFromHierarchy());
-            root.Add(overlay);
+            town.Add(overlay);
         }
     }
 }

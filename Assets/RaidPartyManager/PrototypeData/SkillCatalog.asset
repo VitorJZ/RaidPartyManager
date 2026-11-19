@@ -71,6 +71,7 @@ MonoBehaviour:
     displayName: "万箭齐发"
     icon: {fileID: 2800000, guid: f26422bac9534a92be183541c4a328e7, type: 3}
     battleEffect: {fileID: 2800000, guid: 4d4cbea12bb1446bbdc98f2f6d102bdd, type: 3}
+    projectile: {fileID: 2800000, guid: efc02e51828f4f29b3035172a141b363, type: 3}
     requirement: 3
     cost: 1
     skillEffect: 7
@@ -80,6 +81,8 @@ MonoBehaviour:
     displayName: "星陨术"
     icon: {fileID: 2800000, guid: 084cd3a6a53b40eda9704dcb625babd8, type: 3}
     battleEffect: {fileID: 2800000, guid: 72f27523372a4c70bc0dd25fbbe6b1ca, type: 3}
+    projectile: {fileID: 2800000, guid: a611f34e93e74c1c981a65c5b3aaf5ea, type: 3}
+    projectileFragments: {fileID: 2800000, guid: 011e2e243dbd45fbbdc52a349af06378, type: 3}
     requirement: 1
     cost: 1
     skillEffect: 7

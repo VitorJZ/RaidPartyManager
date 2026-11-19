@@ -65,15 +65,15 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Middle(title);
             panel.Add(title);
 
-            var battleButton = PrototypeStyle.Button("战斗", "open-battle",
-                () => OpenStandalone("BattlePrototype"), true);
-            battleButton.style.minHeight = 46;
-            panel.Add(battleButton);
+            var routeButton = PrototypeStyle.Button(AdventureFlow.HasSave ? "继续讨伐" : "开始讨伐",
+                "open-route", AdventureFlow.OpenRoute, true);
+            routeButton.style.minHeight = 46;
+            panel.Add(routeButton);
 
-            var templateButton = PrototypeStyle.Button("模板", "open-template", () => OpenStandalone("SampleScene"));
-            templateButton.style.minHeight = 46;
-            templateButton.style.marginTop = 10;
-            panel.Add(templateButton);
+            var battleButton = PrototypeStyle.Button("战斗", "open-battle", () => OpenStandalone("BattlePrototype"));
+            battleButton.style.minHeight = 46;
+            battleButton.style.marginTop = 10;
+            panel.Add(battleButton);
 
             var shopButton = PrototypeStyle.Button("商店", "open-shop", () => OpenStandalone("DockShop"));
             shopButton.style.minHeight = 46;

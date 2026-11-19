@@ -17,7 +17,8 @@ namespace RaidPartyManager.Battle
                 if (growth > 0)
                 {
                     unit.AttackGrowth += growth;
-                    Report(BattleEventKind.Effect, unit, unit, "传话筒", ActionKind.Shield, detail: $"攻击 +{growth}");
+                    Report(BattleEventKind.Effect, unit, unit, "传话筒", ActionKind.Shield,
+                        detail: $"攻击 +{growth}", visual: BattleVisualCue.RoundStartBonus);
                     Heal(unit, unit, growth, "传话筒", BattleEventKind.Effect);
                 }
             }
@@ -33,14 +34,16 @@ namespace RaidPartyManager.Battle
             {
                 if (!Opponents(owner).Any())
                     continue;
-                var eligible = units.Where(unit => unit != owner && unit.Input.Side == owner.Input.Side &&
-                    unit.Health > 0 && Array.IndexOf(unit.Slots, null) != -1).ToArray();
+                var eligible = units.Where(unit => unit != owner && unit.Input.Side == owner.Input.Side && unit.Health > 0)
+                    .Select(unit => (Unit: unit, Slot: Enumerable.Range(0, unit.Slots.Length)
+                        .Where(slot => unit.Slots[slot] == null && !HasReservedSlot(unit, slot)).DefaultIfEmpty(-1).First()))
+                    .Where(entry => entry.Slot >= 0).ToArray();
                 if (eligible.Length == 0)
                     continue;
 
-                var receiver = eligible[random.Next(eligible.Length)];
+                var (receiver, slot) = eligible[random.Next(eligible.Length)];
                 owner.Slots[Array.IndexOf(owner.Slots, item)] = null;
-                receiver.Slots[Array.IndexOf(receiver.Slots, null)] = item;
+                receiver.Slots[slot] = item;
                 item.Transfers++;
                 owner.ApplySlotChanges();
                 receiver.ApplySlotChanges();
@@ -50,7 +53,7 @@ namespace RaidPartyManager.Battle
                 if (owner.Input.Side == Side.Party && item.Id != null)
                     loadout = currentLoadout = CaptureLoadout();
                 Report(BattleEventKind.Effect, owner, receiver, "传话筒", ActionKind.Shield,
-                    detail: $"传递第 {item.Transfers} 次", loadout: loadout);
+                    detail: $"传递第 {item.Transfers} 次", loadout: loadout, visual: BattleVisualCue.RoundEndTransfer);
             }
         }
     }

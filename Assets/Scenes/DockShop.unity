@@ -289,6 +289,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 081aa91af2c9425479f445860d02712f, type: 2}
   backdrop: {fileID: 2800000, guid: 6f4b1e3a26ab417db0f9a6eb9cf39b9d, type: 3}
   merchantSheet: {fileID: 2800000, guid: ad486e4fb3564fa1be503ce9f705ef5e, type: 3}
+  merchantLaugh: {fileID: 2800000, guid: 3655b8b019bb4d4095660ae6274f7557, type: 3}
   shelfArtwork: {fileID: 2800000, guid: 6142aef10a5942e097a115dd39233248, type: 3}
   counterArtwork: {fileID: 2800000, guid: 93c0239008de4a23a1992bf9f611a927, type: 3}
 --- !u!114 &1741968123

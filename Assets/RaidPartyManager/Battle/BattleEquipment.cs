@@ -26,6 +26,7 @@ namespace RaidPartyManager.Battle
 
         private void StartBattle()
         {
+            SetOpeningEnemyShields();
             foreach (var actor in units.Where(unit => unit.Health > 0).ToArray())
                 ResolveOpeningGear(actor, canSummon: true);
             foreach (var recruit in recruits)
@@ -112,7 +113,8 @@ namespace RaidPartyManager.Battle
             foreach (var actor in units.Where(unit => unit.Health > 0))
                 foreach (var item in actor.Gear)
                     if (item.Effect == InsightTotem)
-                        GrantStatus(actor, TargetableOpponents(actor).First(), Exposed, 1);
+                        GrantStatus(actor, TargetableOpponents(actor).First(), Exposed, 1,
+                            "洞察图腾", BattleVisualCue.RoundStartExposed, BattleEventKind.Effect);
             ApplyMegaphoneBonus();
         }
 
@@ -127,9 +129,9 @@ namespace RaidPartyManager.Battle
                         if (unit.Health == 0)
                             break;
                         if (item.Effect == LifePendant)
-                            Heal(unit, unit, 3, "生命吊坠", BattleEventKind.Effect);
+                            Heal(unit, unit, 3, "生命吊坠", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndHeal);
                         else if (item.Effect == FirstFire)
-                            GrantStatus(unit, unit, Ember, 1);
+                            GrantStatus(unit, unit, Ember, 1, "初始之火", BattleVisualCue.RoundEndEmber, BattleEventKind.Effect);
                     }
 
                     if (unit.Health == 0)
@@ -138,9 +140,9 @@ namespace RaidPartyManager.Battle
                     if (poison > 0)
                     {
                         if (unit.Has(WitchDoctorDoll))
-                            Heal(unit, unit, poison, "巫医玩偶", BattleEventKind.Effect);
+                            Heal(unit, unit, poison, "巫医玩偶", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndPoisonHeal);
                         else
-                            Strike(null, unit, poison, DamageType.True, "中毒", BattleEventKind.Effect);
+                            Strike(null, unit, poison, DamageType.True, "中毒", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndPoison);
                     }
                     if (!Opponents(unit).Any() || !units.Any(ally => ally.Input.Side == unit.Input.Side && ally.Health > 0))
                         return;
@@ -149,11 +151,13 @@ namespace RaidPartyManager.Battle
 
             ApplyRoundEndTraits();
             PassMegaphones();
+            ResolveScavengerEscapes();
             foreach (var unit in units.Where(unit => unit.Health > 0))
             {
                 bool changed = false;
                 foreach (var status in DecayingStatuses)
-                    changed |= RemoveLayers(unit, status, 1);
+                    if (unit.DelayStatusDecay?.Remove(status) != true)
+                        changed |= RemoveLayers(unit, status, 1);
                 if (changed)
                     Report(BattleEventKind.Effect, unit, unit, "回合状态递减", ActionKind.Shield, detail: "状态层数 −1");
             }
@@ -161,7 +165,7 @@ namespace RaidPartyManager.Battle
 
         private void GrantStatus(Unit actor, Unit target, StatusKind status, int layers,
             string actionName = null, BattleVisualCue visual = BattleVisualCue.None, BattleEventKind? kind = null,
-            string skillBookId = null)
+            string skillBookId = null, bool delayDecay = false)
         {
             var eventKind = kind ?? (actionName == null ? BattleEventKind.Effect : BattleEventKind.Action);
             if (target.Health == 0 || (status != Purity && target.Layers(Purity) > 0) ||
@@ -173,18 +177,25 @@ namespace RaidPartyManager.Battle
             }
 
             int bonus = status == Poison ? 2 * (actor?.Count(PoisonRecipe) ?? 0) : 0;
-            int total = target.Layers(status) + layers + bonus + (status == Greed ? 0 : target.Layers(Greed));
+            int previous = target.Layers(status);
+            int total = previous + layers + bonus + (status == Greed ? 0 : target.Layers(Greed));
             if (status == Purity)
+            {
                 target.Statuses.Clear();
+                target.DelayStatusDecay?.Clear();
+            }
             if (status == Chill && total >= 3)
             {
                 target.Statuses.Remove(Chill);
                 target.Statuses[Frozen] = 1;
-                Report(BattleEventKind.Effect, actor, target, "冰冻", ActionKind.Shield, detail: "寒冷达到 3 层");
+                Report(eventKind, actor, target, "冰冻", ActionKind.Shield, detail: "寒冷达到 3 层",
+                    visual: visual, skillBookId: skillBookId);
                 return;
             }
 
             target.Statuses[status] = total;
+            if (delayDecay && previous == 0)
+                (target.DelayStatusDecay ??= new HashSet<StatusKind>()).Add(status);
             var statusName = StatusRules.For(status).Name;
             Report(eventKind, actor, target, actionName ?? statusName, ActionKind.Shield,
                 detail: $"{(actionName == null ? "" : statusName + " ")}达到 {total} 层", visual: visual,
@@ -197,7 +208,10 @@ namespace RaidPartyManager.Battle
             if (prior == 0)
                 return false;
             if (prior <= amount)
+            {
                 unit.Statuses.Remove(status);
+                unit.DelayStatusDecay?.Remove(status);
+            }
             else
                 unit.Statuses[status] = prior - amount;
             return true;
@@ -252,6 +266,8 @@ namespace RaidPartyManager.Battle
             components.Add((ResolveType(action.DamageType), attack + action.Power));
             foreach (var part in action.AdditionalDamage)
                 components.Add((ResolveType(part.Type), part.Power + (part.ScalesWithAttack ? attack : 0)));
+            if (actor.Trait == CharacterTrait.EnemyFogSignalGunner && target.Layers(Chill) > 0)
+                components.Add((DamageType.Fire, 2));
 
             int ember = actor.Layers(Ember);
             if (ember > 0)
@@ -275,22 +291,26 @@ namespace RaidPartyManager.Battle
                         GrantStatus(actor, target, Injured, 1);
             }
 
-            if (actor.SweepSkillId is string sweepSkillId)
+            if (actor.SweepSkill is { } sweep)
             {
                 int multiplier = actor.DoubleNextAttack ? 2 : 1;
                 actor.DoubleNextAttack = false;
-                actor.SweepSkillId = null;
+                actor.SweepSkill = null;
                 var sweepKind = BattleEventKind.Action;
+                // All sweep hits belong to one release. Resolve retaliation and bonus attacks afterward.
+                var reactions = new List<Action>();
                 foreach (var enemy in Opponents(actor).ToArray())
                 {
                     if (actor.Health == 0)
                         break;
                     if (enemy.Health == 0)
                         continue;
-                    Hit(actor, enemy, action, sweepKind, reason, multiplier: multiplier,
-                        firstTarget: sweepKind == BattleEventKind.Action, skillBookId: sweepSkillId);
+                    Hit(actor, enemy, action, sweepKind, reason, sweep.Name, multiplier: multiplier,
+                        firstTarget: sweepKind == BattleEventKind.Action, skillBookId: sweep.Id, reactions: reactions);
                     sweepKind = BattleEventKind.Effect;
                 }
+                foreach (var reaction in reactions)
+                    reaction();
                 return;
             }
 
@@ -300,16 +320,21 @@ namespace RaidPartyManager.Battle
                         unit.Input.Position < actor.Input.Position).Reverse().Concat(Opponents(actor)).ToArray();
                 int falloff = 0;
                 var kind = BattleEventKind.Action;
+                // The arrow is already in flight when these hits trigger counterattacks or bonus shots.
+                var reactions = new List<Action>();
                 foreach (var unit in forward)
                 {
                     if (actor.Health == 0)
                         break;
                     if (unit.Health == 0)
                         continue;
-                    if (Hit(actor, unit, action, kind, reason, falloff: falloff, firstTarget: kind == BattleEventKind.Action))
+                    if (Hit(actor, unit, action, kind, reason, falloff: falloff, visual: BattleVisualCue.PiercingArrow,
+                        firstTarget: kind == BattleEventKind.Action, reactions: reactions))
                         falloff++;
                     kind = BattleEventKind.Effect;
                 }
+                foreach (var reaction in reactions)
+                    reaction();
                 return;
             }
 
@@ -331,7 +356,8 @@ namespace RaidPartyManager.Battle
 
         private bool Hit(Unit actor, Unit target, ActionDefinition action, BattleEventKind kind,
             DecisionReason reason, string equipmentName = null, int falloff = 0, bool canCounter = true,
-            BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true, string skillBookId = null)
+            BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true, string skillBookId = null,
+            List<Action> reactions = null)
         {
             string name = equipmentName ?? action.Name;
             if (actor.DoubleNextAttack)
@@ -355,7 +381,8 @@ namespace RaidPartyManager.Battle
             }
             int physicalDealt = 0;
             if (missed)
-                Report(kind, actor, target, name, ActionKind.Attack, reason: reason, detail: "未命中", weaponAttack: true, visual: visual);
+                Report(kind, actor, target, name, ActionKind.Attack, reason: reason, detail: "未命中", weaponAttack: true,
+                    visual: visual, skillBookId: skillBookId);
             else
             {
                 int thorns = target.Layers(Thorns);
@@ -367,8 +394,12 @@ namespace RaidPartyManager.Battle
                 if (damage.Total > 0 && actor.Trait == CharacterTrait.PoisonOnHit)
                     GrantStatus(actor, target, Poison, actor.TraitPower);
                 physicalDealt = damage.Physical;
-                if (thorns > 0 && damage.Total >= 2 && actor.Health > 0)
-                    Strike(target, actor, damage.Total / 2, DamageType.Physical, "荆棘", BattleEventKind.Effect);
+                if (thorns > 0 && damage.Total >= 2)
+                    React(() =>
+                    {
+                        if (actor.Health > 0)
+                            Strike(target, actor, damage.Total / 2, DamageType.Physical, "荆棘", BattleEventKind.Effect);
+                    });
 
                 if (actor.Health > 0 && ember > 0 && !execution && !actor.Has(EternalFire))
                 {
@@ -378,7 +409,7 @@ namespace RaidPartyManager.Battle
             }
 
             if (!missed && canCounter)
-                CounterAttack(target, actor);
+                React(() => CounterAttack(target, actor));
 
             foreach (var item in actor.Gear)
             {
@@ -394,16 +425,27 @@ namespace RaidPartyManager.Battle
                     case Bagua when !missed && actor.Input.Position % 2 != 0:
                         GrantStatus(actor, target, Chill, 1);
                         break;
-                    case WindGlove when kind == BattleEventKind.Action && random.NextDouble() < 0.30:
-                        var targets = TargetableOpponents(actor);
-                        var next = targets.Contains(target) ? target :
-                            action.Target == TargetRule.RearEnemy ? targets.LastOrDefault() : targets.FirstOrDefault();
-                        if (next != null)
-                            Hit(actor, next, action, BattleEventKind.Effect, reason, "疾风手套", falloff, canCounter);
+                    case WindGlove when kind == BattleEventKind.Action:
+                        React(() =>
+                        {
+                            if (actor.Health == 0 || random.NextDouble() >= 0.30)
+                                return;
+                            var targets = TargetableOpponents(actor);
+                            var next = targets.Contains(target) ? target :
+                                action.Target == TargetRule.RearEnemy ? targets.LastOrDefault() : targets.FirstOrDefault();
+                            if (next != null)
+                                Hit(actor, next, action, BattleEventKind.Effect, reason, "疾风手套", falloff, canCounter);
+                        });
                         break;
                 }
             }
             return !missed;
+
+            void React(Action reaction)
+            {
+                if (reactions == null) reaction();
+                else reactions.Add(reaction);
+            }
         }
 
         private void CounterAttack(Unit defender, Unit attacker)
@@ -461,13 +503,16 @@ namespace RaidPartyManager.Battle
                 amount *= type == DamageType.Fire ? 3 : 2;
             if (type == DamageType.Fire)
                 amount *= 1m + 0.5m * target.Layers(Chill);
-            return (int)Math.Min(int.MaxValue, decimal.Floor(amount) + (actor?.Count(WindChime) ?? 0));
+            return (int)Math.Clamp(decimal.Floor(amount) + (actor?.Count(WindChime) ?? 0), 1, int.MaxValue);
         }
 
         private int ProjectedDamage(Unit actor, Unit target, IReadOnlyList<(DamageType Type, int Power)> parts,
             bool ignoreDefense = false) =>
-            LimitDamage(target, Math.Max(0, SumDamage(parts.Select(part =>
-                Damage(actor, target, part.Power, FinalDamageType(actor, part.Type), ignoreDefense))) - target.Shield));
+            LimitDamage(target, Math.Max(0, DamageAfterGuard(target, SumDamage(parts.Select(part =>
+                Damage(actor, target, part.Power, FinalDamageType(actor, part.Type), ignoreDefense)))) - target.Shield));
+
+        private int DamageAfterGuard(Unit target, int damage) =>
+            damage > 0 ? Math.Max(1, damage - DockGuardReduction(target)) : 0;
 
         private static int LimitDamage(Unit target, int damage) =>
             target.Trait == CharacterTrait.DamageLimit ? Math.Min(damage, target.TraitPower) : damage;
@@ -492,8 +537,15 @@ namespace RaidPartyManager.Battle
                 int amount = (int)Math.Min(int.MaxValue, (long)Damage(actor, target, part.Power, type, ignoreDefense) * multiplier);
                 return (Type: type, Amount: amount);
             }).ToArray();
+            int total = SumDamage(resolved.Select(part => part.Amount));
+            int guarded = DamageAfterGuard(target, total);
+            if (guarded < total)
+            {
+                int first = Array.FindIndex(resolved, part => part.Amount > 0);
+                resolved[first].Amount -= total - guarded;
+            }
             int damage = actor != null && actor.Input.Side != target.Input.Side && Round > 0 && target.ProtectedRound == Round
-                ? 0 : SumDamage(resolved.Select(part => part.Amount));
+                ? 0 : guarded;
             if (damage > 0)
             {
                 RemoveLayers(target, Exposed, 1);
@@ -507,12 +559,17 @@ namespace RaidPartyManager.Battle
             int healthDamage = damage - absorbed;
             var linked = healthDamage > 0 ? LinkedAllies(target) : new List<Unit>();
             int dealt = LoseHealth(target, LimitDamage(target, healthDamage), out string protection);
+            var lifeLost = LifeLossByType(resolved, absorbed, dealt);
+            int physicalLost = lifeLost.Where(part => part.Type == DamageType.Physical).Sum(part => part.Amount);
+            bool poisonDamage = visual == BattleVisualCue.RoundEndPoison;
             string detail = protection ?? DamageDetail(resolved);
             Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack,
-                visual: visual, skillBookId: skillBookId);
+                visual: visual, skillBookId: skillBookId, damageTaken: lifeLost, poisonDamage: poisonDamage);
             if (target.Health == 0)
                 Report(BattleEventKind.Defeated, actor, target, name, ActionKind.Attack);
-            var lifeLost = LifeLossByType(resolved, absorbed, dealt);
+            if (target.Health > 0 && absorbed > 0 && target.Shield == 0)
+                BreakAnchorArmor(target);
+            ReactToEnemyHealthLoss(target, dealt, physicalLost);
             OnLifeLost(actor, target, dealt);
             if (dealt > 0 && weaponAttack && actor.Input.Side != target.Input.Side &&
                 target.Trait == CharacterTrait.ExposeMeleeAttacker && IsMeleeStrike(actor))
@@ -524,27 +581,31 @@ namespace RaidPartyManager.Battle
                     break;
                 if (actor != null && actor.Input.Side != ally.Input.Side && Round > 0 && ally.ProtectedRound == Round)
                     continue;
-                int linkedDamage = ally.Has(InsulatingOrb) ? lifeLost.Physical : dealt;
+                bool physicalOnly = ally.Has(InsulatingOrb);
+                int linkedDamage = physicalOnly ? physicalLost : dealt;
                 if (linkedDamage == 0)
                     continue;
                 int mirrored = LoseHealth(ally, LimitDamage(ally, linkedDamage), out string allyProtection);
+                var mirroredParts = physicalOnly ? lifeLost.Where(part => part.Type == DamageType.Physical) : lifeLost;
                 Report(BattleEventKind.Effect, target, ally, "红绳", ActionKind.Attack, mirrored,
-                    detail: allyProtection);
+                    detail: allyProtection, damageTaken: LifeLossByType(mirroredParts, 0, mirrored), poisonDamage: poisonDamage);
                 if (ally.Health == 0)
                     Report(BattleEventKind.Defeated, target, ally, "红绳", ActionKind.Attack);
+                ReactToEnemyHealthLoss(ally, mirrored, physicalOnly ? mirrored : Math.Min(mirrored, physicalLost));
                 OnLifeLost(actor, ally, mirrored);
             }
 
             if (target.Health == 0 || linked.Any(ally => ally.Health == 0))
                 UpdateEquipment();
+            int magicLost = lifeLost.Where(part => part.Type is DamageType.Magic or DamageType.Fire).Sum(part => part.Amount);
             int crystals = actor?.Count(ArcaneCrystal) ?? 0;
-            if (lifeLost.Magic > 0 && crystals > 0 && actor.Health > 0 && !actor.ResolvingCrystalHeal)
+            if (magicLost > 0 && crystals > 0 && actor.Health > 0 && !actor.ResolvingCrystalHeal)
             {
                 actor.ResolvingCrystalHeal = true;
                 // The earrings can turn the heal back into magic damage.
                 try
                 {
-                    Heal(actor, actor, (int)Math.Min(int.MaxValue, (long)lifeLost.Magic * crystals),
+                    Heal(actor, actor, (int)Math.Min(int.MaxValue, (long)magicLost * crystals),
                         "魔导水晶", BattleEventKind.Effect, hostileTarget: target);
                 }
                 finally
@@ -552,18 +613,20 @@ namespace RaidPartyManager.Battle
                     actor.ResolvingCrystalHeal = false;
                 }
             }
-            return (dealt, lifeLost.Physical);
+            return (dealt, physicalLost);
         }
 
         private static bool IsMeleeStrike(Unit actor) => UsesShortbow(actor) ||
             actor.Input.Character.Reach == AttackReach.Melee ||
             (actor.Input.Character.Reach == AttackReach.Unspecified && actor.Input.Character.Profession == Profession.Warrior);
 
-        private static (int Physical, int Magic) LifeLossByType(IEnumerable<(DamageType Type, int Amount)> parts,
-            int shield, int healthLoss)
+        private static IReadOnlyList<(DamageType Type, int Amount)> LifeLossByType(
+            IEnumerable<(DamageType Type, int Amount)> parts, int shield, int healthLoss)
         {
-            int physical = 0;
-            int magic = 0;
+            if (healthLoss == 0)
+                return Array.Empty<(DamageType Type, int Amount)>();
+
+            var loss = new List<(DamageType Type, int Amount)>();
             foreach (var part in parts)
             {
                 if (healthLoss == 0)
@@ -572,12 +635,10 @@ namespace RaidPartyManager.Battle
                 shield -= absorbed;
                 int applied = Math.Min(healthLoss, part.Amount - absorbed);
                 healthLoss -= applied;
-                if (part.Type == DamageType.Physical)
-                    physical += applied;
-                else if (part.Type is DamageType.Magic or DamageType.Fire)
-                    magic += applied;
+                if (applied > 0)
+                    loss.Add((part.Type, applied));
             }
-            return (physical, magic);
+            return loss.AsReadOnly();
         }
 
         private static string DamageDetail(IReadOnlyList<(DamageType Type, int Amount)> parts)
@@ -679,7 +740,9 @@ namespace RaidPartyManager.Battle
             if (amount > 0 && roots > 0)
                 foreach (var enemy in Opponents(target).ToArray())
                     if (enemy.Health > 0)
-                        Strike(target, enemy, amount * roots, DamageType.Lightning, "古树根茎", BattleEventKind.Effect);
+                        Strike(target, enemy, amount * roots, DamageType.Lightning, "古树根茎", BattleEventKind.Effect,
+                            visual: visual is BattleVisualCue.RoundEndHeal or BattleVisualCue.RoundEndPoisonHeal
+                                ? BattleVisualCue.RoundEndLightning : BattleVisualCue.None);
         }
     }
 }

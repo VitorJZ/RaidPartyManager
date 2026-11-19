@@ -137,15 +137,16 @@ namespace RaidPartyManager.Tests
                 .Select(entry => entry.Amount), Is.EqualTo(new[] { 5, 10, 10 }));
         }
 
-        [TestCase(FirstFire, LifePendant, "余烬", "生命吊坠")]
-        [TestCase(LifePendant, FirstFire, "生命吊坠", "余烬")]
+        [TestCase(FirstFire, LifePendant, BattleVisualCue.RoundEndEmber, BattleVisualCue.RoundEndHeal)]
+        [TestCase(LifePendant, FirstFire, BattleVisualCue.RoundEndHeal, BattleVisualCue.RoundEndEmber)]
         public void RitualMaskRepeatsRoundEndGearInSlotOrder(
-            EquipmentEffect first, EquipmentEffect second, string firstEffect, string secondEffect)
+            EquipmentEffect first, EquipmentEffect second, BattleVisualCue firstEffect, BattleVisualCue secondEffect)
         {
             var party = Unit("party", Side.Party, health: 10, gear: Gear(first, second, RitualMask));
             var result = Fight(party, Unit("enemy", Side.Enemy));
             var triggers = result.Events.Where(entry => entry.Kind == BattleEventKind.Effect &&
-                (entry.ActionName == "余烬" || entry.ActionName == "生命吊坠")).Select(entry => entry.ActionName);
+                (entry.VisualCue == BattleVisualCue.RoundEndEmber || entry.VisualCue == BattleVisualCue.RoundEndHeal))
+                .Select(entry => entry.VisualCue);
             Assert.That(triggers, Is.EqualTo(new[] { firstEffect, secondEffect, firstEffect, secondEffect }));
         }
 
@@ -170,7 +171,9 @@ namespace RaidPartyManager.Tests
                 statuses: new Dictionary<StatusKind, int> { { StatusKind.Poison, 3 } });
             var result = Fight(actor, Unit("enemy", Side.Enemy));
             Assert.That(result.Events.Single(entry => entry.ActionName == "红水晶吊坠").Amount, Is.EqualTo(2));
-            Assert.That(result.Events.Single(entry => entry.ActionName == "巫医玩偶").Amount, Is.EqualTo(3));
+            var poisonHeal = result.Events.Single(entry => entry.ActionName == "巫医玩偶");
+            Assert.That(poisonHeal.Amount, Is.EqualTo(3));
+            Assert.That(poisonHeal.VisualCue, Is.EqualTo(BattleVisualCue.RoundEndPoisonHeal));
 
             var heal = new ActionDefinition("heal", "heal", ActionKind.Heal, TargetRule.WoundedAlly, 6, 2);
             var reversed = Fight(Unit("party", Side.Party, gear: Gear(RebelEarring), skill: heal),
@@ -179,6 +182,11 @@ namespace RaidPartyManager.Tests
             Assert.That(Action(reversed, "party").ActionKind, Is.EqualTo(ActionKind.Attack));
             Assert.That(Action(reversed, "party").Amount, Is.EqualTo(6));
             Assert.That(Action(reversed, "party").Detail, Is.EqualTo("魔法"));
+
+            var reversedPendant = Fight(Unit("party", Side.Party, gear: Gear(LifePendant, RebelEarring)),
+                Unit("enemy", Side.Enemy)).Events.Single(entry => entry.VisualCue == BattleVisualCue.RoundEndHeal);
+            Assert.That(reversedPendant.TargetId, Is.EqualTo("enemy"));
+            Assert.That(reversedPendant.ActionKind, Is.EqualTo(ActionKind.Attack));
         }
 
         [Test]
@@ -196,8 +204,27 @@ namespace RaidPartyManager.Tests
 
             Assert.That(actions.Select(entry => entry.Amount), Is.EqualTo(new[] { 32, 10 }));
             Assert.That(actions[0].Detail, Is.EqualTo("物理 8 + 魔法 12 + 火焰 12"));
+            Assert.That(actions[0].DamageTaken, Is.EqualTo(new[]
+                { (DamageType.Physical, 8), (DamageType.Magic, 12), (DamageType.Fire, 12) }));
             Assert.That(actions[1].Detail, Is.EqualTo("物理 4 + 魔法 6"));
+
+            var wounded = Unit("enemy", Side.Enemy, health: 13, stats: enemy.Stats, statuses: enemy.StartingStatuses);
+            var lethal = Action(Fight(attacker, wounded), attacker.Id);
+            Assert.That(lethal.Amount, Is.EqualTo(13));
+            Assert.That(lethal.DamageTaken, Is.EqualTo(new[] { (DamageType.Physical, 8), (DamageType.Magic, 5) }));
             Assert.That(actions[0].TargetStatuses, Is.Empty);
+        }
+
+        [TestCase(DamageType.Physical)]
+        [TestCase(DamageType.Magic)]
+        public void AHitDealsAtLeastOneDamageAgainstHighDefenseAndResolve(DamageType type)
+        {
+            var basic = new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0, damageType: type);
+            var attacker = Unit("party", Side.Party, basic: basic);
+            var target = Unit("enemy", Side.Enemy, stats: new Stats(2, 10, 10, 30),
+                statuses: new Dictionary<StatusKind, int> { { StatusKind.Resolve, 1 } });
+
+            Assert.That(Action(Fight(attacker, target), attacker.Id).Amount, Is.EqualTo(1));
         }
 
         [Test]
@@ -306,7 +333,7 @@ namespace RaidPartyManager.Tests
         public void FormationPassivesUseTeamStatsAndRedCordSharesGearAndDamage()
         {
             var front = Unit("front", Side.Party, stats: new Stats(3, 3, 2, 30), gear: Gear(GuardianBanner));
-            var rear = Unit("rear", Side.Party, 3, gear: Gear(GreedyHand, ScarletRose, RedCord));
+            var rear = Unit("rear", Side.Party, 2, gear: Gear(GreedyHand, ScarletRose, RedCord));
             var enemy = Unit("enemy", Side.Enemy, stats: new Stats(4, 0, 0, 100));
             var stats = EquipmentFormation.Resolve(new[] { front, rear, enemy });
             Assert.That(stats["rear"].Attack, Is.EqualTo(10));
@@ -321,6 +348,26 @@ namespace RaidPartyManager.Tests
 
             var banner = EquipmentFormation.Resolve(new[] { front, Unit("rear", Side.Party, 3) });
             Assert.That(banner["rear"].Defense, Is.EqualTo(3));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void RedCordDoesNotShareEquipmentOrMirrorDamageAcrossAVacancy(bool hasFallenAlly)
+        {
+            var front = Unit("front", Side.Party, stats: new Stats(3, 3, 2, 30));
+            var wearer = Unit("wearer", Side.Party, 3, stats: new Stats(5, 2, 1, 30), gear: Gear(RedCord, ScarletRose));
+            var enemy = Unit("enemy", Side.Enemy, stats: new Stats(6, 0, 0, 100));
+            var lineup = new List<Combatant> { front, wearer, enemy };
+            if (hasFallenAlly)
+                lineup.Add(Unit("fallen", Side.Party, 2, health: 0));
+
+            var stats = EquipmentFormation.Resolve(lineup);
+            Assert.That(stats[front.Id], Is.EqualTo(front.Stats));
+            Assert.That(stats[wearer.Id].Attack, Is.EqualTo(8));
+            var result = Fight(lineup.ToArray());
+            Assert.That(Action(result, front.Id).Amount, Is.EqualTo(3));
+            Assert.That(result.Events.Any(entry => entry.ActionName == "红绳"), Is.False);
+            Assert.That(result.HealthById[wearer.Id], Is.EqualTo(wearer.Health));
         }
 
         [Test]

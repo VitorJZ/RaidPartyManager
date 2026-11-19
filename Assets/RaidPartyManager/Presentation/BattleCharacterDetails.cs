@@ -59,7 +59,7 @@ namespace RaidPartyManager.Presentation
                 var skill = known[i];
                 var row = PrototypeStyle.Row();
                 row.style.alignItems = Align.Center;
-                var icon = new EquipmentIcon(skill, iconFor(skill.Id));
+                var icon = new EquipmentIcon(skill, iconFor(skill.Id), showScroll: false);
                 icon.style.width = icon.style.height = 25;
                 icon.style.flexGrow = 0;
                 icon.style.flexShrink = 0;
@@ -91,7 +91,8 @@ namespace RaidPartyManager.Presentation
             IgnorePicking(this);
         }
 
-        public void Refresh(Stats stats, int currentHealth, int shield, IReadOnlyList<StatusStack> statuses)
+        public void Refresh(Stats stats, int currentHealth, int shield, IReadOnlyList<StatusStack> statuses,
+            IReadOnlyDictionary<BattleCountdownKind, int> countdowns)
         {
             health.text = $"生命  {HealthText(currentHealth, stats.Health)}";
             attack.text = $"攻击  {stats.Attack}";
@@ -107,6 +108,12 @@ namespace RaidPartyManager.Presentation
                     active.Add($"护盾 {shield}");
                 if (statuses != null)
                     active.AddRange(statuses.Select(status => $"{StatusRules.For(status.Kind).Name} ×{status.Layers}"));
+                if (countdowns != null)
+                    foreach (var timer in countdowns)
+                    {
+                        var info = BattleCountdownIcon.Details(timer.Key);
+                        active.Add($"{info.Name} 剩余 {timer.Value} {info.Unit}");
+                    }
             }
             conditions.text = $"状态  {(active.Count == 0 ? "无" : string.Join("、", active))}";
         }

@@ -51,12 +51,14 @@ namespace RaidPartyManager.Battle
                 {
                     case PoisonOpponents:
                         foreach (var enemy in Opponents(unit))
-                            GrantStatus(unit, enemy, Poison, unit.TraitPower);
+                            GrantStatus(unit, enemy, Poison, unit.TraitPower,
+                                "幽雾炼药", BattleVisualCue.RoundStartPoison, BattleEventKind.Effect);
                         break;
                     case BlessAlly:
                         var allies = living.Where(ally => ally != unit && ally.Input.Side == unit.Input.Side).ToArray();
                         if (allies.Length > 0)
-                            GrantStatus(unit, allies[random.Next(allies.Length)], BlessingStatuses[random.Next(BlessingStatuses.Length)], 1);
+                            GrantStatus(unit, allies[random.Next(allies.Length)], BlessingStatuses[random.Next(BlessingStatuses.Length)], 1,
+                                "颂歌祝福", BattleVisualCue.RoundStartBlessing, BattleEventKind.Effect);
                         break;
                     case BorrowAllyAttack:
                         var behind = living.FirstOrDefault(ally => ally.Input.Side == unit.Input.Side &&
@@ -66,7 +68,7 @@ namespace RaidPartyManager.Battle
                             unit.BorrowedAttack = CurrentAttack(behind);
                             behind.BlockedRound = Round;
                             Report(BattleEventKind.Effect, unit, behind, "地煞借力", ActionKind.Shield,
-                                detail: $"地煞攻击 +{unit.BorrowedAttack}，队友本回合无法行动");
+                                detail: $"地煞攻击 +{unit.BorrowedAttack}，队友本回合无法行动", visual: BattleVisualCue.RoundStartBonus);
                         }
                         break;
                 }
@@ -87,28 +89,32 @@ namespace RaidPartyManager.Battle
                 {
                     int gain = ++unit.GrowthTriggers * unit.TraitPower;
                     unit.AttackGrowth += gain;
-                    Report(BattleEventKind.Effect, unit, unit, "星辉增长", ActionKind.Shield, detail: $"攻击 +{gain}");
+                    Report(BattleEventKind.Effect, unit, unit, "星辉增长", ActionKind.Shield, detail: $"攻击 +{gain}",
+                        visual: BattleVisualCue.RoundEndGrowth);
                 }
                 else if (unit.Trait == LightningChant && Round % 3 == 0)
                 {
                     foreach (var enemy in Opponents(unit).ToArray())
                         if (enemy.Health > 0)
-                            Strike(unit, enemy, unit.TraitPower, DamageType.Lightning, "灾厄吟唱", BattleEventKind.Effect);
+                            Strike(unit, enemy, unit.TraitPower, DamageType.Lightning, "灾厄吟唱", BattleEventKind.Effect,
+                                visual: BattleVisualCue.RoundEndLightning);
                 }
 
                 var formId = unit.Input.Character.BattleFormId;
                 if (unit.Health > 0 && formId != null && request.CharacterCatalog.TryGetValue(formId, out var form))
-                    ChangeForm(unit, unit, form, "切换形态");
+                    ChangeForm(unit, unit, form, "切换形态", BattleVisualCue.RoundEndFormShift);
             }
 
             UpdateEquipment();
         }
 
-        private void ChangeForm(Unit source, Unit target, CharacterDefinition form, string reason)
+        private void ChangeForm(Unit source, Unit target, CharacterDefinition form, string reason,
+            BattleVisualCue visual = BattleVisualCue.None)
         {
             target.ChangeForm(form);
             UpdateFormation();
-            Report(BattleEventKind.FormChanged, source, target, reason, ActionKind.Shield, detail: form.Name, form: form);
+            Report(BattleEventKind.FormChanged, source, target, reason, ActionKind.Shield, detail: form.Name, form: form,
+                visual: visual);
         }
 
         private void OnLifeLost(Unit source, Unit target, int amount)

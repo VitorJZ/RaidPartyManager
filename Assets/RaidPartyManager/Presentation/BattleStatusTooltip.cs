@@ -1,3 +1,4 @@
+using RaidPartyManager.Domain;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -41,16 +42,17 @@ namespace RaidPartyManager.Presentation
             panel.Add(description);
         }
 
-        public void Show(VisualElement badge, string status, int count, string effect, Texture2D icon, Color color, bool shield)
+        public void Show(VisualElement badge, string status, int count, string effect, Texture2D icon, Color color, bool shield,
+            BattleCountdownKind? countdown = null, string unit = null)
         {
             anchor = badge;
             title.style.color = color;
-            SetCount(badge, status, count);
+            SetCount(badge, status, count, unit);
             description.text = effect;
             PrototypeStyle.Outline(panel, color, 6);
             PrototypeStyle.Outline(artwork, PrototypeStyle.Edge, 4);
             artwork.Clear();
-            artwork.Add(CreateIcon(icon, status, color, shield));
+            artwork.Add(CreateIcon(icon, status, color, shield, countdown));
             panel.style.width = Mathf.Clamp(root.layout.width - 12f, 0f, 224f);
             if (panel.parent == null)
                 root.Add(panel);
@@ -59,10 +61,10 @@ namespace RaidPartyManager.Presentation
             PositionPanel();
         }
 
-        public void SetCount(VisualElement badge, string status, int count)
+        public void SetCount(VisualElement badge, string status, int count, string unit)
         {
             if (anchor == badge)
-                title.text = $"{status} ×{count}";
+                title.text = unit == null ? $"{status} ×{count}" : $"{status} · 剩余 {count} {unit}";
         }
 
         public void Hide(VisualElement badge = null)
@@ -90,8 +92,11 @@ namespace RaidPartyManager.Presentation
             panel.style.top = Mathf.Clamp(top, margin, Mathf.Max(margin, root.layout.height - height - margin));
         }
 
-        internal static VisualElement CreateIcon(Texture2D art, string title, Color color, bool shield)
+        internal static VisualElement CreateIcon(Texture2D art, string title, Color color, bool shield,
+            BattleCountdownKind? countdown = null)
         {
+            if (countdown.HasValue)
+                return new BattleCountdownIcon(countdown.Value, color);
             if (art != null)
                 return new Image { image = art, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore,
                     style = { flexGrow = 1 } };

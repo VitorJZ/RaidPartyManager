@@ -43,7 +43,7 @@ namespace RaidPartyManager.Tests
             var catalog = new EquipmentDefinition[] { Armor, Armor, book };
 
             var release = run.SupplyEditorBackpack(catalog, 4);
-            Assert.That(run.Inventory.Count(item => item.Id != original.Id), Is.EqualTo(4));
+            Assert.That(run.Inventory.Count, Is.EqualTo(4));
             Assert.That(run.SkillBooks.Count, Is.EqualTo(4));
             var borrowed = run.Inventory.First(item => item.Id != original.Id);
             Assert.That(run.TryEquip("b", 0, borrowed.Id), Is.True);
@@ -56,7 +56,7 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Members.Single(member => member.Id == "b").LearnedSkills[0], Is.SameAs(book));
 
             release = run.SupplyEditorBackpack(catalog, 4);
-            Assert.That(run.Inventory.Count, Is.EqualTo(6));
+            Assert.That(run.Inventory.Count, Is.EqualTo(4));
             Assert.That(run.SkillBooks.Count, Is.EqualTo(4));
             release();
             Assert.That(run.Inventory, Is.EquivalentTo(new[] { original, borrowed }));

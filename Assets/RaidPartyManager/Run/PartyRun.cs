@@ -28,11 +28,13 @@ namespace RaidPartyManager.Run
     {
         public string Id { get; }
         public EquipmentDefinition Definition { get; }
+        internal long AcquisitionOrder { get; }
 
-        internal EquipmentInstance(string id, EquipmentDefinition definition)
+        internal EquipmentInstance(string id, EquipmentDefinition definition, long acquisitionOrder)
         {
             Id = id;
             Definition = definition;
+            AcquisitionOrder = acquisitionOrder;
         }
     }
 
@@ -92,11 +94,14 @@ namespace RaidPartyManager.Run
 
         private readonly List<Member> members = new List<Member>();
         private readonly Dictionary<string, EquipmentInstance> inventory = new Dictionary<string, EquipmentInstance>();
+        private HashSet<string> stolenDuringBattle = new();
+        private readonly HashSet<string> editorSupplies = new HashSet<string>();
         private readonly Dictionary<string, EquipmentDefinition> potionDefinitions = new Dictionary<string, EquipmentDefinition>();
         private readonly Dictionary<string, EquipmentDefinition> accessoryDefinitions = new Dictionary<string, EquipmentDefinition>();
         private BattleRequest activeBattle;
         private EquipmentDefinition activeReward;
         private int nextItemId;
+        private long nextAcquisitionOrder;
         private int nextBookId;
         private int nextEditorItemId;
         private int nextBattleId;
@@ -109,14 +114,91 @@ namespace RaidPartyManager.Run
                 AddEquipment(equipment);
         }
 
+        private PartyRun() { }
+
+        internal PartyCheckpoint CaptureCheckpoint()
+        {
+            var assigned = AssignedEquipmentIds();
+            return new PartyCheckpoint
+            {
+                Gold = Gold, NextItemId = nextItemId, NextBookId = nextBookId,
+                NextEditorItemId = nextEditorItemId, NextBattleId = nextBattleId,
+                Inventory = inventory.Values.Where(item => !editorSupplies.Contains(item.Id) || assigned.Contains(item.Id))
+                    .OrderBy(item => item.AcquisitionOrder)
+                    .Select(item => new CheckpointItem { Id = item.Id, Definition = item.Definition.Id }).ToArray(),
+                Members = members.Select(member => new CheckpointMember
+                {
+                    Id = member.Id, StartingCharacter = member.Start.Character.Id, StartingPosition = member.Start.Position,
+                    StartingHealth = member.Start.Health, InitialStatuses = CaptureStatuses(member.Start.StartingStatuses),
+                    Character = member.Character.Id, Position = member.Position ?? 0, Health = member.Health,
+                    PermanentAttack = member.PermanentAttack, IsAway = member.IsAway, Statuses = CaptureStatuses(member.StartingStatuses),
+                    Slots = (string[])member.Slots.Clone(), Skills = member.LearnedSkills.Select(skill => skill?.Id).ToArray()
+                }).ToArray()
+            };
+        }
+
+        internal static PartyRun RestoreCheckpoint(PartyCheckpoint saved, IReadOnlyDictionary<string, CharacterDefinition> characters,
+            IReadOnlyDictionary<string, EquipmentDefinition> items)
+        {
+            if (saved?.Members == null || saved.Inventory == null || saved.Members.Length is < 1 or > Rules.Positions)
+                throw new ArgumentException("Invalid saved party.");
+
+            var party = new PartyRun
+            {
+                Gold = saved.Gold, nextItemId = saved.NextItemId, nextBookId = saved.NextBookId,
+                nextEditorItemId = saved.NextEditorItemId, nextBattleId = saved.NextBattleId
+            };
+            foreach (var item in saved.Inventory)
+            {
+                var definition = items[item.Definition];
+                party.inventory.Add(item.Id, new EquipmentInstance(item.Id, definition, ++party.nextAcquisitionOrder));
+                party.RegisterReward(definition);
+            }
+            foreach (var entry in saved.Members)
+            {
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Id) || entry.Slots?.Length != Rules.EquipmentSlots ||
+                    entry.Skills?.Length != 2 || !Rules.IsPosition(entry.StartingPosition) ||
+                    entry.Position != 0 && !Rules.IsPosition(entry.Position) || entry.Health < 0)
+                    throw new ArgumentException("Invalid saved party member.");
+                var member = new Member(new PartyMemberStart(entry.Id, characters[entry.StartingCharacter], entry.StartingPosition,
+                    entry.StartingHealth, RestoreStatuses(entry.InitialStatuses)))
+                {
+                    Character = characters[entry.Character],
+                    Position = entry.Position == 0 ? (int?)null : entry.Position,
+                    Health = entry.Health, PermanentAttack = entry.PermanentAttack, IsAway = entry.IsAway,
+                    StartingStatuses = RestoreStatuses(entry.Statuses)
+                };
+                for (int i = 0; i < member.Slots.Length; i++)
+                    if (!string.IsNullOrEmpty(entry.Slots[i]))
+                        member.Slots[i] = party.inventory[entry.Slots[i]].Id;
+                for (int i = 0; i < member.LearnedSkills.Length; i++)
+                {
+                    if (string.IsNullOrEmpty(entry.Skills[i]))
+                        continue;
+                    if (!(items[entry.Skills[i]] is SkillBookDefinition skill))
+                        throw new ArgumentException("Invalid saved skill.");
+                    member.LearnedSkills[i] = skill;
+                }
+                party.members.Add(member);
+            }
+            return party;
+        }
+
+        private static CheckpointStatus[] CaptureStatuses(IReadOnlyDictionary<StatusKind, int> statuses) =>
+            statuses?.Select(entry => new CheckpointStatus { Kind = entry.Key, Layers = entry.Value }).ToArray();
+
+        private static IReadOnlyDictionary<StatusKind, int> RestoreStatuses(CheckpointStatus[] statuses) =>
+            statuses == null || statuses.Length == 0 ? null : statuses.ToDictionary(status => status.Kind, status => status.Layers);
+
         private static List<Member> ValidateRoster(IEnumerable<PartyMemberStart> startingMembers)
         {
             var roster = new List<Member>();
             foreach (var entry in startingMembers)
             {
-                if (string.IsNullOrWhiteSpace(entry.Id) || entry.Character == null || !Rules.IsPosition(entry.Position) ||
+                if (string.IsNullOrWhiteSpace(entry.Id) || entry.Character == null || !Rules.Fits(entry.Position, entry.Character.PositionSlots) ||
                     entry.Health < 0 || entry.Health > entry.Character.BaseStats.Health ||
-                    roster.Any(member => member.Id == entry.Id || member.Start.Position == entry.Position))
+                    roster.Any(member => member.Id == entry.Id ||
+                        Rules.Overlaps(entry.Position, entry.Character.PositionSlots, member.Start.Position, member.Character.PositionSlots)))
                     throw new ArgumentException("Invalid or duplicate starting member.", nameof(startingMembers));
 
                 roster.Add(new Member(entry));
@@ -137,8 +219,7 @@ namespace RaidPartyManager.Run
 
         public void ResetEncounter()
         {
-            activeBattle = null;
-            activeReward = null;
+            CancelBattle();
             var occupied = new HashSet<int>();
             foreach (var member in members)
             {
@@ -149,22 +230,30 @@ namespace RaidPartyManager.Run
                 if (!IsRooted(member) || member.Health == 0 || !member.Position.HasValue)
                     member.Position = null;
                 else
-                    occupied.Add(member.Position.Value);
+                    occupied.UnionWith(Enumerable.Range(member.Position.Value, member.Character.PositionSlots));
             }
             foreach (var member in members.Where(member => !member.IsAway && member.Health > 0 && !member.Position.HasValue))
             {
-                if (occupied.Add(member.Start.Position))
+                if (CanFit(member, member.Start.Position))
+                {
                     member.Position = member.Start.Position;
+                    occupied.UnionWith(Enumerable.Range(member.Start.Position, member.Character.PositionSlots));
+                }
             }
 
             // A recruited member's first position may also be an original member's starting slot.
-            int open = 1;
             foreach (var member in members.Where(member => !member.IsAway && member.Health > 0 && !member.Position.HasValue))
             {
-                while (occupied.Contains(open))
-                    open++;
-                member.Position = open++;
+                int open = Enumerable.Range(1, Rules.Positions).FirstOrDefault(slot => CanFit(member, slot));
+                if (open > 0)
+                {
+                    member.Position = open;
+                    occupied.UnionWith(Enumerable.Range(open, member.Character.PositionSlots));
+                }
             }
+
+            bool CanFit(Member member, int position) => Rules.Fits(position, member.Character.PositionSlots) &&
+                !Enumerable.Range(position, member.Character.PositionSlots).Any(occupied.Contains);
         }
 
         public IReadOnlyList<MemberView> Members
@@ -178,8 +267,18 @@ namespace RaidPartyManager.Run
             }
         }
 
-        public IReadOnlyList<EquipmentInstance> Inventory => inventory.Values.Where(item => item.Definition is not SkillBookDefinition).ToArray();
+        public IReadOnlyList<EquipmentInstance> Inventory => inventory.Values.Where(item =>
+            item.Definition is not SkillBookDefinition && !stolenDuringBattle.Contains(item.Id)).ToArray();
         public IReadOnlyList<EquipmentInstance> SkillBooks => inventory.Values.Where(item => item.Definition is SkillBookDefinition).ToArray();
+        public IReadOnlyList<EquipmentInstance> BackpackItems
+        {
+            get
+            {
+                var assigned = AssignedEquipmentIds();
+                return inventory.Values.Where(item => !assigned.Contains(item.Id) && !stolenDuringBattle.Contains(item.Id))
+                    .OrderBy(item => item.AcquisitionOrder).ToArray();
+            }
+        }
         public int Gold { get; private set; }
 
         public IReadOnlyList<Combatant> CaptureFormation(Side side) =>
@@ -196,16 +295,23 @@ namespace RaidPartyManager.Run
         {
             var member = FindMember(memberId);
             if (activeBattle != null || member == null || member.IsAway || member.Health == 0 ||
-                (position.HasValue && !Rules.IsPosition(position.Value)) ||
+                (position.HasValue && !Rules.Fits(position.Value, member.Character.PositionSlots)) ||
                 (member.Position.HasValue && member.Position != position && IsRooted(member)))
                 return false;
 
             if (position.HasValue)
             {
-                var occupant = members.Find(other => other != member && other.Position == position);
-                if (occupant != null)
+                var occupants = members.Where(other => other != member &&
+                    Overlaps(other, position.Value, member.Character.PositionSlots)).ToArray();
+                if (occupants.Length > 1)
+                    return false;
+                if (occupants.Length == 1)
                 {
-                    if (IsRooted(occupant))
+                    var occupant = occupants[0];
+                    if (IsRooted(occupant) || member.Position is int former &&
+                        (!Rules.Fits(former, occupant.Character.PositionSlots) ||
+                         Rules.Overlaps(former, occupant.Character.PositionSlots, position.Value, member.Character.PositionSlots) ||
+                         members.Any(other => other != member && other != occupant && Overlaps(other, former, occupant.Character.PositionSlots))))
                         return false;
                     occupant.Position = member.Position;
                 }
@@ -214,6 +320,9 @@ namespace RaidPartyManager.Run
             member.Position = position;
             return true;
         }
+
+        private static bool Overlaps(Member member, int position, int width) => member.Position is int occupied &&
+            Rules.Overlaps(position, width, occupied, member.Character.PositionSlots);
 
         // Assigning an existing instance moves it out of any prior slot. Replaced gear stays in the bag.
         public bool TryEquip(string memberId, int slot, string equipmentId)
@@ -265,7 +374,9 @@ namespace RaidPartyManager.Run
         public bool TryChangeForm(string memberId, CharacterDefinition newForm)
         {
             var member = FindMember(memberId);
-            if (activeBattle != null || member == null || member.IsAway || newForm == null)
+            if (activeBattle != null || member == null || member.IsAway || newForm == null ||
+                member.Position is int position && (!Rules.Fits(position, newForm.PositionSlots) ||
+                    members.Any(other => other != member && Overlaps(other, position, newForm.PositionSlots))))
                 return false;
 
             member.Character = newForm;
@@ -285,12 +396,30 @@ namespace RaidPartyManager.Run
                 Rules.IsPosition(slot) && members.All(existing => existing.Position != slot))
                 position = slot;
 
+            int lastStart = Rules.Positions - replacement.PositionSlots + 1;
+            if (position.HasValue)
+                position = Math.Min(lastStart, position.Value);
+            var displaced = position.HasValue ? members.Where(other => other != member &&
+                Overlaps(other, position.Value, replacement.PositionSlots)).OrderBy(other => other.Position).ToArray()
+                : Array.Empty<Member>();
+            if (displaced.Any(IsRooted))
+                return false;
+
             // Equipment instances remain in inventory. Replacing the member releases their assigned slots.
             members[members.IndexOf(member)] = new Member(new PartyMemberStart(
-                member.Id, replacement, position ?? member.Start.Position, replacement.BaseStats.Health))
+                member.Id, replacement, position ?? Math.Min(lastStart, member.Start.Position), replacement.BaseStats.Health))
             {
                 Position = position
             };
+            foreach (var other in displaced)
+                other.Position = null;
+            foreach (var other in displaced)
+            {
+                int open = Enumerable.Range(1, Rules.Positions).FirstOrDefault(candidate =>
+                    Rules.Fits(candidate, other.Character.PositionSlots) &&
+                    members.All(placed => !Overlaps(placed, candidate, other.Character.PositionSlots)));
+                other.Position = open == 0 ? (int?)null : open;
+            }
             return true;
         }
 
@@ -329,7 +458,7 @@ namespace RaidPartyManager.Run
                 equipped.Any(id => !inventory.ContainsKey(id)) ||
                 loadout.Consumed.Any(id => !original.TryGetValue(id, out var definition) || !definition.IsPotion))
                 return false;
-            var instances = equipped.Concat(loadout.Consumed).ToArray();
+            var instances = equipped.Concat(loadout.Consumed).Concat(loadout.Stolen).ToArray();
             if (instances.Length != original.Count || instances.Distinct().Count() != original.Count ||
                 instances.Any(id => !original.ContainsKey(id)))
                 return false;
@@ -338,6 +467,7 @@ namespace RaidPartyManager.Run
                 CopySlots(loadout.Slots[unit.Id], FindMember(unit.Id));
             foreach (var id in loadout.Consumed)
                 inventory.Remove(id);
+            stolenDuringBattle = new HashSet<string>(loadout.Stolen);
             return true;
         }
 
@@ -445,6 +575,9 @@ namespace RaidPartyManager.Run
             RollRandomRewards(potionDefinitions, result.PotionsEarned, rewards);
             RollRandomRewards(accessoryDefinitions, result.AccessoriesEarned, rewards);
             loot = rewards.AsReadOnly();
+            foreach (var id in stolenDuringBattle)
+                inventory.Remove(id);
+            stolenDuringBattle.Clear();
             activeBattle = null;
             activeReward = null;
             return true;
@@ -469,6 +602,20 @@ namespace RaidPartyManager.Run
 
         public void CancelBattle()
         {
+            if (stolenDuringBattle.Count > 0 && activeBattle != null)
+            {
+                foreach (var unit in activeBattle.Combatants.Where(unit => unit.Side == Side.Party))
+                {
+                    var member = FindMember(unit.Id);
+                    for (int slot = 0; slot < unit.EquipmentSlots.Count; slot++)
+                    {
+                        string item = unit.EquipmentSlots[slot];
+                        if (member != null && member.Slots[slot] == null && item != null && stolenDuringBattle.Contains(item))
+                            member.Slots[slot] = item;
+                    }
+                }
+            }
+            stolenDuringBattle.Clear();
             activeBattle = null;
             activeReward = null;
         }
@@ -552,9 +699,8 @@ namespace RaidPartyManager.Run
             if (activeBattle != null)
                 return null;
 
-            var assigned = AssignedEquipmentIds();
-            var available = inventory.Values.Where(item => !assigned.Contains(item.Id))
-                .GroupBy(item => item.Definition.Id).ToDictionary(group => group.Key, group => group.Count());
+            var available = inventory.Values.GroupBy(item => item.Definition.Id)
+                .ToDictionary(group => group.Key, group => group.Count());
             var supplied = new List<string>();
             foreach (var definition in catalog.Where(item => item != null).GroupBy(item => item.Id).Select(group => group.First()))
             {
@@ -562,7 +708,8 @@ namespace RaidPartyManager.Run
                 for (int i = 0; i < missing; i++)
                 {
                     string id = $"editor-{++nextEditorItemId}";
-                    inventory.Add(id, new EquipmentInstance(id, definition));
+                    inventory.Add(id, new EquipmentInstance(id, definition, ++nextAcquisitionOrder));
+                    editorSupplies.Add(id);
                     supplied.Add(id);
                 }
             }
@@ -572,8 +719,11 @@ namespace RaidPartyManager.Run
             {
                 var equipped = AssignedEquipmentIds();
                 foreach (string id in supplied)
+                {
+                    editorSupplies.Remove(id);
                     if (!equipped.Contains(id))
                         inventory.Remove(id);
+                }
             }
         }
 
@@ -585,7 +735,7 @@ namespace RaidPartyManager.Run
             if (definition == null)
                 throw new ArgumentNullException(nameof(definition));
             string id = definition is SkillBookDefinition ? $"book-{++nextBookId}" : $"gear-{++nextItemId}";
-            var item = new EquipmentInstance(id, definition);
+            var item = new EquipmentInstance(id, definition, ++nextAcquisitionOrder);
             inventory.Add(item.Id, item);
             RegisterReward(definition);
             return item;

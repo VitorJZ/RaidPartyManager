@@ -9,7 +9,7 @@ namespace RaidPartyManager.Presentation
     {
         public const float Width = 208f;
 
-        public EquipmentTooltip(EquipmentDefinition item, Texture2D texture)
+        public EquipmentTooltip(EquipmentDefinition item, Texture2D texture, bool showScroll = true)
         {
             name = "equipment-tooltip";
             style.position = Position.Absolute;
@@ -20,7 +20,7 @@ namespace RaidPartyManager.Presentation
             pickingMode = PickingMode.Ignore;
             PrototypeStyle.Outline(this, PrototypeStyle.Accent, 7);
 
-            var art = new EquipmentIcon(item, texture) { name = "equipment-tooltip-art" };
+            var art = new EquipmentIcon(item, texture, showScroll) { name = "equipment-tooltip-art" };
             art.style.height = 87;
             art.style.flexGrow = 0;
             art.style.backgroundColor = PrototypeStyle.Inset;
