@@ -19,6 +19,7 @@ namespace RaidPartyManager.Content
         public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
         public IReadOnlyList<CharacterDefinition> CharacterCatalog { get; }
         public IReadOnlyList<CharacterDefinition> EnemyRoster { get; }
+        public IReadOnlyList<EnemyFormation> EnemyFormations { get; }
         private readonly CharacterDefinition[] partyRoster;
         private readonly IReadOnlyDictionary<string, Texture2D> portraits;
         private readonly HashSet<string> battlePortraitIds;
@@ -46,7 +47,7 @@ namespace RaidPartyManager.Content
             IReadOnlyDictionary<string, Texture2D> battleProjectiles,
             IReadOnlyDictionary<string, Texture2D> campSprites, SkillBookDefinition[] skillBooks, Texture2D backpackIcon,
             IReadOnlyDictionary<string, Texture2D> skillEffects, IReadOnlyDictionary<string, (Texture2D Flight, Texture2D Fragments)> skillProjectiles,
-            IEnumerable<string> battlePortraitIds)
+            IEnumerable<string> battlePortraitIds, EnemyFormation[] enemyFormations)
         {
             Name = name;
             Party = Array.AsReadOnly(party);
@@ -73,11 +74,19 @@ namespace RaidPartyManager.Content
             RecruitmentPool = Array.AsReadOnly(recruitmentPool);
             CharacterCatalog = Array.AsReadOnly(characterCatalog);
             EnemyRoster = Array.AsReadOnly(enemyRoster);
+            EnemyFormations = Array.AsReadOnly(enemyFormations);
             partyRoster = characterCatalog.Where(character => character.RosterNumber > 0).ToArray();
         }
 
         public IReadOnlyList<Combatant> Draft(Side side, System.Random random)
         {
+            if (side == Side.Enemy)
+            {
+                var groups = EnemyFormations.Where(group => group.Rank == EnemyRank.Normal).ToArray();
+                if (groups.Length > 0)
+                    return groups[random.Next(groups.Length)].CreateLineup("enemy");
+            }
+
             var candidates = (side == Side.Party ? partyRoster :
                 EnemyRoster.Where(character => character.Rank != EnemyRank.Boss && character.PositionSlots == 1)).ToArray();
             if (candidates.Length < Rules.Positions)
@@ -98,8 +107,18 @@ namespace RaidPartyManager.Content
         public Texture2D IconFor(string itemId) =>
             itemId != null && equipmentIcons.TryGetValue(itemId, out var icon) ? icon : null;
 
-        public Texture2D SkillEffectFor(string skillBookId) =>
-            skillBookId != null && skillEffects.TryGetValue(skillBookId, out var artwork) ? artwork : null;
+        public Texture2D SkillEffectFor(string skillBookId, BattleVisualCue visual = BattleVisualCue.None)
+        {
+            var impact = visual switch
+            {
+                BattleVisualCue.SkillFireImpact => SkillEffect.BlazingFire,
+                BattleVisualCue.SkillLightningImpact => SkillEffect.LightningWhip,
+                _ => SkillEffect.None
+            };
+            string artworkId = impact == SkillEffect.None ? skillBookId :
+                SkillBooks.FirstOrDefault(book => book.SkillEffect == impact)?.Id;
+            return artworkId != null && skillEffects.TryGetValue(artworkId, out var artwork) ? artwork : null;
+        }
 
         public (Texture2D Flight, Texture2D Fragments) SkillProjectileFor(string skillBookId) =>
             skillBookId != null && skillProjectiles.TryGetValue(skillBookId, out var artwork) ? artwork : default;
@@ -202,11 +221,23 @@ namespace RaidPartyManager.Content
             }
         }
 
+        [Serializable]
+        private sealed class FormationEntry
+        {
+            public string name;
+            public string[] enemyIds = Array.Empty<string>();
+
+            public EnemyFormation ToData(IReadOnlyDictionary<string, CharacterDefinition> roster) =>
+                new EnemyFormation(name, enemyIds.Select(id => roster.TryGetValue(id, out var enemy) ? enemy :
+                    throw new InvalidOperationException($"Enemy formation '{name}' references '{id}' outside the encounter roster.")));
+        }
+
         [SerializeField] private string displayName;
         [SerializeField] private UnitEntry[] party = Array.Empty<UnitEntry>();
         [SerializeField] private UnitEntry[] enemies = Array.Empty<UnitEntry>();
         [SerializeField] private CharacterAsset[] additionalRecruits = Array.Empty<CharacterAsset>();
         [SerializeField] private CharacterAsset[] enemyRoster = Array.Empty<CharacterAsset>();
+        [SerializeField] private FormationEntry[] enemyFormations = Array.Empty<FormationEntry>();
         [SerializeField] private Texture2D[] statusIcons = Array.Empty<Texture2D>();
         [SerializeField] private Texture2D arrowProjectile;
         [SerializeField] private Texture2D magicProjectile;
@@ -261,20 +292,26 @@ namespace RaidPartyManager.Content
                 if (skills[i].Projectile != null)
                     skillProjectiles.Add(books[i].Id, (skills[i].Projectile, skills[i].ProjectileFragments));
             }
+            var enemyDefinitions = enemyChoices.Select(character => character.ToDefinition()).ToArray();
+            var enemyById = enemyDefinitions.ToDictionary(enemy => enemy.Id, StringComparer.Ordinal);
+            var formations = enemyFormations.Select(group => group.ToData(enemyById)).ToArray();
+            if (formations.Select(group => group.Name).Distinct(StringComparer.Ordinal).Count() != formations.Length)
+                throw new InvalidOperationException($"Encounter '{displayName}' has duplicate enemy formation names.");
+
             return new EncounterData(displayName, partyInputs, enemyInputs,
                 startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies)).ToArray(),
                 victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits, equipmentIcons,
                 recruits.Select(character => character.ToDefinition()).ToArray(),
                 catalog.Values.Select(character => character.ToDefinition()).ToArray(), statusIcons, battleSpriteSheets,
                 battleAttackSheets, battleWalkSheets, arrowProjectile, magicProjectile,
-                enemyChoices.Select(character => character.ToDefinition()).ToArray(),
+                enemyDefinitions,
                 catalog.Values.ToDictionary(character => character.Id, character => character.BattleExtras, StringComparer.Ordinal),
                 catalog.Values.Where(character => character.BattleProjectile != null)
                     .ToDictionary(character => character.Id, character => character.BattleProjectile, StringComparer.Ordinal),
                 catalog.Values.Where(character => character.CampSeatedSprite != null)
                     .ToDictionary(character => character.Id, character => character.CampSeatedSprite, StringComparer.Ordinal),
                 books, backpackIcon, skillEffects, skillProjectiles,
-                catalog.Values.Where(character => character.UsePortraitInBattle).Select(character => character.Id));
+                catalog.Values.Where(character => character.UsePortraitInBattle).Select(character => character.Id), formations);
         }
     }
 }

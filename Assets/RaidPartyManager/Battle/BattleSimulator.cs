@@ -314,17 +314,12 @@ namespace RaidPartyManager.Battle
                 if (FinishIfDecided())
                     return events.GetRange(firstEvent, events.Count - firstEvent);
                 ApplyRoundStartTraits();
-                foreach (var side in new[] { Side.Party, Side.Enemy })
+                foreach (var actor in RoundOrder())
                 {
-                    var order = units.Where(unit => unit.Input.Side == side && unit.Health > 0).ToArray();
-                    Shuffle(order);
-                    foreach (var actor in order)
-                    {
-                        if (actor.Health > 0 && actor.BlockedRound != Round && actor.Layers(StatusKind.Stunned) == 0)
-                            Act(actor);
-                        if (FinishIfDecided())
-                            return events.GetRange(firstEvent, events.Count - firstEvent);
-                    }
+                    if (CanActThisRound(actor))
+                        Act(actor);
+                    if (FinishIfDecided())
+                        return events.GetRange(firstEvent, events.Count - firstEvent);
                 }
 
                 EndRound();
@@ -366,6 +361,20 @@ namespace RaidPartyManager.Battle
 
         private int RoundInterval() => units.Where(unit => unit.Health > 0)
             .Max(unit => unit.Input.Character.ActionInterval);
+
+        private bool CanActThisRound(Unit unit) =>
+            unit.Health > 0 && unit.BlockedRound != Round && unit.Layers(StatusKind.Stunned) == 0;
+
+        private IEnumerable<Unit> RoundOrder()
+        {
+            var living = units.Where(unit => unit.Health > 0).ToArray();
+            var party = living.Where(unit => unit.Input.Side == Side.Party && CanActThisRound(unit)).ToArray();
+            var opener = party.Length > 1 ? party[random.Next(party.Length)] : party.FirstOrDefault();
+            // Fix only the opening slot. Shuffle the rest together, regardless of side.
+            var remaining = living.Where(unit => unit != opener).ToArray();
+            Shuffle(remaining);
+            return opener == null ? remaining : remaining.Prepend(opener);
+        }
 
         private void Shuffle(Unit[] order)
         {

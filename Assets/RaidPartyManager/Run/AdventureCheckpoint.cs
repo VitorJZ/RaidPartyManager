@@ -19,6 +19,7 @@ namespace RaidPartyManager.Run
         public int Investment;
         public bool InvestmentPaid;
         public int[] InvestorFloors;
+        public AdventureEventKind[] SeenEvents;
         public bool FloorCleared;
         public bool Failed;
         public bool QuestActive;

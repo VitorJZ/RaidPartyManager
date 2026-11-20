@@ -52,19 +52,24 @@ namespace RaidPartyManager.Presentation
             overview.contentContainer.style.paddingTop = overview.contentContainer.style.paddingBottom = 18;
             Add(overview);
 
-            var header = PrototypeStyle.Row();
+            var header = PrototypeStyle.Row("party-editor-header");
             header.style.alignItems = Align.Center;
-            var backButton = PrototypeStyle.Button("返回", "back-party-editor", back);
-            backButton.style.width = 100;
-            header.Add(backButton);
+            const int buttonWidth = 100;
+            var leftSpacer = new VisualElement { pickingMode = PickingMode.Ignore };
+            leftSpacer.style.width = buttonWidth;
+            leftSpacer.style.flexShrink = 0;
+            header.Add(leftSpacer);
             var title = PrototypeStyle.Text(side == Side.Party ? "角色编辑" : "敌方编辑", 27);
             title.style.flexGrow = 1;
             PrototypeStyle.Middle(title);
             header.Add(title);
-            var mainMenuButton = PrototypeSceneMenu.ReturnButton();
-            mainMenuButton.style.width = 100;
-            header.Add(mainMenuButton);
+            var backButton = PrototypeStyle.Button("返回", "back-party-editor", back);
+            backButton.style.width = buttonWidth;
+            backButton.style.flexShrink = 0;
+            header.Add(backButton);
             overview.Add(header);
+            if (side == Side.Enemy && content.EnemyFormations.Count > 0)
+                overview.Add(BuildFormationPicker(content.EnemyFormations));
 
             modalLayer = new VisualElement { name = "character-details-layer" };
             PrototypeStyle.Fill(modalLayer);
@@ -85,6 +90,39 @@ namespace RaidPartyManager.Presentation
                     back();
                 evt.StopPropagation();
             }, TrickleDown.TrickleDown);
+        }
+
+        private VisualElement BuildFormationPicker(IReadOnlyList<EnemyFormation> formations)
+        {
+            const string placeholder = "选择预设敌阵…";
+            var choices = new List<string> { placeholder };
+            choices.AddRange(formations.Select(group => $"{RankLabel(group.Rank)} · {group.Name}"));
+            var row = PrototypeStyle.Row("enemy-formation-picker");
+            row.style.alignItems = Align.Center;
+            row.style.marginTop = 12;
+            var picker = new DropdownField(choices, 0) { name = "enemy-formation" };
+            picker.style.width = 256;
+            row.Add(picker);
+            var apply = PrototypeStyle.Button("载入敌阵", "apply-enemy-formation", () =>
+            {
+                int index = picker.index - 1;
+                if (index < 0 || index >= formations.Count)
+                    return;
+                run.ResetRoster(formations[index].CreateLineup("enemy").Select(unit =>
+                    new PartyMemberStart(unit.Id, unit.Character, unit.Position, unit.Health)));
+                RenderEditedRoster();
+            });
+            apply.SetEnabled(false);
+            picker.RegisterValueChangedCallback(_ => apply.SetEnabled(picker.index > 0));
+            row.Add(apply);
+            return row;
+
+            static string RankLabel(EnemyRank rank) => rank switch
+            {
+                EnemyRank.Elite => "精英",
+                EnemyRank.Boss => "首领",
+                _ => "普通"
+            };
         }
 
         private void RenderRoster()

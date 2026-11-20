@@ -99,6 +99,51 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void RandomEventsAreRememberedAfterDecliningAndResumingOnAnotherFloor()
+        {
+            var checkpoint = Create(17, false).CheckpointForExit();
+            checkpoint.Options = new[] { NodeKind.Event };
+            checkpoint.Choice = 0; // Use a fixed node seed for a repeatable encounter.
+            checkpoint.Seed = Enumerable.Range(0, 100).First(seed => new Random(seed).Next(4) == 2);
+            var run = AdventureRun.RestoreCheckpoint(checkpoint, content.CharacterCatalog, gear);
+            Assert.That(run.EnterRoute(0), Is.True);
+            Assert.That(run.Current.Event, Is.EqualTo(AdventureEventKind.FoundCoins));
+
+            var suspended = AdventureRun.RestoreCheckpoint(run.CheckpointForExit(), content.CharacterCatalog, gear);
+            Assert.That(suspended.EnterRoute(0), Is.True);
+            Assert.That(suspended.Current.Event, Is.EqualTo(AdventureEventKind.FoundCoins));
+            Assert.That(suspended.DeclineEvent() && suspended.CloseVisit(), Is.True);
+
+            var saved = suspended.CheckpointForExit();
+            Assert.That(saved.SeenEvents, Is.EqualTo(new[] { AdventureEventKind.FoundCoins }));
+            saved.FloorCleared = true;
+            var next = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            Assert.That(next.NextFloor(), Is.True);
+            Assert.That(next.AvailableEvents(), Has.No.Member(AdventureEventKind.FoundCoins));
+            Assert.That(next.AvailableEvents(), Has.Member(AdventureEventKind.Ambush));
+        }
+
+        [Test]
+        public void ExhaustedEventPoolStillRollsAmbushWithoutMarkingItSeen()
+        {
+            var checkpoint = Create(17, false).CheckpointForExit();
+            checkpoint.SeenEvents = Enum.GetValues(typeof(AdventureEventKind)).Cast<AdventureEventKind>()
+                .Where(kind => kind != AdventureEventKind.Ambush).ToArray();
+            checkpoint.Options = new[] { NodeKind.Event };
+            checkpoint.Nodes[1].Kind = NodeKind.Event;
+            checkpoint.Nodes[1].Fork = false;
+            var run = AdventureRun.RestoreCheckpoint(checkpoint, content.CharacterCatalog, gear);
+            for (int i = 0; i < 2; i++)
+            {
+                Assert.That(run.AvailableEvents(), Is.EqualTo(new[] { AdventureEventKind.Ambush }));
+                Assert.That(run.EnterRoute(0), Is.True);
+                Assert.That(run.Current.Event, Is.EqualTo(AdventureEventKind.Ambush));
+                Assert.That(run.DeclineEvent() && run.CloseVisit(), Is.True);
+            }
+            Assert.That(run.CheckpointForExit().SeenEvents, Is.EquivalentTo(checkpoint.SeenEvents));
+        }
+
+        [Test]
         public void TreasureChestOffersThreeDistinctNonPotionItemsAfterOpening()
         {
             var drawn = new List<EquipmentDefinition>();
@@ -286,7 +331,7 @@ namespace RaidPartyManager.Tests
                 run.Party.TryEquip(member.Id, 0, run.Party.AddEquipment(weapon).Id);
             run.Inspect(kind, eventKind);
             if (eventKind.HasValue) Assert.That(run.StartEventBattle(), Is.True);
-            var enemies = run.PrepareEnemies(content.EnemyRoster);
+            var enemies = run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
             int startingGold = run.Party.Gold;
             var request = run.Party.BeginBattle(enemies, 200, null, content.RecruitmentPool, content.CharacterCatalog);
             run.BindBattle(request.Id);
@@ -325,7 +370,7 @@ namespace RaidPartyManager.Tests
             foreach (var member in party.Members)
                 party.TryEquip(member.Id, 0, party.AddEquipment(new EquipmentDefinition("test-power", "test", new Stats(100, 0, 0, 0))).Id);
             Assert.That(run.Inspect(kind), Is.True);
-            var request = party.BeginBattle(run.PrepareEnemies(content.EnemyRoster), 200, null);
+            var request = party.BeginBattle(run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations), 200, null);
             run.BindBattle(request.Id);
             var result = new BattleSimulator().Simulate(request);
             Assert.That(result.Outcome, Is.EqualTo(BattleOutcome.Victory));
@@ -373,7 +418,7 @@ namespace RaidPartyManager.Tests
             for (int i = 0; i < 2; i++)
             {
                 run.Inspect(NodeKind.NormalBattle);
-                var request = run.Party.BeginBattle(run.PrepareEnemies(content.EnemyRoster), 200, null);
+                var request = run.Party.BeginBattle(run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations), 200, null);
                 run.BindBattle(request.Id); var result = new BattleSimulator().Simulate(request);
                 Assert.That(run.Party.TrySettle(result, out _), Is.True); Assert.That(run.SettleBattle(result), Is.True);
                 run.ClaimReward(0); run.CloseVisit();
@@ -393,7 +438,7 @@ namespace RaidPartyManager.Tests
             run.Inspect(NodeKind.Event, AdventureEventKind.LockedChest);
             Assert.That(run.LeaveCompanion(members[0].Id), Is.True); run.CloseVisit();
             run.Inspect(NodeKind.NormalBattle);
-            var request = run.Party.BeginBattle(run.PrepareEnemies(content.EnemyRoster), 200, null,
+            var request = run.Party.BeginBattle(run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations), 200, null,
                 content.RecruitmentPool, content.CharacterCatalog);
             Assert.That(request.RecruitmentPool.Count, Is.EqualTo(0));
             Assert.That(request.Combatants.Count(c => c.Side == Side.Party), Is.EqualTo(3));
@@ -409,7 +454,7 @@ namespace RaidPartyManager.Tests
             var run = new AdventureRun(party, content.CharacterCatalog, gear, true, new Random(13));
             Assert.That(party.Inventory.Count, Is.EqualTo(1), "Registering a reward catalog must not grant its items.");
             run.Inspect(NodeKind.NormalBattle);
-            var request = party.BeginBattle(run.PrepareEnemies(content.EnemyRoster), 200, null);
+            var request = party.BeginBattle(run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations), 200, null);
             run.BindBattle(request.Id); var result = new BattleSimulator().Simulate(request);
             Assert.That(result.PotionsEarned, Is.EqualTo(1));
             Assert.That(party.TrySettle(result, out _), Is.True);

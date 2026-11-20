@@ -66,6 +66,31 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator LoadingAGraveyardPresetUsesTheWholeFormationInBattle()
+        {
+            yield return SceneManager.LoadSceneAsync("WhisperingGraveyard");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            Press(root, "open-settings");
+            Press(root, "open-enemy-editor");
+            Assert.That(root.Q<Button>("apply-enemy-formation").enabledInHierarchy, Is.False);
+            root.Q<DropdownField>("enemy-formation").value = "首领 · 无名葬王";
+            Assert.That(root.Q<Button>("apply-enemy-formation").enabledInHierarchy, Is.True);
+            Press(root, "apply-enemy-formation");
+            Assert.That(root.Q("editor-positions").Query<Label>("character-name").ToList().Select(label => label.text),
+                Is.EqualTo(new[] { "无名葬王", "盗墓苦役" }));
+            Press(root, "back-party-editor");
+            var prepared = (IReadOnlyList<Combatant>)typeof(BattlePrototype).GetField("preparedEnemies", Private).GetValue(scene);
+            Assert.That(prepared.Select(enemy => (enemy.Character.Id, enemy.Position)),
+                Is.EqualTo(new[] { ("EnemyNamelessKing", 1), ("EnemyGraveDigger", 4) }));
+            Press(root, "start");
+            Assert.That(root.Q("enemy-position-1"), Is.Not.Null);
+            Assert.That(root.Q("enemy-position-2"), Is.Null);
+            Assert.That(root.Q("enemy-position-4"), Is.Not.Null);
+        }
+
+        [UnityTest]
         public IEnumerator GraveyardUsesItsBackgroundAndActualPoseFramesDuringTheFirstRound()
         {
             useAuthoredLineups = true;

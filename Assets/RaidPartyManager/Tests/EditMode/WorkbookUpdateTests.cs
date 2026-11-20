@@ -58,6 +58,39 @@ namespace RaidPartyManager.Tests
                 Is.EqualTo(new[] { front.Id, rear.Id }));
         }
 
+        [TestCase(0, DamageType.Fire, 3, BattleVisualCue.None)]
+        [TestCase(1, DamageType.Lightning, 9, BattleVisualCue.SkillLightningImpact)]
+        [TestCase(2, DamageType.Fire, 3, BattleVisualCue.None)]
+        public void BlazingFireUsesTheElementalQuartzDamageRulesAndImpactArt(
+            int quartzCount, DamageType damageType, int damage, BattleVisualCue visual)
+        {
+            const string folder = "Assets/RaidPartyManager/PrototypeData/";
+            var content = AssetDatabase.LoadAssetAtPath<EncounterAsset>(folder + "RoadsideEncounter.asset").ToData();
+            var fire = content.SkillBooks.Single(book => book.SkillEffect == SkillEffect.BlazingFire);
+            var whip = content.SkillBooks.Single(book => book.SkillEffect == SkillEffect.LightningWhip);
+            var quartz = content.StartingEquipment.First(item => item.Id == "elemental-quartz");
+            var thunderEye = content.StartingEquipment.First(item => item.Effect == EquipmentEffect.ThunderEye);
+            var stats = new Stats(6, 0, 0, 40);
+            var mage = new CharacterDefinition("mage", "mage", Profession.Mage, Personality.Impatient, stats, 1,
+                new ActionDefinition("basic", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0));
+            var caster = new Combatant("caster", mage, Side.Party, 1, stats, stats.Health,
+                Enumerable.Repeat(quartz, quartzCount).Append(thunderEye), learnedSkills: new[] { fire });
+            var enemies = new[] { Fighter("front", Side.Enemy, 1, Personality.Reckless),
+                Fighter("rear", Side.Enemy, 4, Personality.Reckless) }.Select(unit =>
+                new Combatant(unit.Id, unit.Character, unit.Side, unit.Position, new Stats(2, 0, 4, 30), 30)).ToArray();
+            var round = new BattleSimulator(new PreferBooks()).Start(
+                new BattleRequest("quartz", enemies.Prepend(caster), 1)).AdvanceRound();
+            var hits = round.Where(entry => entry.SkillBookId == fire.Id && entry.ActionKind == ActionKind.Attack).ToArray();
+            Assert.That(hits.Select(entry => entry.TargetId), Is.EqualTo(enemies.Select(enemy => enemy.Id)));
+            foreach (var hit in hits)
+            {
+                Assert.That(hit.DamageTaken, Is.EqualTo(new[] { (damageType, damage) }));
+                Assert.That(hit.VisualCue, Is.EqualTo(visual));
+                Assert.That(content.SkillEffectFor(fire.Id, hit.VisualCue),
+                    Is.SameAs(content.SkillEffectFor(damageType == DamageType.Lightning ? whip.Id : fire.Id)));
+            }
+        }
+
         [TestCase(7)]
         [TestCase(8)]
         [TestCase(9)]

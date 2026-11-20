@@ -454,7 +454,7 @@ namespace RaidPartyManager.Tests
         {
             var odd = Unit("odd", Side.Party, gear: Gear(Bagua));
             var even = Unit("even", Side.Party, 2, gear: Gear(Bagua, ElementalQuartz, ThunderEye));
-            var enemy = Unit("enemy", Side.Enemy);
+            var enemy = Unit("enemy", Side.Enemy, statuses: new Dictionary<StatusKind, int> { [StatusKind.Chill] = 1 });
             var result = Fight(odd, even, enemy);
 
             Assert.That(result.Events.Any(entry => entry.ActorId == odd.Id && entry.ActionName == "寒冷"), Is.True);

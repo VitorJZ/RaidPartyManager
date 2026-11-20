@@ -90,6 +90,58 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 239e5e8759805e91bdaa395abfb74471, type: 2}
   - {fileID: 11400000, guid: 2b54fe8570aa5dceab1ca2b2b4bcb4a0, type: 2}
   - {fileID: 11400000, guid: e2dc032536075db9a1bd9d8b1298f514, type: 2}
+  enemyFormations:
+  - name: 墓园普通突击
+    enemyIds:
+    - EnemyGraveDigger
+    - EnemyGraveShoveler
+    - EnemyVigilCrossbow
+    - EnemyBoneLantern
+  - name: 墓园普通消耗
+    enemyIds:
+    - EnemyTombShield
+    - EnemyRustSpear
+    - EnemyStitchServant
+    - EnemyCarrionRaven
+  - name: 墓园普通寒火
+    enemyIds:
+    - EnemyCoffinHound
+    - EnemyFrostRevenant
+    - EnemyFuneralDrummer
+    - EnemyPhosphorWisp
+  - name: 抬棺四侍
+    enemyIds:
+    - EnemyPallbearer
+    - EnemyBoneLantern
+    - EnemyCarrionRaven
+  - name: 墓钟敲击者
+    enemyIds:
+    - EnemyGraveBell
+    - EnemyTombShield
+    - EnemyStitchServant
+  - name: 缝魂医师
+    enemyIds:
+    - EnemySoulStitcher
+    - EnemyGraveShoveler
+    - EnemyVigilCrossbow
+  - name: 哭墙石像
+    enemyIds:
+    - EnemyWeepingGargoyle
+    - EnemyFrostRevenant
+    - EnemyPhosphorWisp
+  - name: 巡墓刽子手
+    enemyIds:
+    - EnemyGraveExecutioner
+    - EnemyTombShield
+    - EnemyDirgeAcolyte
+  - name: 无名葬王
+    enemyIds:
+    - EnemyNamelessKing
+    - EnemyGraveDigger
+  - name: 守墓圣母
+    enemyIds:
+    - EnemySepulchralMatron
+    - EnemyRustSpear
   statusIcons:
   - {fileID: 2800000, guid: a82a7b25f01b1bc4d8f57719079638c0, type: 3}
   - {fileID: 2800000, guid: c3db1f960c157b24c81aaaa99c08e2e3, type: 3}

@@ -186,13 +186,17 @@ def make_definition(enemy: dict) -> None:
     meta(asset, "asset")
 
 
-def make_encounter(enemies: list[dict]) -> None:
+def make_encounter(enemies: list[dict], formations: list[dict]) -> None:
     prototype = ROOT / "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset"
     destination = prototype.with_name("WhisperingGraveyardEncounter.asset")
     text = prototype.read_text(encoding="utf-8").replace("m_Name: RoadsideEncounter", "m_Name: WhisperingGraveyardEncounter")
     text = re.sub(r"  displayName:.*", "  displayName: 低语墓园演练", text, count=1)
     roster = "  enemyRoster:\n" + "".join("  - " + ref(ASSETS / ("Enemy" + e["id"] + ".asset"), 11400000, 2) + "\n" for e in enemies)
-    text = re.sub(r"  enemyRoster:.*?(?=  statusIcons:)", lambda _: roster, text, flags=re.S)
+    groups = "  enemyFormations:\n"
+    for group in formations:
+        groups += f'  - name: {json.dumps(group["name"], ensure_ascii=False)}\n    enemyIds:\n'
+        groups += "".join(f"    - Enemy{enemy_id}\n" for enemy_id in group["enemies"])
+    text = re.sub(r"  enemyRoster:.*?(?=  statusIcons:)", lambda _: roster + groups, text, flags=re.S)
     opening = "  enemies:\n"
     for i, enemy in enumerate([enemies[0], enemies[5], enemies[7], enemies[12]], 1):
         opening += f'  - instanceId: graveyard-{i}\n    character: {ref(ASSETS / ("Enemy" + enemy["id"] + ".asset"), 11400000, 2)}\n    position: {i}\n    startingHealth: -1\n'
@@ -237,7 +241,8 @@ def main() -> None:
     parser.add_argument("--allow-missing", action="store_true")
     parser.add_argument("--data-only", action="store_true", help="Rebuild numeric definitions without re-slicing unchanged art")
     args = parser.parse_args()
-    enemies = json.loads(DATA.read_text(encoding="utf-8"))["enemies"]
+    data = json.loads(DATA.read_text(encoding="utf-8"))
+    enemies = data["enemies"]
     assert len(enemies) == 30 and len({e["id"] for e in enemies}) == 30
     assert [sum(e["rank"] == rank for e in enemies) for rank in RANKS[1:]] == [23, 5, 2]
     assert all(sum(a["weight"] for a in e["actions"]) == 100 for e in enemies)
@@ -252,7 +257,7 @@ def main() -> None:
         elif not source.exists():
             missing.append(enemy["id"])
         make_definition(enemy)
-    make_encounter(enemies)
+    make_encounter(enemies, data["formations"])
     for directory in ("Domain", "Content", "Battle"):
         for script in (ROOT / "Assets/RaidPartyManager" / directory).glob("*.cs"):
             meta(script, "script")

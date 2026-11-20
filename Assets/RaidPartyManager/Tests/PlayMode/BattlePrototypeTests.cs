@@ -147,6 +147,12 @@ namespace RaidPartyManager.Tests
             yield return Drag(root, root.Q("bag-cell-0"), root.Q("edit-slot-1"));
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("精钢壁垒"));
             Press(root, "close-character-details");
+            var header = root.Q("party-editor-header");
+            Assert.That(header.Q("return-main-menu"), Is.Null);
+            Assert.That(header.Children().Last().name, Is.EqualTo("back-party-editor"));
+            Press(root, "back-party-editor");
+            Assert.That(root.Q("party-editor"), Is.Null);
+            Press(root, "open-settings");
             Press(root, "return-main-menu");
             yield return WaitForScene("MainMenu");
 
@@ -546,6 +552,19 @@ namespace RaidPartyManager.Tests
             var type = typeof(BattlePrototype);
             var content = (EncounterData)type.GetField("content", PrivateInstance).GetValue(scene);
             var archer = content.CharacterCatalog.Single(character => character.Id == "TianGong");
+            Assert.That(content.BattleEffectFor(archer.Id, BattleVisualCue.PiercingArrow) == null, Is.True,
+                "The piercing projectile does not require a separate impact atlas.");
+
+            // Force a Unity-null texture whose managed wrapper still exists, even in batch mode.
+            var missingAtlas = new Texture2D(8, 1);
+            Object.Destroy(missingAtlas);
+            yield return null;
+            Assert.That(missingAtlas == null && !ReferenceEquals(missingAtlas, null), Is.True);
+            var extras = (IDictionary<string, (Texture2D Body, Texture2D Effect, Texture2D Finale, Texture2D Strike)>)
+                typeof(EncounterData).GetField("battleExtras", PrivateInstance).GetValue(content);
+            var sprites = extras[archer.Id];
+            extras[archer.Id] = (sprites.Body, missingAtlas, sprites.Finale, sprites.Strike);
+
             var party = new PartyRun(new[] { new PartyMemberStart("archer", archer, 2, archer.BaseStats.Health) },
                 System.Array.Empty<EquipmentDefinition>());
             var foe = content.Enemies[0].Character;
@@ -593,6 +612,8 @@ namespace RaidPartyManager.Tests
                 yield return null;
             Assert.That(root.Q("battle-piercing-flight"), Is.Null);
             Assert.That(root.Query<Image>("battle-arrow-particle").ToList(), Is.Empty);
+            Assert.That(root.Query<Image>("battle-impact-effect").ToList(), Is.Empty);
+            LogAssert.NoUnexpectedReceived();
 
             string HealthAt(int position) => root.Q("enemy-position-" + position).Q<Label>("health-value").text;
         }
@@ -1250,17 +1271,19 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite"), Is.SameAs(sprites[0]));
             Assert.That(root.Q("enemy-position-1").Q<Image>("battle-sprite"), Is.Null);
             var actionFrames = new bool[4];
-            bool enemyHasActed = false;
+            var playbackField = typeof(BattlePrototype).GetField("actionPlayback", PrivateInstance);
+            var actorSpriteField = playbackField.FieldType.GetField("sprite", PrivateInstance);
             bool archerRecoiled = false;
             deadline = Time.realtimeSinceStartup + 7f;
             while ((!actionFrames.All(played => played) || !archerRecoiled) && Time.realtimeSinceStartup < deadline)
             {
-                enemyHasActed |= root.Query<Label>("battle-action").ToList()
-                    .Any(label => label.text.Contains("] 拦路蛮兵 ·") || label.text.Contains("] 绕后猎手 ·"));
+                var playback = playbackField.GetValue(scene);
+                var activeFigure = playback == null ? null :
+                    (actorSpriteField.GetValue(playback) as VisualElement)?.Q<Image>("battle-sprite");
                 for (int slot = 0; slot < sprites.Length; slot++)
                 {
                     int row = FrameRow(sprites[slot]);
-                    if (!enemyHasActed)
+                    if (ReferenceEquals(sprites[slot], activeFigure))
                         actionFrames[slot] |= sprites[slot].image.name.EndsWith("-Attack") || (slot == 0 && row == 2);
                     else if (slot == 3)
                         archerRecoiled |= row == 2;
@@ -1364,10 +1387,10 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator BookmarksSwitchPagesAndOnlyEmptySkillSlotsAcceptBooks()
+        public IEnumerator BookmarksSwitchPagesAndCompatibleBooksCanReplaceLearnedSkills()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
-            yield return null;
+            yield return WaitForScene("BattlePrototype");
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "open-party-editor");
@@ -1400,8 +1423,28 @@ namespace RaidPartyManager.Tests
             var learned = root.Q("skill-slot-0");
             Assert.That(learned.Q<Image>().image.name, Is.EqualTo("01-WarCry"));
             yield return null;
-            yield return Drag(root, root.Q("book-cell-0"), learned);
-            Assert.That(learned.Q<Image>().image.name, Is.EqualTo("01-WarCry"));
+            yield return Drag(root, root.Q("book-cell-0"), learned); // Another War Cry is still rejected.
+            Assert.That(root.Q("skill-slot-0").Q<Image>().image.name, Is.EqualTo("01-WarCry"));
+            var content = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
+            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+            var replacement = content.SkillBooks.Single(book => book.SkillEffect == SkillEffect.StoneGuard);
+            var replacementItem = party.SkillBooks.First(book => book.Definition.Id == replacement.Id);
+            var booksBefore = party.SkillBooks.Select(book => book.Id).ToArray();
+            var replacementCell = root.Query<VisualElement>().ToList()
+                .FirstOrDefault(view => view.name?.StartsWith("book-cell-") == true && view.Q($"edit-book-{replacementItem.Id}") != null);
+            while (replacementCell == null)
+            {
+                var next = root.Q<Button>("bag-next");
+                Assert.That(next?.enabledInHierarchy, Is.True, "The replacement book must be on a backpack page.");
+                Press(root, "bag-next");
+                yield return null;
+                replacementCell = root.Query<VisualElement>().ToList().FirstOrDefault(view =>
+                    view.name?.StartsWith("book-cell-") == true && view.Q($"edit-book-{replacementItem.Id}") != null);
+            }
+            yield return Drag(root, replacementCell, root.Q("skill-slot-0"));
+            Assert.That(root.Q<Label>("skill-name-0").text, Is.EqualTo(replacement.Name));
+            Assert.That(party.SkillBooks.Select(book => book.Id), Is.EquivalentTo(booksBefore.Where(id => id != replacementItem.Id)));
+            learned = root.Q("skill-slot-0");
             Down(learned);
             yield return new WaitForSecondsRealtime(0.4f);
             Assert.That(root.Q("equipment-drag-preview"), Is.Null);
@@ -1411,13 +1454,12 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("bag-cell-0"), Is.Not.Null);
             Assert.That(root.Q("book-cell-0"), Is.Null);
             Press(root, "close-character-details");
-            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
             var rose = party.Inventory.First(item => item.Definition.Effect == EquipmentEffect.ScarletRose);
             Assert.That(party.TryEquip("guard", 0, rose.Id), Is.True);
             Press(root, "edit-member-guard");
             Assert.That(root.Q<Label>("details-defense").text, Is.EqualTo("防御 0 (-3)"));
             Assert.That(root.Q<Label>("details-special-defense").text, Is.EqualTo("特防 0 (-3)"));
-            Assert.That(root.Q("skill-slot-0").Q<Image>().image.name, Is.EqualTo("01-WarCry"));
+            Assert.That(root.Q<Label>("skill-name-0").text, Is.EqualTo(replacement.Name));
         }
 
         private static int FrameRow(Image sprite) => Mathf.RoundToInt(sprite.sourceRect.y / sprite.sourceRect.height);

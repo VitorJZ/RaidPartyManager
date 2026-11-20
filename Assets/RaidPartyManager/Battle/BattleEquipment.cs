@@ -538,6 +538,11 @@ namespace RaidPartyManager.Battle
                 int amount = (int)Math.Min(int.MaxValue, (long)Damage(actor, target, part.Power, type, ignoreDefense) * multiplier);
                 return (Type: type, Amount: amount);
             }).ToArray();
+            // Keep the skill identity for the log, but use the converted element for the impact art.
+            if (skillBookId != null && visual == BattleVisualCue.None && resolved.Length == 1 &&
+                resolved[0].Type != parts[0].Type)
+                visual = resolved[0].Type == DamageType.Lightning
+                    ? BattleVisualCue.SkillLightningImpact : BattleVisualCue.SkillFireImpact;
             int total = SumDamage(resolved.Select(part => part.Amount));
             int guarded = DamageAfterGuard(target, total);
             if (guarded < total)

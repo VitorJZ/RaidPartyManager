@@ -139,7 +139,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void SkillBooksAreConsumedOnlyWhenACompatibleEmptySlotLearnsAndSurviveEvolution()
+        public void SkillBooksCanOverwriteKnownSkillsAndTheNewSkillsSurviveEvolution()
         {
             var run = MakeRun();
             var roar = new SkillBookDefinition("roar", "战争咆哮", "", SkillRequirement.None, 1, 2);
@@ -161,18 +161,23 @@ namespace RaidPartyManager.Tests
             Assert.That(run.TrySettle(Result(battle.Id, BattleOutcome.Victory, 7, 0, 0), out _), Is.True);
             Assert.That(run.TryLearnSkill("a", 0, first.Id), Is.True);
             Assert.That(run.TryLearnSkill("b", 0, first.Id), Is.False);
-            Assert.That(run.TryLearnSkill("a", 0, second.Id), Is.False);
+            Assert.That(run.TryLearnSkill("a", 0, restricted.Id), Is.False);
+            Assert.That(run.TryLearnSkill("a", 0, duplicate.Id), Is.False);
+            Assert.That(run.TryLearnSkill("a", 0, second.Id), Is.True);
+            Assert.That(run.Members[0].LearnedSkills[0], Is.SameAs(guard));
+            Assert.That(run.SkillBooks.Select(book => book.Id), Is.EquivalentTo(new[] { duplicate.Id, restricted.Id }));
 
             var basic = run.Members[0].Character.BasicAttack;
             var evolved = new CharacterDefinition("evolved", "evolved", Profession.Warrior, Personality.Reckless,
                 new Stats(8, 1, 1, 12), 1, basic, stage: 2);
             Assert.That(run.TryChangeForm("a", evolved), Is.True);
             Assert.That(run.Members[0].SkillSlotCount, Is.EqualTo(2));
-            Assert.That(run.TryLearnSkill("a", 1, duplicate.Id), Is.False);
-            Assert.That(run.TryLearnSkill("a", 1, second.Id), Is.True);
+            var extraGuard = run.AddEquipment(guard);
+            Assert.That(run.TryLearnSkill("a", 1, extraGuard.Id), Is.False);
+            Assert.That(run.TryLearnSkill("a", 1, duplicate.Id), Is.True);
             run.ResetEncounter();
-            Assert.That(run.Members[0].LearnedSkills, Is.EqualTo(new[] { roar, guard }));
-            Assert.That(run.SkillBooks, Is.EquivalentTo(new[] { duplicate, restricted }));
+            Assert.That(run.Members[0].LearnedSkills, Is.EqualTo(new[] { guard, roar }));
+            Assert.That(run.SkillBooks, Is.EquivalentTo(new[] { restricted, extraGuard }));
         }
 
         [Test]

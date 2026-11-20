@@ -3,6 +3,18 @@
   "regionId": "whispering-graveyard",
   "version": "2026-11-19",
   "floor": 2,
+  "formations": [
+    {"name": "墓园普通突击", "enemies": ["GraveDigger", "GraveShoveler", "VigilCrossbow", "BoneLantern"]},
+    {"name": "墓园普通消耗", "enemies": ["TombShield", "RustSpear", "StitchServant", "CarrionRaven"]},
+    {"name": "墓园普通寒火", "enemies": ["CoffinHound", "FrostRevenant", "FuneralDrummer", "PhosphorWisp"]},
+    {"name": "抬棺四侍", "enemies": ["Pallbearer", "BoneLantern", "CarrionRaven"]},
+    {"name": "墓钟敲击者", "enemies": ["GraveBell", "TombShield", "StitchServant"]},
+    {"name": "缝魂医师", "enemies": ["SoulStitcher", "GraveShoveler", "VigilCrossbow"]},
+    {"name": "哭墙石像", "enemies": ["WeepingGargoyle", "FrostRevenant", "PhosphorWisp"]},
+    {"name": "巡墓刽子手", "enemies": ["GraveExecutioner", "TombShield", "DirgeAcolyte"]},
+    {"name": "无名葬王", "enemies": ["NamelessKing", "GraveDigger"]},
+    {"name": "守墓圣母", "enemies": ["SepulchralMatron", "RustSpear"]}
+  ],
   "enemies": [
     {"number":24,"id":"GraveDigger","name":"盗墓苦役","rank":"Normal","profession":"Warrior","reach":"Melee","attack":5,"defense":1,"specialDefense":1,"health":20,"slots":1,"appearance":"Hunched undead gravedigger in a ragged brown hood, rusty shovel, rope belt and a small stolen funerary coin pouch.","counter":"防住前排，趁其掘土蓄力时集火。","actions":[{"name":"锈铲劈砍","weight":75,"kind":"Attack","target":"Front"},{"name":"掘土重击","weight":25,"kind":"Attack","target":"Front","power":3,"charge":true}]},
     {"number":25,"id":"GraveShoveler","name":"腐锹尸","rank":"Normal","profession":"Warrior","reach":"Melee","attack":6,"defense":0,"specialDefense":1,"health":22,"slots":1,"appearance":"Bulky moss covered corpse, broken iron spade fused into one forearm, exposed ribs, pale jade grave fungus.","counter":"物理防御低，优先用物理伤害击倒。","actions":[{"name":"腐锹拍击","weight":70,"kind":"Attack","target":"Front"},{"name":"泥骨溅射","weight":30,"kind":"Attack","target":"FrontTwo","power":-2}]},

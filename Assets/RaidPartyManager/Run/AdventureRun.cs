@@ -214,6 +214,7 @@ namespace RaidPartyManager.Run
         private readonly EquipmentDefinition[] battleLoot;
         private readonly EquipmentDefinition[] treasureLoot;
         private readonly HashSet<int> investorFloors = new HashSet<int>();
+        private readonly HashSet<AdventureEventKind> seenEvents = new();
         private readonly List<AwayCompanion> away = new List<AwayCompanion>();
         private int eventsTaken, elitesTaken;
         private IReadOnlyList<NodeKind> routeOptions;
@@ -291,7 +292,8 @@ namespace RaidPartyManager.Run
             {
                 Party = Party.CaptureCheckpoint(), Seed = seed, Floor = Floor, Stage = Stage, CompletedNodes = CompletedNodes,
                 EventsTaken = eventsTaken, ElitesTaken = elitesTaken, Investment = Investment, InvestmentPaid = InvestmentPaid,
-                InvestorFloors = investorFloors.ToArray(), FloorCleared = FloorCleared, Failed = Failed,
+                InvestorFloors = investorFloors.ToArray(), SeenEvents = seenEvents.OrderBy(kind => kind).ToArray(),
+                FloorCleared = FloorCleared, Failed = Failed,
                 QuestActive = QuestActive, QuestWins = QuestWins, ReturnMessage = ReturnMessage,
                 Nodes = Route.Nodes.Select(node => new RouteCheckpointNode
                 {
@@ -331,6 +333,10 @@ namespace RaidPartyManager.Run
                 random = new Random(saved.Seed)
             };
             run.investorFloors.UnionWith(saved.InvestorFloors ?? Array.Empty<int>());
+            run.seenEvents.UnionWith(saved.SeenEvents ?? Array.Empty<AdventureEventKind>());
+            // Earlier saves recorded investor visits separately.
+            if (run.investorFloors.Count > 0)
+                run.RecordEvent(AdventureEventKind.Investor);
             run.away.AddRange((saved.Away ?? Array.Empty<CheckpointCompanion>()).Select(companion =>
                 new AwayCompanion(companion.MemberId, companion.Position, companion.ReturnAt)));
             if (saved.HasBattleReward)
@@ -341,8 +347,9 @@ namespace RaidPartyManager.Run
                     throw new ArgumentException("Invalid battle rewards.");
                 run.RouteDestination = run.RouteChoice(saved.Choice);
                 run.nodeCheckpoint = saved;
-                run.Current = new AdventureVisit(run.RouteDestination.Value.Kind.Value,
-                    reward.Event < 0 ? (AdventureEventKind?)null : (AdventureEventKind)reward.Event)
+                var eventKind = reward.Event < 0 ? (AdventureEventKind?)null : (AdventureEventKind)reward.Event;
+                run.RecordEvent(eventKind);
+                run.Current = new AdventureVisit(run.RouteDestination.Value.Kind.Value, eventKind)
                 {
                     Resolved = reward.Resolved, Message = reward.Message ?? "", NeedsEvolution = reward.NeedsEvolution,
                     EvolutionMemberId = string.IsNullOrEmpty(reward.EvolutionMember) ? null : reward.EvolutionMember,
@@ -449,6 +456,7 @@ namespace RaidPartyManager.Run
         private void Open(NodeKind kind, AdventureEventKind? eventKind)
         {
             var visit = Current = new AdventureVisit(kind, eventKind);
+            if (!IsInspection) RecordEvent(eventKind);
             if (eventKind == AdventureEventKind.Investor)
             {
                 visit.InvestorAvailable = !InvestmentPaid && !InvestorVisitedThisFloor;
@@ -498,7 +506,13 @@ namespace RaidPartyManager.Run
             if (Stage <= 3) list.AddRange(new[] { AdventureEventKind.LostTraveler, AdventureEventKind.FoundCoins, AdventureEventKind.HatTrick });
             else if (Stage <= 6) list.AddRange(new[] { AdventureEventKind.Forge, AdventureEventKind.LockedChest });
             else if (Stage <= 9) list.AddRange(new[] { AdventureEventKind.AscensionTrial, AdventureEventKind.Alchemist });
-            return list;
+            return list.Where(kind => !seenEvents.Contains(kind)).ToArray();
+        }
+
+        private void RecordEvent(AdventureEventKind? kind)
+        {
+            if (kind is { } seen && seen != AdventureEventKind.Ambush)
+                seenEvents.Add(seen);
         }
 
         private AdventureEventKind RollEvent()
@@ -644,10 +658,30 @@ namespace RaidPartyManager.Run
             if (Current?.Battle != null && !Current.Battle.Settled) Current.Battle.RequestId = requestId;
         }
 
-        public IReadOnlyList<Combatant> PrepareEnemies(IReadOnlyList<CharacterDefinition> roster)
+        public IReadOnlyList<Combatant> PrepareEnemies(IReadOnlyList<CharacterDefinition> roster,
+            IReadOnlyList<EnemyFormation> formations = null)
         {
             var ticket = Current?.Battle ?? throw new InvalidOperationException("No encounter selected.");
             if (ticket.Enemies != null) return ticket.Enemies;
+            var rank = ticket.Kind switch
+            {
+                NodeKind.Boss => EnemyRank.Boss,
+                NodeKind.EliteBattle => EnemyRank.Elite,
+                _ => EnemyRank.Normal
+            };
+            int allies = Party.CaptureFormation(Side.Party).Count;
+            int count = rank == EnemyRank.Normal ? Math.Max(1, allies) :
+                Current.Event == AdventureEventKind.AscensionTrial ? 1 : Math.Min(3, Math.Max(1, allies - 1));
+            var groups = formations?.Where(group => group.Rank == rank &&
+                (rank != EnemyRank.Normal || group.Members.Count >= count)).ToArray();
+            if (groups is { Length: > 0 })
+            {
+                ticket.Enemies = groups[random.Next(groups.Length)].CreateLineup("route-enemy", count);
+                if (rank != EnemyRank.Normal)
+                    ticket.EliteIds.Add(ticket.Enemies[0].Id);
+                return ticket.Enemies;
+            }
+
             EnemyRank RankOf(CharacterDefinition character) => character.Rank != EnemyRank.Unspecified
                 ? character.Rank
                 : character.Trait is CharacterTrait.EnemyBell or CharacterTrait.EnemyRearAmbush or CharacterTrait.EnemyResolve
@@ -656,15 +690,11 @@ namespace RaidPartyManager.Run
             var selected = new List<(CharacterDefinition Character, bool Elite)>();
             if (ticket.Kind != NodeKind.NormalBattle)
             {
-                var rank = ticket.Kind == NodeKind.Boss ? EnemyRank.Boss : EnemyRank.Elite;
                 var candidates = roster.Where(c => RankOf(c) == rank).ToArray();
                 var primary = candidates.Length > 0 ? candidates[random.Next(candidates.Length)] :
                     roster.FirstOrDefault(c => c.Trait == CharacterTrait.EnemyBell) ?? roster.First();
                 selected.Add((primary, true));
             }
-            int allies = Party.CaptureFormation(Side.Party).Count;
-            int count = ticket.Kind == NodeKind.NormalBattle ? Math.Max(1, allies) :
-                Current.Event == AdventureEventKind.AscensionTrial ? 1 : Math.Min(3, Math.Max(1, allies - 1));
             int usedSlots = selected.Sum(entry => entry.Character.PositionSlots);
             foreach (var candidate in normal.Where(c => selected.All(entry => entry.Character.Id != c.Id)))
             {

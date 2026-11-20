@@ -55,7 +55,7 @@ namespace RaidPartyManager.Domain
         RoundEndEmber, RoundEndHeal, RoundEndPoison, RoundEndPoisonHeal, RoundEndGrowth,
         RoundEndLightning, RoundEndFormShift, RoundEndTransfer,
         RoundStartExposed, RoundStartPoison, RoundStartBlessing, RoundStartBonus, PiercingArrow,
-        GraveyardSpecial, GraveyardCharge, GraveyardPhase
+        GraveyardSpecial, GraveyardCharge, GraveyardPhase, SkillFireImpact, SkillLightningImpact
     }
 
     public static class Rules

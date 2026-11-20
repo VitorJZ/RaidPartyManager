@@ -175,24 +175,36 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void GraveyardPresetsUseTheMeasuredFormationsAndDraftOnlyNormalGroups()
+        {
+            var graveyard = Load();
+            Assert.That(graveyard.EnemyFormations.Select(group => group.Rank), Is.EquivalentTo(
+                Enumerable.Repeat(EnemyRank.Normal, 3).Concat(Enumerable.Repeat(EnemyRank.Elite, 5))
+                    .Concat(Enumerable.Repeat(EnemyRank.Boss, 2))));
+            foreach (var group in graveyard.EnemyFormations)
+            {
+                var units = group.CreateLineup("test-enemy");
+                Assert.That(units.SelectMany(unit => Enumerable.Range(unit.Position, unit.Character.PositionSlots)),
+                    Is.EqualTo(new[] { 1, 2, 3, 4 }), group.Name);
+                Assert.That(units.All(unit => unit.Health == unit.Character.BaseStats.Health), Is.True, group.Name);
+            }
+            var random = new Random(53);
+            var normal = graveyard.EnemyFormations.Where(group => group.Rank == EnemyRank.Normal).ToArray();
+            for (int i = 0; i < 12; i++)
+            {
+                var draft = graveyard.Draft(Side.Enemy, random);
+                Assert.That(normal.Any(group => group.Members.Select(member => member.Id).SequenceEqual(
+                    draft.Select(unit => unit.Character.Id))), Is.True);
+            }
+        }
+
+        [Test]
         public void RecordReproducibleDifficultySamples()
         {
             var graveyard = Load();
             var dock = AssetDatabase.LoadAssetAtPath<EncounterAsset>("Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
-            var cases = new (string Name, string[] Enemies)[]
-            {
-                ("码头普通对照", new[] {"EnemyRoadBrute", "EnemyOathlineGuard", "EnemyAshLanternAdept", "EnemyThreadRifleman"}),
-                ("墓园普通突击", new[] {"EnemyGraveDigger", "EnemyGraveShoveler", "EnemyVigilCrossbow", "EnemyBoneLantern"}),
-                ("墓园普通消耗", new[] {"EnemyTombShield", "EnemyRustSpear", "EnemyStitchServant", "EnemyCarrionRaven"}),
-                ("墓园普通寒火", new[] {"EnemyCoffinHound", "EnemyFrostRevenant", "EnemyFuneralDrummer", "EnemyPhosphorWisp"}),
-                ("抬棺四侍", new[] {"EnemyPallbearer", "EnemyBoneLantern", "EnemyCarrionRaven"}),
-                ("墓钟敲击者", new[] {"EnemyGraveBell", "EnemyTombShield", "EnemyStitchServant"}),
-                ("缝魂医师", new[] {"EnemySoulStitcher", "EnemyGraveShoveler", "EnemyVigilCrossbow"}),
-                ("哭墙石像", new[] {"EnemyWeepingGargoyle", "EnemyFrostRevenant", "EnemyPhosphorWisp"}),
-                ("巡墓刽子手", new[] {"EnemyGraveExecutioner", "EnemyTombShield", "EnemyDirgeAcolyte"}),
-                ("无名葬王", new[] {"EnemyNamelessKing", "EnemyGraveDigger"}),
-                ("守墓圣母", new[] {"EnemySepulchralMatron", "EnemyRustSpear"})
-            };
+            var cases = new[] { (Name: "码头普通对照", Formation: dock.EnemyFormations.Single(group => group.Name == "码头巡防")) }
+                .Concat(graveyard.EnemyFormations.Select(group => (Name: group.Name, Formation: group))).ToArray();
             var records = new List<string> { "遭遇,队伍,样本数,胜利数,胜率,平均回合,胜利时平均倒下数,胜利时剩余生命比例" };
             foreach (bool prepared in new[] { false, true })
             {
@@ -211,14 +223,7 @@ namespace RaidPartyManager.Tests
                 int maximumHealth = party.Sum(unit => unit.Stats.Health);
                 foreach (var fixture in cases)
                 {
-                    int position = 1;
-                    var enemies = fixture.Enemies.Select(id =>
-                    {
-                        var character = graveyard.EnemyRoster.Concat(dock.EnemyRoster).Single(entry => entry.Id == id);
-                        var unit = new Combatant(id, character, Side.Enemy, position, character.BaseStats, character.BaseStats.Health);
-                        position += character.PositionSlots;
-                        return unit;
-                    }).ToArray();
+                    var enemies = fixture.Formation.CreateLineup("sample-enemy");
                     int victories = 0, rounds = 0, defeated = 0, remaining = 0;
                     for (int seed = 0; seed < 100; seed++)
                     {

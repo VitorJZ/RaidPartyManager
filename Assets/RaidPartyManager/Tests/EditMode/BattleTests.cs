@@ -61,9 +61,12 @@ namespace RaidPartyManager.Tests
         [Test]
         public void CooperativeUsesLivingTargetPreviouslyAttackedByTeammate()
         {
-            var result = Fight(Unit("leader", Side.Party, 1, basic: Attack("rear", TargetRule.RearEnemy)),
+            var result = new BattleSimulator(random: new System.Random(1)).Simulate(new BattleRequest("follow-ally", new[]
+            {
+                Unit("leader", Side.Party, 1, basic: Attack("rear", TargetRule.RearEnemy)),
                 Unit("support", Side.Party, 2, Personality.Cooperative),
-                Unit("front", Side.Enemy, 1), Unit("back", Side.Enemy, 4));
+                Unit("front", Side.Enemy, 1), Unit("back", Side.Enemy, 4)
+            }, 1));
             var action = FirstAction(result, "support");
             Assert.That(action.TargetId, Is.EqualTo("back"));
             Assert.That(action.Reason, Is.EqualTo(DecisionReason.FollowAlly));
@@ -105,8 +108,7 @@ namespace RaidPartyManager.Tests
             Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
             var first = session.AdvanceRound().Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
             Assert.That(first.Select(entry => entry.ActorId), Is.EquivalentTo(new[] { "enemy", "guard", "archer" }));
-            Assert.That(first.Last().ActorId, Is.EqualTo("enemy"));
-            Assert.That(first.Last().TargetId, Is.EqualTo("archer"));
+            Assert.That(first.Single(entry => entry.ActorId == "enemy").TargetId, Is.EqualTo("archer"));
             Assert.That(session.TrySwapPartyPositions(1, 2), Is.False);
             Assert.That(session.TrySwapPartyPositions(1, 4), Is.False);
             Assert.That(session.TrySwapPartyPositions(1, 3), Is.True);
@@ -114,8 +116,7 @@ namespace RaidPartyManager.Tests
 
             var second = session.AdvanceRound().Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
             Assert.That(second.Select(entry => entry.ActorId), Is.EquivalentTo(new[] { "enemy", "guard", "archer" }));
-            Assert.That(second.Last().ActorId, Is.EqualTo("enemy"));
-            Assert.That(second.Last().TargetId, Is.EqualTo("guard"));
+            Assert.That(second.Single(entry => entry.ActorId == "enemy").TargetId, Is.EqualTo("guard"));
             session.AdvanceRound();
             Assert.That(session.Result.PartyPositionsById["guard"], Is.EqualTo(3));
             Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
@@ -133,7 +134,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void SeededRoundsCanBeReplayedAndShuffleEachSideIndependently()
+        public void SeededRoundsReplayWithAnAlliedOpenerAndMixedTurns()
         {
             var a = Unit("a", Side.Party, 1, maxHealth: 100);
             var b = Unit("b", Side.Party, 4, maxHealth: 100);
@@ -145,11 +146,28 @@ namespace RaidPartyManager.Tests
 
             var rounds = first.Events.Where(entry => entry.Kind == BattleEventKind.Action).GroupBy(entry => entry.Tick)
                 .Select(round => round.Select(entry => entry.ActorId).ToArray()).ToArray();
-            Assert.That(rounds.All(round => round.Take(2).All(id => id == "a" || id == "b")), Is.True);
-            Assert.That(rounds.All(round => round.Skip(2).All(id => id == "c" || id == "d")), Is.True);
+            Assert.That(rounds.All(round => round[0] is "a" or "b"), Is.True);
+            Assert.That(rounds.Any(round => round[1] is "c" or "d"), Is.True);
             Assert.That(rounds.Select(round => round[0]).Distinct().Count(), Is.EqualTo(2));
-            Assert.That(rounds.Select(round => round[2]).Distinct().Count(), Is.EqualTo(2));
+            foreach (var round in rounds)
+                Assert.That(round, Is.EquivalentTo(new[] { "a", "b", "c", "d" }));
             Assert.That(first.Outcome, Is.EqualTo(BattleOutcome.Timeout));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void AStunnedAllyDoesNotTakeTheOpeningTurn(bool bothAlliesStunned)
+        {
+            var a = Unit("a", Side.Party, 1);
+            var b = Unit("b", Side.Party, 2);
+            var c = Unit("c", Side.Enemy, 1);
+            var round = Fight(Stunned(a), bothAlliesStunned ? Stunned(b) : b, c)
+                .Events.Where(entry => entry.Kind == BattleEventKind.Action).Select(entry => entry.ActorId);
+            Assert.That(round, Is.EqualTo(bothAlliesStunned ? new[] { "c" } : new[] { "b", "c" }));
+
+            static Combatant Stunned(Combatant unit) => new(unit.Id, unit.Character, unit.Side, unit.Position,
+                unit.Stats, unit.Health, startingStatuses: new System.Collections.Generic.Dictionary<StatusKind, int>
+                { [StatusKind.Stunned] = 1 });
         }
 
         [Test]

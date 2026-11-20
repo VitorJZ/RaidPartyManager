@@ -356,7 +356,7 @@ namespace RaidPartyManager.Presentation
         private VisualElement BuildCell(CellKind kind, int index, EquipmentInstance item = null,
             SkillBookDefinition learned = null, string equippedBy = null)
         {
-            bool selectable = item != null || kind == CellKind.EquipmentSlot || kind == CellKind.SkillSlot && learned == null;
+            bool selectable = item != null || kind is CellKind.EquipmentSlot or CellKind.SkillSlot;
             var view = new VisualElement { name = CellName(kind, index), focusable = selectable, tabIndex = selectable ? 0 : -1 };
             var cell = new Cell { View = view, Kind = kind, Index = index, Item = item, LearnedSkill = learned, EquippedBy = equippedBy };
             view.userData = cell;

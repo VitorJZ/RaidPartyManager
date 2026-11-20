@@ -774,7 +774,7 @@ namespace RaidPartyManager.Tests
                 party.AddGold(30);
                 var seeded = new AdventureRun(party, content.CharacterCatalog, gear, false, new System.Random(seed));
                 seeded.EnterRoute(0);
-                var enemies = seeded.PrepareEnemies(content.EnemyRoster);
+                var enemies = seeded.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
                 seeded.BindBattle("fixture");
                 Assert.That(seeded.SettleBattle(new BattleResult("fixture", BattleOutcome.Victory,
                     enemies.ToDictionary(enemy => enemy.Id, _ => 0), System.Array.Empty<BattleEvent>()), out _), Is.True);

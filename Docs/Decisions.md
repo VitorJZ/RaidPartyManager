@@ -23,3 +23,9 @@
 | 2026-11-19 | 墓园通过独立场景试玩，敌阵按遭遇资源分别缓存；正式路线暂沿用码头 | 避免切换演练后混入其他区域敌人，不扩展尚未确认的墓园关卡路线 | `MainMenuOpensGraveyardAndSwitchingRegionsKeepsTheirEnemyPoolsSeparate` |
 | 2026-11-19 | 原共享 Excel 不可访问时输出独立墓园增补表并注明未合并 | 提交完整可检查的数据与插图，避免误称已写入原在线图鉴 | 工作簿 30 条敌人、62 条行动、30 个概率合计和 2200 场试算核对 |
 | 2026-11-19 | 取得用户提供的本地图鉴后，在敌人表末尾追加墓园，并保留原 8 个工作表及原生音效表 | 合并为 53 名敌人的完整图鉴；保留旧数据与格式，避免导出时丢失未修改的原生内容 | `MergeGraveyardWorkbook.mjs --verify`、`PreserveGraveyardWorkbook.py`，记录见 `WhisperingGraveyardValidation.json` |
+| 2026-11-21 | 正式码头按等级抽预设敌阵，演练可载入码头和墓园的普通、精英、首领预设 | 保留有意设计的前后排和随从搭配，复用墓园已测阵容，沿用人数缩放与升阶试炼既有规则 | `DockEncountersSelectAuthoredRanksAndKeepWorkbookStats`、`DockFormationsScaleToAStartingPair`、`LoadingAGraveyardPresetUsesTheWholeFormationInBattle` |
+| 2026-11-21 | 编辑页右上角使用「返回」，移除编辑页内直达主菜单的按钮 | 保持同一编辑页的退出方向，沿原路径回到营地、商店、地图或战前画面 | `EquipmentPersistsAcrossMainMenuAndLeavingABattle` |
+| 2026-11-21 | 技能书可覆盖角色已有技能 | 消耗新书并遗忘旧技能，遵守职业、槽位和技能去重限制 | `SkillBooksCanOverwriteKnownSkillsAndTheNewSkillsSurviveEvolution`、`BookmarksSwitchPagesAndCompatibleBooksCanReplaceLearnedSkills` |
+| 2026-11-21 | 元素石英转换后播放实际命中元素的特效 | 保留原技能名称，命中特效、飘字与防御结算使用同一元素 | `BlazingFireUsesTheElementalQuartzDamageRulesAndImpactArt` |
+| 2026-11-21 | 每回合一名可行动的己方队员先手，其余双方混排 | 保留己方开局优势，允许敌人在其他队员之间行动 | `SeededRoundsReplayWithAnAlliedOpenerAndMixedTurns`、`AStunnedAllyDoesNotTakeTheOpeningTurn` |
+| 2026-11-21 | 正式讨伐的随机事件跨楼层去重，遭遇战可重复 | 让已出现的事件退出抽选，保留可重复的保底事件与存档续玩 | `RandomEventsAreRememberedAfterDecliningAndResumingOnAnotherFloor`、`ExhaustedEventPoolStillRollsAmbushWithoutMarkingItSeen` |

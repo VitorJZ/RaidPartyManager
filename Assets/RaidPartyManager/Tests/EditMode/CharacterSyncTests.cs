@@ -111,7 +111,13 @@ namespace RaidPartyManager.Tests
                 var party = new PartyRun(members, Array.Empty<EquipmentDefinition>());
                 var run = new AdventureRun(party, encounter.CharacterCatalog, encounter.StartingEquipment, true, new Random(seed));
                 Assert.That(run.Inspect(node), Is.True);
-                var enemies = run.PrepareEnemies(encounter.EnemyRoster);
+                var enemies = run.PrepareEnemies(encounter.EnemyRoster, encounter.EnemyFormations);
+                Assert.That(run.PrepareEnemies(encounter.EnemyRoster, encounter.EnemyFormations), Is.SameAs(enemies));
+                Assert.That(encounter.EnemyFormations.Where(group => group.Rank == rank).Any(group =>
+                    group.Members.Take(enemies.Count).Select(member => member.Id)
+                        .SequenceEqual(enemies.Select(enemy => enemy.Character.Id))), Is.True);
+                Assert.That(run.Current.Battle.EliteIds,
+                    Is.EquivalentTo(rank == EnemyRank.Normal ? Array.Empty<string>() : new[] { enemies[0].Id }));
                 var primary = enemies.First();
                 Assert.That(primary.Character.Rank, Is.EqualTo(rank));
                 Assert.That(primary.Character.PositionSlots, Is.EqualTo((int)rank));
@@ -124,6 +130,23 @@ namespace RaidPartyManager.Tests
                     seen.Add(enemy.Character.Id);
             }
             Assert.That(seen, Has.Count.EqualTo(expected));
+        }
+
+        [TestCase(NodeKind.NormalBattle, 2)]
+        [TestCase(NodeKind.EliteBattle, 1)]
+        [TestCase(NodeKind.Boss, 1)]
+        public void DockFormationsScaleToAStartingPair(NodeKind node, int expectedCount)
+        {
+            var encounter = LoadEncounter();
+            var party = new PartyRun(encounter.Party.Take(2).Select(unit =>
+                new PartyMemberStart(unit.Id, unit.Character, unit.Position, unit.Health)), Array.Empty<EquipmentDefinition>());
+            var run = new AdventureRun(party, encounter.CharacterCatalog, encounter.StartingEquipment, true, new Random(19));
+            Assert.That(run.Inspect(node), Is.True);
+            var enemies = run.PrepareEnemies(encounter.EnemyRoster, encounter.EnemyFormations);
+            Assert.That(enemies, Has.Count.EqualTo(expectedCount));
+            Assert.That(encounter.EnemyFormations.Any(group => group.Rank == enemies[0].Character.Rank &&
+                group.Members.Take(expectedCount).Select(member => member.Id).SequenceEqual(enemies.Select(enemy => enemy.Character.Id))),
+                Is.True);
         }
 
         [Test]
@@ -371,7 +394,7 @@ namespace RaidPartyManager.Tests
                 new PartyMemberStart("star", ally, 1, ally.BaseStats.Health),
                 new PartyMemberStart("weaver", weaver, 2, weaver.BaseStats.Health)
             }, Array.Empty<EquipmentDefinition>());
-            var simulator = new BattleSimulator(random: new FixedOrder());
+            var simulator = new BattleSimulator(random: new Random(1));
             var request = run.BeginBattle(new[] { enemy }, 15, null, characterCatalog: new[] { ally, weaver, chronomancer });
             var result = simulator.Simulate(request);
 

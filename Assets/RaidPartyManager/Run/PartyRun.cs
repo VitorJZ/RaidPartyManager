@@ -355,7 +355,7 @@ namespace RaidPartyManager.Run
         {
             var member = FindMember(memberId);
             return activeBattle == null && member != null && !member.IsAway && member.Health > 0 &&
-                slot >= 0 && slot < MemberView.SkillSlotsFor(member.Character) && member.LearnedSkills[slot] == null &&
+                slot >= 0 && slot < MemberView.SkillSlotsFor(member.Character) &&
                 bookId != null && inventory.TryGetValue(bookId, out var item) && item.Definition is SkillBookDefinition book &&
                 book.CanLearn(member.Character) && !member.LearnedSkills.Any(known => known?.Id == book.Id);
         }
@@ -365,6 +365,7 @@ namespace RaidPartyManager.Run
             if (!CanLearnSkill(memberId, slot, bookId))
                 return false;
 
+            // Learned skills are not inventory items; overwriting forgets the previous skill.
             FindMember(memberId).LearnedSkills[slot] = (SkillBookDefinition)inventory[bookId].Definition;
             inventory.Remove(bookId);
             return true;

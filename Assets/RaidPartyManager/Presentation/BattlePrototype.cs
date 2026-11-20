@@ -203,7 +203,7 @@ namespace RaidPartyManager.Presentation
                 enemyRun.ResetRoster(RosterStart(Side.Enemy));
             victoryRewards = adventure?.Current?.Battle?.Reward;
             preparedEnemies = victoryRewards != null ? Array.Empty<Combatant>() :
-                adventure != null ? adventure.PrepareEnemies(content.EnemyRoster) : enemyRun.CaptureFormation(Side.Enemy);
+                adventure != null ? adventure.PrepareEnemies(content.EnemyRoster, content.EnemyFormations) : enemyRun.CaptureFormation(Side.Enemy);
             phase = Phase.Preparation;
             pauseRequested = false;
             battle = null;
@@ -612,8 +612,13 @@ namespace RaidPartyManager.Presentation
                         }
                         else if (DockEnemyEffectPlayback.Supports(entry.VisualCue))
                             dockEffects.Add(new DockEnemyEffectPlayback(entry, now, AnimationScale));
-                        else if (!isRoundEndEffect && !isRoundStartEffect && EffectArt(entry) is Texture2D effect)
-                            impactEffects.Add(new BattleEffectPlayback(entry.TargetId, effect, now, AnimationScale));
+                        else if (!isRoundEndEffect && !isRoundStartEffect)
+                        {
+                            var effect = EffectArt(entry);
+                            // An unassigned Unity texture can still satisfy a C# type pattern.
+                            if (effect != null)
+                                impactEffects.Add(new BattleEffectPlayback(entry.TargetId, effect, now, AnimationScale));
+                        }
                     }
                     QueueSkillEffect(entry, now);
                 }
@@ -719,8 +724,10 @@ namespace RaidPartyManager.Presentation
 
         private void QueueSkillEffect(BattleEvent entry, double now)
         {
-            if (entry.SkillBookId == null || entry.TargetId == null || entry.ActorEnergy.HasValue || entry.Detail == "未命中" ||
-                content.SkillEffectFor(entry.SkillBookId) is not Texture2D atlas)
+            if (entry.SkillBookId == null || entry.TargetId == null || entry.ActorEnergy.HasValue || entry.Detail == "未命中")
+                return;
+            var atlas = content.SkillEffectFor(entry.SkillBookId, entry.VisualCue);
+            if (atlas == null)
                 return;
             if (impactEffects.Any(effect => effect.SkillBookId == entry.SkillBookId &&
                 effect.TargetId == entry.TargetId && effect.ActiveAt(now)))

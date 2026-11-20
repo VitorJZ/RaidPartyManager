@@ -75,6 +75,77 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 7fa0cb9df83641d9858dc3fdf6c40723, type: 2}
   - {fileID: 11400000, guid: 5c4e06ddb9894387bbe39063c9b1d1f2, type: 2}
   - {fileID: 11400000, guid: caee66938290470dbddf5d08aaba302e, type: 2}
+  enemyFormations:
+  - name: 码头巡防
+    enemyIds:
+    - EnemyRoadBrute
+    - EnemyOathlineGuard
+    - EnemyAshLanternAdept
+    - EnemyThreadRifleman
+  - name: 后排伏兵
+    enemyIds:
+    - EnemyRoadBrute
+    - EnemyRearHunter
+    - EnemyOathlineGuard
+    - EnemyFogSignalGunner
+  - name: 弩手掩护
+    enemyIds:
+    - EnemyDeckSailor
+    - EnemyCorpseCrossbowman
+    - EnemyBrassQuack
+    - EnemyAshLanternAdept
+  - name: 抢救沉货
+    enemyIds:
+    - EnemyForkFisher
+    - EnemyWreckScavenger
+    - EnemyDeckSailor
+    - EnemyShipCaulker
+  - name: 潮线拦截
+    enemyIds:
+    - EnemySaltCrab
+    - EnemyTideFollower
+    - EnemyMudEel
+    - EnemyLanternMoth
+  - name: 破陶火线
+    enemyIds:
+    - EnemyCrackedPotter
+    - EnemyFogSignalGunner
+    - EnemyRearHunter
+    - EnemyForkFisher
+  - name: 涌潮护航
+    enemyIds:
+    - EnemyOathlineGuard
+    - EnemyShipCaulker
+    - EnemyTideFollower
+    - EnemyThreadRifleman
+  - name: 钟声戒严
+    enemyIds:
+    - EnemyBellMagistrate
+    - EnemyOathlineGuard
+    - EnemyBrassQuack
+  - name: 破锚工班
+    enemyIds:
+    - EnemyAnchorHermit
+    - EnemyDeckSailor
+    - EnemyShipCaulker
+  - name: 雾灯诱猎
+    enemyIds:
+    - EnemyFogAngler
+    - EnemyMudEel
+    - EnemyLanternMoth
+  - name: 系缆警卫
+    enemyIds:
+    - EnemyMooringWarden
+    - EnemyForkFisher
+    - EnemyFogSignalGunner
+  - name: 封港炮队
+    enemyIds:
+    - EnemyBlockadeAdmiral
+    - EnemyDeckSailor
+  - name: 沉灯潮涌
+    enemyIds:
+    - EnemyDrownedLanternRay
+    - EnemySaltCrab
   statusIcons:
   - {fileID: 2800000, guid: a82a7b25f01b1bc4d8f57719079638c0, type: 3}
   - {fileID: 2800000, guid: c3db1f960c157b24c81aaaa99c08e2e3, type: 3}
