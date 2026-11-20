@@ -40,6 +40,8 @@ foreach ($mode in 'editmode', 'playmode') {
 
 墓园内容的验收记录见 [WhisperingGraveyardValidation.json](Docs/Validation/WhisperingGraveyardValidation.json)，包含测试结果、资源数量、图鉴核对和文件哈希。正式讨伐路线目前仍使用码头，墓园通过独立场景试玩。
 
+2026-11-20 数值测试覆盖 114,722 次战斗执行、600 条码头路线和两区域全部 53 名敌人。报告记录调参优先级、对照条件与样本边界。[Markdown 报告](Docs/Balance/2026-11-20.md) · [Excel 明细](Docs/Balance/2026-11-20.xlsx)
+
 ## 开发入口
 
 - [战斗界面与状态栏](Docs/BattleUI.md)
