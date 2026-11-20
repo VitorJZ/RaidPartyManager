@@ -10,6 +10,9 @@ namespace RaidPartyManager.Presentation
     public sealed class DockTown : MonoBehaviour
     {
         [SerializeField] private AdventureContentAsset assets;
+        [SerializeField] private ServiceStageArt stageArt;
+        private TownStage stage;
+        private readonly Button[] serviceSigns = new Button[4];
         private AdventureRun run;
         private VisualElement root;
         private VisualElement town;
@@ -23,68 +26,90 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
             run = AdventureFlow.ForScene("Town") ?? AdventureFlow.Select(assets, true);
             if (run.Current?.Kind != NodeKind.Town) run.Inspect(NodeKind.Town);
-            root.style.backgroundImage = new StyleBackground(assets.TownBackdrop);
-            root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-            root.style.backgroundColor = PrototypeStyle.Background;
+            stage = new TownStage(transform, root, stageArt);
+            root.style.backgroundColor = Color.clear;
             town = new VisualElement { name = "town-content" };
             PrototypeStyle.Fill(town);
             root.Add(town);
-            topBar = new RunTopBar(root, run.Party, assets.Encounter, () => topBar.EditParty(), "open-town-editor");
+            topBar = new RunTopBar(root, run.Party, assets.Encounter, () => topBar.EditParty(Render), "open-town-editor");
             RunTopBar.PlaceAtTop(root, topBar);
             Render();
         }
 
-        private void OnDisable() => PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
+        private void OnDisable()
+        {
+            stage?.Dispose();
+            PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
+        }
+
+        private void Update()
+        {
+            stage.FrameCamera();
+            stage.Animate(Time.unscaledTime);
+            for (int i=0;i<serviceSigns.Length;i++)
+                stage.PlaceService(serviceSigns[i], i);
+        }
 
         private void Render()
         {
+            stage.ShowCompany(run.Party, assets.Encounter);
             town.Clear();
             topBar.Refresh();
             var header = PrototypeStyle.Row();
             header.style.position = Position.Absolute; header.style.top = RunTopBar.Height + 7; header.style.left = header.style.right = 22;
             header.style.alignItems = Align.Center;
-            header.Add(AdventureFlow.ReturnButton(() => topBar.WhenRewardsArrive(AdventureFlow.ReturnFromNode)));
+            header.pickingMode = PickingMode.Ignore;
             var title = PrototypeStyle.Text("弥雾码头 · 城镇", 26, PrototypeStyle.Accent);
             title.style.marginLeft = 16; title.style.flexGrow = 1; header.Add(title);
             var status = PrototypeStyle.Text($"已使用 {run.Current.UsedServices.Count}／2 项服务", 17);
             status.name = "town-services-count"; status.style.backgroundColor = PrototypeStyle.PanelColor;
-            status.style.paddingLeft = status.style.paddingRight = 12; header.Add(status); town.Add(header);
-            var services = PrototypeStyle.Row("town-services");
-            services.style.position = Position.Absolute; services.style.left = services.style.right = 22; services.style.bottom = 34;
-            town.Add(services);
-            Service(services, "招募", "邀请一名初始形态伙伴", TownService.Recruit, NodeKind.Event, Recruit);
-            Service(services, "商店", "进入商店，拖拽购买物品", TownService.Shop, NodeKind.Shop,
+            status.style.marginRight = Length.Percent(15); status.style.paddingLeft = status.style.paddingRight = 12; header.Add(status); town.Add(header);
+            AdventureFlow.AddServiceNavigation(town, stageArt.timber, topBar);
+            var services = new VisualElement { name = "town-services", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(services);
+            town.Insert(0,services);
+            Service(services, "招募", "邀请一名初始形态伙伴", TownService.Recruit, 0, Recruit);
+            Service(services, "商店", "进入商店，拖拽购买物品", TownService.Shop, 1,
                 () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("DockShop", true)));
-            Service(services, "营地", "招募、升阶或休息，三选一", TownService.Camp, NodeKind.Camp,
+            Service(services, "营地", "招募、升阶或休息，三选一", TownService.Camp, 2,
                 () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("Camp", true)));
-            Service(services, "委托", run.QuestActive ? $"战斗胜利 {run.QuestWins}／2 · 完成可领取 15 金币" : "接下两场战斗的委托", TownService.Quest, NodeKind.Event,
+            Service(services, "委托", run.QuestActive ? $"战斗胜利 {run.QuestWins}／2 · 完成可领取 15 金币" : "接下两场战斗的委托", TownService.Quest, 3,
                 () =>
                 {
                     if (topBar.CollectReward(town.Q("town-service-Quest"), run.TownQuest))
                         Render();
                 }, !run.QuestActive || run.QuestWins >= 2);
-            var notice = PrototypeStyle.Text(string.IsNullOrEmpty(run.Current.Message) ? "城镇里可以选择两项不同服务。完成后返回事件选择继续前进。" : run.Current.Message,
+            var notice = PrototypeStyle.Text(string.IsNullOrEmpty(run.Current.Message) ? "可任选两处设施。" : run.Current.Message,
                 17, PrototypeStyle.Accent);
             notice.name = "town-message"; notice.style.position = Position.Absolute;
-            notice.style.left = notice.style.right = 28; notice.style.bottom = 214;
+            notice.style.left = notice.style.right = 28; notice.style.bottom = Length.Percent(AudienceForeground.ClearancePercent);
+            PrototypeStyle.Middle(notice);
             notice.style.backgroundColor = new Color(0.07f, 0.08f, 0.09f, 0.88f);
             notice.style.paddingLeft = notice.style.paddingRight = 12; notice.style.paddingTop = notice.style.paddingBottom = 9;
             town.Add(notice);
         }
 
-        private void Service(VisualElement parent, string title, string description, TownService service, NodeKind icon,
+        private void Service(VisualElement parent, string title, string description, TownService service, int index,
             System.Action click, bool available = true)
         {
             bool used = run.Current.UsedServices.Contains(service);
             var button = PrototypeStyle.Button("", "town-service-" + service, click);
-            button.style.width = Length.Percent(24); button.style.flexGrow = 1; button.style.marginRight = 10;
-            button.style.height = 164; button.style.paddingTop = 9;
-            button.style.backgroundColor = new Color(0.09f, 0.10f, 0.12f, 0.95f);
-            var image = new Image { image = assets.NodeIcon(icon), scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
-            image.style.height = 66; button.Add(image);
-            var heading = PrototypeStyle.Text(title + (used ? " · 已使用" : ""), 23, PrototypeStyle.Accent);
-            PrototypeStyle.Middle(heading); button.Add(heading);
-            var words = PrototypeStyle.Text(description, 13, PrototypeStyle.Muted); PrototypeStyle.Middle(words); button.Add(words);
+            serviceSigns[index] = button;
+            stage.PlaceService(button, index);
+            button.style.backgroundColor = Color.clear;
+            PrototypeStyle.Outline(button,Color.clear,0);
+            button.style.justifyContent = Justify.FlexEnd;
+            var sign = new VisualElement { pickingMode = PickingMode.Ignore };
+            sign.style.backgroundColor = new Color(.085f,.075f,.065f,.92f);
+            sign.style.borderTopWidth = 2;
+            sign.style.borderTopColor = PrototypeStyle.Accent;
+            sign.style.paddingTop = sign.style.paddingBottom = 4;
+            var heading = PrototypeStyle.Text(title + (used ? " · 已使用" : ""), 20, PrototypeStyle.Accent);
+            PrototypeStyle.Middle(heading); sign.Add(heading);
+            var words = PrototypeStyle.Text(description, 12, PrototypeStyle.Ink); PrototypeStyle.Middle(words); sign.Add(words);
+            button.Add(sign);
+            button.RegisterCallback<PointerEnterEvent>(_ => sign.style.backgroundColor = new Color(.25f,.19f,.11f,.96f));
+            button.RegisterCallback<PointerLeaveEvent>(_ => sign.style.backgroundColor = new Color(.085f,.075f,.065f,.92f));
             button.SetEnabled(available && run.CanUseTown(service)); parent.Add(button);
         }
 

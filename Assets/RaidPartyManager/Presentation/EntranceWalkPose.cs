@@ -14,8 +14,9 @@ namespace RaidPartyManager.Presentation
         private readonly float stride;
         private readonly float lift;
         private int frame = -1;
+        private readonly StageActorImage paper;
 
-        public EntranceWalkPose(Texture2D sheet, Profession profession, bool facesLeft)
+        public EntranceWalkPose(Texture2D sheet, Profession profession, bool facesLeft, BattleStage stage)
         {
             this.sheet = sheet;
             this.facesLeft = facesLeft;
@@ -27,14 +28,35 @@ namespace RaidPartyManager.Presentation
                 _ => (0.084f, 0.062f)
             };
             pickingMode = PickingMode.Ignore;
-            generateVisualContent += Draw;
+            if (stage == null)
+                generateVisualContent += Draw;
+            else
+            {
+                paper = new StageActorImage(stage, true)
+                {
+                    name = "walking-paper",
+                    image = sheet,
+                    sourceRect = new Rect(0, 0, sheet.width / 8, sheet.height / 4),
+                    scaleMode = ScaleMode.StretchToFill,
+                    pickingMode = PickingMode.Ignore,
+                    Walk = new Vector4(1, 0, facesLeft ? -1 : 1, stride)
+                };
+                PrototypeStyle.Fill(paper);
+                Add(paper);
+            }
         }
 
         public void ShowFrame(int index)
         {
             if (frame == index) return;
             frame = index;
-            MarkDirtyRepaint();
+            if (paper != null)
+            {
+                float phase = index * 2 * Mathf.PI / 6;
+                paper.Walk = new Vector4(Mathf.Cos(phase), Mathf.Sin(phase), facesLeft ? -1 : 1, stride);
+            }
+            else
+                MarkDirtyRepaint();
         }
 
         private void Draw(MeshGenerationContext context)

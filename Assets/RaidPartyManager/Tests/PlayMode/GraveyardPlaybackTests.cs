@@ -83,12 +83,30 @@ namespace RaidPartyManager.Tests
             Assert.That(enemies.All(image => image.image.name.EndsWith("-Combat")), Is.True);
             Assert.That(root.Q("enemy-positions").Query("health-bar").ToList().Count, Is.EqualTo(4));
 
+            var stage = scene.transform.Find("Paper Theatre");
+            Assert.That(stage.Find("Cyclorama").GetComponent<MeshRenderer>().sharedMaterial.IsKeywordEnabled("RPM_DOCK_MOON"), Is.False);
+            Assert.That(stage.Find("Moonlit harbour mist"), Is.Null);
+            Assert.That(stage.Find("Upstage").position.z, Is.GreaterThan(stage.Find("Left wing").position.z));
+            var block = new MaterialPropertyBlock();
+            var worldPoses = new HashSet<(Texture, Vector4)>();
+            var renderers = new List<MeshRenderer>();
             bool sawGraveyardAction = false;
             var displayedFrames = new HashSet<string>();
             var sheets = enemies.Select(image => image.image.name.Replace("-Combat", "")).ToArray();
             float deadline = Time.realtimeSinceStartup + 14f;
             while (Time.realtimeSinceStartup < deadline)
             {
+                stage.GetComponentsInChildren(renderers);
+                foreach (var body in renderers)
+                {
+                    if (!body.enabled || body.name is not ("battle-attack-pose" or "battle-moving-character"))
+                        continue;
+                    body.GetPropertyBlock(block);
+                    var atlas = block.GetTexture("_MainTex");
+                    if (atlas != null && sheets.Any(prefix => atlas.name.StartsWith(prefix)) &&
+                        (atlas.name.EndsWith("-Attack") || atlas.name.EndsWith("-Special")))
+                        worldPoses.Add((atlas, block.GetVector("_MainTex_ST")));
+                }
                 foreach (var pose in root.Q("battle-action-layer").Query<Image>().ToList())
                 {
                     if (pose.image is not Texture2D atlas || !sheets.Any(prefix => atlas.name.StartsWith(prefix)) ||
@@ -103,6 +121,7 @@ namespace RaidPartyManager.Tests
                 yield return null;
             }
             Assert.That(sawGraveyardAction, Is.True, "An actual authored attack or special atlas must reach the action layer.");
+            Assert.That(worldPoses.Count, Is.GreaterThan(1), "The camera must receive different printed attack frames.");
             Assert.That(displayedFrames.Count, Is.GreaterThan(1), "Playback must advance beyond a single pose frame.");
             Assert.That(root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList().Count, Is.GreaterThan(0));
         }

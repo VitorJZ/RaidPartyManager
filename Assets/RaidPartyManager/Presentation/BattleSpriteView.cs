@@ -17,7 +17,7 @@ namespace RaidPartyManager.Presentation
         private static readonly float[] HitEnds = { 0.07f, 0.17f, 0.28f, 0.40f };
         private static readonly float[] DeathEnds = { 0.08f, 0.19f, 0.32f, 0.46f, 0.60f, 0.74f, 0.87f, 1f };
 
-        private readonly Image figure;
+        private readonly StageActorImage figure;
         private readonly VisualElement effects;
         private readonly Profession profession;
         private readonly Texture2D attackSheet;
@@ -39,15 +39,17 @@ namespace RaidPartyManager.Presentation
 
         public Texture2D Sheet { get; }
         public bool UsesPortrait { get; }
-        public Image Figure => figure;
+        public StageActorImage Figure => figure;
+        public BattleStage Stage { get; }
         public bool IsAlive => alive == true;
         public bool HasWideAttack => attackSheet != null || specialSheet != null;
         public bool FacesLeft { get; }
 
         public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position, bool facesLeft,
-            bool usesPortrait = false)
+            BattleStage stage, bool usesPortrait = false)
         {
             name = "profession-portrait-art";
+            Stage = stage;
             Sheet = sheet;
             UsesPortrait = usesPortrait;
             this.attackSheet = attackSheet;
@@ -69,7 +71,7 @@ namespace RaidPartyManager.Presentation
             style.bottom = 3;
             style.left = style.right = 5;
 
-            figure = new Image
+            figure = new StageActorImage(stage)
             {
                 name = "battle-sprite",
                 image = sheet,
@@ -224,7 +226,7 @@ namespace RaidPartyManager.Presentation
             ShowFrame(frame);
             if (UsesPortrait)
                 PosePortrait(elapsed, actionLength, ref offset, ref lift);
-            figure.tintColor = tint;
+            figure.SetInk(tint);
             figure.style.translate = new Translate(FacesLeft ? -offset : offset, lift, 0f);
             if (effectProgress >= 0f || light >= 0f)
             {
@@ -252,7 +254,7 @@ namespace RaidPartyManager.Presentation
             else
                 ShowFrame(0);
 
-            figure.tintColor = Color.white;
+            figure.SetInk(Color.white);
             figure.style.scale = new Scale(new Vector3(-1, 1, 1));
             figure.style.translate = new Translate((FacesLeft ? 1 : -1) * 78f * progress, 0);
             figure.style.opacity = 1f - Mathf.SmoothStep(0, 1, progress);

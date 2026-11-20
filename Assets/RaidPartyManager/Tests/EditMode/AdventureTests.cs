@@ -75,6 +75,29 @@ namespace RaidPartyManager.Tests
             Assert.That(chestLocations, Is.EquivalentTo(Enumerable.Range(3, 6)));
         }
 
+        [TestCase(NodeKind.Camp)]
+        [TestCase(NodeKind.Town)]
+        [TestCase(NodeKind.Shop)]
+        public void ServiceCanBeSkippedByChoosingThePreviewedBranch(NodeKind service)
+        {
+            var saved = Create(17, false).CheckpointForExit();
+            saved.Nodes[0].Kind = service;
+            saved.Nodes[1].Kind = NodeKind.Event;
+            saved.Nodes[1].Fork = true;
+            saved.Nodes[1].AlternativePlusOne = (int)NodeKind.NormalBattle + 1;
+            var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            Assert.That(run.EnterRoute(0), Is.True);
+            var destination = run.FollowingChoice(1);
+            Assert.That(run.CompletedNodes, Is.Zero);
+            Assert.That(run.EnterFollowing(2), Is.False);
+            Assert.That(run.Current.Kind, Is.EqualTo(service));
+            Assert.That(run.EnterFollowing(1), Is.True);
+            Assert.That(run.RouteCurrent.Kind, Is.EqualTo(service));
+            Assert.That(run.Current.Kind, Is.EqualTo(NodeKind.NormalBattle));
+            Assert.That(run.RouteDestination.Value, Is.EqualTo(destination));
+            Assert.That(run.CompletedNodes, Is.EqualTo(1));
+        }
+
         [Test]
         public void TreasureChestOffersThreeDistinctNonPotionItemsAfterOpening()
         {
@@ -213,6 +236,24 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.Members.Single(m => m.Id == old.Id).Character.Id, Is.EqualTo(recruit.Id));
             Assert.That(run.Party.Inventory.Any(i => i.Id == item), Is.True);
             Assert.That(run.Party.Members.Any(m => m.EquipmentIds.Contains(item)), Is.False);
+        }
+
+        [Test]
+        public void ShopCanSellSkillBooksForGoldAndDeliverThemToTheBookInventory()
+        {
+            var party = Create().Party;
+            var run = new AdventureRun(party, content.CharacterCatalog, content.SkillBooks, true, new Random(34));
+            run.Inspect(NodeKind.Shop);
+            Assert.That(run.Current.Stock.Count, Is.EqualTo(4));
+            var offer = run.Current.Stock[0];
+            Assert.That(offer.Item, Is.InstanceOf<SkillBookDefinition>());
+            Assert.That(offer.Price, Is.GreaterThan(0));
+            int gold = party.Gold, count = party.SkillBooks.Count;
+            Assert.That(run.Buy(0), Is.True);
+            Assert.That(run.Buy(0), Is.False);
+            Assert.That(party.Gold, Is.EqualTo(gold - offer.Price));
+            Assert.That(party.SkillBooks.Count, Is.EqualTo(count + 1));
+            Assert.That(party.SkillBooks.Any(i => i.Definition.Id == offer.Item.Id), Is.True);
         }
 
         [Test]

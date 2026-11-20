@@ -65,7 +65,10 @@ namespace RaidPartyManager.Presentation
             const float gap = 7f;
             float width = Mathf.Clamp(root.layout.width - 2 * margin, 0, Width);
             style.width = width;
-            RegisterCallback<GeometryChangedEvent>(_ => Place());
+            void Follow(GeometryChangedEvent _) => Place();
+            RegisterCallback<GeometryChangedEvent>(Follow);
+            anchor.RegisterCallback<GeometryChangedEvent>(Follow);
+            RegisterCallback<DetachFromPanelEvent>(_ => anchor.UnregisterCallback<GeometryChangedEvent>(Follow));
             root.Add(this);
             Place();
 

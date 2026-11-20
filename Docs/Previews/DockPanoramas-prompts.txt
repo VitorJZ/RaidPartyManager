@@ -1,0 +1,16 @@
+ImageGen — 弥雾码头环景绘制提示词
+
+共同绘制要求
+Game texture: ultrawide panoramic hand-painted theatrical backcloth, a single continuous horizontal landscape painting, frontal/elevation of distant scenery for a miniature wooden theatre. Compose as an extra wide landscape, aspect 5:1 or wider if possible. For fitting a cylindrical band keep the entire recognizable skyline, features and horizon in the narrow middle 27% of image height; outside that band only atmospheric sky above and receding ground/water below. All the way across include left, middle and right scenery, no division, no repeating panels, no vignette. Broad broken gouache brushstrokes on scenic canvas, softly distressed pigments and edges, stylised late 19th century dark fantasy harbour. Restrained contrast so foreground actors will read. No text, panels, frame, ribbons, pillars, curtains, stage, ceiling or audience. Deliver illustration edge to edge.
+
+Harbour.jpg
+Moonless night on a foggy working harbour. Weathered quayside warehouses, chimney silhouettes and a tiny amber lighthouse recede into inky blue-green haze across the distant shore. A few pinpoints of warm windows, navy-blue cloudy sky, grey teal water. No moon, no moon glow, no people, no foreground cranes, no boats crossing the foreground.
+
+Camp.jpg
+A quiet wooded inlet just beyond the docks. Rear silhouettes of spruce and pines, a distant glimmer of grey-green water and low nocturnal mist. A dark forest at blue hour. Breaks in the canopy and variation in tree heights across the whole band. No people, no fire, no fallen logs in the foreground, no moon.
+
+Town.jpg
+A rainy coastal port town at blue hour seen from across a quay. Uneven rooflines of timber warehouses, dormers, a few amber windows, faded harbour masts softened in lilac blue fog. Keep the distant skyline low and continuous. No foreground shops, no stalls, no people, no moon.
+
+Chandlery.jpg
+Inside a dockside chandlery, a continuous wall-length painted workshop interior with muted blue timber boards, high small windows looking out on foggy sea, hanging coils of rope, worn net floats and folded canvas on far shelves. Warm lamp accents and cool ambient blue. No shopkeeper, no people, no central foreground counter or foreground display case.

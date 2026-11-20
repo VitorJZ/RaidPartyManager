@@ -55,6 +55,22 @@ namespace RaidPartyManager.Presentation
         private Font localFont;
         private FontAsset localFontAsset;
         private EncounterData content;
+        [SerializeField] private BattleStageArt stageArt;
+        private BattleStage stage;
+        private DockEventStage eventStage;
+        private Action finishEventBattle;
+
+        internal void UseEventStage(DockEventStage venue, EncounterAsset data, BattleStageArt art,
+            Texture2D logPaper, Texture2D arrow, Action finish)
+        {
+            eventStage = venue;
+            encounter = data;
+            stageArt = art;
+            battleLogParchment = logPaper;
+            piercingArrowParticle = arrow;
+            finishEventBattle = finish;
+        }
+        private VisualElement stageAnchor;
         private Texture2D battleBackground;
         private PartyRun run;
         private PartyRun enemyRun;
@@ -166,6 +182,8 @@ namespace RaidPartyManager.Presentation
             statusTooltip?.Hide();
             HideEquipmentTooltip();
             PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
+            stage?.Dispose();
+            stage = null;
         }
 
         private void ResetDemo(bool reroll = false)
@@ -207,18 +225,25 @@ namespace RaidPartyManager.Presentation
             battleBackground = backgrounds.Length > 0 ? backgrounds[draftRandom.Next(backgrounds.Length)] : null;
             if (adventure != null)
                 battleBackground = backgrounds.FirstOrDefault(texture => texture.name.StartsWith("01-")) ?? battleBackground;
+            stage?.Dispose();
+            stage = null;
+            var scenery = stageArt != null ? stageArt.For(battleBackground) : null;
+            if (eventStage != null)
+                stage = eventStage.BattleCast(root,stageArt,PlaybackNow);
+            else if (scenery != null && Camera.main is { } sceneCamera)
+                stage = new BattleStage(transform, sceneCamera, root, stageArt, scenery, PlaybackNow);
             if (victoryRewards != null)
             {
                 phase = Phase.Settlement;
                 Render();
                 return;
             }
-            entrance.Add(run.CaptureFormation(Side.Party), content);
+            if (eventStage == null) entrance.Add(run.CaptureFormation(Side.Party), content, stage);
             enemyEntranceScheduled = false;
             RenderPreparation();
         }
 
-        private bool AutoStarts => adventure is { IsInspection: false };
+        private bool AutoStarts => eventStage != null || adventure is { IsInspection: false };
 
         private void RenderPreparation()
         {
@@ -229,7 +254,7 @@ namespace RaidPartyManager.Presentation
             }
             if (phase == Phase.Preparation && !enemyEntranceScheduled && CanPreviewEnemies())
             {
-                entrance.Add(preparedEnemies, content);
+                entrance.Add(preparedEnemies, content, stage);
                 enemyEntranceScheduled = true;
             }
             Render();
@@ -256,7 +281,7 @@ namespace RaidPartyManager.Presentation
 
             if (!enemyEntranceScheduled)
             {
-                entrance.Add(battle.Formation.Where(unit => unit.Side == Side.Enemy), content);
+                entrance.Add(battle.Formation.Where(unit => unit.Side == Side.Enemy), content, stage);
                 enemyEntranceScheduled = true;
             }
 
@@ -334,6 +359,10 @@ namespace RaidPartyManager.Presentation
             if (settingsOpenedAt.HasValue)
                 return;
 
+            // Entrance steps advance only when presented. Start the action clock after the curtain opens.
+            if (DockPlayhouse.Moving)
+                return;
+
             double now = PlaybackNow;
             if (entrance.Active)
                 entrance.Show(now, entranceLayer, unitCards);
@@ -398,6 +427,17 @@ namespace RaidPartyManager.Presentation
                 endingTeamWipe = false;
                 PrototypeSceneMenu.OpenStandalone("MainMenu");
             }
+        }
+
+        private void LateUpdate()
+        {
+            if (stage == null || root.layout.height <= 0) return;
+            // Keep the boards level with the feet even when the log or a large boss changes the layout.
+            var foot = stageAnchor?.worldBound ?? default;
+            float baseline = foot.height > 0 ? 1 - (foot.yMax - 3 - root.worldBound.yMin) / root.layout.height : .3f;
+            float focus = actionPlayback != null && visualAction.ActorId != null && unitCards.TryGetValue(visualAction.ActorId, out var actor)
+                ? (actor.BodyBounds.center.x - root.worldBound.center.x) / (root.layout.width * .5f) : 0;
+            stage.Update(PlaybackNow, baseline, focus, settingsOpenedAt.HasValue ? 0 : Time.unscaledDeltaTime);
         }
 
         private void AdvancePlayback(double now)
@@ -813,18 +853,21 @@ namespace RaidPartyManager.Presentation
             root.Clear();
             unitCards.Clear();
             energyBars.Clear();
-            root.style.backgroundColor = PrototypeStyle.Background;
+            root.style.backgroundColor = stage == null ? PrototypeStyle.Background : Color.clear;
             root.style.color = PrototypeStyle.Ink;
 
-            var backdrop = new VisualElement { name = "battle-background", pickingMode = PickingMode.Ignore };
-            PrototypeStyle.Fill(backdrop);
-            if (battleBackground != null)
+            if (stage == null)
             {
-                backdrop.style.backgroundImage = new StyleBackground(battleBackground);
-                backdrop.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
-                backdrop.style.unityBackgroundImageTintColor = new Color(0.78f, 0.78f, 0.78f, 1f);
+                var backdrop = new VisualElement { name = "battle-background", pickingMode = PickingMode.Ignore };
+                PrototypeStyle.Fill(backdrop);
+                if (battleBackground != null)
+                {
+                    backdrop.style.backgroundImage = new StyleBackground(battleBackground);
+                    backdrop.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                    backdrop.style.unityBackgroundImageTintColor = new Color(0.78f, 0.78f, 0.78f, 1f);
+                }
+                root.Add(backdrop);
             }
-            root.Add(backdrop);
 
             bool defeat = phase == Phase.Settlement && victoryRewards == null;
             bool setup = phase == Phase.Preparation || defeat;
@@ -849,7 +892,8 @@ namespace RaidPartyManager.Presentation
             page.verticalScroller.valueChanged += _ => HideEquipmentTooltip();
             page.contentContainer.style.flexGrow = 1;
             page.contentContainer.style.paddingTop = 8;
-            page.contentContainer.style.paddingLeft = page.contentContainer.style.paddingRight = 22;
+            page.contentContainer.style.paddingLeft = page.contentContainer.style.paddingRight =
+                stage == null ? new Length(22) : Length.Percent(stage.HasDockHouse ? 7.5f : 3.5f);
             root.Add(page);
 
             var arena = new VisualElement { name = "battlefield" };
@@ -886,6 +930,7 @@ namespace RaidPartyManager.Presentation
             opposingLines.Add(divider);
             opposingLines.Add(BuildLine(Side.Enemy, portraitHeight, showEnemies));
             arena.Add(opposingLines);
+            stageAnchor = opposingLines.Q("combatant-portrait");
             actionLayer = new VisualElement { name = "battle-action-layer", pickingMode = PickingMode.Ignore };
             PrototypeStyle.Fill(actionLayer);
             arena.Add(actionLayer);
@@ -906,6 +951,13 @@ namespace RaidPartyManager.Presentation
 
             var footer = BuildFooter(previousInspection);
             root.Add(footer);
+            if (stage != null)
+            {
+                var clearance = new VisualElement { name = "audience-clearance", pickingMode = PickingMode.Ignore };
+                clearance.style.height = Length.Percent(AudienceForeground.ClearancePercent);
+                clearance.style.flexShrink = 0;
+                root.Add(clearance);
+            }
             numberLayer = new VisualElement { name = "battle-number-layer", pickingMode = PickingMode.Ignore };
             PrototypeStyle.Fill(numberLayer);
             numberLayer.style.top = RunTopBar.Height;
@@ -961,7 +1013,7 @@ namespace RaidPartyManager.Presentation
                 if (adventure == null)
                     controls.Add(PrototypeStyle.Button("重置演练", "reset", () => ResetDemo(reroll: true), true));
                 else
-                    controls.Add(AdventureFlow.ReturnButton());
+                    controls.Add(PrototypeStyle.Button("返回事件选择", "return-event-select", AdventureFlow.ReturnFromNode));
             }
             return controls;
         }
@@ -1025,7 +1077,7 @@ namespace RaidPartyManager.Presentation
         private bool CanPreviewEnemies() =>
             run.Members.Any(member => member.Health > 0 && member.Character.Trait == CharacterTrait.RevealEnemies);
 
-        private static float PortraitHeight(int slots) => 185 + (slots - 1) * 28;
+        private static float PortraitHeight(int slots) => 174 + (slots - 1) * 28;
 
         private VisualElement BuildLine(Side side, float portraitHeight, bool showUnits = true)
         {
@@ -1103,7 +1155,8 @@ namespace RaidPartyManager.Presentation
             {
                 if (!battleSprites.TryGetValue(id, out sprite) || sprite.Sheet != illustration)
                     battleSprites[id] = sprite = new BattleSpriteView(illustration, content.BattleAttackFor(character.Id),
-                        character.Profession, position, side == Side.Enemy, usesPortrait: sheet == null);
+                        character.Profession, position, side == Side.Enemy, stage, usesPortrait: sheet == null);
+                sprite.Figure.Performer = new DockSet.Player(side == Side.Enemy, content.BattleWalkFor(character.Id), sheet);
                 sprite.style.top = 5 + portraitHeight - PortraitHeight(character.PositionSlots);
                 sprite.RemoveFromHierarchy();
             }
@@ -1400,10 +1453,9 @@ namespace RaidPartyManager.Presentation
                 return;
 
             leavingVictory = true;
-            if (adventure == null)
-                PrototypeSceneMenu.OpenStandalone("MainMenu");
-            else
-                AdventureFlow.ReturnFromNode();
+            if (finishEventBattle != null) finishEventBattle();
+            else if (adventure == null) PrototypeSceneMenu.OpenStandalone("MainMenu");
+            else AdventureFlow.ReturnFromNode();
         }
 
         private void RenderVictory()

@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 40ad37a155624f22b71350b7d60b8c62, type: 3}
+  m_Name: ServiceStageArt
+  m_EditorClassIdentifier: 
+  shader: {fileID: 4800000, guid: d2cd23da58bb46588491f23491ba94e7, type: 3}
+  campSky: {fileID: 2800000, guid: abad079608fc4e1f98770fbf8d83e3a8, type: 3}
+  bark: {fileID: 2800000, guid: 8c85e736f27a450285863002e870741c, type: 3}
+  endGrain: {fileID: 2800000, guid: 9525a78567064a318c01424339879a53, type: 3}
+  soil: {fileID: 2800000, guid: f02dec956a664651a12f8226ea7c7e78, type: 3}
+  townSky: {fileID: 2800000, guid: 0349d90e05f8476cad2515ead5459ce3, type: 3}
+  timber: {fileID: 2800000, guid: 963780983bc943638ddd8fa53d870b07, type: 3}
+  cobbles: {fileID: 2800000, guid: ae56cadf9e704d13bc6b975d15fe562d, type: 3}
+  counterFront: {fileID: 2800000, guid: c46f674be0a04579badf8b4332fe3d74, type: 3}
+  mooring: {fileID: 2800000, guid: 562fb0156c9a4eb5b4c0df13c0c0bee8, type: 3}
+  firewood: {fileID: 2800000, guid: 9d10c3b5d4fc4d9b94b9a98e34859676, type: 3}
+  parcel: {fileID: 2800000, guid: a3a7e5809add4595b83759e72ff53f78, type: 3}
+  creel: {fileID: 2800000, guid: 44f3d274e4544714bf25e5f01966c784, type: 3}
+  seatBack: {fileID: 2800000, guid: af94142bf2b8414ca9fe93bc961908e1, type: 3}
+  ferns: {fileID: 2800000, guid: 5d22633fb2b7487993a8811b24b6e0a3, type: 3}
+  facilities:
+  - {fileID: 2800000, guid: c6afdb3c25b24a20a1b6e152ff0ab0d7, type: 3}
+  - {fileID: 2800000, guid: 63384a64a40841a192689eed25a406ed, type: 3}
+  - {fileID: 2800000, guid: 3a6bc9d4be0549828a5d93d7ced6e711, type: 3}
+  - {fileID: 2800000, guid: 290ac25c3ee04d059f2fb40d2b015e73, type: 3}
+  residents:
+  - {fileID: 2800000, guid: 72f3b67f56534f87947ae33f56b34f48, type: 3}
+  - {fileID: 2800000, guid: 7abd4b904f984b85b9a7c12aad670c62, type: 3}
+  - {fileID: 2800000, guid: e60c790124f748dda3e6ddb61819ba5c, type: 3}
+  - {fileID: 2800000, guid: 8863a7f5792e4a3e94d6aa68a1f2a026, type: 3}

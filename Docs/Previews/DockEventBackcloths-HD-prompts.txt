@@ -1,0 +1,24 @@
+ImageGen 内置工具
+
+Generate ONE single high-resolution landscape illustration for an indie 2.5D theatrical game. Native output at maximum supported high resolution; target 3840 x 1280 (3:1 panoramic horizontal canvas). One continuous edge-to-edge painted scene, no collage, no stripes, no inset panels. It will be cropped to the central 44 percent of the height (final 6.8:1 panoramic backcloth), KEEP EVERY KEY FEATURE and its silhouette between y=29 and 71 percent; y above and below is spare soft atmosphere. All land and architectural elements are viewed at the same eye level, distant, an even straight low horizon, with restrained perspective, crisp hand-painted building and material details at the focus, softly faded faraway layers. The important landmark sits around x=50% to remain visible through the physical theatre opening. Let the background continue naturally on both sides, with carefully authored secondary silhouettes and subdued colors. Authored in layered matte scenic gouache on canvas, fine controlled bristle strokes and crisp edges, late 19th century misty fantasy seaport, muted slate blue, grey-green and browned timbers, isolated accents of warm amber, consistent directional dusk light. Calm value grouping behind game sprites, but with clear forms and readable architectural detail. Exclude characters, text, icons, stage frames and curtains, foreground furniture or objects, and camera effects.
+
+Alley.jpg
+A harbor service alley opening onto a misted canal, low stone and timber warehouses receding along left and right, wall lanterns and bollards in the distance, distant cranes faint against the central fog. Make the middle quiet but readable, with small moored masts and rows of weathered shuttered windows.
+
+Foundry.jpg
+The long stone and timber exterior of a working foundry on the docks, a single softly glowing brick furnace arch alongside old factory windows and flues, earthen bricks and cold iron. The central orange glow is modest and the distant roof and warehouse line extend on both sides.
+
+Laboratory.jpg
+A compact apothecary's old oak workshop wall, central multi-pane leaded window onto the misty docks, waist-high drawer fronts and matching side bays of dried botanicals, finely rendered copper instruments, bundled herbs and small labelled drawers without legible writing. Open space where the onstage alchemist and her portable desk will be placed. Use gentle warm rim lighting on the cabinetry, cool blue beyond the window.
+
+Pavilion.jpg
+A small old harlequin's fairground pavilion across the dockyard at purple dusk, with plum and brass painted canvas, stencilled pale stars, aged facades and wispy pennant lines. A modest decorative central tent elevation and peaceful background wings of harbour roofs. No foreground performance table, stage hardware, or people.
+
+SailLoft.jpg
+An extended dockside sail loft facade viewed from the wharf, repeating timber bays with handstitched cream sails hung up to dry, ropes, spars and quiet stone arches opening onto the harbour. Some ship masts show through the open bays. Keep the sail shapes small, evenly spaced, and subtle behind the game characters.
+
+TrialGate.jpg
+The trial grounds at the edge of a seaport, old low stone sea fortifications and a central rounded arch, a few weathered carmine flags above the parapet, distant waters and hazy headlands. Calm empty approach beyond the physical stage, small warm glows against slate-colored coastal stone.
+
+半圆幕两侧补绘参考各场景独立生成的原图
+Extend this individual theatrical backcloth horizontally into the dark blank wings. The input illustration in the middle is the reference for matching the exact horizon, dawn/dusk palette and brushwork. Reproduce the existing middle scene in place, at the same scale and coordinates, as accurately as possible. Fill the left and right blank areas with architecture or distant scenery that physically continues outward from the edge pixels of the central painting. Fill the blank top and bottom with the sky or wall and far ground or water that naturally continues from the existing art. Full bleed single continuous image on a 3:1 horizontal canvas. This will be used for widescreen 180-degree curved stage décor, so the entire x axis is needed. No extra landmark, lettering or characters. No thick frame, no divider and no repeated main building. The center is at the coordinates from the input, with the quiet extensions to its two sides.

@@ -26,8 +26,8 @@ namespace RaidPartyManager.Presentation
         private readonly double poseStart;
         private readonly double releaseAt;
         private readonly double returnAt;
-        private readonly Image movingImage;
-        private readonly Image standingPose;
+        private readonly StageActorImage movingImage;
+        private readonly StageActorImage standingPose;
         private readonly MeteorPlayback meteor;
         private readonly PiercingArrowPlayback piercingArrow;
 
@@ -87,10 +87,10 @@ namespace RaidPartyManager.Presentation
                     return (hit.TargetId, hit.Detail == "未命中", view);
                 }).ToArray();
             if (walkSheet != null)
-                movingImage = MakeImage("battle-moving-character");
+                movingImage = MakeActor("battle-moving-character");
             if (walkSheet == null && sprite?.HasWideAttack == true && (kind != ActionKind.Shield || special != null))
             {
-                standingPose = MakeImage("battle-attack-pose");
+                standingPose = MakeActor("battle-attack-pose");
                 sprite.SetBodyVisible(false, keepLocalEffects: true);
             }
             if (walkSheet != null)
@@ -171,7 +171,7 @@ namespace RaidPartyManager.Presentation
                 return;
             }
             SetImage(standingPose, (Texture2D)sprite.Figure.image, sprite.Figure.sourceRect);
-            standingPose.tintColor = sprite.Figure.tintColor;
+            standingPose.SetInk(sprite.Figure.Ink);
             var size = sprite.PoseSize(source.size);
             SetBounds(standingPose, new Rect(source.center.x - size.x * 0.5f, source.yMax - size.y, size.x, size.y));
             Attach(layer, standingPose);
@@ -222,12 +222,12 @@ namespace RaidPartyManager.Presentation
                     int height = walkSheet.height / 2;
                     SetImage(movingImage, walkSheet, new Rect(index % 3 * width, index / 3 * height, width, height));
                 }
-                movingImage.tintColor = Color.white;
+                movingImage.SetInk(Color.white);
             }
             else
             {
                 SetImage(movingImage, (Texture2D)sprite.Figure.image, sprite.Figure.sourceRect);
-                movingImage.tintColor = sprite.Figure.tintColor;
+                movingImage.SetInk(sprite.Figure.Ink);
                 size = sprite.PoseSize(source.size);
                 if (sprite.UsesPortrait)
                 {
@@ -238,6 +238,16 @@ namespace RaidPartyManager.Presentation
             float orientation = (now >= returnAt ? -direction : direction) * (sprite.FacesLeft ? -1f : 1f);
             movingImage.style.scale = new Scale(new Vector3(orientation, 1f, 1f));
             SetBounds(movingImage, new Rect(x - size.x * 0.5f, source.yMax - size.y - lift, size.x, size.y));
+        }
+
+        private StageActorImage MakeActor(string name)
+        {
+            var view = new StageActorImage(sprite.Stage, true)
+            {
+                name = name, pickingMode = PickingMode.Ignore, scaleMode = ScaleMode.StretchToFill
+            };
+            view.style.position = Position.Absolute;
+            return view;
         }
 
         private static Image MakeImage(string name)

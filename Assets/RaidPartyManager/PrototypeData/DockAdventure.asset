@@ -45,9 +45,9 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 1cbd634b6eb54eca85d11f95fe180e1e, type: 3}
   - {fileID: 2800000, guid: 9f5c47c1683f46709a441a28a27c2128, type: 3}
   - {fileID: 2800000, guid: 628e7cce474c44c5882c3dd764bb910b, type: 3}
-  - {fileID: 2800000, guid: 19e3444facb24303a8f46ed1ed045336, type: 3}
+  - {fileID: 2800000, guid: cac0df6d10634468b3ae7770edd30a47, type: 3}
   - {fileID: 2800000, guid: 46522b5c4d034260b2e1904b4ac78b4c, type: 3}
   routeSignpost: {fileID: 2800000, guid: 881b3c0273844bed98dd2122e15c5206, type: 3}
-  chestClosed: {fileID: 2800000, guid: 7b2995bb94954a7daeb469559101b276, type: 3}
-  chestAjar: {fileID: 2800000, guid: c2a364e5794b48618cf5617cabeb05d5, type: 3}
-  chestOpen: {fileID: 2800000, guid: e493e5fc1f85400cba25fc220f74d09f, type: 3}
+  chestClosed: {fileID: 2800000, guid: 69e7f4f84c8d4a64a758d455b16b07f8, type: 3}
+  chestAjar: {fileID: 2800000, guid: 574fad475c5f4867b754add591d49409, type: 3}
+  chestOpen: {fileID: 2800000, guid: 392468f64b5741ceb3350fb3a156c9ec, type: 3}

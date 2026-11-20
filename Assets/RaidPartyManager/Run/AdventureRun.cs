@@ -111,6 +111,19 @@ namespace RaidPartyManager.Run
         public int Price { get; }
         public bool Sold { get; internal set; }
         internal AdventureShopOffer(EquipmentDefinition item, int price) { Item = item; Price = price; }
+
+        // Books have a shop value independent of their battle reward definition.
+        public static int BasePrice(EquipmentDefinition item) => item is SkillBookDefinition ?
+            item.Tier switch { 1 => 35, 2 => 25, 3 => 15, _ => 0 } : item.Price;
+
+        public static IReadOnlyList<AdventureShopOffer> Draw(IEnumerable<EquipmentDefinition> catalogue, Random random, bool discount)
+        {
+            var stock = catalogue.Where(e => BasePrice(e) > 0).GroupBy(e => e.Id).Select(g => g.First()).ToArray();
+            var choices = stock.Where(e => e.Tier == 1).OrderBy(_ => random.Next()).Take(2)
+                .Concat(stock.Where(e => e.Tier is 2 or 3).OrderBy(_ => random.Next()).Take(2)).OrderBy(_ => random.Next());
+            return choices.Select(e => new AdventureShopOffer(e, (int)Math.Ceiling(
+                Math.Ceiling(BasePrice(e) * (.7 + random.NextDouble() * .6)) * (discount ? .5 : 1)))).ToArray();
+        }
     }
 
     public sealed class AwayCompanion
@@ -197,6 +210,7 @@ namespace RaidPartyManager.Run
         private Random random;
         private readonly CharacterDefinition[] characters;
         private readonly EquipmentDefinition[] equipment;
+        private readonly EquipmentDefinition[] shopCatalogue;
         private readonly EquipmentDefinition[] battleLoot;
         private readonly EquipmentDefinition[] treasureLoot;
         private readonly HashSet<int> investorFloors = new HashSet<int>();
@@ -234,6 +248,7 @@ namespace RaidPartyManager.Run
             Party = party ?? throw new ArgumentNullException(nameof(party));
             this.characters = characters.Where(c => c.RosterNumber > 0).ToArray();
             var items = equipment.GroupBy(e => e.Id).Select(g => g.First()).ToArray();
+            shopCatalogue = items;
             this.equipment = items.Where(e => e.Tier >= 0 && e.Price > 0).ToArray();
             battleLoot = items.Where(e => e.CanDropInBattle).ToArray();
             treasureLoot = items.Where(e => !e.IsPotion && e.Tier is >= 1 and <= 3).ToArray();
@@ -283,7 +298,7 @@ namespace RaidPartyManager.Run
                     Kind = node.Kind, Fork = node.IsFork, Replaces = node.Replaces.HasValue ? (int)node.Replaces.Value : -1,
                     AlternativePlusOne = node.Alternative.HasValue ? (int)node.Alternative.Value + 1 : 0
                 }).ToArray(),
-                Options = routeOptions?.ToArray(), Current = new CheckpointStop(RouteCurrent),
+                Options = routeOptions?.ToArray(), FollowingOptions = followingOptions?.ToArray(), Current = new CheckpointStop(RouteCurrent),
                 Previous = new CheckpointStop(RoutePrevious.GetValueOrDefault()), HasPrevious = RoutePrevious.HasValue,
                 Choice = choice, FinishVisit = finishVisit,
                 Away = away.Select(companion => new CheckpointCompanion
@@ -311,6 +326,7 @@ namespace RaidPartyManager.Run
                 FloorCleared = saved.FloorCleared, Failed = saved.Failed, QuestActive = saved.QuestActive, QuestWins = saved.QuestWins,
                 ReturnMessage = saved.ReturnMessage ?? "", Route = new DockRoute(saved.Nodes),
                 RouteCurrent = saved.Current.Restore(), RoutePrevious = saved.HasPrevious ? saved.Previous.Restore() : (RouteStop?)null,
+                followingOptions = saved.FollowingOptions is { Length: > 0 } ? saved.FollowingOptions : null,
                 routeOptions = saved.Options is { Length: > 0 } ? saved.Options : null,
                 random = new Random(saved.Seed)
             };
@@ -354,6 +370,39 @@ namespace RaidPartyManager.Run
 
         public IReadOnlyList<NodeKind> RouteOptions => routeOptions ??=
             Route.Options(Stage, eventsTaken, elitesTaken, random);
+
+        private IReadOnlyList<NodeKind> followingOptions;
+
+        public bool CanChooseFollowing => !IsInspection && !Failed && Stage < DockRoute.Stages &&
+            RouteDestination.HasValue && Current != null && (Current.Resolved ||
+                Current.Kind is NodeKind.Camp or NodeKind.Shop or NodeKind.Town);
+
+        public IReadOnlyList<NodeKind> FollowingOptions => CanChooseFollowing
+            ? followingOptions ??= Route.Options(Stage + 1, eventsTaken, elitesTaken, random)
+            : Array.Empty<NodeKind>();
+
+        public RouteStop FollowingChoice(int index)
+        {
+            var options = FollowingOptions;
+            int lane = RouteDestination.Value.Lane + (options.Count > 1 ? (index == 0 ? -1 : 1) : 0);
+            return new RouteStop(Stage + 1, lane, options[index]);
+        }
+
+        public bool EnterFollowing(int index)
+        {
+            var options = FollowingOptions;
+            if (index < 0 || index >= options.Count ||
+                options[index] is (NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss) && !Party.CanStartBattle)
+                return false;
+            return Leave() && EnterRoute(index);
+        }
+
+        public bool DeclineEvent()
+        {
+            if (Current?.Kind != NodeKind.Event || Current.Resolved || Current.Battle != null) return false;
+            Finish("你向对方道了别，准备赶路。");
+            return true;
+        }
 
         public RouteStop RouteChoice(int index)
         {
@@ -470,7 +519,7 @@ namespace RaidPartyManager.Run
                 var second = PickItem(1, new[] { first.Id });
                 Party.AddEquipment(first); Party.AddEquipment(second);
                 InvestmentPaid = true;
-                Finish($"创业者在账本上划下最后一笔。临走前，他送给你{first.Name}和{second.Name}。");
+                Finish($"创业者在账本上划下最后一笔。临走前，她送给你{first.Name}和{second.Name}。");
             }
             else Finish($"创业者接过 {amount} 枚金币，把你的名字记在账本上。“改日再来看看船吧。”");
             return true;
@@ -841,11 +890,8 @@ namespace RaidPartyManager.Run
 
         private IReadOnlyList<AdventureShopOffer> CreateStock()
         {
-            var choices = equipment.Where(e => e.Tier == 1).OrderBy(_ => random.Next()).Take(2)
-                .Concat(equipment.Where(e => e.Tier is 2 or 3).OrderBy(_ => random.Next()).Take(2)).OrderBy(_ => random.Next());
             bool discount = Party.Members.Any(m => !m.IsAway && m.Health > 0 && m.Character.Trait == CharacterTrait.ShopDiscount);
-            return choices.Select(e => new AdventureShopOffer(e, (int)Math.Ceiling(
-                Math.Ceiling(e.Price * (0.7 + random.NextDouble() * 0.6)) * (discount ? 0.5 : 1)))).ToArray();
+            return AdventureShopOffer.Draw(shopCatalogue, random, discount);
         }
 
         public bool Leave()
@@ -878,7 +924,8 @@ namespace RaidPartyManager.Run
                 else Stage++;
             }
             nodeCheckpoint = null;
-            routeOptions = null;
+            routeOptions = followingOptions;
+            followingOptions = null;
         }
 
         public void AdvanceInspection()

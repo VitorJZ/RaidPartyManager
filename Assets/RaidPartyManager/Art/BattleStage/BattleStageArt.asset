@@ -1,0 +1,101 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0c85397883ca424c96d966e7af3c113e, type: 3}
+  m_Name: BattleStageArt
+  m_EditorClassIdentifier: 
+  paperShader: {fileID: 4800000, guid: 5b7473da159a45979217b9c125faef49, type: 3}
+  drapery: {fileID: 2800000, guid: b5e7af09da9e4d81a03d2709daeb8896, type: 3}
+  mooring: {fileID: 2800000, guid: 562fb0156c9a4eb5b4c0df13c0c0bee8, type: 3}
+  creel: {fileID: 2800000, guid: 44f3d274e4544714bf25e5f01966c784, type: 3}
+  seatBack: {fileID: 2800000, guid: af94142bf2b8414ca9fe93bc961908e1, type: 3}
+  apronWood: {fileID: 2800000, guid: 963780983bc943638ddd8fa53d870b07, type: 3}
+  breakers: {fileID: 2800000, guid: 9031e200d3f0428fa5602e5416b25376, type: 3}
+  sets:
+  - region: {fileID: 2800000, guid: d1538346d12e4d88888e19ea36f54969, type: 3}
+    moored: 1
+    backcloth: {fileID: 2800000, guid: 3c93ef7b2e1645269b64cf2651368f45, type: 3}
+    floor: {fileID: 2800000, guid: 963780983bc943638ddd8fa53d870b07, type: 3}
+    upstage: {fileID: 2800000, guid: 7f9f2b7c0d13401a924e64d2300d2257, type: 3}
+    leftWing: {fileID: 2800000, guid: 90d96d7a8bb747e092f220dd959088a5, type: 3}
+    rightWing: {fileID: 2800000, guid: 10de0bd01a02464d96be2366ae3588dd, type: 3}
+  - region: {fileID: 2800000, guid: 959ef6380f0a43a49442d609a5ac103d, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: a966614cec324de1a3423ce01f8ca2e4, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: db8158419c0e4d9c944aa1151f3fffc6, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: 7cc1f95ae61e4d58b588abe5b68fabc8, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: c05348e0fd3740489c6d003ac711677b, type: 3}
+    backcloth: {fileID: 2800000, guid: 86013047caba450ba1dc9906b17e30e5, type: 3}
+    floor: {fileID: 2800000, guid: ae56cadf9e704d13bc6b975d15fe562d, type: 3}
+    upstage: {fileID: 2800000, guid: f68fad52db2249b9a3e610b2f478b3e0, type: 3}
+    leftWing: {fileID: 2800000, guid: 0a1af8b43b1641dd9e7eb00f15370b85, type: 3}
+    rightWing: {fileID: 2800000, guid: e32a25d96a2c44a5b08f5d5e7ff99195, type: 3}
+  - region: {fileID: 2800000, guid: 8e15373ee1a546ef8016103ff4108a60, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: c19d9a28623e4270a1587515e48dcbbd, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: f553d855539e49f7b139191c929ff801, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: 3cfd324695374f4bb699844ed0ecf06b, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: 2685ca8f113f4b78937d1103236ff82f, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: 06a17501538d4a19ae5784e674bdbe0a, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: 02b84dc5c28c4388960f6ca8aa426f23, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: f6163df1d4824d46bf7464bff6c79a1f, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: dc7475de3abf4d64ae13a6d94eb48c28, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: 66cdc4909fab4ba58b2bde012181bb16, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: 7b11c8f942914a1e85a1876c04515f3d, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: afcf819fa7ac4bf4b331f195ab54e73d, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: 6ad9638923b6473fb85d8bd4121f12bd, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: 7aa87389104f41cea1ee3acd9e9ce1ff, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: 7c1aafeac067405899669a99319276ab, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: 91049ed1de1a4fbda3799711bc845a8b, type: 3}
+    rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: 855c7c44eb2b469ab565c0083f80aa7c, type: 3}
+    backcloth: {fileID: 0}
+    floor: {fileID: 0}
+    upstage: {fileID: 0}
+    leftWing: {fileID: 2800000, guid: 8dba722ed4084cd7a529652c9098d163, type: 3}
+    rightWing: {fileID: 0}

@@ -22,7 +22,7 @@ namespace RaidPartyManager.Presentation
             public readonly bool UsesPortrait;
             public int DisplayedFrame = -1;
 
-            public Arrival(Combatant unit, EncounterData content, double start)
+            public Arrival(Combatant unit, EncounterData content, double start, BattleStage stage)
             {
                 Unit = unit;
                 Start = start;
@@ -30,9 +30,9 @@ namespace RaidPartyManager.Presentation
                 var art = content.BattleSpriteFor(unit.Character.Id);
                 UsesPortrait = content.BattlePortraitFor(unit.Character.Id) != null;
                 if (WalkSheet == null && art != null)
-                    Figure = new EntranceWalkPose(art, unit.Character.Profession, unit.Side == Side.Enemy);
+                    Figure = new EntranceWalkPose(art, unit.Character.Profession, unit.Side == Side.Enemy, stage);
                 else
-                    Figure = new Image
+                    Figure = new StageActorImage(stage, true)
                     {
                         image = WalkSheet ?? content.PortraitFor(unit.Character.Id),
                         scaleMode = WalkSheet != null ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit,
@@ -49,11 +49,11 @@ namespace RaidPartyManager.Presentation
         public bool Active => arrivals.Count > 0;
         public bool EnemyEntrancePending => arrivals.Any(arrival => arrival.Unit.Side == Side.Enemy);
 
-        public void Add(IEnumerable<Combatant> team, EncounterData content)
+        public void Add(IEnumerable<Combatant> team, EncounterData content, BattleStage stage)
         {
             var lineup = team.Where(unit => unit.Health > 0).OrderBy(unit => unit.Position).ToArray();
             for (int i = 0; i < lineup.Length; i++)
-                arrivals.Add(new Arrival(lineup[i], content, clock + i * Stagger));
+                arrivals.Add(new Arrival(lineup[i], content, clock + i * Stagger, stage));
         }
 
         public void Show(double now, VisualElement layer, IReadOnlyDictionary<string, BattleUnitCard> cards)

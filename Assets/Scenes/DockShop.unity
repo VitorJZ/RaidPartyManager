@@ -241,6 +241,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 29928fbcaccc4305a364cd4c0c2f8105, type: 3}
   m_Name:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.DockShop
+  stageArt: {fileID: 11400000, guid: 4cd3bc80cc27484fbd1549bdc64f63cb, type: 2}
   encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
   stockPool:
   - {fileID: 11400000, guid: 756e87ec389e6924f86f5145ab2e62cc, type: 2}
@@ -287,11 +288,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d2d66e38aa9b4238a8977bbd3883c621, type: 2}
   - {fileID: 11400000, guid: 2523c9e00295452d8867c80a33f74a8e, type: 2}
   - {fileID: 11400000, guid: 081aa91af2c9425479f445860d02712f, type: 2}
-  backdrop: {fileID: 2800000, guid: 6f4b1e3a26ab417db0f9a6eb9cf39b9d, type: 3}
-  merchantSheet: {fileID: 2800000, guid: ad486e4fb3564fa1be503ce9f705ef5e, type: 3}
-  merchantLaugh: {fileID: 2800000, guid: 3655b8b019bb4d4095660ae6274f7557, type: 3}
-  shelfArtwork: {fileID: 2800000, guid: 6142aef10a5942e097a115dd39233248, type: 3}
-  counterArtwork: {fileID: 2800000, guid: 93c0239008de4a23a1992bf9f611a927, type: 3}
+  backdrop: {fileID: 2800000, guid: f43046f4208542ba90a66d72230e39d7, type: 3}
+  merchantReactions: {fileID: 2800000, guid: eb808c08f0d04453b327e5567f16ddd2, type: 3}
 --- !u!114 &1741968123
 MonoBehaviour:
   m_ObjectHideFlags: 0

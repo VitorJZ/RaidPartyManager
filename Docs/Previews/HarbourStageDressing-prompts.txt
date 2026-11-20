@@ -1,0 +1,16 @@
+ImageGen · transparent stage flats
+
+Shared direction
+Hand-painted 2.5D harbour theatre scenery cutout for a dark fantasy game. Single, isolated wide grounded prop viewed nearly straight on, with just a little of its top visible. Restrained gouache on painted plywood, broad brush strokes, simplified edges, sea-worn muted browns, charcoal outlines, gentle upper-left light. Low contrast, readable at 65 pixels. No text, bright glints, glow, ground plane, scenery, cast shadow, pole extending off canvas, or character. Genuine transparent background and clean external alpha edge.
+
+Mooring.png
+One stout, very short tarred timber mooring bollard, broad coil of thick hemp running off its base to the right. Low asymmetrical silhouette.
+
+Firewood.png
+A low horizontal hand-tied bundle of six split billets of firewood. One barky end juts out, dark cinnamon bark, straw rope and a few muted ochre cut ends.
+
+Parcel.png
+A small merchant's stack: one rectangular parcel wrapped in faded indigo sailcloth and tied with two straps, a shorter ochre canvas parcel leaning against it. One cohesive grounded cluster.
+
+Creel.png
+A squat, broad old wicker fisherman's creel, its heavy faded olive-green fishing net draped over one side, two dark cork floats. Low asymmetrical silhouette.

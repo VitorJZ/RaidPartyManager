@@ -244,6 +244,7 @@ MonoBehaviour:
   encounter: {fileID: 11400000, guid: 581ddb5b18905f3bb1cab24defcc61e9, type: 2}
   battleLogParchment: {fileID: 2800000, guid: 4e047520344d41258ad09562525ee5fb, type: 3}
   piercingArrowParticle: {fileID: 2800000, guid: 6a0a3a3ba12e4829a4524b68cc749620, type: 3}
+  stageArt: {fileID: 11400000, guid: c4d4b7ce4d5b476c849a305eb7830cfa, type: 2}
   battleBackgrounds:
   - {fileID: 2800000, guid: c05348e0fd3740489c6d003ac711677b, type: 3}
   randomizeLineups: 1

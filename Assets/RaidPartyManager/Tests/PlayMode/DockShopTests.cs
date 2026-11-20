@@ -3,6 +3,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using NUnit.Framework;
+using RaidPartyManager.Content;
+using RaidPartyManager.Domain;
+using RaidPartyManager.Run;
 using RaidPartyManager.Presentation;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -46,73 +49,99 @@ namespace RaidPartyManager.Tests
             foreach (var view in offers)
             {
                 var item = OfferItem(shop, view);
-                int basePrice = (int)item.GetType().GetProperty("ShopPrice").GetValue(item);
+                int basePrice = AdventureShopOffer.BasePrice(item);
                 Assert.That(Price(view), Is.InRange((int)System.Math.Ceiling(basePrice * 0.7),
                     (int)System.Math.Ceiling(basePrice * 1.3)));
             }
-            Assert.That(root.Query<Label>("shop-item-name").ToList().Select(label => label.text).Distinct().Count(),
-                Is.EqualTo(4));
-            Assert.That(root.Q("shop-offer-0").worldBound.center.y,
-                Is.EqualTo(root.Q("shop-offer-1").worldBound.center.y).Within(1f));
-            Assert.That(root.Q("shop-offer-2").worldBound.center.y,
-                Is.GreaterThan(root.Q("shop-offer-0").worldBound.center.y));
+            Assert.That(root.Q("shop-item-name"), Is.Null);
+            Assert.That(offers.Select(view => OfferItem(shop, view).Id).Distinct().Count(), Is.EqualTo(4));
+            Assert.That(offers.Select(v => v.worldBound.center.x), Is.Ordered);
+            var stage = shop.transform.Find("Service theatre");
+            Assert.That(stage.Find("shop-merchant").position.x, Is.Zero.Within(.01f));
+            Assert.That(stage.Find("Cabinet back"), Is.Null);
 
             ConfigureLowerTierStock(shop);
             root = shop.GetComponent<UIDocument>().rootVisualElement;
             yield return null;
-            var merchant = root.Q<Image>("shop-merchant");
-            var sheet = merchant.image;
-            var laugh = (Texture2D)typeof(DockShop).GetField("merchantLaugh", Private).GetValue(shop);
+            var merchant = shop.transform.Find("Service theatre/shop-merchant").GetComponent<MeshRenderer>();
+            float restY = merchant.transform.position.y;
+            var sheet = ((ServiceStageArt)typeof(DockShop).GetField("stageArt", Private).GetValue(shop)).residents[1];
+            var faces = (Texture2D)typeof(DockShop).GetField("merchantReactions", Private).GetValue(shop);
             Assert.That(sheet, Is.Not.Null);
-            Assert.That(laugh, Is.Not.Null);
-            Assert.That(laugh, Is.Not.SameAs(sheet));
-            Assert.That(merchant.sourceRect.x, Is.Zero);
+            Assert.That(faces, Is.Not.Null);
+            Assert.That(faces, Is.Not.SameAs(sheet));
+            Move(root, root.worldBound.min + Vector2.one * 2);
+            AssertFace(merchant, sheet, 4);
             var high = OfferViews(root).First(view => OfferTier(shop, view) == 1);
             var medium = OfferViews(root).Single(view => OfferTier(shop, view) == 2);
             var low = OfferViews(root).Single(view => OfferTier(shop, view) == 3);
             int price = Price(high);
             Enter(high);
-            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width * 2).Within(0.1f));
+            AssertFace(merchant, faces, 3, 1);
             Enter(medium);
-            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
+            AssertFace(merchant, faces, 3, 0);
             Enter(low);
-            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
+            AssertFace(merchant, faces, 3, 0);
 
+            var bob = stage.Find("Hanging stock " + high.name.Split('-').Last());
+            var cord = stage.Find("Hemp line " + high.name.Split('-').Last());
+            void AssertTagOnRope()
+            {
+                var tag = high.Q<Label>("shop-item-price");
+                var expected = bob.position + bob.up * (.83f * .43f) + cord.up * .29f;
+                var uv = Camera.main.WorldToViewportPoint(expected);
+                var panelPoint = root.worldBound.min + Vector2.Scale(root.worldBound.size, new Vector2(uv.x, 1-uv.y));
+                Assert.That(Vector2.Distance(tag.worldBound.center, panelPoint), Is.LessThan(5));
+                Assert.That(tag.resolvedStyle.visibility, Is.EqualTo(Visibility.Visible));
+            }
+            var rest = bob.position;
+            AssertTagOnRope();
             Down(high);
-            Assert.That(root.Q("shop-drag-preview"), Is.Not.Null);
             Vector2 blank = root.worldBound.min + Vector2.Scale(root.worldBound.size, new Vector2(0.51f, 0.94f));
             Move(root, blank);
+            Assert.That(Vector3.Distance(bob.position, rest), Is.GreaterThan(.3f));
+            yield return null; yield return null;
+            AssertTagOnRope();
             Up(root, blank);
-            Assert.That(root.Q("shop-drag-preview"), Is.Null);
-            Assert.That(high.Q("shop-sold"), Is.Null);
+            float firstSide = Mathf.Sign(bob.position.y - rest.y);
+            int crossings = 0;
+            float deadline = Time.unscaledTime + 1.65f;
+            while (Time.unscaledTime < deadline)
+            {
+                float dy = bob.position.y - rest.y;
+                if (Mathf.Abs(dy) > .008f && Mathf.Sign(dy) != firstSide) { firstSide = Mathf.Sign(dy); crossings++; }
+                yield return null;
+            }
+            Assert.That(crossings, Is.GreaterThanOrEqualTo(2));
+            Assert.That(Vector3.Distance(bob.position, rest), Is.LessThan(.004f));
+            Assert.That(bob.gameObject.activeSelf, Is.True);
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  999"));
-            Assert.That(merchant.sourceRect.x, Is.Zero);
+            AssertFace(merchant, sheet, 4);
             Assert.That(Price(high), Is.EqualTo(price), "Hovering and cancelling a drag must keep the displayed price.");
 
             Down(high);
             Vector2 counter = root.Q("shop-checkout").worldBound.center;
             Move(root, counter);
             Up(root, counter);
-            Assert.That(high.Q("shop-sold"), Is.Not.Null);
+            Assert.That(bob.gameObject.activeSelf, Is.False);
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo($"金币  {999 - price}"));
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 1));
             Assert.That(root.Q<Label>("shop-feedback").text, Does.Contain("共享背包"));
-            Assert.That(merchant.image, Is.SameAs(laugh));
-            Assert.That(merchant.sourceRect, Is.EqualTo(new Rect(0, 0, laugh.width, laugh.height)));
+            AssertFace(merchant, faces, 3, 2);
             Enter(medium);
-            Assert.That(merchant.image, Is.SameAs(laugh));
+            AssertFace(merchant, faces, 3, 2);
 
             yield return new WaitForSecondsRealtime(0.12f);
-            Assert.That(Mathf.Abs(root.Q("shop-merchant-stage").resolvedStyle.translate.y), Is.GreaterThan(0.05f));
+            Assert.That(Mathf.Abs(merchant.transform.position.y-restY), Is.GreaterThan(0.004f));
             yield return new WaitForSecondsRealtime(1.1f);
-            Assert.That(root.Q("shop-merchant-stage").resolvedStyle.translate.y, Is.EqualTo(0f).Within(0.01f));
-            Assert.That(merchant.image, Is.SameAs(sheet));
-            Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f));
+            Assert.That(cord.localScale.y * 2, Is.LessThan(.31f));
+            Assert.That(merchant.transform.position.y, Is.EqualTo(restY).Within(0.01f));
+            AssertFace(merchant, faces, 3, 0);
 
             Down(low);
             Move(root, counter);
             Up(root, counter);
-            Assert.That(merchant.image, Is.SameAs(laugh));
+            AssertFace(merchant, faces, 3, 2);
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 2));
             Press(root, "open-settings");
             Press(root, "return-main-menu");
@@ -129,55 +158,75 @@ namespace RaidPartyManager.Tests
             yield return null;
             var shop = Object.FindAnyObjectByType<DockShop>();
             ConfigureLowerTierStock(shop, "MurkyWater", "Bludgeon");
-            var document = shop.GetComponent<UIDocument>();
-            var originalSettings = document.panelSettings;
-            var settings = Object.Instantiate(originalSettings);
-            var target = new RenderTexture(1280, 720, 0, RenderTextureFormat.ARGB32);
+            yield return null;
+            var root = shop.GetComponent<UIDocument>().rootVisualElement;
+            float until = Time.realtimeSinceStartup + 4;
+            while (root.Q("curtain-input-shield") != null && Time.realtimeSinceStartup < until) yield return null;
+            Assert.That(root.Q("curtain-input-shield"), Is.Null);
+            var merchant = shop.transform.Find("Service theatre/shop-merchant").GetComponent<MeshRenderer>();
+            var camera = Camera.main;
+            var target = new RenderTexture(1280,720,24);
             target.Create();
-            settings.targetTexture = target;
-            settings.scaleMode = PanelScaleMode.ConstantPixelSize;
-            settings.scale = 1;
-            document.panelSettings = settings;
+            var sheet = ((ServiceStageArt)typeof(DockShop).GetField("stageArt", Private).GetValue(shop)).residents[1];
+            var faces = (Texture2D)typeof(DockShop).GetField("merchantReactions", Private).GetValue(shop);
+            // Compare the actual rendered face from a fixed camera position, independent of pointer parallax.
+            var originalTarget = camera.targetTexture;
+            camera.targetTexture = target;
+            yield return null;
+            var pose = (camera.transform.position,camera.transform.rotation);
+            Color32[] FacePixels()
+            {
+                var pos = camera.transform.position;
+                var rot = camera.transform.rotation;
+                try
+                {
+                    camera.transform.SetPositionAndRotation(pose.position,pose.rotation);
+                    camera.Render();
+                    var uv = camera.WorldToViewportPoint(merchant.bounds.center+Vector3.up*.66f);
+                    return ReadFace(target,new Rect(uv.x*target.width-65,(1-uv.y)*target.height-55,130,110));
+                }
+                finally
+                {
+                    camera.transform.SetPositionAndRotation(pos,rot);
+                }
+            }
             try
             {
-                yield return new WaitForSecondsRealtime(0.15f);
-                var root = document.rootVisualElement;
-                var merchant = root.Q<Image>("shop-merchant");
-                var bounds = merchant.worldBound;
-                var face = new Rect(bounds.x + bounds.width * 0.25f,
-                    bounds.y + bounds.height * 0.08f, bounds.width * 0.5f, bounds.height * 0.42f);
-                var idle = ReadFace(target, face);
+                Move(root, root.worldBound.min + Vector2.one * 2);
+                AssertFace(merchant, sheet, 4);
+                var idle = FacePixels();
                 var high = OfferViews(root).First(view => OfferTier(shop, view) == 1);
                 Color32[] happy = null;
                 foreach (string item in new[] { "浑浊的水", "打狗棒" })
                 {
-                    var offer = OfferViews(root).Single(view => view.Q<Label>("shop-item-name").text == item);
+                    var offer = OfferViews(root).Single(view => OfferItem(shop, view).Name == item);
                     Move(root, offer.worldBound.center);
-                    yield return new WaitForSecondsRealtime(0.1f);
-                    Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width).Within(0.1f), item);
-                    happy = ReadFace(target, face);
+                    Assert.That(root.Q<Label>("equipment-tooltip-name").text, Does.Contain(item));
+                    AssertFace(merchant,faces,3,0);
+                    happy = FacePixels();
                     Assert.That(ChangedPixels(idle, happy), Is.GreaterThan(idle.Length / 50), item);
-                    Move(root, new Vector2(650, 690));
-                    yield return new WaitForSecondsRealtime(0.1f);
-                    Assert.That(ChangedPixels(idle, ReadFace(target, face)), Is.LessThan(idle.Length / 200), item);
+                    Move(root, root.worldBound.min + Vector2.one*2);
+                    Assert.That(ChangedPixels(idle, FacePixels()), Is.LessThan(idle.Length / 200), item);
                 }
                 Enter(high);
-                yield return new WaitForSecondsRealtime(0.1f);
-                Assert.That(merchant.sourceRect.x, Is.EqualTo(merchant.sourceRect.width * 2).Within(0.1f));
-                var delighted = ReadFace(target, face);
-                Assert.That(ChangedPixels(happy, delighted), Is.GreaterThan(idle.Length / 50));
-                Move(root, new Vector2(650, 690));
-                yield return new WaitForSecondsRealtime(0.1f);
-                Assert.That(merchant.sourceRect.x, Is.Zero);
-                Assert.That(ChangedPixels(idle, ReadFace(target, face)), Is.LessThan(idle.Length / 200));
+                AssertFace(merchant,faces,3,1);
+                Assert.That(ChangedPixels(happy, FacePixels()), Is.GreaterThan(idle.Length / 50));
             }
             finally
             {
-                document.panelSettings = originalSettings;
-                Object.Destroy(settings);
+                camera.targetTexture = originalTarget;
                 target.Release();
                 Object.Destroy(target);
             }
+        }
+
+        private static void AssertFace(MeshRenderer merchant, Texture sheet, int frames, int frame = -1)
+        {
+            var paint = new MaterialPropertyBlock();
+            merchant.GetPropertyBlock(paint);
+            Assert.That(paint.GetTexture("_MainTex"), Is.SameAs(sheet));
+            if (frame >= 0) Assert.That(paint.GetVector("_MainTex_ST").z, Is.EqualTo((float)frame/frames).Within(.001f));
+            Assert.That(paint.GetVector("_MainTex_ST").x, Is.EqualTo(1f/frames).Within(.001f));
         }
 
         private static Color32[] ReadFace(RenderTexture target, Rect face)
@@ -215,11 +264,11 @@ namespace RaidPartyManager.Tests
             Down(offer);
             Move(root, counter);
             Up(root, counter);
-            Assert.That(offer.Q("shop-sold"), Is.Null);
+            Assert.That(shop.transform.Find("Service theatre/Hanging stock 0").gameObject.activeSelf, Is.True);
             Assert.That(root.Q<Label>("shop-feedback").text, Is.EqualTo("金币不足"));
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  0"));
-            Assert.That(root.Q<Image>("shop-merchant").image,
-                Is.SameAs(typeof(DockShop).GetField("merchantSheet", Private).GetValue(shop)));
+            AssertFace(shop.transform.Find("Service theatre/shop-merchant").GetComponent<MeshRenderer>(),
+                ((ServiceStageArt)typeof(DockShop).GetField("stageArt", Private).GetValue(shop)).residents[1], 4);
 
             funds.SetValue(shop, 999);
             typeof(DockShop).GetMethod("RefreshGold", Private).Invoke(shop, null);
@@ -231,24 +280,24 @@ namespace RaidPartyManager.Tests
             Up(root, counter);
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo($"金币  {999 - price}"));
             Assert.That(InventoryCount(), Is.EqualTo(purchasedItems));
-            Assert.That(root.Q("shop-drag-preview"), Is.Null);
+            Assert.That(shop.transform.Find("Service theatre/Hanging stock 0").gameObject.activeSelf, Is.False);
         }
 
         private static VisualElement[] OfferViews(VisualElement root) =>
             Enumerable.Range(0, 4).Select(index => root.Q($"shop-offer-{index}")).ToArray();
 
-        private static object OfferItem(DockShop shop, VisualElement view)
+        private static EquipmentDefinition OfferItem(DockShop shop, VisualElement view)
         {
             var offers = (IEnumerable)typeof(DockShop).GetField("offers", Private).GetValue(shop);
             var offer = offers.Cast<object>().Single(entry =>
                 ReferenceEquals(entry.GetType().GetField("View").GetValue(entry), view));
-            return offer.GetType().GetField("Item").GetValue(offer);
+            return (EquipmentDefinition)offer.GetType().GetField("Item").GetValue(offer);
         }
 
         private static int OfferTier(DockShop shop, VisualElement view)
         {
             var item = OfferItem(shop, view);
-            return (int)item.GetType().GetProperty("ShopTier").GetValue(item);
+            return item.Tier;
         }
 
         private static int Price(VisualElement view) =>
@@ -256,20 +305,14 @@ namespace RaidPartyManager.Tests
 
         private static void ConfigureLowerTierStock(DockShop shop, params string[] assetNames)
         {
-            var field = typeof(DockShop).GetField("stockPool", Private);
-            var pool = (System.Array)field.GetValue(shop);
-            var assets = pool.Cast<Object>().ToArray();
-            int Tier(Object asset) => (int)asset.GetType().GetProperty("ShopTier").GetValue(asset);
-            var lower = assetNames.Length == 0
-                ? new[] { assets.First(asset => Tier(asset) == 2), assets.First(asset => Tier(asset) == 3) }
-                : assetNames.Select(name => assets.Single(asset => asset.name == name)).ToArray();
-            var selected = assets.Where(asset => Tier(asset) == 1).Take(2).Concat(lower).ToArray();
-            var fixture = System.Array.CreateInstance(pool.GetType().GetElementType(), selected.Length);
-            for (int i = 0; i < selected.Length; i++)
-                fixture.SetValue(selected[i], i);
-            shop.enabled = false;
-            field.SetValue(shop, fixture);
-            shop.enabled = true;
+            var assets = (EquipmentAsset[])typeof(DockShop).GetField("stockPool", Private).GetValue(shop);
+            var gear = assets.Where(a => a != null && a.ShopPrice > 0).ToArray();
+            var lower = assetNames.Length == 0 ?
+                new[] { gear.First(a => a.ShopTier == 2), gear.First(a => a.ShopTier == 3) } :
+                assetNames.Select(name => gear.Single(a => a.name == name)).ToArray();
+            var stock = AdventureShopOffer.Draw(gear.Where(a => a.ShopTier == 1).Take(2).Concat(lower)
+                .Select(a => a.ToDefinition()), new System.Random(9), false);
+            typeof(DockShop).GetMethod("DisplayStock", Private).Invoke(shop, new object[] { stock });
         }
 
         private static int InventoryCount()

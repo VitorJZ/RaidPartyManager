@@ -241,9 +241,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4c6e9fbccd41449fa28054961b53f4b1, type: 3}
   m_Name:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.CampPrototype
+  stageArt: {fileID: 11400000, guid: 4cd3bc80cc27484fbd1549bdc64f63cb, type: 2}
   encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
-  backdrop: {fileID: 2800000, guid: 525671459f624273a8b9e5a783c27248, type: 3}
-  fireArtwork: {fileID: 2800000, guid: a7703dc6a21f46edb37bebe68047fff7, type: 3}
+  fireArtwork: {fileID: 2800000, guid: c891cbd5ec524b06a64ad8af93d554cd, type: 3}
 --- !u!114 &1741968123
 MonoBehaviour:
   m_ObjectHideFlags: 0

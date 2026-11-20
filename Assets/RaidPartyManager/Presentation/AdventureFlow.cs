@@ -12,11 +12,11 @@ namespace RaidPartyManager.Presentation
 {
     internal static class AdventureFlow
     {
+        private static AdventureContentAsset routeArt;
         private static AdventureRun inspection;
         private static AdventureRun route;
         private static string destination;
         private static string origin;
-        private static int lastMapProgress = -1;
         private static string checkpointPathOverride;
         private static string CheckpointPath => checkpointPathOverride ??
             Path.Combine(Application.persistentDataPath, "raid-adventure-v1.json");
@@ -25,13 +25,13 @@ namespace RaidPartyManager.Presentation
         internal static bool HasSave => File.Exists(CheckpointPath) && invalidatedPath != CheckpointPath &&
             PlayerPrefs.GetInt(InvalidatedSaveKey, 0) == 0;
         internal static AdventureRun Active { get; private set; }
+        internal static bool OnRoute => destination != null && Active is { IsInspection: false } && !InspectionMode;
         internal static bool InspectionMode { get; private set; } = true;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Reset()
         {
             inspection = route = Active = null;
-            lastMapProgress = -1;
             destination = origin = null;
             InspectionMode = true;
         }
@@ -44,6 +44,7 @@ namespace RaidPartyManager.Presentation
 
         internal static AdventureRun Select(AdventureContentAsset assets, bool inspectionMode, bool reset = false)
         {
+            routeArt = assets;
             InspectionMode = inspectionMode;
             if (inspectionMode)
             {
@@ -99,7 +100,6 @@ namespace RaidPartyManager.Presentation
             if (selected.Count != 2 || selected[0].Id == selected[1].Id)
                 throw new ArgumentException("A new route needs two different starters.", nameof(selected));
 
-            lastMapProgress = -1;
             return Active = route = CreateRun(content, selected, false, new System.Random());
         }
 
@@ -249,7 +249,6 @@ namespace RaidPartyManager.Presentation
         {
             Active = route = null;
             destination = origin = null;
-            lastMapProgress = -1;
         }
 
         internal static void OpenHub() => OpenHub(true);
@@ -264,38 +263,95 @@ namespace RaidPartyManager.Presentation
         private static void OpenHub(bool inspectionMode)
         {
             ClearSceneContext();
+            if (inspectionMode && inspection?.Current?.Event.HasValue == true) inspection = null;
             InspectionMode = inspectionMode;
             destination = "EventSelect";
             PrototypeSceneMenu.OpenScene("EventSelect");
-        }
-
-        internal static bool ShowMapAdvance(AdventureRun run)
-        {
-            if (run.RouteDestination.HasValue)
-                return false;
-
-            bool advanced = !run.SuspendedChoice.HasValue && lastMapProgress >= 0 &&
-                run.CompletedNodes == lastMapProgress + 1;
-            lastMapProgress = run.CompletedNodes;
-            return advanced;
         }
 
         internal static AdventureRun ForScene(string scene) => destination == scene ? Active : null;
 
         internal static void OpenNodeScene(string scene, bool fromTown = false)
         {
-            origin = fromTown ? "Town" : "EventSelect";
-            destination = scene;
-            PrototypeSceneMenu.OpenScene(scene);
+            DockPlayhouse.ChangeSet(() =>
+            {
+                origin = fromTown ? "Town" : "EventSelect";
+                destination = scene;
+                PrototypeSceneMenu.OpenScene(scene);
+            });
+        }
+
+        internal static string SceneFor(NodeKind kind) => kind switch
+        {
+            NodeKind.Event or NodeKind.TreasureChest => "EventSelect",
+            NodeKind.Camp => "Camp", NodeKind.Shop => "DockShop", NodeKind.Town => "Town",
+            _ => "BattlePrototype"
+        };
+
+        internal static void AddFollowingSigns(VisualElement parent, Texture2D timber, RunTopBar bar)
+        {
+            var run = Active;
+            var visit = run.Current;
+            DockRouteSigns signs = null;
+            signs = new DockRouteSigns(run, routeArt, timber, null, Choose, null, following: true);
+            parent.Add(new StageSignMask(signs));
+
+            bool Choose(int index)
+            {
+                if (run.Current != visit || DockPlayhouse.Moving) return false;
+                var kind = run.FollowingChoice(index).Kind.Value;
+                if (kind is (NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss) && !run.Party.CanStartBattle)
+                {
+                    if (signs.Q("route-entry-message") == null)
+                    {
+                        var note = PrototypeStyle.Text("请先为队员安排出战站位。", 14);
+                        note.name = "route-entry-message";
+                        note.style.alignSelf = Align.Center;
+                        signs.Add(note);
+                    }
+                    return false;
+                }
+                parent.SetEnabled(false);
+                bar.WhenRewardsArrive(() =>
+                {
+                    if (run.Current != visit || !run.EnterFollowing(index))
+                    {
+                        parent.SetEnabled(true);
+                        return;
+                    }
+                    OpenNodeScene(SceneFor(kind));
+                });
+                return true;
+            }
+        }
+
+        internal static void AddServiceNavigation(VisualElement parent, Texture2D timber, RunTopBar bar)
+        {
+            if (OnRoute && Active.CanChooseFollowing)
+            {
+                AddFollowingSigns(parent, timber, bar);
+                if (origin != "Town") return;
+                var back = PrototypeStyle.Button("返回城镇", "return-event-select", () => bar.WhenRewardsArrive(ReturnFromNode));
+                back.style.position = Position.Absolute;
+                back.style.left = 20;
+                back.style.top = RunTopBar.Height + 45;
+                parent.Add(back);
+            }
+            else parent.Add(new StageSignMask(ReturnButton(() => bar.WhenRewardsArrive(ReturnFromNode))));
         }
 
         internal static Button ReturnButton(Action onReturn = null)
         {
-            string caption = origin == "Town" ? "返回城镇" : "返回事件选择";
-            return PrototypeStyle.Button(caption, "return-event-select", onReturn ?? ReturnFromNode);
+            return HangingSign.Exit("return-event-select", onReturn ?? ReturnFromNode);
         }
 
         internal static void ReturnFromNode()
+        {
+            bool signs = origin != "Town" && (destination != "BattlePrototype" || Active.Current?.Resolved == true);
+            DockPlayhouse.ChangeSet(FinishReturn, signs);
+        }
+
+        private static void FinishReturn()
         {
             if (origin == "Town")
             {
@@ -304,7 +360,12 @@ namespace RaidPartyManager.Presentation
                 return;
             }
             if (destination != "BattlePrototype") Active.Leave();
-            else if (Active.Current?.Resolved == true) Active.CloseVisit();
+            else if (Active.Current?.Resolved == true)
+            {
+                bool inspectedEvent = Active.IsInspection && Active.Current.Event.HasValue;
+                Active.CloseVisit();
+                if (inspectedEvent) Active = inspection = null;
+            }
             destination = "EventSelect"; origin = null;
             PrototypeSceneMenu.OpenScene("EventSelect");
         }
@@ -332,24 +393,15 @@ namespace RaidPartyManager.Presentation
 
         internal static string Narrative(AdventureEventKind kind) => kind switch
         {
-            AdventureEventKind.Investor =>
-                "创业者用一颗旧螺帽压住图纸的一角。纸上的船已经扬帆，水里的那艘却连桅杆都还没有。\n“添一枚也是添。等它能下水了，我记得来过的人。”",
-            AdventureEventKind.Ambush =>
-                "栈桥两头的灯一盏接一盏熄了。雾里有人把刀鞘掂在手上，另一个人的腰间响了一声，像是几枚硬币碰在一起。\n“到这儿就够了。”",
-            AdventureEventKind.LostTraveler =>
-                "旅行者把地图翻了个面，还是没找到要去的地方。见你们穿过雾，他赶紧卷起地图。\n“你们认得路？要是顺路，能不能一起走一段？”",
-            AdventureEventKind.FoundCoins =>
-                "一只湿漉漉的钱袋卡在栈桥的木板缝里。海鸥啄了两下，嫌它不能吃，扭头飞走了。",
-            AdventureEventKind.HatTrick =>
-                "戏法师用指节敲敲最左边的帽檐，抬起来让你看了一眼。\n“记好它在哪儿。等我停手，你指一顶给我看。”",
-            AdventureEventKind.Forge =>
-                "铁匠从炉膛里拨开一层白灰，底下的炭还红着。\n“翻翻背包。找两件舍得熔掉的旧物，说不定还能打出点新花样。”",
-            AdventureEventKind.LockedChest =>
-                "锁孔叫海盐堵了个严实，箱子一晃，里面倒有东西在响。\n一名队员蹲下来端详了片刻。“想开的话，得留个人慢慢弄。等锁开了，留下的人再追上来。”",
-            AdventureEventKind.AscensionTrial =>
-                "守门人把一包东西搁在台阶上。门缝里透出火光，里头有人拖着一柄重剑走过石地。\n“礼物在这儿。你们也可以往里走，看看自己还有什么本事没使出来。”",
-            _ =>
-                "炼药师把几只没贴签的瓶子一字排开，有一只的瓶塞还在轻轻响。\n“随便挑一瓶。钱就免了，改天记得告诉我尝起来怎么样。”"
+            AdventureEventKind.Investor => "诸位瞧，图纸上的船都快出海了，船坞里还欠一根桅杆。船主翻开账本，给您的名字留了个空。",
+            AdventureEventKind.Ambush => "方才还有三盏灯，这会儿一盏也没了。听，那声刀出鞘，可不是我手里的醒铃！",
+            AdventureEventKind.LostTraveler => "这位客官对着海图走了半日。您提醒她一句？她手里那张，拿倒了。",
+            AdventureEventKind.FoundCoins => "啪嗒！钱袋开了口。您瞧那海鸥，鱼虾不理，倒先叼走了一枚金币。",
+            AdventureEventKind.HatTrick => "且看桌上这三顶帽子。那宝贝刚躲进哪一顶，您可记准了？一眨眼，它们就要换座喽。",
+            AdventureEventKind.Forge => "铁匠说，她这炉子专吃旧家伙，少了两件还不开口。至于吐出来个什么，她自己也想瞧瞧。",
+            AdventureEventKind.LockedChest => "这箱子呀，锁比箱板还结实。您听里头那一响！要解开它，得有个人舍得在这儿坐上半晌。",
+            AdventureEventKind.AscensionTrial => "看门人把礼匣搁在门槛外，自己退进门里磨刀去了。收礼的路跟试胆的路，就在这儿分开。",
+            _ => "三瓶药排了一溜，炼药师偏把签儿揭了。她说这回免钱，只求您回来告诉她，哪瓶会打嗝。"
         };
     }
 }

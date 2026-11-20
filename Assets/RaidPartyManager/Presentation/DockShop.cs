@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using RaidPartyManager.Content;
 using RaidPartyManager.Run;
+using RaidPartyManager.Domain;
 using UnityEngine;
 using UnityEngine.TextCore.Text;
 using UnityEngine.UIElements;
@@ -14,29 +15,28 @@ namespace RaidPartyManager.Presentation
     {
         private const float CelebrationDuration = 1.05f;
 
-        private enum MerchantExpression { Idle, Happy, Delighted, Laugh }
-
         private sealed class Offer
         {
-            public EquipmentAsset Item;
+            public EquipmentDefinition Item;
+            public Texture2D Icon;
+            public int Index;
             public int Price;
             public VisualElement View;
+            public Label PriceTag;
             public bool Sold;
         }
 
         [SerializeField] private EncounterAsset encounter;
         [SerializeField] private EquipmentAsset[] stockPool = Array.Empty<EquipmentAsset>();
         [SerializeField] private Texture2D backdrop;
-        [SerializeField] private Texture2D merchantSheet;
-        [SerializeField] private Texture2D merchantLaugh;
-        [SerializeField] private Texture2D shelfArtwork;
-        [SerializeField] private Texture2D counterArtwork;
+        [SerializeField] private Texture2D merchantReactions;
+        [SerializeField] private ServiceStageArt stageArt;
 
         private readonly System.Random random = new System.Random();
         private readonly List<Offer> offers = new List<Offer>();
         private VisualElement root;
-        private VisualElement merchant;
-        private Image merchantImage;
+        private ShopStage stage;
+        private VisualElement stockLayer;
         private VisualElement checkout;
         private RunTopBar topBar;
         private PartyRun party;
@@ -45,12 +45,10 @@ namespace RaidPartyManager.Presentation
         private FontAsset localFontAsset;
         private EncounterData content;
         private int coins;
-        private MerchantExpression? expression;
         private Offer hovered;
         private Offer dragging;
         private int pointerId = -1;
         private Vector2 pointer;
-        private EquipmentIcon dragPreview;
         private EquipmentTooltip tooltip;
         private double celebrationUntil;
         private double feedbackUntil;
@@ -64,32 +62,44 @@ namespace RaidPartyManager.Presentation
             adventure = AdventureFlow.ForScene("DockShop");
             party = adventure?.Party ?? BattlePrototype.GetPlaySession(content);
             coins = 999;
-            expression = null;
             hovered = null;
             celebrationUntil = 0;
-            offers.Clear();
-            var stock = stockPool.Where(item => item != null && item.ShopTier >= 0 && item.ShopPrice > 0).Distinct().ToArray();
-            var choices = adventure != null ? adventure.Current.Stock.Select(offer => stock.First(item => item.ToDefinition().Id == offer.Item.Id)).ToArray() :
-                stock.Where(item => item.ShopTier == 1).OrderBy(_ => random.Next()).Take(2)
-                .Concat(stock.Where(item => item.ShopTier >= 2).OrderBy(_ => random.Next()).Take(2))
-                .OrderBy(_ => random.Next()).ToArray();
-            if (choices.Length != 4 || choices.Count(item => item.ShopTier == 1) != 2)
-                throw new InvalidOperationException("The shop needs two T1 items and two T2/T3 items.");
-            foreach (var item in choices)
-                offers.Add(new Offer
-                {
-                    Item = item,
-                    Price = adventure != null ? adventure.Current.Stock[offers.Count].Price :
-                        (int)Math.Ceiling(item.ShopPrice * (0.7 + random.NextDouble() * 0.6)),
-                    Sold = adventure != null && adventure.Current.Stock[offers.Count].Sold
-                });
+            var catalogue = stockPool.Where(item => item != null).Select(item => item.ToDefinition()).Concat(content.SkillBooks);
+            var stock = adventure?.Current.Stock ?? AdventureShopOffer.Draw(catalogue, random, false);
+            stage = new ShopStage(transform, root, stageArt, backdrop, merchantReactions);
+            stage.ShowCompany(party, content);
             Render();
+            DisplayStock(stock);
+        }
+
+        private void DisplayStock(IReadOnlyList<AdventureShopOffer> stock)
+        {
+            offers.Clear();
+            stockLayer.Clear();
+            for (int i = 0; i < stock.Count; i++)
+            {
+                var record = stock[i];
+                var offer = new Offer { Index = i, Item = record.Item, Icon = content.IconFor(record.Item.Id),
+                    Price = record.Price, Sold = record.Sold };
+                offers.Add(offer);
+                stage.Hang(i, offer.Item, offer.Icon, offer.Sold);
+                var view = BuildOffer(offer);
+                stockLayer.Add(view);
+                if (!offer.Sold) stage.PlaceOffer(view, offer.PriceTag, i);
+            }
         }
 
         private void OnDisable()
         {
             CancelDrag();
             HideTooltip();
+            root.UnregisterCallback<PointerMoveEvent>(OnPointerMove);
+            root.UnregisterCallback<PointerUpEvent>(OnPointerUp);
+            root.UnregisterCallback<PointerCaptureOutEvent>(OnCaptureOut);
+            root.UnregisterCallback<PointerCancelEvent>(OnPointerCancel);
+            root.UnregisterCallback<PointerLeaveEvent>(OnPointerLeave);
+            root.UnregisterCallback<KeyDownEvent>(OnKeyDown);
+            stage?.Dispose();
             PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
         }
 
@@ -97,84 +107,38 @@ namespace RaidPartyManager.Presentation
         {
             root.Clear();
             root.style.overflow = Overflow.Hidden;
-            root.style.backgroundColor = PrototypeStyle.Background;
-            root.style.backgroundImage = new StyleBackground(backdrop);
-            root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+            root.style.backgroundColor = Color.clear;
             root.style.color = PrototypeStyle.Ink;
             root.focusable = true;
 
-            merchant = new VisualElement { name = "shop-merchant-stage", pickingMode = PickingMode.Ignore };
-            Place(merchant, 1, 7, 47, 80);
-            merchantImage = Picture(merchantSheet, "shop-merchant");
-            PrototypeStyle.Fill(merchantImage);
-            merchant.Add(merchantImage);
-            root.Add(merchant);
+            stockLayer = new VisualElement { name = "shop-stock", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(stockLayer);
+            root.Add(stockLayer);
 
-            var cabinet = new VisualElement { name = "shop-shelf", pickingMode = PickingMode.Ignore };
-            Place(cabinet, 55, 14, 41, 79);
-            var cabinetImage = Picture(shelfArtwork, "shop-shelf-art");
-            PrototypeStyle.Fill(cabinetImage);
-            cabinet.Add(cabinetImage);
-            root.Add(cabinet);
-            var grid = new VisualElement { name = "shop-stock" };
-            grid.style.position = Position.Absolute;
-            grid.style.left = grid.style.right = Length.Percent(11);
-            grid.style.top = Length.Percent(11);
-            grid.style.bottom = Length.Percent(12);
-            cabinet.Add(grid);
-            for (int row = 0; row < 2; row++)
-            {
-                var line = PrototypeStyle.Row("shop-stock-row");
-                line.style.flexGrow = 1;
-                line.style.flexBasis = 0;
-                line.style.minHeight = 0;
-                for (int column = 0; column < 2; column++)
-                    line.Add(BuildOffer(offers[row * 2 + column], row * 2 + column));
-                grid.Add(line);
-            }
-
-            var counter = new VisualElement { name = "shop-counter", pickingMode = PickingMode.Ignore };
-            Place(counter, 1, 64, 48, 32);
-            var counterImage = Picture(counterArtwork, "shop-counter-art");
-            PrototypeStyle.Fill(counterImage);
-            counter.Add(counterImage);
-            root.Add(counter);
             checkout = new VisualElement { name = "shop-checkout" };
-            checkout.style.position = Position.Absolute;
-            checkout.style.left = checkout.style.right = Length.Percent(6);
-            checkout.style.top = Length.Percent(12);
-            checkout.style.height = Length.Percent(55);
             checkout.style.justifyContent = Justify.Center;
             checkout.style.alignItems = Align.Center;
             PrototypeStyle.Outline(checkout, Color.clear, 7);
             var instruction = PrototypeStyle.Text("将商品拖到这里购买", 17, PrototypeStyle.Accent);
             instruction.pickingMode = PickingMode.Ignore;
+            instruction.style.display = DisplayStyle.None;
             instruction.style.backgroundColor = new Color(0.05f, 0.06f, 0.065f, 0.88f);
             instruction.style.paddingLeft = instruction.style.paddingRight = 12;
             instruction.style.paddingTop = instruction.style.paddingBottom = 6;
             checkout.Add(instruction);
-            counter.Add(checkout);
+            root.Add(checkout);
+            stage.PlaceCounter(checkout);
 
-            var header = PrototypeStyle.Row("shop-header");
-            header.style.position = Position.Absolute;
-            header.style.top = RunTopBar.Height + 7;
-            header.style.left = header.style.right = 22;
-            header.style.alignItems = Align.Center;
-            if (adventure != null)
-                header.Add(AdventureFlow.ReturnButton());
-            var title = PrototypeStyle.Text("弥雾码头 · 商店", 23, PrototypeStyle.Accent);
-            title.style.flexGrow = 1;
-            title.style.marginLeft = 18;
-            header.Add(title);
-            root.Add(header);
             topBar = new RunTopBar(root, party, content, OpenEditor, "open-shop-editor",
                 () => adventure?.Party.Gold ?? coins, "shop-gold");
+            if (adventure != null) AdventureFlow.AddServiceNavigation(root, stageArt.timber, topBar);
+            else root.Add(new StageSignMask(HangingSign.Exit("leave-shop", () => PrototypeSceneMenu.OpenStandalone("MainMenu"))));
             RunTopBar.PlaceAtTop(root, topBar);
 
             feedback = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
             feedback.name = "shop-feedback";
             feedback.style.position = Position.Absolute;
-            feedback.style.bottom = 14;
+            feedback.style.bottom = Length.Percent(AudienceForeground.ClearancePercent);
             feedback.style.left = Length.Percent(15);
             feedback.style.right = Length.Percent(15);
             feedback.style.display = DisplayStyle.None;
@@ -186,59 +150,36 @@ namespace RaidPartyManager.Presentation
 
             root.RegisterCallback<PointerMoveEvent>(OnPointerMove);
             root.RegisterCallback<PointerUpEvent>(OnPointerUp);
-            root.RegisterCallback<PointerCaptureOutEvent>(evt =>
-            {
-                if (evt.pointerId == pointerId)
-                    CancelDrag();
-            });
-            root.RegisterCallback<PointerLeaveEvent>(_ =>
-            {
-                if (dragging == null)
-                    Hover(null);
-            });
-            root.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Escape)
-                    CancelDrag();
-            });
+            root.RegisterCallback<PointerCaptureOutEvent>(OnCaptureOut);
+            root.RegisterCallback<PointerCancelEvent>(OnPointerCancel);
+            root.RegisterCallback<PointerLeaveEvent>(OnPointerLeave);
+            root.RegisterCallback<KeyDownEvent>(OnKeyDown);
             RefreshExpression();
         }
 
-        private VisualElement BuildOffer(Offer offer, int index)
+        private VisualElement BuildOffer(Offer offer)
         {
-            var view = new VisualElement { name = $"shop-offer-{index}" };
+            var view = new VisualElement { name = $"shop-offer-{offer.Index}" };
             offer.View = view;
-            view.style.flexGrow = 1;
-            view.style.flexBasis = 0;
-            view.style.minWidth = view.style.minHeight = 0;
-            view.style.marginLeft = view.style.marginRight = 6;
-            view.style.marginTop = view.style.marginBottom = 5;
+            view.style.alignItems = Align.Center;
             if (offer.Sold)
             {
-                var sold = PrototypeStyle.Text("已售出", 18, PrototypeStyle.Muted);
-                sold.name = "shop-sold"; sold.style.flexGrow = 1; PrototypeStyle.Middle(sold);
-                view.Add(sold); view.SetEnabled(false); view.style.opacity = 0.55f;
+                view.style.display = DisplayStyle.None;
                 return view;
             }
-            var icon = new EquipmentIcon(offer.Item.ToDefinition(), offer.Item.Icon);
-            icon.name = "shop-item-art";
-            icon.style.flexBasis = 0;
-            icon.style.minHeight = 0;
-            view.Add(icon);
-            var caption = new VisualElement { pickingMode = PickingMode.Ignore };
-            caption.style.backgroundColor = new Color(0.04f, 0.05f, 0.055f, 0.88f);
-            caption.style.paddingLeft = caption.style.paddingRight = 5;
-            var name = PrototypeStyle.Text(offer.Item.ToDefinition().Name, 15);
-            name.name = "shop-item-name";
-            name.pickingMode = PickingMode.Ignore;
-            PrototypeStyle.Middle(name);
-            caption.Add(name);
-            var price = PrototypeStyle.Text($"{offer.Price} 金币", 14, PrototypeStyle.Accent);
+            var price = PrototypeStyle.Text($"{offer.Price} 金币", 13, new Color32(58,36,19,255));
+            offer.PriceTag = price;
             price.name = "shop-item-price";
             price.pickingMode = PickingMode.Ignore;
-            PrototypeStyle.Middle(price);
-            caption.Add(price);
-            view.Add(caption);
+            price.style.position = Position.Absolute;
+            price.style.translate = new Translate(Length.Percent(-50), Length.Percent(-50));
+            price.style.whiteSpace = WhiteSpace.NoWrap;
+            price.style.paddingLeft = price.style.paddingRight = 7;
+            price.style.paddingTop = price.style.paddingBottom = 2;
+            price.style.unityFontStyleAndWeight = FontStyle.Bold;
+            price.style.backgroundColor = (Color)new Color32(224,193,138,255);
+            PrototypeStyle.Outline(price, new Color32(123,85,43,255), 2);
+            view.Add(price);
             view.RegisterCallback<PointerEnterEvent>(_ => { if (dragging == null) Hover(offer); });
             view.RegisterCallback<PointerLeaveEvent>(_ => { if (dragging == null && hovered == offer) Hover(null); });
             view.RegisterCallback<PointerDownEvent>(evt => BeginDrag(evt, offer));
@@ -253,21 +194,40 @@ namespace RaidPartyManager.Presentation
             pointerId = evt.pointerId;
             pointer = evt.position;
             HideTooltip();
-            dragPreview = new EquipmentIcon(offer.Item.ToDefinition(), offer.Item.Icon) { name = "shop-drag-preview" };
-            dragPreview.style.position = Position.Absolute;
-            dragPreview.style.width = dragPreview.style.height = 100;
-            offer.View.style.opacity = 0.4f;
-            root.Add(dragPreview);
+            checkout[0].style.display = DisplayStyle.Flex;
             root.Focus();
             root.CapturePointer(pointerId);
-            MoveDragPreview();
+            MoveHeldItem();
             RefreshExpression();
             evt.StopPropagation();
         }
 
+        private void OnCaptureOut(PointerCaptureOutEvent evt)
+        {
+            if (evt.pointerId == pointerId)
+                CancelDrag();
+        }
+
+        private void OnPointerCancel(PointerCancelEvent evt)
+        {
+            if (evt.pointerId == pointerId) CancelDrag();
+        }
+
+        private void OnPointerLeave(PointerLeaveEvent evt)
+        {
+            if (dragging == null)
+                Hover(null);
+        }
+
+        private void OnKeyDown(KeyDownEvent evt)
+        {
+            if (evt.keyCode == KeyCode.Escape)
+                CancelDrag();
+        }
+
         private void OnPointerMove(PointerMoveEvent evt)
         {
-            if (!merchant.enabledInHierarchy)
+            if (!stockLayer.enabledInHierarchy)
                 return;
             pointer = evt.position;
             if (dragging == null)
@@ -277,7 +237,7 @@ namespace RaidPartyManager.Presentation
             }
             if (evt.pointerId != pointerId)
                 return;
-            MoveDragPreview();
+            MoveHeldItem();
             bool ready = checkout.worldBound.Contains(pointer);
             checkout.style.backgroundColor = ready ? new Color(0.65f, 0.46f, 0.16f, 0.22f) : Color.clear;
             PrototypeStyle.Outline(checkout, ready ? PrototypeStyle.Accent : Color.clear, 7);
@@ -289,46 +249,41 @@ namespace RaidPartyManager.Presentation
             if (evt.button != 0 || dragging == null || evt.pointerId != pointerId)
                 return;
             var offer = dragging;
+            pointer = evt.position;
+            MoveHeldItem();
             bool atCheckout = checkout.worldBound.Contains(evt.position);
-            CancelDrag();
-            if (atCheckout)
-                Purchase(offer);
+            bool bought = atCheckout && Purchase(offer);
+            EndDrag(bought);
             evt.StopPropagation();
         }
 
-        private void Purchase(Offer offer)
+        private bool Purchase(Offer offer)
         {
             if (offer.Sold)
-                return;
+                return false;
             if ((adventure?.Party.Gold ?? coins) < offer.Price)
             {
                 ShowFeedback("金币不足");
-                return;
+                return false;
             }
             if (adventure != null)
             {
-                if (!adventure.Buy(offers.IndexOf(offer))) { ShowFeedback("这次购买未能完成"); return; }
+                if (!adventure.Buy(offer.Index)) { ShowFeedback("这次购买未能完成"); return false; }
             }
             else
             {
-                party.AddEquipment(offer.Item.ToDefinition());
+                party.AddEquipment(offer.Item);
                 coins -= offer.Price;
             }
             offer.Sold = true;
-            offer.View.Clear();
-            offer.View.SetEnabled(false);
-            offer.View.style.opacity = 0.55f;
-            var sold = PrototypeStyle.Text("已售出", 18, PrototypeStyle.Muted);
-            sold.name = "shop-sold";
-            sold.style.flexGrow = 1;
-            PrototypeStyle.Middle(sold);
-            offer.View.Add(sold);
+            offer.View.style.display = DisplayStyle.None;
             hovered = null;
             HideTooltip();
             RefreshGold();
             celebrationUntil = Time.unscaledTimeAsDouble + CelebrationDuration;
             RefreshExpression();
-            ShowFeedback($"已购买 {offer.Item.ToDefinition().Name}，已放入共享背包");
+            ShowFeedback("已放入共享背包");
+            return true;
         }
 
         private void Hover(Offer offer)
@@ -340,7 +295,7 @@ namespace RaidPartyManager.Presentation
             RefreshExpression();
             if (offer == null || offer.Sold || dragging != null)
                 return;
-            tooltip = new EquipmentTooltip(offer.Item.ToDefinition(), offer.Item.Icon);
+            tooltip = new EquipmentTooltip(offer.Item, offer.Icon);
             tooltip.Query<VisualElement>().ForEach(element => element.pickingMode = PickingMode.Ignore);
             tooltip.ShowAbove(root, offer.View);
         }
@@ -348,70 +303,56 @@ namespace RaidPartyManager.Presentation
         private void RefreshExpression()
         {
             var offer = dragging ?? hovered;
-            var next = Time.unscaledTimeAsDouble < celebrationUntil ? MerchantExpression.Laugh :
-                offer?.Item.ShopTier switch
-                {
-                    null => MerchantExpression.Idle,
-                    1 => MerchantExpression.Delighted,
-                    _ => MerchantExpression.Happy
-                };
-            if (next == expression || merchantSheet == null)
-                return;
-
-            expression = next;
-            if (next == MerchantExpression.Laugh && merchantLaugh != null)
-            {
-                merchantImage.image = merchantLaugh;
-                merchantImage.sourceRect = new Rect(0, 0, merchantLaugh.width, merchantLaugh.height);
-            }
-            else
-            {
-                merchantImage.image = merchantSheet;
-                var frame = next == MerchantExpression.Laugh ? MerchantExpression.Delighted : next;
-                float width = merchantSheet.width / 3f;
-                merchantImage.sourceRect = new Rect((int)frame * width, 0, width, merchantSheet.height);
-            }
-            merchantImage.MarkDirtyRepaint();
+            var remaining = Mathf.Clamp01((float)((celebrationUntil - Time.unscaledTimeAsDouble) / CelebrationDuration));
+            var face = remaining > 0 ? ShopStage.Expression.Laugh : offer == null ? ShopStage.Expression.Idle :
+                offer.Item.Tier == 1 ? ShopStage.Expression.Delighted : ShopStage.Expression.Happy;
+            stage.SetMerchant(face, Time.unscaledTime, remaining);
         }
 
         private void Update()
         {
-            if (merchant == null)
-                return;
-            float remaining = Mathf.Clamp01((float)((celebrationUntil - Time.unscaledTimeAsDouble) / CelebrationDuration));
-            float offset = Mathf.Sin((1f - remaining) * Mathf.PI * 6f) * 12f * remaining;
-            merchant.style.translate = new Translate(0, offset);
+            stage.FrameCamera();
+            stage.PlaceCounter(checkout);
+            foreach (var offer in offers)
+            {
+                stage.Pose(offer.Index, Time.unscaledTime);
+                if (!offer.Sold) stage.PlaceOffer(offer.View, offer.PriceTag, offer.Index);
+            }
             RefreshExpression();
             if (feedback != null && Time.unscaledTimeAsDouble >= feedbackUntil)
                 feedback.style.display = DisplayStyle.None;
         }
 
-        private void CancelDrag()
+        private void CancelDrag() => EndDrag(false);
+
+        private void EndDrag(bool bought)
         {
             int captured = pointerId;
             pointerId = -1;
             if (dragging != null)
-                dragging.View.style.opacity = 1;
+            {
+                stage.Release(dragging.Index, bought);
+            }
             dragging = null;
             hovered = null;
             HideTooltip();
-            dragPreview?.RemoveFromHierarchy();
-            dragPreview = null;
             if (root != null && captured >= 0 && root.HasPointerCapture(captured))
                 root.ReleasePointer(captured);
             if (checkout != null)
             {
+                checkout[0].style.display = DisplayStyle.None;
                 checkout.style.backgroundColor = Color.clear;
                 PrototypeStyle.Outline(checkout, Color.clear, 7);
             }
             RefreshExpression();
         }
 
-        private void MoveDragPreview()
+        private void MoveHeldItem()
         {
-            var local = root.WorldToLocal(pointer);
-            dragPreview.style.left = local.x - 50;
-            dragPreview.style.top = local.y - 50;
+            var bounds = root.worldBound;
+            if (bounds.width <= 0 || bounds.height <= 0) return;
+            stage.Pull(dragging.Index, new Vector2((pointer.x - bounds.xMin) / bounds.width,
+                1 - (pointer.y - bounds.yMin) / bounds.height));
         }
 
         private void HideTooltip()
@@ -432,21 +373,8 @@ namespace RaidPartyManager.Presentation
         private void OpenEditor()
         {
             CancelDrag();
-            topBar.EditParty(edited: adventure == null ? BattlePrototype.MarkPartyEdited : null);
+            topBar.EditParty(() => stage.ShowCompany(party, content), edited: adventure == null ? BattlePrototype.MarkPartyEdited : null);
         }
 
-        private static Image Picture(Texture2D texture, string name) => new Image
-        {
-            name = name, image = texture, scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore
-        };
-
-        private static void Place(VisualElement element, float left, float top, float width, float height)
-        {
-            element.style.position = Position.Absolute;
-            element.style.left = Length.Percent(left);
-            element.style.top = Length.Percent(top);
-            element.style.width = Length.Percent(width);
-            element.style.height = Length.Percent(height);
-        }
     }
 }

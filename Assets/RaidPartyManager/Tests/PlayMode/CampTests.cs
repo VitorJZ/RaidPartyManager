@@ -25,25 +25,47 @@ namespace RaidPartyManager.Tests
                 "open-camp");
             yield return WaitForScene("Camp");
             var root = Object.FindAnyObjectByType<CampPrototype>().GetComponent<UIDocument>().rootVisualElement;
-            Assert.That(root.Query<Image>().ToList().Count(image => image.name.StartsWith("camp-seat-")), Is.EqualTo(4));
+            var theatre = Object.FindAnyObjectByType<CampPrototype>().transform.Find("Service theatre");
+            var camera = Camera.main;
+            Assert.That(camera.orthographic, Is.False);
+            MeshRenderer Seat(int n) => theatre.Find($"camp-seat-{n}").GetComponent<MeshRenderer>();
+            Texture Artwork(int n)
+            {
+                var block = new MaterialPropertyBlock();
+                Seat(n).GetPropertyBlock(block);
+                return block.GetTexture("_MainTex");
+            }
+            Vector3 ScreenAt(int n) => camera.WorldToViewportPoint(Seat(n).bounds.center);
             for (int position = 1; position <= 4; position++)
             {
-                var seated = root.Q<Image>($"camp-seat-{position}");
-                Assert.That(seated.image, Is.Not.Null);
-                Assert.That(seated.resolvedStyle.scale.value.x, Is.EqualTo(position <= 2 ? -1f : 1f));
+                Assert.That(Seat(position).enabled, Is.True);
+                Assert.That(Artwork(position), Is.Not.Null);
+                Assert.That(Mathf.Sign(Seat(position).transform.localScale.x), Is.EqualTo(position <= 2 ? -1f : 1f));
             }
-            var stage = root.Q("camp-stage");
-            var leftRear = root.Q("camp-seat-3");
-            var rightRear = root.Q("camp-seat-2");
-            var leftFront = root.Q("camp-seat-4");
-            var rightFront = root.Q("camp-seat-1");
-            Assert.That(leftRear.worldBound.center.x, Is.LessThan(stage.worldBound.center.x));
-            Assert.That(rightRear.worldBound.center.x, Is.GreaterThan(stage.worldBound.center.x));
-            Assert.That(leftFront.worldBound.center.y, Is.GreaterThan(leftRear.worldBound.center.y));
-            Assert.That(rightFront.worldBound.center.y, Is.GreaterThan(rightRear.worldBound.center.y));
-            Assert.That(root.Q("camp-fire").worldBound.center.y, Is.GreaterThan(leftFront.worldBound.center.y));
-
-            var before = root.Q<Image>("camp-seat-1").image;
+            Assert.That(ScreenAt(3).x, Is.LessThan(.5f));
+            Assert.That(ScreenAt(2).x, Is.GreaterThan(.5f));
+            Assert.That(ScreenAt(4).y, Is.LessThan(ScreenAt(3).y));
+            Assert.That(ScreenAt(1).y, Is.LessThan(ScreenAt(2).y));
+            var lamp = theatre.GetComponentInChildren<Light>();
+            Assert.That(lamp.type, Is.EqualTo(LightType.Point));
+            float initial = lamp.intensity;
+            yield return new WaitForSecondsRealtime(.12f);
+            Assert.That(lamp.intensity, Is.Not.EqualTo(initial));
+            Assert.That(Seat(1).sharedMaterial.GetVector("_FireLight").w, Is.EqualTo(lamp.intensity).Within(.001f));
+            var hearth = theatre.Find("camp-fire").GetComponent<MeshRenderer>();
+            var paint = new MaterialPropertyBlock();
+            hearth.GetPropertyBlock(paint);
+            Assert.That(paint.GetTexture("_MainTex").name, Is.EqualTo("PaperHearth-Cels"));
+            float frame = paint.GetVector("_MainTex_ST").z;
+            float until = Time.unscaledTime + .85f;
+            while (Time.unscaledTime < until && Mathf.Approximately(frame, paint.GetVector("_MainTex_ST").z))
+            {
+                yield return null;
+                hearth.GetPropertyBlock(paint);
+            }
+            Assert.That(paint.GetVector("_MainTex_ST").z, Is.Not.EqualTo(frame));
+            Assert.That(Seat(1).bounds.size.y, Is.LessThan(1.85f));
+            var before = Artwork(1);
             Press(root, "open-camp-editor");
             yield return null;
             var outgoing = root.Q("edit-position-1");
@@ -58,7 +80,7 @@ namespace RaidPartyManager.Tests
             Press(root, selected.name);
             Press(root, "back-party-editor");
             yield return null;
-            var replacement = root.Q<Image>("camp-seat-1").image;
+            var replacement = Artwork(1);
             Assert.That(replacement, Is.Not.SameAs(before));
             Assert.That(replacement.name, Does.Contain(characterId));
             Press(root, "open-settings");

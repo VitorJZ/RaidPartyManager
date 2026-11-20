@@ -241,6 +241,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 29ddc9dcba8d4b6ea564b61c6bb81688, type: 3}
   m_Name:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.AdventureEventHub
+  encounterStageArt: {fileID: 11400000, guid: c4d4b7ce4d5b476c849a305eb7830cfa, type: 2}
+  encounterArrow: {fileID: 2800000, guid: 6a0a3a3ba12e4829a4524b68cc749620, type: 3}
+  stageArt: {fileID: 11400000, guid: 4cd3bc80cc27484fbd1549bdc64f63cb, type: 2}
   assets: {fileID: 11400000, guid: a1428cde7eca4031befb94f7db252b7e, type: 2}
 --- !u!114 &1741968123
 MonoBehaviour:

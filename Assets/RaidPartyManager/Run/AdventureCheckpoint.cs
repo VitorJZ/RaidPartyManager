@@ -26,6 +26,7 @@ namespace RaidPartyManager.Run
         public string ReturnMessage;
         public RouteCheckpointNode[] Nodes;
         public NodeKind[] Options;
+        public NodeKind[] FollowingOptions;
         public CheckpointStop Current;
         public CheckpointStop Previous;
         public bool HasPrevious;

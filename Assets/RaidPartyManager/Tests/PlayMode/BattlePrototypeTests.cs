@@ -253,6 +253,13 @@ namespace RaidPartyManager.Tests
                 yield return null;
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo(name));
             yield return null;
+            if (name == "BattlePrototype")
+            {
+                var root = Object.FindAnyObjectByType<BattlePrototype>().GetComponent<UIDocument>().rootVisualElement;
+                while (root.Q("curtain-input-shield") != null && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                Assert.That(root.Q("curtain-input-shield"), Is.Null);
+            }
         }
 
         [UnityTest]
@@ -266,18 +273,30 @@ namespace RaidPartyManager.Tests
             UseFastAttacks(scene);
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Assert.That(root.panel, Is.Not.Null);
-            var backdrop = root.Q("battle-background");
-            var background = backdrop.resolvedStyle.backgroundImage.texture;
-            Assert.That(background, Is.Not.Null);
-            Assert.That(root.ElementAt(0), Is.SameAs(backdrop));
-            Assert.That(backdrop.pickingMode, Is.EqualTo(PickingMode.Ignore));
-            Assert.That(backdrop.worldBound, Is.EqualTo(root.worldBound));
-            Assert.That(root.Q("battlefield").resolvedStyle.backgroundImage.texture, Is.Null);
+            var stage = scene.transform.Find("Paper Theatre");
+            Assert.That(Camera.main.orthographic, Is.False);
+            Assert.That(root.Q("battle-background"), Is.Null);
+            Assert.That(root.resolvedStyle.backgroundColor.a, Is.Zero);
+            var backcloth = stage.Find("Cyclorama").GetComponent<MeshRenderer>();
+            Assert.That(backcloth.enabled, Is.True);
+            Assert.That(backcloth.bounds.max.z, Is.GreaterThan(stage.Find("Left wing").position.z));
+            var deckBounds = stage.Find("Stage floor").GetComponent<Renderer>().bounds;
+            Assert.That(stage.Find("Left wing").position.z, Is.InRange(deckBounds.min.z, deckBounds.max.z));
+            var house = Object.FindAnyObjectByType<DockPlayhouse>();
+            var drape = house != null ? house.transform.Find("Curtain L").GetComponent<Renderer>() : stage.Find("Left drape").GetComponent<Renderer>();
+            Assert.That(drape.bounds.center.z, Is.LessThan(0));
+            Assert.That(Vector3.Dot(stage.Find("Stage floor").up, Vector3.forward), Is.GreaterThan(.99f));
             var footer = root.Q("battle-footer");
             Assert.That(footer.parent, Is.SameAs(root));
             var rosterBounds = footer.Q("roster-equipment").worldBound;
             var logBounds = footer.Q("battle-log-paper").worldBound;
-            Assert.That(root.worldBound.yMax - rosterBounds.yMax, Is.EqualTo(10f).Within(1f));
+            var clearance = root.Q("audience-clearance").worldBound;
+            Assert.That(clearance.height / root.worldBound.height, Is.InRange(.061f, .067f));
+            Assert.That(clearance.yMin - rosterBounds.yMax, Is.EqualTo(10f).Within(1f));
+            var seats = house != null ? house.transform.Find("Stalls/Front row/Seat L1").GetComponent<MeshRenderer>() :
+                stage.Find("Audience/Front stalls").GetComponent<MeshRenderer>();
+            float crest = Camera.main.WorldToViewportPoint(seats.bounds.max).y;
+            Assert.That(crest, Is.InRange(.035f, .11f));
             Assert.That(logBounds.yMax, Is.EqualTo(rosterBounds.yMax).Within(1f));
             Assert.That(logBounds.xMin - rosterBounds.xMax, Is.EqualTo(32f).Within(1f));
             Assert.That(((Texture2D[])typeof(BattlePrototype).GetField("battleBackgrounds", PrivateInstance)
@@ -373,7 +392,7 @@ namespace RaidPartyManager.Tests
             yield return null;
             AssertBattleEquipmentIsReadOnly(root);
             yield return WaitForRoundBreak(root);
-            Assert.That(root.Q("battle-background").resolvedStyle.backgroundImage.texture, Is.SameAs(background));
+            Assert.That(scene.transform.Find("Paper Theatre/Cyclorama").GetComponent<MeshRenderer>(), Is.SameAs(backcloth));
             AssertBattleEquipmentIsReadOnly(root);
             var initialLog = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 普攻")), Is.True);
@@ -384,7 +403,7 @@ namespace RaidPartyManager.Tests
             var mageDetails = HoverCharacter(root, root.Q("equipment-portrait-2"));
             Assert.That(mageDetails.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  6"));
             yield return ResolveBattle(root);
-            Assert.That(root.Q("battle-background").resolvedStyle.backgroundImage.texture, Is.SameAs(background));
+            Assert.That(scene.transform.Find("Paper Theatre/Cyclorama").GetComponent<MeshRenderer>(), Is.SameAs(backcloth));
             var first = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(first.First(label => label.text.Contains("突袭队尾")).text, Does.Contain("银叶射手"));
             var rewards = root.Q("victory-rewards");
@@ -1213,6 +1232,9 @@ namespace RaidPartyManager.Tests
                 Assert.That(pose.height, Is.EqualTo(224f).Within(0.01f));
             }
 
+            // The combat playback clock waits for the opening curtain before advancing the idle cycle.
+            float openBy = Time.realtimeSinceStartup + 4;
+            while (root.Q("curtain-input-shield") != null && Time.realtimeSinceStartup < openBy) yield return null;
             var idleFrames = sprites.Select(_ => new HashSet<int>()).ToArray();
             float deadline = Time.realtimeSinceStartup + 2.2f;
             while (idleFrames.Any(frames => frames.Count < 8) && Time.realtimeSinceStartup < deadline)
@@ -1401,6 +1423,272 @@ namespace RaidPartyManager.Tests
         private static int FrameRow(Image sprite) => Mathf.RoundToInt(sprite.sourceRect.y / sprite.sourceRect.height);
         private static int FrameColumn(Image sprite) => Mathf.RoundToInt(sprite.sourceRect.x / sprite.sourceRect.width);
 
+        private static IEnumerator LoadDockBattle()
+        {
+            void ChooseDock(Scene loaded, LoadSceneMode mode)
+            {
+                if (loaded.name != "BattlePrototype") return;
+                var battle = Object.FindAnyObjectByType<BattlePrototype>();
+                var field = typeof(BattlePrototype).GetField("battleBackgrounds", PrivateInstance);
+                var choices = (Texture2D[])field.GetValue(battle);
+                field.SetValue(battle, choices.Where(texture => texture.name.StartsWith("01-")).ToArray());
+            }
+            SceneManager.sceneLoaded += ChooseDock;
+            try { yield return SceneManager.LoadSceneAsync("BattlePrototype"); }
+            finally { SceneManager.sceneLoaded -= ChooseDock; }
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator DockFloorMeetsTheApronAndRestsOnItsJoistsAtEveryFraming()
+        {
+            yield return LoadDockBattle();
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var house = Object.FindAnyObjectByType<DockPlayhouse>().transform;
+            var port = house.Find("Half-round stage/Port gallery").GetComponent<MeshFilter>().sharedMesh.vertices;
+            var starboard = house.Find("Half-round stage/Starboard gallery").GetComponent<MeshFilter>().sharedMesh.vertices;
+            Assert.That(port.Length, Is.EqualTo(starboard.Length));
+            float mirrorError = port.Zip(starboard, (p, q) => (p - new Vector3(-q.x, q.y, q.z)).magnitude).Max();
+            Assert.That(mirrorError, Is.LessThan(.0001f));
+            var loft = house.Find("Half-round stage/Fly loft").GetComponent<MeshFilter>().sharedMesh;
+            var crown = loft.vertices.Where(v => Mathf.Abs(v.y - loft.bounds.max.y) < .001f).ToArray();
+            Assert.That(crown.Max(v => v.z) - crown.Min(v => v.z), Is.GreaterThan(11.9f),
+                "The ceiling must stay level from the front of the house to the rear.");
+            var aft = house.Find("Half-round stage/Backcloth opening");
+            Assert.That((aft.localPosition.z - 7.165f) / aft.localScale.x, Is.EqualTo(.5f).Within(.001f));
+            var apron = house.Find("Apron").GetComponent<MeshFilter>();
+            var timber = house.Find("Half-round stage/Deck and joists").GetComponent<Renderer>();
+            var floor = scene.transform.Find("Paper Theatre/Stage floor").GetComponent<Renderer>();
+            var stage = typeof(BattlePrototype).GetField("stage", PrivateInstance).GetValue(scene);
+            var frame = stage.GetType().GetMethod("Update");
+            var camera = Camera.main;
+            float initialAspect = camera.aspect;
+            // Only back-edge plank vertices are shared with the playing floor. Lamps are higher, further downstage.
+            float rearZ = apron.sharedMesh.bounds.max.z;
+            Vector3 joint = apron.sharedMesh.vertices.Where(v => Mathf.Abs(v.z - rearZ) < .001f)
+                .OrderByDescending(v => v.y).First();
+            try
+            {
+                foreach (float aspect in new[] { 16f / 9, 4f / 3, 21f / 9 })
+                foreach (float baseline in new[] { .24f, .30f, .40f })
+                {
+                    camera.aspect = aspect;
+                    frame.Invoke(stage, new object[] { Time.unscaledTimeAsDouble, baseline, .8f, .1f });
+                    var edge = apron.transform.TransformPoint(joint);
+                    Bounds ceiling = house.Find("Half-round stage/Fly loft").GetComponent<Renderer>().bounds;
+                    Bounds deckBounds = timber.bounds;
+                    foreach (var masking in new[] { "Portal and traveller rail", "Curtain L", "Curtain R" })
+                        Assert.That(house.Find(masking).GetComponent<Renderer>().bounds.max.z,
+                            Is.LessThan(deckBounds.min.z - .05f), masking + " must stay downstage of the rotating deck.");
+                    float sweptRadius = new Vector2(deckBounds.extents.x, deckBounds.extents.y).magnitude;
+                    Assert.That(ceiling.min.y - (deckBounds.center.y + sweptRadius), Is.GreaterThan(1),
+                        "The loft must clear the entire semicircle, including the joists, during its half-turn.");
+                    var bottomRear = new Vector3(ceiling.center.x, ceiling.min.y, ceiling.max.z);
+                    Assert.That(camera.WorldToViewportPoint(bottomRear).y, Is.GreaterThan(1.02f),
+                        "Even the farthest underside of the ceiling must be above the audience's view.");
+                    Assert.That(timber.bounds.size.x, Is.EqualTo(2 * timber.bounds.size.z).Within(.002f));
+                    var cloth = scene.transform.Find("Paper Theatre/Cyclorama").GetComponent<MeshFilter>();
+                    var pattern = cloth.sharedMesh;
+                    Assert.That(pattern.subMeshCount, Is.EqualTo(1));
+                    var rim = pattern.vertices.Where(v => Mathf.Abs(v.y) < .001f).ToArray();
+                    Assert.That(rim.Min(v => v.x), Is.EqualTo(-1).Within(.001f));
+                    Assert.That(rim.Max(v => v.x), Is.EqualTo(1).Within(.001f));
+                    Assert.That(rim.All(v => v.z >= -.001f && Mathf.Abs(v.x*v.x + v.z*v.z - 1) < .001f), Is.True);
+                    var uv = pattern.uv.Where(t => t.y < .001f).Select(t => t.x).ToArray();
+                    Assert.That(uv[0], Is.EqualTo(0));
+                    Assert.That(uv[uv.Length-1], Is.EqualTo(1));
+                    Assert.That(uv.Zip(uv.Skip(1), (a, b) => b > a).All(increases => increases), Is.True);
+                    Assert.That(cloth.GetComponent<Renderer>().bounds.max.z, Is.EqualTo(timber.bounds.max.z).Within(.002f));
+                    Assert.That(timber.bounds.min.z, Is.EqualTo(edge.z).Within(.0002f));
+                    Assert.That(timber.bounds.max.y, Is.EqualTo(edge.y).Within(.0002f));
+                    Assert.That(floor.bounds.min.z, Is.EqualTo(edge.z).Within(.0002f));
+                    Assert.That(floor.bounds.center.y - timber.bounds.max.y, Is.EqualTo(.001f).Within(.0002f));
+                    Assert.That(floor.bounds.center.y, Is.EqualTo(.001f).Within(.0002f));
+                    Assert.That(floor.bounds.max.z, Is.EqualTo(timber.bounds.max.z).Within(.0002f));
+                    Assert.That(floor.bounds.min.x, Is.EqualTo(timber.bounds.min.x).Within(.0002f));
+                    Assert.That(floor.bounds.max.x, Is.EqualTo(timber.bounds.max.x).Within(.0002f));
+                }
+                if (SystemInfo.graphicsDeviceType != UnityEngine.Rendering.GraphicsDeviceType.Null)
+                    AssertPlanksReachTheJoint(camera, floor);
+            }
+            finally { camera.aspect = initialAspect; }
+        }
+
+        private static void AssertPlanksReachTheJoint(Camera camera, Renderer floor)
+        {
+            var target = RenderTexture.GetTemporary(672, 288, 24);
+            var originalTarget = camera.targetTexture;
+            var clear = camera.backgroundColor;
+            int mask = camera.cullingMask;
+            int layer = floor.gameObject.layer;
+            try
+            {
+                floor.gameObject.layer = 30;
+                camera.cullingMask = 1 << 30;
+                camera.backgroundColor = Color.magenta;
+                camera.targetTexture = target;
+                camera.Render();
+                // The old view-space clip discarded the front planks at this framing.
+                var point = new Vector3(floor.bounds.center.x, floor.bounds.center.y, floor.bounds.min.z + .12f);
+                var view = camera.WorldToViewportPoint(point);
+                var region = new Rect(view.x - .004f, 1 - view.y - .004f, .008f, .008f);
+                var pixels = ReadRenderedRegion(target, new Rect(0, 0, 1, 1), region);
+                Assert.That(pixels.All(pixel => pixel.r < 245 || pixel.b < 245), Is.True);
+            }
+            finally
+            {
+                camera.targetTexture = originalTarget;
+                camera.backgroundColor = clear;
+                camera.cullingMask = mask;
+                floor.gameObject.layer = layer;
+                RenderTexture.ReleaseTemporary(target);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator BothPortalPostsMaskTheMovingCast()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("Stage occlusion requires a graphics device.");
+            yield return LoadDockBattle();
+            var stage = Object.FindAnyObjectByType<BattlePrototype>().transform.Find("Paper Theatre");
+            var house = Object.FindAnyObjectByType<DockPlayhouse>().transform;
+            var portal = house.Find("Portal and traveller rail");
+            var camera = Camera.main;
+            var target = RenderTexture.GetTemporary(960, 540, 24);
+            var previous = camera.targetTexture;
+            int oldMask = camera.cullingMask, oldLayer = portal.gameObject.layer;
+            // Bright ink at entrance sorting order, crossing both jambs. The window must still show the ink.
+            var card = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            var actor = card.GetComponent<MeshRenderer>();
+            actor.sharedMaterial = stage.Find("Right wing").GetComponent<Renderer>().sharedMaterial;
+            actor.sortingOrder = 5;
+            var ink = new MaterialPropertyBlock();
+            ink.SetColor("_Color", Color.magenta);
+            ink.SetTexture("_MainTex", Texture2D.whiteTexture);
+            actor.SetPropertyBlock(ink);
+            try
+            {
+                card.layer = portal.gameObject.layer = 30;
+                camera.cullingMask = 1 << 30;
+                camera.targetTexture = target;
+                card.transform.position = house.TransformPoint(new Vector3(0, -.24f, 7.53f));
+                card.transform.localScale = new Vector3(24, 3, 1);
+                camera.Render();
+                foreach (int side in new[] { -1, 1 })
+                {
+                    bool InkAt(float x)
+                    {
+                        var uv = camera.WorldToViewportPoint(house.TransformPoint(new Vector3(side * x, -.24f, 7.81f)));
+                        var region = new Rect(uv.x - .002f, 1 - uv.y - .004f, .004f, .008f);
+                        return ReadRenderedRegion(target, new Rect(0, 0, 1, 1), region)
+                            .All(p => p.r > 150 && p.b > 150 && p.g < 50);
+                    }
+                    Assert.That(InkAt(3.70f), Is.True, "Incoming ink should be visible inside the portal.");
+                    Assert.That(InkAt(4.12f), Is.False, "The front post must occlude an incoming actor.");
+                }
+            }
+            finally
+            {
+                camera.targetTexture = previous;
+                camera.cullingMask = oldMask;
+                portal.gameObject.layer = oldLayer;
+                Object.Destroy(card);
+                RenderTexture.ReleaseTemporary(target);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator DockMoonHangsFromTheLoftAndIlluminatesThePlayingBoards()
+        {
+            if (SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Null)
+                Assert.Ignore("Moonlight verification requires a graphics device.");
+
+            yield return LoadDockBattle();
+            var stage = Object.FindAnyObjectByType<BattlePrototype>().transform.Find("Paper Theatre");
+            var sky = stage.Find("Cyclorama");
+            var floor = stage.Find("Stage floor");
+            var house = Object.FindAnyObjectByType<DockPlayhouse>().transform;
+            var hook = house.Find("Half-round stage/Fly loft/Moon shackle");
+            var lantern = hook.Find("Flown moon lantern");
+            Assert.That(lantern.gameObject.activeInHierarchy, Is.True);
+            var lift = lantern.Find("Hemp lift line");
+            Assert.That(Vector3.Distance(lift.TransformPoint(Vector3.up), hook.position), Is.LessThan(.001f));
+            Assert.That(hook.position.z, Is.LessThan(house.Find("Half-round stage/Backcloth opening").position.z - 2f));
+            var lens = lantern.Find("Illuminated silk").gameObject;
+            var lamp = lantern.GetComponentInChildren<Light>();
+            Assert.That(lamp.type, Is.EqualTo(LightType.Spot));
+            int lensLayer = lens.layer;
+            var cargoShadow = stage.Find("Left wing/Moon shadow").gameObject;
+            int shadowLayer = cargoShadow.layer;
+            var material = sky.GetComponent<MeshRenderer>().sharedMaterial;
+            Assert.That(material.IsKeywordEnabled("RPM_DOCK_MOON"), Is.True);
+
+            var camera = Camera.main;
+            var originalTarget = camera.targetTexture;
+            int originalMask = camera.cullingMask;
+            int skyLayer = sky.gameObject.layer, floorLayer = floor.gameObject.layer;
+            var target = new RenderTexture(960, 540, 24);
+            target.Create();
+            try
+            {
+                sky.gameObject.layer = floor.gameObject.layer = lens.layer = 30;
+                camera.cullingMask = 1 << 30;
+                camera.targetTexture = target;
+                yield return null;
+                yield return null;
+                Vector3 moon = material.GetVector("_MoonWorld");
+                Vector3 landing = material.GetVector("_MoonLanding");
+                var paint = new MaterialPropertyBlock();
+                sky.GetComponent<Renderer>().GetPropertyBlock(paint);
+                var crop = paint.GetVector("_MainTex_ST");
+                Assert.That(crop.x, Is.EqualTo(1), "A single uninterrupted image must span both wings.");
+                Assert.That(crop.z, Is.EqualTo(0));
+                Assert.That(paint.GetTexture("_MainTex").name, Is.EqualTo("Harbour"));
+                Assert.That(Vector3.Distance(moon, lantern.position), Is.LessThan(.001f));
+                Assert.That(moon.z, Is.LessThan(sky.GetComponent<Renderer>().bounds.max.z - 2));
+                Assert.That(moon.y, Is.LessThan(hook.position.y));
+                Assert.That(landing.z, Is.EqualTo(0).Within(1f));
+
+                float BrightnessAround(Vector3 point)
+                {
+                    Vector3 v = camera.WorldToViewportPoint(point);
+                    var region = new Rect(v.x - .008f, 1 - v.y - .008f, .016f, .016f);
+                    Assert.That(new Rect(0, 0, 1, 1).Contains(region.min), Is.True);
+                    var pixels = ReadRenderedRegion(target, new Rect(0, 0, 1, 1), region);
+                    return (float)pixels.Average(c => (c.r + c.g + c.b) / 3f);
+                }
+                camera.Render();
+                float litDisc = BrightnessAround(moon), litDeck = BrightnessAround(landing);
+                var boardArea = new Rect(.02f, .52f, .96f, .46f);
+                var screen = new Rect(0, 0, 1, 1);
+                var bareBoards = ReadRenderedRegion(target, screen, boardArea);
+                cargoShadow.layer = 30;
+                camera.Render();
+                var withShadow = ReadRenderedRegion(target, screen, boardArea);
+                int shadedPixels = bareBoards.Zip(withShadow, (a, b) => a.r - b.r).Count(drop => drop > 4);
+                Assert.That(shadedPixels, Is.GreaterThan(25), "Cargo must cast a visible shadow on the dock.");
+                cargoShadow.layer = shadowLayer;
+                material.DisableKeyword("RPM_DOCK_MOON");
+                lens.layer = lensLayer;
+                camera.Render();
+                Assert.That(litDisc, Is.GreaterThan(BrightnessAround(moon) + 8));
+                Assert.That(litDeck, Is.GreaterThan(BrightnessAround(landing) + 8));
+            }
+            finally
+            {
+                material.EnableKeyword("RPM_DOCK_MOON");
+                lens.layer = lensLayer;
+                sky.gameObject.layer = skyLayer;
+                floor.gameObject.layer = floorLayer;
+                cargoShadow.layer = shadowLayer;
+                camera.cullingMask = originalMask;
+                camera.targetTexture = originalTarget;
+                target.Release();
+                Object.Destroy(target);
+            }
+        }
+
         [UnityTest]
         public IEnumerator AttackWindupRepaintsTheRenderedCharacterBeforeTheProjectile()
         {
@@ -1413,12 +1701,13 @@ namespace RaidPartyManager.Tests
             SetAttackAnimationTimeScale(scene, 0.70f);
             var document = scene.GetComponent<UIDocument>();
             var root = document.rootVisualElement;
-            var originalTarget = document.panelSettings.targetTexture;
+            var camera = Camera.main;
+            var originalTarget = camera.targetTexture;
             var target = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
             target.Create();
             try
             {
-                document.panelSettings.targetTexture = target;
+                camera.targetTexture = target;
                 yield return null;
                 yield return null;
                 Press(root, "start");
@@ -1434,11 +1723,27 @@ namespace RaidPartyManager.Tests
                         int column = FrameColumn(pose);
                         if ((column == 0 && firstPose == null) || (column == 3 && firstPose != null))
                         {
-                            yield return null; // Let the changed atlas region reach the rendered panel.
+                            yield return null; // Let the pose reach the stage renderer.
                             if (pose.panel != null && FrameRow(pose) == 0 && FrameColumn(pose) == column)
                             {
                                 Assert.That(root.Q("battle-projectile"), Is.Null);
                                 Rect body = root.Q("party-position-2").Q<Image>("battle-sprite").worldBound;
+                                var paper = scene.transform.Find("Paper Theatre").GetComponentsInChildren<MeshRenderer>()
+                                    .Single(view => view.enabled && view.name == "battle-attack-pose");
+                                // Isolate the actor so moving scenery cannot count towards the pixel difference.
+                                int layer = paper.gameObject.layer;
+                                int mask = camera.cullingMask;
+                                try
+                                {
+                                    paper.gameObject.layer = 30;
+                                    camera.cullingMask = 1 << 30;
+                                    camera.Render();
+                                }
+                                finally
+                                {
+                                    camera.cullingMask = mask;
+                                    paper.gameObject.layer = layer;
+                                }
                                 var pixels = ReadRenderedRegion(target, root.worldBound, body);
                                 if (column == 0)
                                     firstPose = pixels;
@@ -1459,7 +1764,7 @@ namespace RaidPartyManager.Tests
             }
             finally
             {
-                document.panelSettings.targetTexture = originalTarget;
+                camera.targetTexture = originalTarget;
                 target.Release();
                 Object.Destroy(target);
             }

@@ -20,6 +20,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D chestAjar;
         [SerializeField] private Texture2D chestOpen;
 
+        public EncounterAsset EncounterAsset => encounter;
         public EncounterData Encounter => encounter.ToData();
         public Texture2D Backdrop => backdrop;
         public Texture2D RouteSignpost => routeSignpost;

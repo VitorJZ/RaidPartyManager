@@ -241,6 +241,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 35ad71dc713547a082502642143b50b4, type: 3}
   m_Name:
   m_EditorClassIdentifier: RaidPartyManager.Presentation::RaidPartyManager.Presentation.DockTown
+  stageArt: {fileID: 11400000, guid: 4cd3bc80cc27484fbd1549bdc64f63cb, type: 2}
   assets: {fileID: 11400000, guid: a1428cde7eca4031befb94f7db252b7e, type: 2}
 --- !u!114 &1741968123
 MonoBehaviour:
