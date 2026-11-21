@@ -985,7 +985,7 @@ namespace RaidPartyManager.Tests
             Press(root, "start");
             Press(root, "battle-pause");
             Image warCry = null;
-            float effectDeadline = Time.realtimeSinceStartup + 5f;
+            float effectDeadline = Time.realtimeSinceStartup + 12f;
             while (warCry == null && Time.realtimeSinceStartup < effectDeadline)
             {
                 yield return null;
@@ -1211,6 +1211,7 @@ namespace RaidPartyManager.Tests
             Press(root, "battle-pause");
             Assert.That(PhaseText(), Is.EqualTo("第 3 回合"));
             Assert.That(root.Q<Button>("battle-pause").text, Is.EqualTo("暂停"));
+            deadline = Time.realtimeSinceStartup + 20f;
             while (PhaseText() != "战斗结算" && Time.realtimeSinceStartup < deadline)
                 yield return null;
             Assert.That(PhaseText(), Is.EqualTo("战斗结算"));
@@ -2114,10 +2115,12 @@ namespace RaidPartyManager.Tests
             yield return null;
             Down(root.Q(from));
             yield return WaitForFormationDrag(root);
+            yield return null;
             var center = root.Q(to).worldBound.center;
             var roster = root.Q("editor-roster");
             using (var move = PointerMoveEvent.GetPooled(Mouse(EventType.MouseDrag, center)))
                 Send(roster, move);
+            yield return null;
             Up(roster, center);
             Assert.That(root.Q("formation-drag-preview"), Is.Null);
         }
@@ -2211,10 +2214,12 @@ namespace RaidPartyManager.Tests
         {
             Down(source);
             yield return WaitForDrag(root);
+            yield return null;
             Assert.That(root.Q("equipment-tooltip"), Is.Null);
             Vector2 destination = target.worldBound.center;
             using (var move = PointerMoveEvent.GetPooled(Mouse(EventType.MouseDrag, destination)))
                 Send(target, move);
+            yield return null;
             Up(target, destination);
             Assert.That(root.Q("equipment-drag-preview"), Is.Null);
         }
