@@ -522,7 +522,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("equipment-position-2").Q("equipment-slot-2").Q<Image>().image, Is.Not.Null);
             Press(root, "open-party-editor");
             Press(root, "edit-member-mage");
-            Assert.That(FindBackpackCell(root, "edit-item-gear-201"), Is.Not.Null);
+            Assert.That(FindBackpackCell(root, VictoryRewardItemName()), Is.Not.Null);
         }
 
         [UnityTest]
@@ -1146,7 +1146,8 @@ namespace RaidPartyManager.Tests
             root = Object.FindAnyObjectByType<BattlePrototype>().GetComponent<UIDocument>().rootVisualElement;
             Press(root, "open-party-editor");
             Press(root, "edit-member-guard");
-            var rewardCell = FindBackpackCell(root, "edit-item-gear-201");
+            string rewardName = VictoryRewardItemName();
+            var rewardCell = FindBackpackCell(root, rewardName);
             Assert.That(rewardCell, Is.Not.Null);
             yield return null;
             string rewardCellName = rewardCell.name;
@@ -1154,21 +1155,21 @@ namespace RaidPartyManager.Tests
             yield return WaitForDrag(root);
             Up(root.Q("character-details-layer").ElementAt(0), Vector2.one);
             Assert.That(root.Q("equipment-drag-preview"), Is.Null);
-            Assert.That(root.Q(rewardCellName).Q("edit-item-gear-201"), Is.Not.Null);
+            Assert.That(root.Q(rewardCellName).Q(rewardName), Is.Not.Null);
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("精钢壁垒"));
 
             yield return Drag(root, root.Q(rewardCellName), root.Q("edit-slot-1"));
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("狂战士之印"));
-            Assert.That(root.Q(rewardCellName).Q("edit-item-gear-201"), Is.Not.Null);
+            Assert.That(root.Q(rewardCellName).Q(rewardName), Is.Not.Null);
             Assert.That(root.Q(rewardCellName).Q("equipped-item-border"), Is.Not.Null);
             yield return null;
-            var emptyCell = root.Q("bag-cell-201");
+            var emptyCell = root.Q("bag-cell-" + (int.Parse(rewardCellName.Substring("bag-cell-".Length)) + 1));
             Assert.That(emptyCell, Is.Not.Null);
             yield return Drag(root, root.Q("edit-slot-1"), emptyCell);
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("装备槽 2"));
-            Assert.That(root.Q(emptyCell.name).Q("edit-item-gear-201"), Is.Not.Null);
+            Assert.That(root.Q(emptyCell.name).Q(rewardName), Is.Not.Null);
             Assert.That(root.Q(emptyCell.name).Q("equipped-item-border"), Is.Null);
-            Assert.That(root.Query("edit-item-gear-201").ToList().Count, Is.EqualTo(1));
+            Assert.That(root.Query(rewardName).ToList().Count, Is.EqualTo(1));
             Press(root, "close-character-details");
             Press(root, "back-party-editor");
             Assert.That(root.Q<Button>("start").enabledInHierarchy, Is.True);
@@ -2144,6 +2145,14 @@ namespace RaidPartyManager.Tests
             Up(target, portrait.worldBound.center);
             Assert.That(root.Q("quick-equipment"), Is.Null);
             Assert.That(root.Q("character-details"), Is.Null);
+        }
+
+        private static string VictoryRewardItemName()
+        {
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var run = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+            var content = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
+            return "edit-item-" + run.Inventory.Last(item => item.Definition.Id == content.VictoryReward.Id).Id;
         }
 
         private static VisualElement FindBackpackCell(VisualElement root, string itemName)
