@@ -14,12 +14,50 @@ namespace RaidPartyManager.Battle
             var enemies = Opponents(actor).ToArray();
             var allies = units.Where(unit => unit.Input.Side == actor.Input.Side && unit.Health > 0).ToArray();
 
-            foreach (var book in actor.Original.LearnedSkills.Where(book => book.Cost <= actor.Energy.Remaining))
+            int highestCost = actor.Original.LearnedSkills.Max(book => book.Cost);
+            bool savingForSkill = false;
+            foreach (var book in actor.Original.LearnedSkills)
             {
+                bool charging = book.Cost > actor.Energy.Remaining;
+                if (charging && book.Cost > actor.Energy.Remaining + Math.Max(0, highestCost - actor.Energy.Capacity)) continue;
                 var action = new ActionDefinition(book.Id, book.Name, ActionKind.Shield, TargetRule.Self, 0);
                 int attack = CurrentAttack(actor);
                 switch (book.SkillEffect)
                 {
+                    case BlockadeSalvo:
+                        Add(actor, enemies.Reverse().Take(2).Sum(e => (long)Estimate(e, attack + 3, DamageType.Physical) + 1));
+                        break;
+                    case DeepwaterSurge:
+                        foreach (var foe in TargetableOpponents(actor))
+                            Add(foe, Estimate(foe, attack + 3, DamageType.Magic) + 3L);
+                        break;
+                    case BurialEdict:
+                        var front = enemies.First();
+                        Add(front, Estimate(front, 2 * attack + 2, DamageType.Physical) + 2L * enemies.Length);
+                        break;
+                    case LongNightPrayer:
+                        Add(actor, allies.Sum(ally => 5L + HealingGain(ally, 5) +
+                            ally.Statuses.Keys.Count(status => StatusRules.For(status).Negative)));
+                        break;
+                    case HookArrow:
+                        var rear = enemies.Last();
+                        Add(rear, Estimate(rear, attack + 3, DamageType.Physical) + 1); break;
+                    case TwinCover: Add(actor, Behind(actor) != null ? 8 : 4); break;
+                    case FieldMedic:
+                        foreach (var ally in allies) Add(ally, Math.Min(8, ally.Stats.Health - ally.Health) +
+                            4 * (ally.Layers(Poison) + ally.Layers(Cursed))); break;
+                    case ColdTide: Add(actor, enemies.Sum(e => (long)Estimate(e, attack + 1, DamageType.Magic) + 2)); break;
+                    case BronzeMirror when actor.MirrorShield == 0: Add(actor, 20); break;
+                    case NightWatch: Add(actor, allies.Sum(a => (long)HealingGain(a, 7))); break;
+                    case SiegeBolt:
+                        foreach (var foe in enemies) Add(foe, foe.Shield + Estimate(foe, 2 * attack + 4, DamageType.Physical) +
+                            NearbyEnemies(actor, foe).Where(e => e != foe).Sum(e => (long)Estimate(e, attack + 2, DamageType.Physical))); break;
+                    case Intercept when allies.Length > 1 && (actor.Intercepts == 0 || actor.InterceptUntil < Round): Add(actor, 15); break;
+                    case BackPay:
+                        foreach (var dead in units.Where(u => u.Input.Side == actor.Input.Side && u.Health == 0 && !u.CorpseConsumed))
+                            Add(dead, dead.Stats.Health + 5); break;
+                    case ThunderVerdict when actor.ThunderRound <= Round:
+                        Add(actor, enemies.Sum(e => (long)Estimate(e, 2 * attack + 6, DamageType.Lightning))); break;
                     case WarCry when !actor.DoubleNextAttack && attack > 0:
                         Add(actor, attack);
                         break;
@@ -95,14 +133,16 @@ namespace RaidPartyManager.Battle
 
                 void Add(Unit target, long projected)
                 {
-                    if (projected > 0)
-                        options.Add(new ActionOption(action, target.Snapshot(), target.Health,
+                    if (projected <= 0) return;
+                    if (charging) savingForSkill = true;
+                    else options.Add(new ActionOption(action, target.Snapshot(), target.Health,
                             (int)Math.Min(int.MaxValue, projected), book: book));
                 }
 
                 int Estimate(Unit target, int power, DamageType type) =>
                     Math.Min(target.Health, ProjectedDamage(actor, target, new[] { (type, power) }));
             }
+            if (savingForSkill) options.RemoveAll(option => option.Book != null);
         }
 
         private static int HealingGain(Unit target, int power) => target.Layers(Cursed) > 0 ? 0 :
@@ -111,7 +151,7 @@ namespace RaidPartyManager.Battle
         private static bool CanAffect(Unit target, StatusKind status) =>
             target.Layers(Purity) == 0 && (status == Poison || target.Layers(status) == 0);
 
-        private static int ArrowPower(Unit target) => Math.Max(1, target.Health / 10);
+        private static int ArrowPower(Unit target) => Math.Max(1, target.Health / 5);
 
         private IEnumerable<Unit> NearbyEnemies(Unit actor, Unit target) =>
             Opponents(actor).Where(enemy => Math.Abs(enemy.Input.Position - target.Input.Position) <= 1);
@@ -123,9 +163,79 @@ namespace RaidPartyManager.Battle
             Report(BattleEventKind.Action, actor, actor, book.Name, ActionKind.Shield,
                 detail: $"消耗 {book.Cost} 点能量", actorEnergy: actor.Energy, skillBookId: book.Id);
 
+            RefundHardFight(actor);
             int attack = CurrentAttack(actor);
             switch (book.SkillEffect)
             {
+                case BlockadeSalvo:
+                    foreach (var enemy in Opponents(actor).Reverse().Take(2).ToArray())
+                    {
+                        DamageEnemy(enemy, attack + 3, DamageType.Physical);
+                        if (enemy.Health > 0) Apply(enemy, Exposed);
+                    }
+                    break;
+                case DeepwaterSurge:
+                    DamageEnemy(target, attack + 3, DamageType.Magic);
+                    foreach (var enemy in Opponents(actor).ToArray()) Apply(enemy, Chill, enemy == target ? 3 : 1);
+                    break;
+                case BurialEdict:
+                    DamageEnemy(target, 2 * attack + 2, DamageType.Physical);
+                    foreach (var enemy in Opponents(actor).ToArray()) Apply(enemy, Cursed, 2);
+                    break;
+                case LongNightPrayer:
+                    foreach (var ally in Allies().ToArray())
+                    {
+                        foreach (var status in ally.Statuses.Keys.Where(status => StatusRules.For(status).Negative).ToArray())
+                            RemoveLayers(ally, status, int.MaxValue);
+                        Show(ally);
+                        Restore(ally, 5);
+                        if (ally.Health > 0) ShieldAlly(actor, ally, 5, book.Name, book.Id);
+                    }
+                    break;
+                case HookArrow:
+                    DamageEnemy(target, attack + 3, DamageType.Physical);
+                    if (target.Health > 0) Apply(target, Exposed);
+                    break;
+                case TwinCover:
+                    ShieldAlly(actor, actor, 4, book.Name, book.Id);
+                    var behind = Behind(actor);
+                    if (behind != null) ShieldAlly(actor, behind, behind.Health * 2 <= behind.Stats.Health ? 7 : 4, book.Name, book.Id);
+                    break;
+                case FieldMedic:
+                    int cleansed = (RemoveLayers(target, Poison, int.MaxValue) ? 1 : 0) +
+                        (RemoveLayers(target, Cursed, int.MaxValue) ? 1 : 0);
+                    Restore(target, 8 + 2 * cleansed); break;
+                case ColdTide:
+                    foreach (var enemy in Opponents(actor).ToArray())
+                    {
+                        DamageEnemy(enemy, attack + 1, DamageType.Magic);
+                        if (enemy.Health > 0) Apply(enemy, Chill, 2);
+                    }
+                    break;
+                case BronzeMirror:
+                    actor.MirrorShield += ShieldAlly(actor, actor, 20, book.Name, book.Id); break;
+                case NightWatch:
+                    foreach (var ally in Allies().ToArray()) Restore(ally, 3);
+                    nightWatches.Add((actor, Round + 2)); break;
+                case SiegeBolt:
+                    var neighbors = NearbyEnemies(actor, target).Where(e => e != target).ToArray();
+                    target.Shield = target.MirrorShield = 0;
+                    target.ReliquaryWard = false;
+                    DamageEnemy(target, 2 * attack + 4, DamageType.Physical);
+                    foreach (var enemy in neighbors) DamageEnemy(enemy, attack + 2, DamageType.Physical);
+                    break;
+                case Intercept:
+                    actor.Intercepts = 3; actor.InterceptUntil = Round + 1; Show(actor); break;
+                case BackPay:
+                    target.Health = Math.Max(1, (int)Math.Ceiling(target.Stats.Health * .4));
+                    target.SpendEnergy(target.Energy.Remaining);
+                    target.BlockedRound = Round;
+                    UpdateEquipment();
+                    Report(BattleEventKind.Effect, actor, target, book.Name, ActionKind.Heal, target.Health,
+                        form: target.Input.Character, targetEnergy: target.Energy, skillBookId: book.Id);
+                    ShieldAlly(actor, target, 5, book.Name, book.Id);
+                    break;
+                case ThunderVerdict: actor.ThunderRound = Round + 1; Show(actor); break;
                 case WarCry:
                     actor.DoubleNextAttack = true;
                     Show(actor);
@@ -163,12 +273,12 @@ namespace RaidPartyManager.Battle
                     break;
                 case FleshFeast:
                     target.CorpseConsumed = true;
-                    actor.BonusMaximumHealth += 3;
-                    actor.Health += 3;
+                    actor.BonusMaximumHealth++;
                     UpdateEquipment();
                     Show(target);
-                    Report(BattleEventKind.Effect, actor, actor, book.Name, ActionKind.Heal, 3,
-                        detail: "生命上限 +3", form: actor.Input.Character, skillBookId: book.Id);
+                    Report(BattleEventKind.Effect, actor, actor, book.Name, ActionKind.Shield,
+                        detail: "生命上限永久 +1", form: actor.Input.Character, skillBookId: book.Id);
+                    Restore(actor, 3);
                     break;
                 case Sidestep:
                     Apply(actor, Swift, 2);

@@ -20,6 +20,7 @@ namespace RaidPartyManager.Presentation
             public readonly double Start;
             public readonly Texture2D WalkSheet;
             public readonly bool UsesPortrait;
+            public int LastStep = -1;
             public int DisplayedFrame = -1;
 
             public Arrival(Combatant unit, EncounterData content, double start, BattleStage stage)
@@ -93,6 +94,12 @@ namespace RaidPartyManager.Presentation
                 if (arrival.Figure.parent != layer)
                     layer.Add(arrival.Figure);
 
+                int step = (int)(elapsed / .29);
+                if (step != arrival.LastStep)
+                {
+                    GameAudio.Play(BattleSounds.Step(arrival.Unit.Character), .30f);
+                    arrival.LastStep = step;
+                }
                 int frame = (int)(elapsed * 15.0) % 6;
                 if (arrival.Figure is EntranceWalkPose pose)
                     pose.ShowFrame(frame);

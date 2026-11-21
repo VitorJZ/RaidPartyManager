@@ -40,8 +40,10 @@ namespace RaidPartyManager.Presentation
         private readonly Func<string, Texture2D> iconFor;
         private readonly Action changed;
         private readonly Action close;
+        private readonly Action openContract;
         private readonly int[] pages = new int[2];
         private bool showSkillBooks;
+        private bool showEmployeeDossier;
         private int Page
         {
             get => pages[showSkillBooks ? 1 : 0];
@@ -58,7 +60,7 @@ namespace RaidPartyManager.Presentation
         private Vector2 pointer;
 
         public CharacterEquipmentPopup(PartyRun run, string memberId, Texture2D portraitArt, Func<string, Texture2D> iconFor, List<string> bag,
-            Action changed, Action close)
+            Action changed, Action close, Action openContract, bool startAtDossier)
         {
             this.run = run;
             this.memberId = memberId;
@@ -67,6 +69,8 @@ namespace RaidPartyManager.Presentation
             this.bag = bag;
             this.changed = changed;
             this.close = close;
+            this.openContract = openContract;
+            showEmployeeDossier = startAtDossier;
 
             PrototypeStyle.Fill(this);
             style.alignItems = Align.Center;
@@ -114,27 +118,26 @@ namespace RaidPartyManager.Presentation
 
             var header = PrototypeStyle.Row();
             header.style.alignItems = Align.Center;
-            header.style.justifyContent = Justify.SpaceBetween;
+            header.style.marginBottom = 5;
             var name = PrototypeStyle.Text(selected.Character.Name, 24);
             name.name = "details-character-name";
-            name.style.flexShrink = 0;
+            name.style.minWidth = 0;
+            name.style.flexShrink = 1;
+            name.style.overflow = Overflow.Hidden;
+            name.style.textOverflow = TextOverflow.Ellipsis;
+            name.tooltip = selected.Character.Name;
             name.style.whiteSpace = WhiteSpace.NoWrap;
             header.Add(name);
-            var temperament = selected.Character.Personality;
-            var personality = PrototypeStyle.Row("details-personality");
-            personality.style.alignItems = Align.Center;
-            personality.style.minWidth = 0;
-            personality.style.marginTop = 2;
-            var personalityName = PrototypeStyle.Text($"{PersonalityText(temperament)}：", 14, PrototypeStyle.Accent);
-            personalityName.name = "details-personality-name";
-            personalityName.style.flexShrink = 0;
-            personalityName.style.whiteSpace = WhiteSpace.NoWrap;
-            personality.Add(personalityName);
-            var description = PrototypeStyle.Text(PersonalityDescription(temperament), 14, PrototypeStyle.Muted);
-            description.name = "details-personality-description";
-            description.style.flexShrink = 1;
-            description.style.minWidth = 0;
-            personality.Add(description);
+            var tabs = PrototypeStyle.Row("character-details-tabs");
+            tabs.style.flexGrow = 1;
+            tabs.style.flexShrink = 0;
+            tabs.style.marginLeft = 12;
+            if (!selected.IsAway)
+            {
+                AddTab("装备与技能", "open-character-loadout", false);
+                AddTab("员工档案", "open-employee-dossier", true);
+            }
+            header.Add(tabs);
             var dismiss = PrototypeStyle.Button("关闭", "close-character-details", close);
             dismiss.style.width = dismiss.style.height = 43;
             dismiss.style.flexShrink = 0;
@@ -144,7 +147,15 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(dismiss, PrototypeStyle.Accent, 23);
             header.Add(dismiss);
             dialog.Add(header);
-            dialog.Add(personality);
+            if (showEmployeeDossier)
+            {
+                dialog.style.height = Length.Percent(90);
+                dialog.Add(new EmployeeDossier(selected, run.EmployeeProfileFor(memberId), openContract));
+                Add(dialog);
+                return;
+            }
+            if (selected.Trait != PlayerTrait.None)
+                dialog.Add(PrototypeStyle.Text(PlayerMarket.Describe(selected.Trait), 13, PrototypeStyle.Accent));
 
             var body = PrototypeStyle.Row();
             body.style.alignItems = Align.Stretch;
@@ -162,6 +173,21 @@ namespace RaidPartyManager.Presentation
             body.Add(BuildBookmarks());
             dialog.Add(body);
             Add(dialog);
+
+            void AddTab(string title, string id, bool dossier)
+            {
+                var button = PrototypeStyle.Button(title, id, () =>
+                {
+                    if (showEmployeeDossier == dossier) return;
+                    CancelInteraction();
+                    showEmployeeDossier = dossier;
+                    Render();
+                    this.Q<Button>(id).Focus();
+                }, showEmployeeDossier == dossier);
+                button.style.marginRight = 6;
+                button.style.whiteSpace = WhiteSpace.NoWrap;
+                tabs.Add(button);
+            }
         }
 
         private VisualElement BuildSlots(MemberView member, IReadOnlyDictionary<string, EquipmentInstance> inventory)
@@ -171,7 +197,7 @@ namespace RaidPartyManager.Presentation
             slots.style.flexShrink = 0;
 
             var equipped = new VisualElement { name = "character-equipment" };
-            for (int slot = 0; slot < Rules.EquipmentSlots; slot++)
+            for (int slot = 0; slot < member.EquipmentIds.Count; slot++)
             {
                 var id = member.EquipmentIds[slot];
                 equipped.Add(BuildCell(CellKind.EquipmentSlot, slot, id == null ? null : inventory[id]));
@@ -287,7 +313,7 @@ namespace RaidPartyManager.Presentation
             backpack.style.flexShrink = 0;
             backpack.style.paddingLeft = backpack.style.paddingRight = BackpackPadding;
             var header = PrototypeStyle.Row();
-            header.style.justifyContent = Justify.SpaceBetween;
+            header.style.marginBottom = 5;
             header.style.alignItems = Align.Center;
             header.style.flexWrap = Wrap.Wrap;
             header.Add(PrototypeStyle.Text("共享背包", 17, PrototypeStyle.Accent));
@@ -486,10 +512,12 @@ namespace RaidPartyManager.Presentation
                 return;
 
             Cell from = source;
+            bool wasDragging = ghost != null;
             Cell target = ghost != null ? TargetAt(evt.position) : null;
             CancelInteraction();
             if (target != null)
                 ApplyDrop(from, target);
+            else if (wasDragging) GameAudio.Play(SoundCue.UiRestricted, .37f);
             evt.StopPropagation();
         }
 
@@ -556,6 +584,7 @@ namespace RaidPartyManager.Presentation
             {
                 if (!run.TryLearnSkill(memberId, target.Index, from.Item.Id))
                     return;
+                GameAudio.Play(SoundCue.SkillLearn);
                 slot = target;
             }
             else
@@ -566,6 +595,7 @@ namespace RaidPartyManager.Presentation
                 if (!run.TryEquip(memberId, slot.Index, unequipping ? null : bagCell.Item?.Id))
                     return;
 
+                GameAudio.Play(unequipping ? SoundCue.Unequip : SoundCue.Equip);
                 if (unequipping && bagCell.Item == null)
                 {
                     int oldCell = bag.IndexOf(slot.Item.Id);

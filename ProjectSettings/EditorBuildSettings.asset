@@ -29,5 +29,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/WhisperingGraveyard.unity
     guid: 1253004c96965cf4b333196219b7d923
+  - enabled: 1
+    path: Assets/Scenes/TalentMarket.unity
+    guid: d26926908ea3497daefb6dec2a0ebc2c
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

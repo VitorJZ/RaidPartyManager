@@ -20,6 +20,7 @@ namespace RaidPartyManager.Presentation
         private readonly EncounterData content;
         private readonly Func<int> readGold;
         private readonly Label gold;
+        private readonly Label calendar;
         private readonly VisualElement coin;
         private readonly VisualElement bag;
         private readonly VisualElement rewardLayer;
@@ -36,7 +37,7 @@ namespace RaidPartyManager.Presentation
         public RunTopBar(VisualElement root, PartyRun party, EncounterData content, Action openEditor = null,
             string editorName = "open-party-editor", Func<int> goldOverride = null, string goldName = "run-gold",
             VisualElement actions = null, Action<bool> settingsChanged = null, Action openEnemyEditor = null,
-            Action resetAdventure = null)
+            Action resetAdventure = null, IReadOnlyList<GoldExpense> expenseOverride = null)
         {
             this.root = root;
             this.party = party;
@@ -53,12 +54,17 @@ namespace RaidPartyManager.Presentation
             style.borderBottomColor = (Color)new Color32(72, 91, 94, 255);
             style.borderBottomWidth = 1;
 
-            var wallet = PrototypeStyle.Row("run-wallet");
+            var wallet = new Button(OpenLedger) { name = "run-wallet", tooltip = "查看最近三天的开销" };
+            wallet.style.flexDirection = FlexDirection.Row;
+            wallet.style.backgroundColor = Color.clear;
+            wallet.style.borderTopWidth = wallet.style.borderBottomWidth = wallet.style.borderLeftWidth = wallet.style.borderRightWidth = 0;
             wallet.style.alignItems = Align.Center;
             wallet.style.flexShrink = 0;
             wallet.style.marginRight = 13;
             coin = new GoldRewardIcon { name = "run-gold-icon" };
             coin.style.width = coin.style.height = 31;
+            calendar = PrototypeStyle.Text("", 15, PrototypeStyle.Ink);
+            calendar.name = "run-day"; wallet.Add(calendar);
             wallet.Add(coin);
             gold = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
             gold.name = goldName;
@@ -111,6 +117,39 @@ namespace RaidPartyManager.Presentation
             Add(settings);
             RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());
             Refresh();
+
+            void OpenLedger()
+            {
+                HideTooltip();
+                settingsChanged?.Invoke(true);
+                var underlying = DisableScreen(root);
+                var sheet = ContractPanel.Sheet("金币账单 · 最近三天", out var paper);
+                sheet.name = "expense-ledger";
+                int today = Math.Max(1, party.Day);
+                var entries = expenseOverride ?? party.Expenses;
+                for (int day = today; day >= Math.Max(1, today - 2); day--)
+                {
+                    var lines = entries.Where(e => e.Day == day).Reverse().ToArray();
+                    paper.Add(ContractPanel.Text($"第 {day} 天　·　支出 {lines.Sum(e => e.Amount)} 金币", 18));
+                    if (lines.Length == 0) paper.Add(ContractPanel.Text("当天没有开销", 14));
+                    foreach (var entry in lines)
+                        paper.Add(ContractPanel.Text($"{entry.Reason}　　 −{entry.Amount} 金币", 15));
+                }
+                void Close()
+                {
+                    sheet.RemoveFromHierarchy();
+                    EnableScreen(underlying);
+                    settingsChanged?.Invoke(false);
+                    this.Q<Button>("run-wallet")?.Focus();
+                }
+                var close = PrototypeStyle.Button("收起账单", "close-ledger", Close);
+                paper.Add(close);
+                sheet.RegisterCallback<KeyDownEvent>(evt => {
+                    if (evt.keyCode == KeyCode.Escape) { evt.StopPropagation(); Close(); }
+                });
+                root.Add(sheet);
+                close.Focus();
+            }
 
             void OpenSettings()
             {
@@ -315,6 +354,7 @@ namespace RaidPartyManager.Presentation
             {
                 _ = new RewardFlight(rewardLayer, origin, () => coin, new GoldRewardIcon(), delay, () =>
                 {
+                    GameAudio.Play(SoundCue.RewardGold);
                     flyingGold -= coins;
                     RefreshGold();
                     FinishFlight();
@@ -327,6 +367,7 @@ namespace RaidPartyManager.Presentation
                 var icon = new EquipmentIcon(item.Definition, content.IconFor(item.Definition.Id));
                 _ = new RewardFlight(rewardLayer, origin, () => items.Q(tileName) ?? bag, icon, delay, () =>
                 {
+                    GameAudio.Play(item.Definition is SkillBookDefinition ? SoundCue.RewardSkillbook : SoundCue.RewardLoot);
                     flyingItems.Remove(item.Id);
                     if (items.Q(tileName) is { } tile)
                     {
@@ -350,7 +391,21 @@ namespace RaidPartyManager.Presentation
             arrived?.Invoke();
         }
 
-        private void RefreshGold() => gold.text = $"金币  {Mathf.Max(0, readGold() - flyingGold)}";
+        private void RefreshGold()
+        {
+            calendar.text = party.Day > 0 ? $"第 {party.Day} 天　" : "";
+            gold.text = $"金币  {Mathf.Max(0, readGold() - flyingGold)}" +
+                (party.PayrollDebt > 0 ? $"　欠薪 {party.PayrollDebt}" : "");
+            calendar.tooltip = $"进入新节点时结算全队日薪 {party.Members.Sum(m => (long)(m.Contract?.DailyWage ?? 0))} 金币";
+            if (teamButton == null || party.Day == 0) return;
+            bool due = party.NeedsRenewal;
+            teamButton.style.backgroundColor = due ? new Color(.35f, .065f, .065f) : PrototypeStyle.Inset;
+            teamButton.Q("team-icon")?.MarkDirtyRepaint();
+            teamButton.tooltip = due ? "右击队员续约 · " + string.Join("、", party.Members
+                .Where(m => m.Contract.EndDay - party.Day <= 3)
+                .Select(m => $"{m.Character.Name}剩 {m.Contract.EndDay - party.Day} 天")) : "编队 · 右击队员查看合约";
+            if (!party.CanAdvanceDay) gold.text += "　出发前请续约";
+        }
 
         public void Refresh()
         {
@@ -422,14 +477,16 @@ namespace RaidPartyManager.Presentation
             pen.Fill();
         }
 
-        private static void DrawTeam(MeshGenerationContext context, Rect rect)
+        private void DrawTeam(MeshGenerationContext context, Rect rect)
         {
             float scale = Mathf.Min(rect.width, rect.height) / 30f;
             var center = rect.center;
             var pen = context.painter2D;
-            Person(-8, 0.77f, PrototypeStyle.Muted);
-            Person(8, 0.77f, PrototypeStyle.Muted);
-            Person(0, 1f, PrototypeStyle.Ink);
+            bool due = party.NeedsRenewal;
+            var rear = due ? new Color(1f, .39f, .35f) : PrototypeStyle.Muted;
+            Person(-8, 0.77f, rear);
+            Person(8, 0.77f, rear);
+            Person(0, 1f, due ? new Color(1f, .62f, .57f) : PrototypeStyle.Ink);
 
             void Person(float offset, float size, Color color)
             {

@@ -36,9 +36,11 @@ namespace RaidPartyManager.Presentation
             InspectionMode = true;
         }
 
+        private static bool IsBattleScene(string scene) => scene is "BattlePrototype" or "WhisperingGraveyard";
+
         internal static void ClearSceneContext()
         {
-            if (destination == "BattlePrototype") Active?.AbortBattle();
+            if (IsBattleScene(destination)) Active?.AbortBattle();
             destination = origin = null;
         }
 
@@ -114,9 +116,8 @@ namespace RaidPartyManager.Presentation
                     .Concat(gear.Where(item => item.Price > 0 && item.Tier == 2).OrderBy(_ => random.Next()).Take(2))
                 : gear.Where(item => !item.IsPotion && item.Tier is 1 or 2).OrderBy(_ => random.Next()).Take(2);
             var party = new PartyRun(members, bag);
-            if (inspectionMode)
-                party.AddGold(100);
-            return new AdventureRun(party, content.CharacterCatalog, gear.Concat(content.SkillBooks), inspectionMode, random);
+            party.AddGold(inspectionMode ? 100 : 50);
+            return new AdventureRun(party, content.CharacterCatalog, gear.Concat(content.SkillBooks), inspectionMode, random, foundingGrant: true);
         }
 
         private static AdventureRun LoadCheckpoint(EncounterData content)
@@ -271,6 +272,16 @@ namespace RaidPartyManager.Presentation
 
         internal static AdventureRun ForScene(string scene) => destination == scene ? Active : null;
 
+        internal static AdventureRun TalentMarketRun(AdventureContentAsset assets)
+        {
+            if (ForScene("TalentMarket") is { } current) return current;
+            var run = Select(assets, true);
+            if (run.Current?.Kind != NodeKind.Town) run.Inspect(NodeKind.Town);
+            origin = "Town";
+            destination = "TalentMarket";
+            return run;
+        }
+
         internal static void OpenNodeScene(string scene, bool fromTown = false)
         {
             DockPlayhouse.ChangeSet(() =>
@@ -278,14 +289,14 @@ namespace RaidPartyManager.Presentation
                 origin = fromTown ? "Town" : "EventSelect";
                 destination = scene;
                 PrototypeSceneMenu.OpenScene(scene);
-            });
+            }, turn: scene == "TalentMarket" ? StageTurn.Forward : StageTurn.Automatic);
         }
 
         internal static string SceneFor(NodeKind kind) => kind switch
         {
             NodeKind.Event or NodeKind.TreasureChest => "EventSelect",
-            NodeKind.Camp => "Camp", NodeKind.Shop => "DockShop", NodeKind.Town => "Town",
-            _ => "BattlePrototype"
+            NodeKind.Camp => "Camp", NodeKind.Shop or NodeKind.Town => "Town",
+            _ => Active?.InGraveyard == true ? "WhisperingGraveyard" : "BattlePrototype"
         };
 
         internal static void AddFollowingSigns(VisualElement parent, Texture2D timber, RunTopBar bar)
@@ -300,11 +311,11 @@ namespace RaidPartyManager.Presentation
             {
                 if (run.Current != visit || DockPlayhouse.Moving) return false;
                 var kind = run.FollowingChoice(index).Kind.Value;
-                if (kind is (NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss) && !run.Party.CanStartBattle)
+                if (!run.Party.CanAdvanceDay || kind is (NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss) && !run.Party.CanStartBattle)
                 {
                     if (signs.Q("route-entry-message") == null)
                     {
-                        var note = PrototypeStyle.Text("请先为队员安排出战站位。", 14);
+                        var note = PrototypeStyle.Text(!run.Party.CanAdvanceDay ? "请在编队中续约后再出发。" : "请先为队员安排出战站位。", 14);
                         note.name = "route-entry-message";
                         note.style.alignSelf = Align.Center;
                         signs.Add(note);
@@ -319,6 +330,7 @@ namespace RaidPartyManager.Presentation
                         parent.SetEnabled(true);
                         return;
                     }
+                    GameAudio.Play(SoundCue.UiMapMarker);
                     OpenNodeScene(SceneFor(kind));
                 });
                 return true;
@@ -347,8 +359,10 @@ namespace RaidPartyManager.Presentation
 
         internal static void ReturnFromNode()
         {
-            bool signs = origin != "Town" && (destination != "BattlePrototype" || Active.Current?.Resolved == true);
-            DockPlayhouse.ChangeSet(FinishReturn, signs);
+            // A district change must turn to the incoming set instead of holding the outgoing battle behind its signs.
+            bool signs = origin != "Town" && Active?.ClearingDock != true &&
+                (!IsBattleScene(destination) || Active?.Current?.Resolved == true);
+            DockPlayhouse.ChangeSet(FinishReturn, signs, destination == "TalentMarket" ? StageTurn.Reverse : StageTurn.Automatic);
         }
 
         private static void FinishReturn()
@@ -359,7 +373,7 @@ namespace RaidPartyManager.Presentation
                 PrototypeSceneMenu.OpenScene("Town");
                 return;
             }
-            if (destination != "BattlePrototype") Active.Leave();
+            if (!IsBattleScene(destination)) Active.Leave();
             else if (Active.Current?.Resolved == true)
             {
                 bool inspectedEvent = Active.IsInspection && Active.Current.Event.HasValue;
@@ -377,7 +391,7 @@ namespace RaidPartyManager.Presentation
             NodeKind.TreasureChest => "宝箱", _ => "Boss 战"
         };
 
-        internal static string EventName(AdventureEventKind kind) => kind switch
+        internal static string EventName(AdventureEventKind kind) => GraveStories.Contains(kind) ? GraveStories.Title(kind) : kind switch
         {
             AdventureEventKind.Investor => "引资的创业者", AdventureEventKind.Ambush => "随机敌人",
             AdventureEventKind.LostTraveler => "呼朋引伴", AdventureEventKind.FoundCoins => "捡到钱了",
@@ -391,7 +405,7 @@ namespace RaidPartyManager.Presentation
             Profession.Monster => "怪物", _ => "后勤"
         };
 
-        internal static string Narrative(AdventureEventKind kind) => kind switch
+        internal static string Narrative(AdventureEventKind kind) => GraveStories.Contains(kind) ? GraveStories.Intro(kind) : kind switch
         {
             AdventureEventKind.Investor => "诸位瞧，图纸上的船都快出海了，船坞里还欠一根桅杆。船主翻开账本，给您的名字留了个空。",
             AdventureEventKind.Ambush => "方才还有三盏灯，这会儿一盏也没了。听，那声刀出鞘，可不是我手里的醒铃！",

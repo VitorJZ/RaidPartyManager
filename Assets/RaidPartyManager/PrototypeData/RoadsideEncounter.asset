@@ -216,6 +216,11 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e2415aeadfc347cc9ddbc11b4e4b412b, type: 2}
   - {fileID: 11400000, guid: ffcda19142e640ce8235352195d987a4, type: 2}
   - {fileID: 11400000, guid: fe8a899e1e3043cfb9c0c4eb53c2cdf2, type: 2}
+  - {fileID: 11400000, guid: c1994474b2f15be7902b52d49b00d0ac, type: 2}
+  - {fileID: 11400000, guid: c212e915635c5e85b55c1fde75367447, type: 2}
+  - {fileID: 11400000, guid: 7e71c8b031275fbfa8c0d9ec1fcebb63, type: 2}
+  - {fileID: 11400000, guid: ccbb97354452529fbf8ff7edc9df3566, type: 2}
+  - {fileID: 11400000, guid: a5bba48446495a0a93589776090c80a8, type: 2}
   backpackIcon: {fileID: 2800000, guid: 6e47ea84955e41c9997c3d367af2fb70, type: 3}
   startingCopies: 4
   skillCatalog: {fileID: 11400000, guid: 5d2799f97ec448aab35b51a5ed0ce044, type: 2}

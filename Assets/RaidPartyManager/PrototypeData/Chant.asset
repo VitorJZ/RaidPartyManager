@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 16
   traitPower: 0
   traitText: "回合开始时，随机对1名队友施加增益状态"
-  personality: 8
+  personality: 2
   attack: 1
   defense: 0
   specialDefense: 0

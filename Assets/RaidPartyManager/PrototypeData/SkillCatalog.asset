@@ -123,7 +123,7 @@ MonoBehaviour:
     cost: 2
     skillEffect: 10
     tier: 3
-    description: "吞食1名敌方阵亡单位的尸体，生命值和上限+3"
+    description: "吞食1名敌方阵亡单位的尸体，自身生命上限永久增加1点，并恢复3点生命。"
   - number: 13
     displayName: "闪身步"
     icon: {fileID: 2800000, guid: 846e8c1aa4c743048df70dd7a77ffbeb, type: 3}
@@ -192,7 +192,137 @@ MonoBehaviour:
     icon: {fileID: 2800000, guid: b7d69feceeb4421086ec5e3f50006654, type: 3}
     battleEffect: {fileID: 2800000, guid: d6fa550683a44fd391e78f23e6374053, type: 3}
     requirement: 3
-    cost: 1
+    cost: 2
     skillEffect: 18
     tier: 3
-    description: "对目标造成当前生命值10%的真实伤害"
+    description: "对目标造成其当前生命值20%的真实伤害（向下取整，基础伤害至少为1）"
+  - number: 21
+    displayName: "钩月箭"
+    icon: {fileID: 2800000, guid: 33cc44d732da4f20b8713a3914263d25, type: 3}
+    battleEffect: {fileID: 2800000, guid: dee12c09af95445c9816da0e4f86a537, type: 3}
+    requirement: 3
+    cost: 3
+    skillEffect: 19
+    tier: 2
+    description: "对最后一名存活敌人造成（攻击力+3）点物理伤害。若目标仍存活，再施加1层破绽。"
+  - number: 22
+    displayName: "双人掩护"
+    icon: {fileID: 2800000, guid: 7f500a72610a4ecca645fd92dcd8dd61, type: 3}
+    battleEffect: {fileID: 2800000, guid: 09e449d46ad64c05a47f00fb8957b931, type: 3}
+    requirement: 5
+    cost: 3
+    skillEffect: 20
+    tier: 2
+    description: "自身和身后的队友各获4点护盾。队友半血或以下时，其护盾改为7点。"
+  - number: 23
+    displayName: "拔毒急救"
+    icon: {fileID: 2800000, guid: 1e349c2ef17c4645b2dbba439cb897eb, type: 3}
+    battleEffect: {fileID: 2800000, guid: 3f85ea0e0ac3446ea85dfe157e97cb98, type: 3}
+    requirement: 2
+    cost: 3
+    skillEffect: 21
+    tier: 2
+    description: "为1名存活友方清除中毒和诅咒，再恢复8点生命值。每清除一种状态，额外恢复2点。"
+  - number: 24
+    displayName: "冻港回潮"
+    icon: {fileID: 2800000, guid: 4a9a57b36fb84d9a8394b8123a1c3aab, type: 3}
+    battleEffect: {fileID: 2800000, guid: 24e19a497a00443a8c86c59604b5477a, type: 3}
+    requirement: 1
+    cost: 4
+    skillEffect: 22
+    tier: 1
+    description: "对全体敌人造成（攻击力+1）点魔法伤害，再施加2层寒冷。"
+  - number: 25
+    displayName: "铜墙反震"
+    icon: {fileID: 2800000, guid: 6cad286e16b94993928c5fce734fb9e8, type: 3}
+    battleEffect: {fileID: 2800000, guid: 104f0c817a8a414db7d9915565c7c72a, type: 3}
+    requirement: 5
+    cost: 4
+    skillEffect: 23
+    tier: 1
+    description: "获得20点护盾，护盾减少时，对伤害来源方造成等量的伤害。"
+  - number: 26
+    displayName: "守夜灯火"
+    icon: {fileID: 2800000, guid: 4572868d0f3b4cd98caea8bee1d1d338, type: 3}
+    battleEffect: {fileID: 2800000, guid: 166fa8abf8a244499ef15e23ff8c8ddd, type: 3}
+    requirement: 2
+    cost: 4
+    skillEffect: 24
+    tier: 1
+    description: "全体存活友方立即恢复3点生命值。接下来的2个回合开始时，全体存活友方各再恢复2点生命值。"
+  - number: 27
+    displayName: "攻城矢"
+    icon: {fileID: 2800000, guid: c9e2120c2e614a628c2486c90d49c133, type: 3}
+    battleEffect: {fileID: 2800000, guid: 8684ec99fed748898e3c49723522ff88, type: 3}
+    requirement: 3
+    cost: 6
+    skillEffect: 25
+    tier: 1
+    description: "移除1名敌人的护盾，对其造成（2×攻击力+4）点物理伤害。与其原站位相邻的存活敌人各受到（攻击力+2）点物理伤害。"
+  - number: 28
+    displayName: "铁壁接管"
+    icon: {fileID: 2800000, guid: 91b27089f37e4f988470f39705baf7ae, type: 3}
+    battleEffect: {fileID: 2800000, guid: c956113fbd9e4351afb379e203acb6cf, type: 3}
+    requirement: 5
+    cost: 6
+    skillEffect: 26
+    tier: 1
+    description: "替队友承受接下来的3次敌方单体攻击，自身仅受25%伤害，持续2个回合。"
+  - number: 29
+    displayName: "未结工钱"
+    icon: {fileID: 2800000, guid: 05e53b0be7f946468369a8e473417de8, type: 3}
+    battleEffect: {fileID: 2800000, guid: c2fe4cb71a9f44339398b1db6fec0407, type: 3}
+    requirement: 2
+    cost: 7
+    skillEffect: 27
+    tier: 1
+    description: "使1名阵亡队友以40%最大生命值复活，并获得5点护盾。复活时能量为0，当回合不能行动。"
+  - number: 30
+    displayName: "雷暴裁决"
+    icon: {fileID: 2800000, guid: e995758a911f44e2a5f880aaabd3f478, type: 3}
+    battleEffect: {fileID: 2800000, guid: 05733465533f471d85521e1422b551ec, type: 3}
+    requirement: 1
+    cost: 8
+    skillEffect: 28
+    tier: 1
+    description: "蓄力至下一回合开始。若施法者仍存活且未被眩晕，对全体敌人造成（2×攻击力+6）点雷电伤害。"
+  - number: 31
+    displayName: "封港连炮"
+    icon: {fileID: 2800000, guid: 297a76b3109353fcaaaa94d239d12906, type: 3}
+    battleEffect: {fileID: 2800000, guid: 5b87537a52aa53b6995034a0151d5c7f, type: 3}
+    requirement: 3
+    cost: 1
+    skillEffect: 29
+    tier: 0
+    rewardBossId: EnemyBlockadeAdmiral
+    description: "对最后两名敌人各造成（攻击力+3）点物理伤害，并对存活目标各施加1层破绽。"
+  - number: 32
+    displayName: "深水翻涌"
+    icon: {fileID: 2800000, guid: b8ac289e35fe56da8e1bef61f5d7c911, type: 3}
+    battleEffect: {fileID: 2800000, guid: fcdfbcc4c5f85a7abb3957b9ceed9722, type: 3}
+    requirement: 1
+    cost: 1
+    skillEffect: 30
+    tier: 0
+    rewardBossId: EnemyDrownedLanternRay
+    description: "对1名敌人造成（攻击力+3）点魔法伤害。对仍存活的主目标施加3层寒冷，对其余存活敌人各施加1层寒冷。"
+  - number: 33
+    displayName: "终葬敕令"
+    icon: {fileID: 2800000, guid: 3616063dcd5a52eea340036d6293d39b, type: 3}
+    battleEffect: {fileID: 2800000, guid: ebd6574531be5e7e9a71b7a485712eae, type: 3}
+    requirement: 5
+    cost: 2
+    skillEffect: 31
+    tier: 0
+    rewardBossId: EnemyNamelessKing
+    description: "对最前方敌人造成（2×攻击力+2）点物理伤害，再对所有存活敌人施加2层诅咒。"
+  - number: 34
+    displayName: "长夜守祷"
+    icon: {fileID: 2800000, guid: c76b664ae1dd518b8279f6a01c096eab, type: 3}
+    battleEffect: {fileID: 2800000, guid: 088fd3dcf8a8575fbd71df669e7c8dc9, type: 3}
+    requirement: 2
+    cost: 2
+    skillEffect: 32
+    tier: 0
+    rewardBossId: EnemySepulchralMatron
+    description: "清除所有存活友方的负面状态，再各恢复5点生命并获得5点护盾。"

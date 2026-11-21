@@ -54,7 +54,8 @@ namespace RaidPartyManager.Presentation
                 rules.name = "skill-book-requirements";
                 rules.style.marginTop = 6;
                 Add(rules);
-                var permanence = PrototypeStyle.Text("学会后无法拆卸或替换", 12, PrototypeStyle.Muted);
+                if (book.Cost > Rules.DefaultEnergy) Add(PrototypeStyle.Text("从第 2 回合起，每回合能量和上限各增加 1 点，直到上限达到所学最高费用。", 12, PrototypeStyle.Accent));
+                var permanence = PrototypeStyle.Text("学会后无法拆卸，覆盖会失去旧技能。", 12, PrototypeStyle.Muted);
                 Add(permanence);
             }
         }

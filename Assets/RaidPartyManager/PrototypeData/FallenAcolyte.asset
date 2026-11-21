@@ -26,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 11
   traitPower: 0
   traitText: "第1次死亡时，恢复所有生命值，且攻击造成2倍伤害。"
-  personality: 7
+  personality: 1
   attack: 6
   defense: 1
   specialDefense: 3

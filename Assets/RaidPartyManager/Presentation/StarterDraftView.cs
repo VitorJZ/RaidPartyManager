@@ -48,10 +48,17 @@ namespace RaidPartyManager.Presentation
             cards.style.alignItems = Align.Stretch;
             panel.Add(cards);
             var selected = new HashSet<CharacterDefinition>();
-            var start = PrototypeStyle.Button("出发", "confirm-starters", () =>
+            var start = PrototypeStyle.Button("拟定合约", "confirm-starters", () =>
             {
-                if (selected.Count == SelectionLimit)
-                    depart(candidates.Where(selected.Contains).ToArray());
+                if (selected.Count != SelectionLimit) return;
+                var starters = candidates.Where(selected.Contains).ToArray();
+                var sheet = ContractPanel.Sheet("起始队员 · 入队合约", out var paper);
+                foreach (var c in starters)
+                    paper.Add(ContractPanel.Text(ContractPanel.Summary(c, Run.CrewContract.Offer(c, 1)), 17));
+                paper.Add(ContractPanel.Text($"两份首约的基础薪资共 {starters.Sum(c => Run.CrewContract.Offer(c, 1).BaseTotal)} 金币，由创队经费当场结清。签约后队伍可用资金为 50 金币。", 15));
+                paper.Add(PrototypeStyle.Button("签约并出发", "sign-starters", () => depart(starters), true));
+                paper.Add(PrototypeStyle.Button("重新选人", "revise-starters", () => sheet.RemoveFromHierarchy()));
+                Add(sheet);
             }, true);
             start.style.minWidth = 120;
             start.style.minHeight = 36;

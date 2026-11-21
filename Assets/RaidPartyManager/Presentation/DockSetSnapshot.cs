@@ -19,6 +19,8 @@ namespace RaidPartyManager.Presentation
         private readonly List<Performer> cast = new();
         private readonly MaterialPropertyBlock block = new();
         internal MeshRenderer Sky { get; }
+        internal SceneryFlipbook Scenery { get; }
+        internal void AnimateBackdrop() => Scenery?.Apply(Sky, block);
         internal MeshRenderer Floor { get; }
         internal bool Moon { get; }
         private readonly float wing;
@@ -33,6 +35,7 @@ namespace RaidPartyManager.Presentation
             internal MeshRenderer ink;
             internal Vector3 position, scale;
             internal DockSet.Player player;
+            internal MaterialPropertyBlock rest;
         }
 
         internal DockSetSnapshot(DockSet set, Bounds deck, bool castOnly = false)
@@ -41,11 +44,13 @@ namespace RaidPartyManager.Presentation
             root = new GameObject("Travelling dock set");
             Object.DontDestroyOnLoad(root);
             Moon = set.Moon;
+            Scenery = set.Scenery;
             var hinges = new Dictionary<Vector2, Piece>();
             foreach (var source in set.Root.GetComponentsInChildren<MeshRenderer>())
             {
                 if (!source.enabled || source.forceRenderingOff || castOnly && !set.Cast.ContainsKey(source)) continue;
-                var mesh = source.GetComponent<MeshFilter>().sharedMesh;
+                if (!source.TryGetComponent<MeshFilter>(out var filter) || filter.sharedMesh == null) continue;
+                var mesh = filter.sharedMesh;
                 var copy = new GameObject(source.name, typeof(MeshFilter), typeof(MeshRenderer)).GetComponent<MeshRenderer>();
                 copy.transform.SetParent(root.transform, false);
                 copy.transform.SetPositionAndRotation(source.transform.position, source.transform.rotation);
@@ -70,8 +75,12 @@ namespace RaidPartyManager.Presentation
                 if (source == set.Sky) Sky = copy;
                 else if (source == set.Floor) Floor = copy;
                 else if (set.Cast.TryGetValue(source, out var player))
+                {
+                    var rest = new MaterialPropertyBlock();
+                    source.GetPropertyBlock(rest);
                     cast.Add(new Performer { ink = copy, player = player, position = copy.transform.position,
-                        scale = copy.transform.localScale });
+                        scale = copy.transform.lossyScale, rest = rest });
+                }
                 else if (set.Flown.Contains(source))
                 {
                     flown.Add(copy.transform);
@@ -121,9 +130,16 @@ namespace RaidPartyManager.Presentation
                     block.SetColor("_Color", Color.white);
                     view.SetPropertyBlock(block);
                     // All player travel sheets are painted facing stage right. Seated cards may be mirrored.
-                    if (actor.player.Seated) scale.x = Mathf.Abs(scale.x) * (entering ? 1 : -1);
+                    if (actor.player.WalkHeight > 0)
+                    {
+                        scale.y = actor.player.WalkHeight;
+                        scale.x = actor.player.Right == entering ? -scale.y : scale.y;
+                        position.y += actor.player.WalkLift;
+                    }
+                    else if (actor.player.Seated) scale.x = Mathf.Abs(scale.x) * (entering ? 1 : -1);
                 }
-                else if (walking) position.y += .038f * Mathf.Abs(Mathf.Sin(seconds * 13 + i));
+                else if (!walking) view.SetPropertyBlock(actor.rest);
+                else position.y += .038f * Mathf.Abs(Mathf.Sin(seconds * 13 + i));
                 view.transform.position = position;
                 view.transform.localScale = scale;
             }

@@ -34,6 +34,8 @@ namespace RaidPartyManager.Presentation
         private float effectProgress = -1f;
         private bool usesExternalEffect;
         private bool fullActionPose;
+        private readonly SoundCue fallSound;
+        private bool pendingFall;
         private bool retreating;
         private Texture2D retreatWalk;
 
@@ -46,11 +48,12 @@ namespace RaidPartyManager.Presentation
         public bool FacesLeft { get; }
 
         public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position, bool facesLeft,
-            BattleStage stage, bool usesPortrait = false)
+            BattleStage stage, bool usesPortrait = false, SoundCue fallSound = SoundCue.None)
         {
             name = "profession-portrait-art";
             Stage = stage;
             Sheet = sheet;
+            this.fallSound = fallSound;
             UsesPortrait = usesPortrait;
             this.attackSheet = attackSheet;
             this.profession = profession;
@@ -156,6 +159,7 @@ namespace RaidPartyManager.Presentation
         {
             if (alive == isAlive)
                 return;
+            pendingFall = !isAlive && alive == true && !retreating;
             if (isAlive)
             {
                 retreating = false;
@@ -199,6 +203,11 @@ namespace RaidPartyManager.Presentation
             switch (motion)
             {
                 case Motion.Death:
+                    if (pendingFall && elapsed >= DeathEnds[4])
+                    {
+                        GameAudio.Play(fallSound);
+                        pendingFall = false;
+                    }
                     frame = 3 * Columns + FrameAt(DeathEnds, elapsed);
                     break;
                 case Motion.Hit:

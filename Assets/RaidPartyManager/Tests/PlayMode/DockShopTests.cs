@@ -39,6 +39,7 @@ namespace RaidPartyManager.Tests
 
             var shop = Object.FindAnyObjectByType<DockShop>();
             var root = shop.GetComponent<UIDocument>().rootVisualElement;
+            Assert.That(root.Q("shop-recruit-open"), Is.Null);
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  999"));
             var prices = root.Query<Label>("shop-item-price").ToList();
             Assert.That(prices.Count, Is.EqualTo(4));
@@ -57,14 +58,27 @@ namespace RaidPartyManager.Tests
             Assert.That(offers.Select(view => OfferItem(shop, view).Id).Distinct().Count(), Is.EqualTo(4));
             Assert.That(offers.Select(v => v.worldBound.center.x), Is.Ordered);
             var stage = shop.transform.Find("Service theatre");
+            Assert.That(stage.Find("Recruitment wheel fixture"), Is.Null);
             Assert.That(stage.Find("shop-merchant").position.x, Is.Zero.Within(.01f));
             Assert.That(stage.Find("Cabinet back"), Is.Null);
+            Assert.That(stage.Find("Shop roof beam"), Is.Null);
+            Assert.That(stage.Find("Shop roof beam lower edge"), Is.Null);
+            Assert.That(stage.Find("Roof knee brace"), Is.Null);
+            var rope = stage.Find("Shop sign braided line");
+            Assert.That(rope, Is.Not.Null);
+            Assert.That(Camera.main.WorldToViewportPoint(rope.TransformPoint(Vector3.up)).y, Is.GreaterThan(1f));
 
             ConfigureLowerTierStock(shop);
             root = shop.GetComponent<UIDocument>().rootVisualElement;
             yield return null;
             var merchant = shop.transform.Find("Service theatre/shop-merchant").GetComponent<MeshRenderer>();
             float restY = merchant.transform.position.y;
+            var wideEye = Camera.main.transform.position;
+            AssertPriceSigns(root, stage);
+            Press(root, "shop-counter");
+            yield return WaitForCounter(root);
+            Assert.That(Camera.main.transform.position.z, Is.GreaterThan(wideEye.z + 3));
+            AssertPriceSigns(root, stage);
             var sheet = ((ServiceStageArt)typeof(DockShop).GetField("stageArt", Private).GetValue(shop)).residents[1];
             var faces = (Texture2D)typeof(DockShop).GetField("merchantReactions", Private).GetValue(shop);
             Assert.That(sheet, Is.Not.Null);
@@ -83,47 +97,32 @@ namespace RaidPartyManager.Tests
             Enter(low);
             AssertFace(merchant, faces, 3, 0);
 
-            var bob = stage.Find("Hanging stock " + high.name.Split('-').Last());
-            var cord = stage.Find("Hemp line " + high.name.Split('-').Last());
-            void AssertTagOnRope()
-            {
-                var tag = high.Q<Label>("shop-item-price");
-                var expected = bob.position + bob.up * (.83f * .43f) + cord.up * .29f;
-                var uv = Camera.main.WorldToViewportPoint(expected);
-                var panelPoint = root.worldBound.min + Vector2.Scale(root.worldBound.size, new Vector2(uv.x, 1-uv.y));
-                Assert.That(Vector2.Distance(tag.worldBound.center, panelPoint), Is.LessThan(5));
-                Assert.That(tag.resolvedStyle.visibility, Is.EqualTo(Visibility.Visible));
-            }
-            var rest = bob.position;
-            AssertTagOnRope();
-            Down(high);
-            Vector2 blank = root.worldBound.min + Vector2.Scale(root.worldBound.size, new Vector2(0.51f, 0.94f));
-            Move(root, blank);
-            Assert.That(Vector3.Distance(bob.position, rest), Is.GreaterThan(.3f));
-            yield return null; yield return null;
-            AssertTagOnRope();
-            Up(root, blank);
-            float firstSide = Mathf.Sign(bob.position.y - rest.y);
-            int crossings = 0;
-            float deadline = Time.unscaledTime + 1.65f;
-            while (Time.unscaledTime < deadline)
-            {
-                float dy = bob.position.y - rest.y;
-                if (Mathf.Abs(dy) > .008f && Mathf.Sign(dy) != firstSide) { firstSide = Mathf.Sign(dy); crossings++; }
-                yield return null;
-            }
-            Assert.That(crossings, Is.GreaterThanOrEqualTo(2));
-            Assert.That(Vector3.Distance(bob.position, rest), Is.LessThan(.004f));
-            Assert.That(bob.gameObject.activeSelf, Is.True);
-            Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  999"));
-            AssertFace(merchant, sheet, 4);
-            Assert.That(Price(high), Is.EqualTo(price), "Hovering and cancelling a drag must keep the displayed price.");
+            var display = stage.Find("Table stock " + high.name.Split('-').Last());
+            var counterTop = stage.Find("Counter top").GetComponent<MeshRenderer>();
+            Assert.That(display.position.y, Is.EqualTo(counterTop.bounds.max.y).Within(.01f));
+            Assert.That(counterTop.bounds.min.x, Is.LessThan(display.position.x));
+            Assert.That(counterTop.bounds.max.x, Is.GreaterThan(display.position.x));
+            Assert.That(stage.Find("Hemp line 0"), Is.Null);
+            var centre = RuntimePanelUtils.CameraTransformWorldToPanel(root.panel, display.Find("Stock artwork").position, Camera.main);
+            Assert.That(root.panel.Pick(centre), Is.SameAs(high));
 
             Down(high);
-            Vector2 counter = root.Q("shop-checkout").worldBound.center;
-            Move(root, counter);
-            Up(root, counter);
-            Assert.That(bob.gameObject.activeSelf, Is.False);
+            Assert.That(high.Q("shop-hold-progress").style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Up(root, high.worldBound.center);
+            yield return new WaitForSecondsRealtime(.62f);
+            Assert.That(display.gameObject.activeSelf, Is.True);
+
+            Down(high);
+            Vector2 blank = root.worldBound.min + Vector2.Scale(root.worldBound.size, new Vector2(.87f, .81f));
+            Move(root, blank);
+            yield return new WaitForSecondsRealtime(.62f);
+            Up(root, blank);
+            Assert.That(display.gameObject.activeSelf, Is.True);
+            Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  999"));
+            Assert.That(Price(high), Is.EqualTo(price));
+
+            yield return HoldToBuy(root, high);
+            Assert.That(display.gameObject.activeSelf, Is.False);
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo($"金币  {999 - price}"));
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 1));
             Assert.That(root.Q<Label>("shop-feedback").text, Does.Contain("共享背包"));
@@ -134,13 +133,22 @@ namespace RaidPartyManager.Tests
             yield return new WaitForSecondsRealtime(0.12f);
             Assert.That(Mathf.Abs(merchant.transform.position.y-restY), Is.GreaterThan(0.004f));
             yield return new WaitForSecondsRealtime(1.1f);
-            Assert.That(cord.localScale.y * 2, Is.LessThan(.31f));
             Assert.That(merchant.transform.position.y, Is.EqualTo(restY).Within(0.01f));
             AssertFace(merchant, faces, 3, 0);
 
-            Down(low);
-            Move(root, counter);
-            Up(root, counter);
+            var background = root.Q("shop-counter-background");
+            Assert.That(root.panel.Pick(blank), Is.SameAs(background));
+            using (var click = PointerDownEvent.GetPooled(Mouse(EventType.MouseDown, blank)))
+                Send(background, click);
+            Up(root, blank);
+            yield return new WaitForSecondsRealtime(.54f);
+            Assert.That(Vector3.Distance(Camera.main.transform.position, wideEye), Is.LessThan(.01f));
+            Assert.That(root.Q("shop-counter-hint").style.display.value, Is.EqualTo(DisplayStyle.None));
+            AssertPriceSigns(root, stage);
+
+            Press(root, "shop-counter");
+            yield return WaitForCounter(root);
+            yield return HoldToBuy(root, low);
             AssertFace(merchant, faces, 3, 2);
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 2));
             Press(root, "open-settings");
@@ -163,6 +171,8 @@ namespace RaidPartyManager.Tests
             float until = Time.realtimeSinceStartup + 4;
             while (root.Q("curtain-input-shield") != null && Time.realtimeSinceStartup < until) yield return null;
             Assert.That(root.Q("curtain-input-shield"), Is.Null);
+            Press(root, "shop-counter");
+            yield return WaitForCounter(root);
             var merchant = shop.transform.Find("Service theatre/shop-merchant").GetComponent<MeshRenderer>();
             var camera = Camera.main;
             var target = new RenderTexture(1280,720,24);
@@ -257,14 +267,17 @@ namespace RaidPartyManager.Tests
             var root = shop.GetComponent<UIDocument>().rootVisualElement;
             var offer = root.Q("shop-offer-0");
             int price = Price(offer);
-            Vector2 counter = root.Q("shop-checkout").worldBound.center;
+            Down(offer);
+            yield return new WaitForSecondsRealtime(.62f);
+            Up(root, offer.worldBound.center);
+            Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  999"));
+            Press(root, "shop-counter");
+            yield return WaitForCounter(root);
             var funds = typeof(DockShop).GetField("coins", Private);
             funds.SetValue(shop, 0);
             typeof(DockShop).GetMethod("RefreshGold", Private).Invoke(shop, null);
-            Down(offer);
-            Move(root, counter);
-            Up(root, counter);
-            Assert.That(shop.transform.Find("Service theatre/Hanging stock 0").gameObject.activeSelf, Is.True);
+            yield return HoldToBuy(root, offer);
+            Assert.That(shop.transform.Find("Service theatre/Table stock 0").gameObject.activeSelf, Is.True);
             Assert.That(root.Q<Label>("shop-feedback").text, Is.EqualTo("金币不足"));
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  0"));
             AssertFace(shop.transform.Find("Service theatre/shop-merchant").GetComponent<MeshRenderer>(),
@@ -272,15 +285,55 @@ namespace RaidPartyManager.Tests
 
             funds.SetValue(shop, 999);
             typeof(DockShop).GetMethod("RefreshGold", Private).Invoke(shop, null);
-            Down(offer);
-            Move(root, counter);
-            Up(root, counter);
+            yield return HoldToBuy(root, offer);
             int purchasedItems = InventoryCount();
-            Down(offer);
-            Up(root, counter);
+            yield return HoldToBuy(root, offer);
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo($"金币  {999 - price}"));
             Assert.That(InventoryCount(), Is.EqualTo(purchasedItems));
-            Assert.That(shop.transform.Find("Service theatre/Hanging stock 0").gameObject.activeSelf, Is.False);
+            Assert.That(shop.transform.Find("Service theatre/Table stock 0").gameObject.activeSelf, Is.False);
+        }
+
+        private static void AssertPriceSigns(VisualElement root, Transform stage)
+        {
+            var camera = Camera.main;
+            for (int i = 0; i < 4; i++)
+            {
+                var display = stage.Find("Table stock " + i);
+                if (!display.gameObject.activeSelf) continue;
+                var paper = display.Find("Counter price paper");
+                var board = display.Find("Counter price tablet");
+                Assert.That(paper.localScale.x, Is.EqualTo(board.localScale.x));
+                Assert.That(paper.localScale.y, Is.EqualTo(board.localScale.y));
+                var price = root.Q($"shop-offer-{i}").Q<Label>("shop-item-price");
+                Vector2 Project(Vector3 point) =>
+                    RuntimePanelUtils.CameraTransformWorldToPanel(root.panel, paper.TransformPoint(point), camera);
+                var centre = Project(Vector3.zero);
+                Assert.That(Vector2.Distance(price.worldBound.center, centre), Is.LessThan(3f));
+                Assert.That(price.worldBound.width, Is.EqualTo(Project(Vector3.right * .5f).x -
+                    Project(Vector3.left * .5f).x).Within(3f));
+                Assert.That(price.worldBound.height, Is.EqualTo(Project(Vector3.down * .5f).y -
+                    Project(Vector3.up * .5f).y).Within(3f));
+                Assert.That(price.resolvedStyle.unityTextAlign, Is.EqualTo(TextAnchor.MiddleCenter));
+            }
+        }
+
+        private static IEnumerator WaitForCounter(VisualElement root)
+        {
+            var hint = root.Q("shop-counter-hint");
+            float deadline = Time.realtimeSinceStartup + 5f;
+            while ((hint.resolvedStyle.display == DisplayStyle.None || root.Q("curtain-input-shield") != null) &&
+                Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(hint.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(root.Q("curtain-input-shield"), Is.Null);
+            yield return null;
+        }
+
+        private static IEnumerator HoldToBuy(VisualElement root, VisualElement offer)
+        {
+            Vector2 start = offer.worldBound.center;
+            Down(offer);
+            yield return new WaitForSecondsRealtime(.65f);
+            Up(root, start);
         }
 
         private static VisualElement[] OfferViews(VisualElement root) =>

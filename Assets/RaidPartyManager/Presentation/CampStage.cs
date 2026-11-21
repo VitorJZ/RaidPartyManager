@@ -20,11 +20,25 @@ namespace RaidPartyManager.Presentation
             new(-2.08f,0,1.72f), new(-3.60f,0,-1.05f)
         };
 
-        public CampStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D fire) :
+        public CampStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D fire, bool graveyard) :
             base(owner, panel, art)
         {
-            HangBackdrop("Pine clearing", art.campSky);
-            Deck(art.soil, new Vector2(2.8f, 2.6f), new Color(.51f, .58f, .68f), true);
+            if (graveyard)
+            {
+                HangBackdrop("Cemetery vigil", art.watchCloister);
+                GraveyardFloor();
+                FloorProp("Vigil kettle", art.vigilStove, -3.9f, -1.44f, 1.22f, -4);
+                FloorProp("Wardens' blankets", art.blanketBench, 3.55f, -.75f, 2.1f, 6);
+                FloorProp("Watch bell", art.bellArch, -4.8f, .7f, 2.5f, -6);
+                FloorProp("Lantern yew", art.lanternTree, 5.4f, .9f, 2.9f, 7);
+            }
+            else
+            {
+                HangBackdrop("Pine clearing", art.campSky);
+                FloorProp("Forager's drying frame", art.herbDryer, -4.45f, .48f, 1.95f, -7);
+                FloorProp("Camp bedrolls", art.canvasBundles, 3.68f, -1.05f, 2.02f, 10);
+                Deck(art.soil, new Vector2(2.8f, 2.6f), new Color(.51f, .58f, .68f), true);
+            }
             for (int side = -1; side <= 1; side += 2)
             {
                 int first = stage.childCount;

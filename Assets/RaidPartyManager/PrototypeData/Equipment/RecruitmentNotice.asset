@@ -16,10 +16,10 @@ MonoBehaviour:
   displayName: "寻人启事"
   effect: 15
   icon: {fileID: 2800000, guid: 29de7a3ff9284fafaa3196e835c2c565, type: 3}
-  description: "战斗开始时，若队伍里存在空位，随机召唤1个队友，并在战斗结束后加入队伍"
+  description: "一次性消耗品。装备后开战时，成功召来一名援军即消耗；没有空位则保留。援军存活到结算时加入队伍。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0
   healthBonus: 0
   shopTier: 2
-  shopPrice: 25
+  shopPrice: 21

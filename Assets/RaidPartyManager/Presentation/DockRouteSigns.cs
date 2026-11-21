@@ -12,16 +12,29 @@ namespace RaidPartyManager.Presentation
         internal DockRouteSigns(AdventureRun run, AdventureContentAsset art, Texture2D timber,
             Func<float, Vector2> anchor, Func<int,bool> enter, Action nextFloor, bool following = false)
         {
+            GameAudio.Play(SoundCue.UiMapReveal, .40f);
             name = "dock-route-signs";
             pickingMode = PickingMode.Ignore;
             if (following) PrototypeStyle.Fill(this);
             else style.flexGrow = 1;
-            bool service = following && run.Current.Kind is (NodeKind.Camp or NodeKind.Shop or NodeKind.Town);
+            bool service = following && run.Current.Kind is (NodeKind.Camp or NodeKind.Town);
             float width = service ? 58 : 82;
             float height = service ? 34 : 47;
             style.overflow = Overflow.Hidden;
             var boards = new List<(HangingSign sign, float x)>();
             bool committed = false;
+            if (!following && run.InGraveyard && run.Stage == 1 && !run.Failed)
+            {
+                var chapter = PrototypeStyle.Text($"第 {run.Floor} 层 · {run.RegionName}", 22, PrototypeStyle.Accent);
+                chapter.name = "route-region";
+                chapter.pickingMode = PickingMode.Ignore;
+                chapter.style.position = Position.Absolute;
+                chapter.style.alignSelf = Align.Center;
+                chapter.style.bottom = Length.Percent(16);
+                chapter.style.backgroundColor = new Color(.10f, .08f, .13f, .87f);
+                chapter.style.paddingLeft = chapter.style.paddingRight = 14;
+                Add(chapter);
+            }
             if (!following && (run.Failed || run.CompletedNodes == 0 && !run.FloorCleared))
             {
                 var hint = PrototypeStyle.Text(run.Failed ? "本次讨伐结束" : "向下拉动路牌，选择去向", 15);
@@ -82,6 +95,7 @@ namespace RaidPartyManager.Presentation
                 float drop = Mathf.SmoothStep(0, 1, t) + Mathf.Sin(t*Mathf.PI)*.10f;
                 foreach (var (sign, x) in boards)
                 {
+                    if (sign.MountedInScenery) continue;
                     float localX;
                     if (service) localX = layout.width * .90f - width * .5f - (x < 0 ? width + 12 : 0);
                     else if (following) localX = layout.width * (.5f + .12f * System.Math.Sign(x));

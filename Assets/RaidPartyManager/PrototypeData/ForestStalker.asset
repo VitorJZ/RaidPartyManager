@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 3
   traitPower: 4
   traitText: "连续攻击同一目标时，下次造成的伤害+4"
-  personality: 11
+  personality: 8
   attack: 7
   defense: 1
   specialDefense: 1

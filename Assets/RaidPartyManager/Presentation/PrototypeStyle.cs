@@ -20,6 +20,7 @@ namespace RaidPartyManager.Presentation
 
         public static void ApplySystemFont(VisualElement root, out Font font, out FontAsset fontAsset)
         {
+            InterfaceSounds.Bind(root);
             string fontName = Array.Find(Font.GetOSInstalledFontNames(), name => name == "Microsoft YaHei" ||
                 name == "Microsoft YaHei UI" || name == "Noto Sans CJK SC" || name == "PingFang SC");
             font = fontName == null ? null : Font.CreateDynamicFontFromOSFont(fontName, 16);
@@ -32,6 +33,7 @@ namespace RaidPartyManager.Presentation
         {
             if (root != null)
             {
+                InterfaceSounds.Unbind(root);
                 root.Clear();
                 root.style.unityFontDefinition = StyleKeyword.Null;
             }

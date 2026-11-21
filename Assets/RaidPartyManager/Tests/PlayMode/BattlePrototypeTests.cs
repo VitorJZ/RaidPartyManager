@@ -42,6 +42,35 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator ApocalypseShowsTheCopiedCharactersActualTraitOnHover()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            UseFastAttacks(scene);
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            Press(root, "open-party-editor");
+            var front = root.Q("edit-member-guard");
+            yield return null;
+            using (var right = PointerUpEvent.GetPooled(new Event
+                { type = EventType.MouseUp, button = 1, mousePosition = front.worldBound.center }))
+                Send(front, right);
+            var candidate = root.Q("replacement-candidates").Query<Button>().ToList()
+                .Single(button => button.Query<Label>().First().text == "天启");
+            Press(root, candidate.name);
+            Press(root, "back-party-editor");
+            Press(root, "start");
+            var copies = (Dictionary<string, CharacterDefinition>)typeof(BattlePrototype)
+                .GetField("copiedTraits", PrivateInstance).GetValue(scene);
+            float deadline = Time.realtimeSinceStartup + 12;
+            while (!copies.ContainsKey("guard") && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(copies.ContainsKey("guard"), Is.True);
+            var details = HoverCharacter(root, root.Q("equipment-portrait-1"));
+            Assert.That(details.Q<Label>("battle-detail-trait").text, Does.Contain(copies["guard"].TraitText));
+            Assert.That(details.Q<Label>("battle-detail-name").text, Does.Contain("天启"));
+        }
+
+        [UnityTest]
         public IEnumerator DefaultDraftsAndManualSelectionsReachTheAnimatedBattle()
         {
             useAuthoredFixture = false;
@@ -214,7 +243,7 @@ namespace RaidPartyManager.Tests
             Assert.That(details.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  5"));
             Assert.That(details.Q<Label>("battle-detail-defense").text, Is.EqualTo("防御  4"));
             Assert.That(details.Q<Label>("battle-detail-special-defense").text, Is.EqualTo("特防  4"));
-            Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("谨慎"));
+            Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("冷幽默"));
             Assert.That(details.Q<Label>("battle-detail-statuses").text, Does.Contain("盛气 ×3"));
             Assert.That(details.Q<Label>("battle-detail-slot-1").text, Is.EqualTo("1 · 空槽"));
             Assert.That(details.Q<Label>("battle-detail-slot-2").text, Is.EqualTo("2 · 精钢壁垒"));
@@ -272,7 +301,7 @@ namespace RaidPartyManager.Tests
         public IEnumerator BuiltSceneSupportsPreparationPlaybackLootAndReset()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
-            yield return null;
+            yield return WaitForScene("BattlePrototype");
 
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
             Assert.That(scene, Is.Not.Null);
@@ -403,9 +432,13 @@ namespace RaidPartyManager.Tests
             var initialLog = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 普攻")), Is.True);
             Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 举盾")), Is.False);
-            Assert.That(root.Q("party-position-4").Q("health-bar").Q<Label>().text, Is.EqualTo("5 / 8"));
+            var round = (IReadOnlyList<BattleEvent>)typeof(BattlePrototype).GetField("roundEvents", PrivateInstance).GetValue(scene);
+            var archer = ((PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene)).Members.Single(m => m.Position == 4);
+            int healthAfterRound = round.Where(e => e.TargetId == archer.Id && e.Kind is BattleEventKind.Action or BattleEventKind.Effect)
+                .Select(e => e.TargetHealth).DefaultIfEmpty(archer.Health).Last();
+            Assert.That(root.Q("party-position-4").Q("health-bar").Q<Label>().text, Is.EqualTo($"{healthAfterRound} / 8"));
             var archerDetails = HoverCharacter(root, root.Q("equipment-portrait-4"));
-            Assert.That(archerDetails.Q<Label>("battle-detail-health").text, Is.EqualTo("生命  5/8"));
+            Assert.That(archerDetails.Q<Label>("battle-detail-health").text, Is.EqualTo($"生命  {healthAfterRound}/8"));
             var mageDetails = HoverCharacter(root, root.Q("equipment-portrait-2"));
             Assert.That(mageDetails.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  6"));
             yield return ResolveBattle(root);
@@ -433,7 +466,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("status-row-flanker").parent.Q<Label>("health-value").text, Does.StartWith("倒下"));
             AssertNoFormationButtons(root);
             Press(root, "claim-gold");
-            Assert.That(party.Gold - startingGold, Is.InRange(6, 10));
+            Assert.That(party.Gold - startingGold, Is.InRange(12, 18));
             Assert.That(party.Inventory.Count, Is.EqualTo(startingItems));
             Assert.That(root.Q("claim-gold"), Is.Null);
             Assert.That(root.Q("reward-flight").Q("reward-gold-icon"), Is.Not.Null);
@@ -543,6 +576,47 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator RayPhaseDuringAPiercingShotKeepsHealthAndLivingSpritesInTheirSlots()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            UseFastAttacks(scene);
+            var type = typeof(BattlePrototype);
+            var content = (EncounterData)type.GetField("content", PrivateInstance).GetValue(scene);
+            var template = content.CharacterCatalog.Single(c => c.Id == "TianGong");
+            var archer = new CharacterDefinition(template.Id, template.Name, template.Profession, template.Personality,
+                new Stats(32, 2, 0, 50), 1, template.BasicAttack, reach: template.Reach, trait: template.Trait);
+            var ray = content.EnemyRoster.Single(c => c.Id == "EnemyDrownedLanternRay");
+            var crab = content.EnemyRoster.Single(c => c.Id == "EnemySaltCrab");
+            var party = new PartyRun(new[] { new PartyMemberStart("archer", archer, 1, 50) }, System.Array.Empty<EquipmentDefinition>());
+            var enemies = new PartyRun(new[] { new PartyMemberStart("ray", ray, 1, ray.BaseStats.Health),
+                new PartyMemberStart("crab", crab, 4, crab.BaseStats.Health) }, System.Array.Empty<EquipmentDefinition>());
+            type.GetField("run", PrivateInstance).SetValue(scene, party);
+            type.GetField("enemyRun", PrivateInstance).SetValue(scene, enemies);
+            type.GetMethod("ResetDemo", PrivateInstance).Invoke(scene, new object[] { false });
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            Press(root, "start");
+            Press(root, "battle-pause");
+            yield return WaitForRoundBreak(root);
+            var round = (IReadOnlyList<BattleEvent>)type.GetField("roundEvents", PrivateInstance).GetValue(scene);
+            Assert.That(round.Count(e => e.ActionName == "沉灯翻涌"), Is.EqualTo(1));
+            foreach (var slot in new[] { ("party-position-1", "archer"), ("enemy-position-1", "ray"), ("enemy-position-4", "crab") })
+            {
+                var state = round.Last(e => e.TargetId == slot.Item2 &&
+                    e.Kind is BattleEventKind.Action or BattleEventKind.Effect or BattleEventKind.Defeated);
+                var card = root.Q(slot.Item1);
+                Assert.That(card.Q<Label>("health-value").text, Does.EndWith($"{state.TargetHealth} / {state.MaximumHealth}"));
+                if (state.TargetHealth > 0)
+                    Assert.That(card.Q<Image>("battle-sprite").visible, Is.True, slot.Item1);
+            }
+            Press(root, "run-wallet");
+            Assert.That(root.Q("expense-ledger"), Is.Not.Null);
+            Press(root, "close-ledger");
+            Assert.That(PausedControl(root), Is.Not.Null);
+        }
+
+        [UnityTest]
         public IEnumerator TianGongFiresOneArrowWithOrbitingParticlesAndStaggeredImpacts()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
@@ -568,7 +642,7 @@ namespace RaidPartyManager.Tests
             var party = new PartyRun(new[] { new PartyMemberStart("archer", archer, 2, archer.BaseStats.Health) },
                 System.Array.Empty<EquipmentDefinition>());
             var foe = content.Enemies[0].Character;
-            var practice = new CharacterDefinition(foe.Id, foe.Name, foe.Profession, Personality.Reckless,
+            var practice = new CharacterDefinition(foe.Id, foe.Name, foe.Profession, Personality.Frank,
                 new Stats(0, 0, 0, 50), 1, foe.BasicAttack, reach: AttackReach.Melee);
             var enemies = new PartyRun(new[] { 1, 2, 4 }.Select(position =>
                 new PartyMemberStart("target-" + position, practice, position, 50)), System.Array.Empty<EquipmentDefinition>());
@@ -727,7 +801,7 @@ namespace RaidPartyManager.Tests
             Assert.That(party.TryLearnSkill(memberId, 0, party.SkillBooks[0].Id), Is.True);
 
             var foe = content.EnemyRoster.First(character => content.BattleSpriteFor(character.Id) != null);
-            var practice = new CharacterDefinition(foe.Id, foe.Name, foe.Profession, Personality.Reckless,
+            var practice = new CharacterDefinition(foe.Id, foe.Name, foe.Profession, Personality.Frank,
                 new Stats(0, 0, 0, 50), 1, new ActionDefinition("practice", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0),
                 reach: AttackReach.Melee);
             var enemies = new PartyRun(Enumerable.Range(1, 3).Select(position =>
@@ -754,7 +828,7 @@ namespace RaidPartyManager.Tests
             Assert.That(party.TryEquip("chanter", 0, party.Inventory.Single().Id), Is.True);
 
             var original = content.Enemies.First().Character;
-            var target = new CharacterDefinition(original.Id, original.Name, Profession.Warrior, Personality.Cautious,
+            var target = new CharacterDefinition(original.Id, original.Name, Profession.Warrior, Personality.Worrier,
                 new Stats(1, 0, 0, 150), 1, original.BasicAttack, reach: AttackReach.Melee);
             var enemies = new PartyRun(new[] { new PartyMemberStart("target", target, 1, 150) }, System.Array.Empty<EquipmentDefinition>());
             type.GetField("run", PrivateInstance).SetValue(scene, party);
@@ -811,7 +885,7 @@ namespace RaidPartyManager.Tests
             var attack = new ActionDefinition("mixed", "混合伤害", ActionKind.Attack, TargetRule.FrontEnemy, 0,
                 damageType: DamageType.Physical, additionalDamage: new[] { new DamageComponent(DamageType.Magic),
                     new DamageComponent(DamageType.Fire), new DamageComponent(DamageType.Lightning) });
-            var guard = new CharacterDefinition(original.Id, original.Name, original.Profession, Personality.Cautious,
+            var guard = new CharacterDefinition(original.Id, original.Name, original.Profession, Personality.Worrier,
                 new Stats(2, 1, 1, 24), 1, attack, reach: original.Reach);
             var effects = new[] { EquipmentEffect.FirstFire, EquipmentEffect.LifePendant, EquipmentEffect.RitualMask };
             var gear = effects.Select(effect => content.StartingEquipment.First(item => item.Effect == effect)).ToArray();
@@ -821,7 +895,7 @@ namespace RaidPartyManager.Tests
                 Assert.That(party.TryEquip("guard", index, party.Inventory.Single(item => item.Definition.Effect == effects[index]).Id),
                     Is.True);
             var foe = content.EnemyRoster.First();
-            var target = new CharacterDefinition(foe.Id, foe.Name, foe.Profession, Personality.Cautious, new Stats(1, 0, 0, 50),
+            var target = new CharacterDefinition(foe.Id, foe.Name, foe.Profession, Personality.Worrier, new Stats(1, 0, 0, 50),
                 1, foe.BasicAttack, reach: foe.Reach);
             var enemies = new PartyRun(new[] { new PartyMemberStart("practice", target, 1, 50) },
                 System.Array.Empty<EquipmentDefinition>());
@@ -938,7 +1012,7 @@ namespace RaidPartyManager.Tests
             var details = HoverCharacter(root, root.Q("equipment-portrait-1"));
             Assert.That(details.Q<Label>("battle-detail-skill-1").text, Is.EqualTo("战争咆哮 · 1 能量"));
             Assert.That(details.Q<Label>("battle-detail-skill-effect-1").text, Does.Contain("翻倍"));
-            Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("谨慎"));
+            Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("冷幽默"));
 
             yield return ResolveBattle(root);
             yield return null;
@@ -978,7 +1052,30 @@ namespace RaidPartyManager.Tests
             yield return null;
             var characterName = root.Q<Label>("details-character-name");
             Assert.That(characterName.text, Is.EqualTo("星辉术师"));
-            Assert.That(root.Q("details-personality").worldBound.yMin, Is.GreaterThanOrEqualTo(characterName.parent.worldBound.yMax));
+            var loadoutTab = root.Q<Button>("open-character-loadout").worldBound;
+            var dossierTab = root.Q<Button>("open-employee-dossier").worldBound;
+            Assert.That(loadoutTab.center.y, Is.EqualTo(characterName.worldBound.center.y).Within(2));
+            Assert.That(dossierTab.center.y, Is.EqualTo(loadoutTab.center.y).Within(2));
+            Assert.That(loadoutTab.xMin, Is.GreaterThanOrEqualTo(characterName.worldBound.xMax));
+            Assert.That(dossierTab.xMin, Is.GreaterThanOrEqualTo(loadoutTab.xMax));
+            Press(root, "open-employee-dossier");
+            yield return null;
+            Assert.That(root.Q("employee-dossier").Children().Count(), Is.GreaterThan(0));
+            Assert.That(root.Q<Label>("employee-personality").text, Does.Contain("戏精"));
+            var chart = root.Q("employee-attribute-radar");
+            Assert.That(chart, Is.Not.Null);
+            var captions = chart.Children().ToArray();
+            Assert.That(captions.Select(caption => caption.Q<Label>().text), Is.EqualTo(new[]
+                { "忠诚程度", "战术服从", "薪酬偏好", "上场需求", "满意程度", "吃苦耐劳" }));
+            Assert.That(captions.Select(caption => int.Parse(caption.Children().OfType<Label>().Last().text)), Is.All.InRange(1, 5));
+            Assert.That(captions.All(caption => chart.worldBound.Contains(caption.worldBound.center)), Is.True);
+            foreach (var stat in new[] { "damage", "damage-taken", "healing", "kills" })
+                Assert.That(root.Q<Label>("employee-stat-" + stat).text, Is.EqualTo("0"));
+            Assert.That(root.Q<Label>("employee-stat-tenure").text, Is.EqualTo("0 天"));
+            Assert.That(root.Q("employee-thoughts").Query<Label>().ToList().Count, Is.GreaterThan(1));
+            Assert.That(root.Q("employee-goals").Query<Label>().ToList().Any(label => label.text.Contains("上场 2 次")), Is.True);
+            Press(root, "open-character-loadout");
+            yield return null;
             Assert.That(root.Q("character-profile"), Is.Not.Null);
             Assert.That(root.Q("character-details").Q("details-health"), Is.Null);
             Assert.That(root.Q("details-attributes").worldBound.yMax, Is.LessThan(root.Q("details-fixed-trait").worldBound.yMin));
@@ -1941,11 +2038,11 @@ namespace RaidPartyManager.Tests
                         attackPosition = moving.worldBound.center.x;
                     }
                 }
-                else if (healthBeforeMelee.HasValue)
+                else if (healthBeforeMelee.HasValue && !returned)
                 {
                     returned = true;
                     Assert.That(guardBody.visible, Is.True);
-                    Assert.That(guardBody.worldBound.center.x, Is.EqualTo(home).Within(2f));
+                    Assert.That(guardBody.worldBound.center.x, Is.EqualTo(home).Within(3.1f), "The returning figure may play its three-pixel hit recoil.");
                 }
                 yield return null;
             }

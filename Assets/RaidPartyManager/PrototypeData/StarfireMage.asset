@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 7
   traitPower: 2
   traitText: "回合结束时，攻击力+2，并使此效果+2"
-  personality: 10
+  personality: 4
   attack: 6
   defense: 2
   specialDefense: 3

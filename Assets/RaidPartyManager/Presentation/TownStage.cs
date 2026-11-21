@@ -12,16 +12,17 @@ namespace RaidPartyManager.Presentation
         private readonly MeshRenderer[] cast = new MeshRenderer[4];
         private readonly int[] frame = { -1, -1, -1, -1 };
 
-        public TownStage(Transform owner, VisualElement panel, ServiceStageArt art) :
+        public TownStage(Transform owner, VisualElement panel, ServiceStageArt art, bool graveyard) :
             base(owner, panel, art)
         {
-            HangBackdrop("Distant harbour", art.townSky);
-            Deck(art.cobbles, new Vector2(1.8f, .78f), new Color(.80f, .78f, .76f));
+            HangBackdrop(graveyard ? "Cemetery square" : "Distant harbour", graveyard ? art.mourningSquare : art.townSky);
+            if (graveyard) GraveyardFloor();
+            else Deck(art.cobbles, new Vector2(1.8f, .78f), new Color(.80f, .78f, .76f));
             for (int i = 0; i < 4; i++)
             {
                 int first = stage.childCount;
                 float x = Centres[i], z = Depths[i];
-                var image = art.facilities[i];
+                var image = (graveyard ? art.graveyardFacilities : art.facilities)[i];
                 float height = Mathf.Min(4.28f, 3.45f * image.height / image.width);
                 float width = height * image.width / image.height;
                 var centre = new Vector3(x, height / 2, z);
@@ -44,7 +45,18 @@ namespace RaidPartyManager.Presentation
                 Dressing.Cast[cast[i]] = new DockSet.Player(true);
                 Shadow(foot, size * .65f, .50f);
             }
-            FloorProp("Quayside catch basket",art.creel,3.12f,-6.45f,1.19f,-12);
+            if (graveyard)
+            {
+                FloorProp("Florist's wreath cart", art.wreathCart, -5.12f, -2.70f, 1.78f, -12);
+                FloorProp("Square bell stand", art.bellStand, 4.45f, -1.65f, 1.24f, 7);
+                FloorProp("Square lantern yew", art.lanternTree, 6.6f, -.65f, 1.55f, 7);
+            }
+            else
+            {
+                FloorProp("Quayside catch basket", art.creel, 3.12f, -6.45f, 1.19f, -12);
+                FloorProp("Dockside hand truck", art.porterDolly, -4.9f, -2.36f, 1.15f, -8);
+                FloorProp("Lobster pots", art.lobsterPots, 5.37f, -2.46f, 1.62f, 9);
+            }
             Animate(0);
         }
 

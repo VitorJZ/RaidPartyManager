@@ -1,0 +1,47 @@
+#contract-paper {
+    background-image: url("../../Art/Events/Event-Parchment.png");
+    -unity-background-image-tint-color: rgb(255, 225, 160);
+}
+#contract-paper .unity-base-field {
+    margin-top: 3px;
+    margin-bottom: 3px;
+}
+#contract-paper .unity-base-field__label, #contract-paper .unity-toggle__text {
+    color: rgb(57, 38, 23);
+    font-size: 14px;
+    white-space: normal;
+}
+#contract-paper .unity-base-text-field__input {
+    color: rgb(53, 32, 17);
+    background-color: rgb(255, 238, 190);
+    border-color: rgb(148, 108, 55);
+    border-width: 1px;
+    min-height: 24px;
+}
+#contract-paper .unity-base-text-field__input:focus {
+    border-color: rgb(127, 52, 30);
+}
+.contract-bonus {
+    align-items: center;
+    justify-content: space-between;
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(129, 88, 44, 0.30);
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+.contract-bonus > .unity-toggle {
+    flex-grow: 1;
+    flex-shrink: 1;
+    min-width: 0;
+}
+.contract-bonus .unity-toggle__text {
+    flex-shrink: 1;
+}
+.contract-bonus > .unity-integer-field {
+    width: 70px;
+    flex-shrink: 0;
+}
+#contract-preview {
+    margin-top: 8px;
+    margin-bottom: 6px;
+}

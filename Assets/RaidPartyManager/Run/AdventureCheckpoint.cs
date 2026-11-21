@@ -35,7 +35,48 @@ namespace RaidPartyManager.Run
         public bool FinishVisit;
         public bool HasBattleReward;
         public BattleRewardCheckpoint BattleReward;
+        public bool HasShopVisit;
+        public ShopVisitCheckpoint ShopVisit;
+        public int ShopRecruitPricePlusOne;
         public CheckpointCompanion[] Away;
+
+        internal NodeKind RestoreKind(int stage, NodeKind kind)
+        {
+            if (kind == NodeKind.Shop) return NodeKind.Town;
+            // Preserve a town the player already entered, and restore future camps that the old town roll replaced.
+            bool unvisited = stage > Stage || stage == Stage && Choice < 0;
+            if (kind == NodeKind.Town && unvisited && stage >= 1 && stage <= Nodes.Length &&
+                Nodes[stage - 1].Kind == NodeKind.Town && Nodes[stage - 1].Replaces == (int)NodeKind.Camp)
+                return NodeKind.Camp;
+            return kind;
+        }
+
+        internal NodeKind[] RestoreOptions(int stage, NodeKind[] options) =>
+            options is { Length: > 0 } ? Array.ConvertAll(options, kind => RestoreKind(stage, kind)) : null;
+    }
+
+    [Serializable]
+    public sealed class ShopVisitCheckpoint
+    {
+        public bool Signed;
+        public string[] Slots;
+        public string[] Candidates;
+        public ShopOfferCheckpoint[] Stock;
+        public TownService[] UsedServices;
+        public string[] TownRecruits;
+        public string PendingRecruit;
+        public int BrokerRefusals, BrokerCounter;
+        public string BrokerMember;
+        public bool Rested;
+        public string Message;
+    }
+
+    [Serializable]
+    public struct ShopOfferCheckpoint
+    {
+        public string Item;
+        public int Price;
+        public bool Sold;
     }
 
     [Serializable]
@@ -75,7 +116,7 @@ namespace RaidPartyManager.Run
             Kind = stop.Kind.GetValueOrDefault();
         }
 
-        internal RouteStop Restore() => Number == 0 ? default : new RouteStop(Number, Lane, Kind);
+        internal RouteStop Restore(AdventureCheckpoint saved) => Number == 0 ? default : new RouteStop(Number, Lane, saved.RestoreKind(Number, Kind));
     }
 
     [Serializable]
@@ -87,9 +128,21 @@ namespace RaidPartyManager.Run
     }
 
     [Serializable]
+    public struct GoldExpense
+    {
+        public int Day;
+        public string Reason;
+        public long Amount;
+    }
+
+    [Serializable]
     public sealed class PartyCheckpoint
     {
+        public GravePromises GravePromises;
         public int Gold;
+        public int Day, TalentSeed;
+        public long PayrollDebt;
+        public GoldExpense[] Expenses;
         public int NextItemId;
         public int NextBookId;
         public int NextEditorItemId;
@@ -102,6 +155,10 @@ namespace RaidPartyManager.Run
     public sealed class CheckpointMember
     {
         public string Id;
+        public PlayerTrait Trait;
+        public EmployeeAttributes EmployeeAttributes;
+        public EmployeeCareer EmployeeCareer;
+        public CrewContract Contract;
         public string StartingCharacter;
         public int StartingPosition;
         public int StartingHealth;
@@ -109,7 +166,7 @@ namespace RaidPartyManager.Run
         public string Character;
         public int Position;
         public int Health;
-        public int PermanentAttack;
+        public int PermanentAttack, PermanentHealth;
         public bool IsAway;
         public CheckpointStatus[] Statuses;
         public string[] Slots;

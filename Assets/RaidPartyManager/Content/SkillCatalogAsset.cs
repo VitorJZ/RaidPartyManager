@@ -17,7 +17,8 @@ namespace RaidPartyManager.Content
         [SerializeField] private SkillRequirement requirement;
         [SerializeField, Min(1)] private int cost;
         [SerializeField] private SkillEffect skillEffect;
-        [SerializeField, Range(1, 3)] private int tier = 2;
+        [SerializeField] private string rewardBossId;
+        [SerializeField, Range(0, 3)] private int tier = 2;
         [SerializeField, TextArea] private string description;
 
         public int Number => number;
@@ -31,7 +32,7 @@ namespace RaidPartyManager.Content
         public string Description => description;
 
         public SkillBookDefinition ToBook() => new SkillBookDefinition($"skill-book-{number:00}", displayName,
-            description, requirement, cost, tier, skillEffect);
+            description, requirement, cost, tier, skillEffect, rewardBossId);
 
         public bool CanLearn(CharacterDefinition character) => ToBook().CanLearn(character);
     }

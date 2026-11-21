@@ -288,6 +288,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d2d66e38aa9b4238a8977bbd3883c621, type: 2}
   - {fileID: 11400000, guid: 2523c9e00295452d8867c80a33f74a8e, type: 2}
   - {fileID: 11400000, guid: 081aa91af2c9425479f445860d02712f, type: 2}
+  - {fileID: 11400000, guid: a5bba48446495a0a93589776090c80a8, type: 2}
   backdrop: {fileID: 2800000, guid: f43046f4208542ba90a66d72230e39d7, type: 3}
   merchantReactions: {fileID: 2800000, guid: eb808c08f0d04453b327e5567f16ddd2, type: 3}
 --- !u!114 &1741968123

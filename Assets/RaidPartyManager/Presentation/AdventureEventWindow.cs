@@ -41,6 +41,7 @@ namespace RaidPartyManager.Presentation
             name = "event-window";
             PrototypeStyle.Fill(this);
             style.overflow = Overflow.Hidden;
+            GameAudio.Play(SoundCue.UiParchmentOpen, .39f);
             var eventKind = run.Current.Event;
             var notes = new VisualElement();
             if (eventKind.HasValue)
@@ -82,6 +83,7 @@ namespace RaidPartyManager.Presentation
                 scenery.style.flexGrow = 1;
                 scenery.style.flexBasis = scenery.style.minWidth = 0;
                 scenery.style.marginRight = 14;
+                SceneryFlipbook.Animate(scenery, art.Backdrop);
                 spread.Add(scenery);
                 var page = new VisualElement { name = "event-right-page" };
                 page.style.flexGrow = 2;
@@ -101,6 +103,12 @@ namespace RaidPartyManager.Presentation
                 text.name = "event-description";
                 story.Add(text);
                 story.Add(notes);
+            }
+            if (eventKind == AdventureEventKind.Auction)
+            {
+                Insert(0, new AuctionTableView(run, stage, topBar, Leave, this.Q<Label>("event-description")));
+                topBar.Refresh();
+                return;
             }
             choices = new EventChoiceRack(timber, notes);
             if (eventKind.HasValue)
@@ -173,12 +181,13 @@ namespace RaidPartyManager.Presentation
         internal void RefreshAfterPartyEdit()
         {
             var visit = run.Current;
+            if (visit.Event == AdventureEventKind.Auction) { topBar.Refresh(); return; }
             if (visit.Event == AdventureEventKind.Forge)
             {
                 var available = run.ForgeInputs.Select(item => item.Id).ToHashSet();
                 forge.RemoveAll(id => !available.Contains(id));
             }
-            if (visit.PendingRecruit != null || visit.Event is AdventureEventKind.Forge or AdventureEventKind.LockedChest or
+            if (GraveStories.Contains(visit.Event) || visit.PendingRecruit != null || visit.Event is AdventureEventKind.Forge or AdventureEventKind.LockedChest or
                 AdventureEventKind.Ambush or AdventureEventKind.AscensionTrial or AdventureEventKind.LostTraveler)
                 RenderChoices();
         }
@@ -193,15 +202,15 @@ namespace RaidPartyManager.Presentation
             PopulateChoices();
             var visit = run.Current;
             if (!run.IsInspection && visit.Kind == NodeKind.Event && !visit.Resolved && visit.Battle == null &&
-                visit.Event != AdventureEventKind.LockedChest && visit.PendingRecruit == null)
+                !GraveStories.Contains(visit.Event) && visit.Event != AdventureEventKind.LockedChest && visit.PendingRecruit == null)
                 choices.Choice("向对方告辞", "decline-event", Decline);
             choices.Arrange();
-            if ((!run.IsInspection || visit.Event.HasValue) && visit.Resolved && !awaitingSigns)
+            if ((!run.IsInspection || visit.Event.HasValue && !GraveStories.Contains(visit.Event)) && visit.Resolved && !awaitingSigns)
             {
                 awaitingSigns = true;
                 topBar.WhenRewardsArrive(() => schedule.Execute(() =>
                 {
-                    if (enabledInHierarchy && !leaving && run.Current == visit && (visit.Event is not (AdventureEventKind.HatTrick or AdventureEventKind.Alchemist) || leftTable || stage.RevealFinished))
+                    if (stage.GraveCueFinished && enabledInHierarchy && !leaving && run.Current == visit && (visit.Event is not (AdventureEventKind.HatTrick or AdventureEventKind.Alchemist) || leftTable || stage.RevealFinished))
                     {
                         if (run.IsInspection) Leave();
                         else AdventureFlow.AddFollowingSigns(this, timber, topBar);
@@ -246,6 +255,26 @@ namespace RaidPartyManager.Presentation
                 return;
             }
             if (!string.IsNullOrEmpty(visit.Message)) choices.Note(PaperText(visit.Message, 14, PaperAccent));
+            if (GraveStories.Contains(visit.Event))
+            {
+                foreach (var option in run.GraveChoices())
+                {
+                    choices.Choice(option.text, "grave-" + option.key, () =>
+                    {
+                        if (!run.ChooseGrave(option.key)) return;
+                        stage.CueGraveAction();
+                        choices.Reset(false);
+                        choices.SetEnabled(false);
+                        schedule.Execute(() =>
+                        {
+                            if (leaving || run.Current != visit || !stage.GraveCueFinished) return;
+                            choices.SetEnabled(true);
+                            RenderChoices();
+                        }).Every(25).Until(() => leaving || run.Current != visit || choices.enabledSelf);
+                    });
+                }
+                return;
+            }
             switch (visit.Event)
             {
                 case AdventureEventKind.Investor:
@@ -279,7 +308,7 @@ namespace RaidPartyManager.Presentation
                     {
                         var profession = recruit.Profession;
                         var option = AdventureWidgets.Action(choices, $"“你是{AdventureFlow.ProfessionName(profession)}？”",
-                            "event-profession-" + profession, () => { run.ChooseProfession(profession); RenderChoices(); },
+                            "event-profession-" + profession, () => { if (run.ChooseProfession(profession) && run.Current.PendingRecruit == null) GameAudio.Play(SoundCue.CompanionJoin); RenderChoices(); },
                             !run.Party.Members.Any(member => member.Character.Id == recruit.Id));
                         CharacterChoicePreview.Attach(option, recruit, content.PortraitFor(recruit.Id));
                     }
@@ -288,7 +317,12 @@ namespace RaidPartyManager.Presentation
                 case AdventureEventKind.Forge:
                     choices.Note(PaperText($"挑两件背包里的旧物  {forge.Count}／2", 17, PaperAccent));
                     AdventureWidgets.Action(choices, "把旧物交给铁匠", "event-forge-confirm",
-                        () => Collect("event-forge-confirm", () => run.Forge(forge[0], forge[1])), forge.Count == 2);
+                        () => Collect("event-forge-confirm", () =>
+                        {
+                            if (!run.Forge(forge[0], forge[1])) return false;
+                            GameAudio.Play(SoundCue.ForgeComplete);
+                            return true;
+                        }), forge.Count == 2);
                     foreach (var item in run.ForgeInputs)
                         AdventureWidgets.Item(choices, item.Definition, content, "forge-item-" + item.Id, () =>
                         {
@@ -312,7 +346,7 @@ namespace RaidPartyManager.Presentation
                     choices.Note(PaperText("谁留下开锁，晚些再跟上？", 18, PaperAccent));
                     foreach (var member in present)
                         AdventureWidgets.Character(choices, member.Character, content, "leave-companion-" + member.Id, () =>
-                        { run.LeaveCompanion(member.Id); RenderChoices(); }, run.Party.CanSendAway(member.Id), member);
+                        { if (run.LeaveCompanion(member.Id)) GameAudio.Play(SoundCue.ChestLatchRelease); RenderChoices(); }, run.Party.CanSendAway(member.Id), member);
                     AdventureWidgets.Action(choices, "返回", "chest-back", () =>
                     { choosingChestCompanion = false; RenderChoices(); });
                     break;

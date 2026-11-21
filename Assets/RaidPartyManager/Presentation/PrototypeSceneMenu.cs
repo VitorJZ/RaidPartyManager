@@ -9,6 +9,8 @@ namespace RaidPartyManager.Presentation
     public sealed class PrototypeSceneMenu : MonoBehaviour
     {
         [SerializeField] private bool showDestinations;
+        [SerializeField] private Texture2D menuBackdrop;
+        private IVisualElementScheduledItem sceneryPlayback;
 
         private static AsyncOperation loadingScene;
         private VisualElement root;
@@ -43,12 +45,20 @@ namespace RaidPartyManager.Presentation
 
         private void OnDisable()
         {
+            sceneryPlayback?.Pause();
+            sceneryPlayback = null;
             PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
         }
 
         private void ShowMainMenu()
         {
             root.style.backgroundColor = PrototypeStyle.Background;
+            if (menuBackdrop != null)
+            {
+                sceneryPlayback = SceneryFlipbook.Animate(root, menuBackdrop);
+                root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+                root.style.unityBackgroundImageTintColor = new Color(.47f, .47f, .50f);
+            }
             root.style.alignItems = Align.Center;
             root.style.justifyContent = Justify.Center;
 

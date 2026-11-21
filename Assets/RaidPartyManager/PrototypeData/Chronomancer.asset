@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 8
   traitPower: 2
   traitText: "每击杀1名敌方角色，攻击力永久+2"
-  personality: 12
+  personality: 6
   attack: 5
   defense: 0
   specialDefense: 3

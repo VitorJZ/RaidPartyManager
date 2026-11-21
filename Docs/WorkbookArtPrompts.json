@@ -197,6 +197,76 @@
         "art": "Assets/RaidPartyManager/Art/Skills/20-CloudPiercer.png",
         "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
         "prompt": "Square 1:1 collectible RPG action icon for Raid Party Manager, an original dark-fantasy pixel-art game. Show one brilliant blue-fletched silver arrow clearly piercing a compact silvery cloud. Crisp detailed hand-painted pixel clusters, bold simple silhouette that reads sharply at 48 pixels, maximum three major visual masses, compact centered design filling about 78% of the canvas. Isolate the skill motif on fully transparent alpha. No scene, text, border, lettering, rank, background panel, or checkerboard."
+      },
+      {
+        "number": 21,
+        "name": "钩月箭",
+        "art": "Assets/RaidPartyManager/Art/Skills/21-HookArrow.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: one swept silver crescent-hook arrowhead on a short indigo shaft, bent in a hooking motion, just one small plum motion streak"
+      },
+      {
+        "number": 22,
+        "name": "双人掩护",
+        "art": "Assets/RaidPartyManager/Art/Skills/22-TwinCover.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: two interlocking kite shields side by side, warm copper and silver-blue, with their edges overlapping in mutual guard"
+      },
+      {
+        "number": 23,
+        "name": "拔毒急救",
+        "art": "Assets/RaidPartyManager/Art/Skills/23-FieldMedic.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: a squat uncorked green medicinal vial with a gauze wrap and two sage leaves, a tiny drop of venom drawn out"
+      },
+      {
+        "number": 24,
+        "name": "冻港回潮",
+        "art": "Assets/RaidPartyManager/Art/Skills/24-ColdTide.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: a single curling turquoise harbor wave crest with frosted ice teeth and a few pale blue spray droplets"
+      },
+      {
+        "number": 25,
+        "name": "铜墙反震",
+        "art": "Assets/RaidPartyManager/Art/Skills/25-BronzeMirror.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: a polished round bronze mirror shield seen at three quarters, concentric bronze bosses with a bright amber rebound spark on one edge"
+      },
+      {
+        "number": 26,
+        "name": "守夜灯火",
+        "art": "Assets/RaidPartyManager/Art/Skills/26-NightWatch.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: a weathered hanging brass watch lantern, glowing amber heart, an understated soft golden pulse curling around the foot"
+      },
+      {
+        "number": 27,
+        "name": "攻城矢",
+        "art": "Assets/RaidPartyManager/Art/Skills/27-SiegeBolt.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: a massive steel-tipped ballista quarrel angled diagonally, punching a splintered shield fragment with a few orange splinters"
+      },
+      {
+        "number": 28,
+        "name": "铁壁接管",
+        "art": "Assets/RaidPartyManager/Art/Skills/28-Intercept.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: an iron gauntlet clenched over the rim of a broad upright rectangular steel tower shield, blue-white impact star on its outside edge"
+      },
+      {
+        "number": 29,
+        "name": "未结工钱",
+        "art": "Assets/RaidPartyManager/Art/Skills/29-BackPay.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: one pale teal spectral hand rising from below to catch three antique gold wage coins, gently curling ghost vapor, darkly humorous but readable"
+      },
+      {
+        "number": 30,
+        "name": "雷暴裁决",
+        "art": "Assets/RaidPartyManager/Art/Skills/30-ThunderVerdict.png",
+        "asset": "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset",
+        "prompt": "Create one square transparent-background 2D fantasy RPG skill icon for an existing Unity game. Match the reference painterly pixel-art inventory sprite style, chunky clean dark navy outline, stepped hand-painted highlights, limited focused palette, strongly readable at 48px. Center a single self-contained emblem using around 82% of the square with safe clear margin, no scene, borders, tiles, labels, letters, numbers, text, UI or checkerboard. Subject: one jagged fork of electric violet and white-gold lightning striking a small cracked dark rock, dramatic downward thrust"
       }
     ]
   }

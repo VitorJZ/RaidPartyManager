@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 20
   traitPower: 0
   traitText: "选择友方目标，为其恢复生命值"
-  personality: 12
+  personality: 5
   attack: 5
   defense: 3
   specialDefense: 4

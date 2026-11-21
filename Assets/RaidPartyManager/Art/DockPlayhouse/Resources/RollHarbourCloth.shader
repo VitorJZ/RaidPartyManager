@@ -4,7 +4,7 @@ Shader "RaidPartyManager/Roll Harbour Cloth"
     {
         _MainTex ("Departing cloth", 2D) = "white" {}
         _NextTex ("Arriving cloth", 2D) = "white" {}
-        _Roll ("Travel", Range(0,1)) = 0
+        _Roll ("Travel", Range(-1,1)) = 0
     }
     SubShader
     {
@@ -25,9 +25,9 @@ Shader "RaidPartyManager/Roll Harbour Cloth"
             {
                 float u=i.uv.x+_Roll;
                 float2 uv=float2(u,i.uv.y);
-                if (u < 1)
+                if (u >= 0 && u < 1)
                     return half4(tex2D(_MainTex,uv*_MainTex_ST.xy+_MainTex_ST.zw).rgb*half3(.87,.915,.975),1);
-                uv.x-=1;
+                uv.x = frac(u);
                 return half4(tex2D(_NextTex,uv*_NextTex_ST.xy+_NextTex_ST.zw).rgb*half3(.87,.915,.975),1);
             }
             ENDCG

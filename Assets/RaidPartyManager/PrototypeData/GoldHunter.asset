@@ -24,8 +24,8 @@ MonoBehaviour:
   stage: 1
   reach: 1
   fixedTrait: 25
-  traitPower: 5
-  traitText: "战斗结束时，若仍然存活，额外获得5金币"
+  traitPower: 8
+  traitText: "战斗结束时，若仍然存活，额外获得8金币"
   evolutions:
   - {fileID: 11400000, guid: 1b56c722b45045eea02a53c43b6f6472, type: 2}
   - {fileID: 11400000, guid: aee2eeafbf56409593501dd5800dd22e, type: 2}

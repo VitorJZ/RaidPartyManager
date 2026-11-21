@@ -143,9 +143,12 @@ namespace RaidPartyManager.Presentation
                     destination = Math.Min(destination.Value, Rules.Positions - width + 1);
                 }
                 if (run.TryPlace(from.MemberId, destination))
+                {
+                    GameAudio.Play(SoundCue.UiSwapPositions);
                     RenderEditedRoster();
+                }
             }, slot => OpenMember(slot.MemberId));
-            layout.Add(PrototypeStyle.Text(side == Side.Party ? "长按立绘换位，左键查看装备，右键替换队员。"
+            layout.Add(PrototypeStyle.Text(side == Side.Party ? (run.Day > 0 ? $"队员 {run.Members.Count}/{PartyRun.RosterLimit}　·　长按换位，左键查看装备，右键查看合约。" : "长按立绘换位，左键查看装备，右键替换队员。")
                 : "长按立绘换位，点击立绘可替换敌人。", 13, PrototypeStyle.Muted));
             var row = PrototypeStyle.Row("editor-positions");
             row.style.justifyContent = Justify.SpaceAround;
@@ -183,7 +186,7 @@ namespace RaidPartyManager.Presentation
             {
                 var button = PrototypeStyle.Button(member.Character.Name + (member.IsAway ? " · 守候宝箱" : ""), $"edit-member-{member.Id}",
                     () => OpenMember(member.Id));
-                button.SetEnabled(!member.IsAway);
+                button.SetEnabled(!member.IsAway || member.Contract != null);
                 RegisterReplacement(button, member);
                 bench.Add(button);
                 drag.Register(new FormationSwap.Slot
@@ -283,30 +286,49 @@ namespace RaidPartyManager.Presentation
             return card;
         }
 
-        private void OpenDetails(string id)
+        private void OpenDetails(string id, bool dossier = false)
         {
             var member = run.Members.Single(candidate => candidate.Id == id);
             OpenModal(id, new CharacterEquipmentPopup(run, id, portraitFor(member.Character.Id), iconFor, backpackCells,
-                RenderEditedRoster, CloseModal), "close-character-details");
+                RenderEditedRoster, CloseModal, ShowContract, dossier || member.IsAway), "close-character-details");
+
+            void ShowContract()
+            {
+                CloseModal();
+                OpenContract(run.Members.Single(candidate => candidate.Id == id), () =>
+                {
+                    if (run.Members.Any(candidate => candidate.Id == id)) OpenDetails(id, dossier: true);
+                });
+            }
         }
 
         private void OpenMember(string id)
         {
-            if (side == Side.Party)
-                OpenDetails(id);
-            else
-                OpenReplacement(run.Members.Single(member => member.Id == id));
+            var member = run.Members.Single(m => m.Id == id);
+            if (side != Side.Party) OpenReplacement(member);
+            else OpenDetails(id);
         }
 
         private void RegisterReplacement(VisualElement target, MemberView member)
         {
+            if (side == Side.Party && member.Contract != null) target.tooltip = "右击查看合约";
             target.RegisterCallback<PointerUpEvent>(evt =>
             {
                 if (evt.button != 1 || memberId != null)
                     return;
-                OpenReplacement(member);
+                if (side == Side.Party && member.Contract != null) OpenContract(member);
+                else OpenReplacement(member);
                 evt.StopPropagation();
             });
+        }
+
+        private void OpenContract(MemberView member, Action closed = null)
+        {
+            var popup = ContractPanel.Negotiate(member.Character, run.Day, member.Trait, 0, member.Contract,
+                run.ExpectedDailyWage(member.Id),
+                (days, terms, clause, wage) => run.SetContract(member.Id, days, terms, clause, wage),
+                () => { CloseModal(); RenderEditedRoster(); closed?.Invoke(); });
+            OpenModal(member.Id, popup, "close-contract");
         }
 
         private void OpenReplacement(MemberView member)

@@ -8,7 +8,7 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class BattleUnitCard : VisualElement
     {
-        private readonly int maximumHealth;
+        private int maximumHealth;
         private readonly Label healthLabel;
         private readonly VisualElement healthFill;
         private readonly VisualElement portrait;
@@ -135,8 +135,9 @@ namespace RaidPartyManager.Presentation
         }
 
         public void Refresh(int health, int shield, double now, IReadOnlyList<StatusStack> statuses = null,
-            IReadOnlyDictionary<BattleCountdownKind, int> countdowns = null)
+            IReadOnlyDictionary<BattleCountdownKind, int> countdowns = null, int updatedMaximum = 0)
         {
+            if (updatedMaximum > 0) maximumHealth = updatedMaximum;
             if (maximumHealth == 0)
                 return;
 

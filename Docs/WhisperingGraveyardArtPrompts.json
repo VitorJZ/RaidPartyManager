@@ -155,5 +155,161 @@
       "name": "守墓圣母",
       "prompt": "Use case: stylized-concept. Asset type: production Unity 2D gothic RPG enemy animation atlas. REFERENCE is style ONLY, keep its detailed muted pixel-painted texture and readable silhouette, but create the NEW ENEMY described below. Full-body facing LEFT in three-quarter side-view, consistent identity and proportions. Genuine transparent RGBA background. EXACT 8 columns by 6 rows, all 48 cells square, perfectly equal regular grid. Suggested 2048x1536 landscape canvas. Every cell has ONE full-body pose of the SAME enemy, identical scale and ground baseline, padding all around. No clipping or overlap. Row1:8 subtle looping idle frames. Row2:8 walking steps (or hovering/wings for spectral/flying creatures). Row3:8 normal attack frames with strong anticipation, contact at frame5, then return. Row4:8 SPECIAL frames using the subject's distinct prop or power, anticipation then cast/contact frame5, recovery. Row5:8 readable recoil/hit frames. Row6:8 death collapse/dissolve frames ending motionless at frame8. Clearly different silhouettes for attack, special and death. No text, labels, grid lines, scenery, shadows outside cells or fake checkerboard. Palette midnight blue, tarnished metal, ivory bone, moss and jade/violet soul lights, with each enemy's distinctive colors. Subject: Colossal mourning cemetery matron in layered ivory and deep blue funeral robes, pale porcelain death mask, halo made of grave keys, cradle shaped reliquary full of cold ghost lights and long spectral hands. Special action identity: 长夜摇篮; a heavier clearly readable attack using its signature weapon. Regal large imposing boss silhouette."
     }
-  ]
+  ],
+  "stageScenery": {
+    "tool": "ImageGen (built-in)",
+    "assets": [
+      {
+        "id": "WakeShop",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/WakeShop.jpg",
+        "prompt": "Original illustrated scenery for a late-medieval paper theatre strategy RPG called Whispering Graveyard. Painterly antique engraved storybook illustrations, physical brushwork, smoky verdigris slate, weathered limestone and restrained amber candlelight, legible medium values, calm, macabre and welcoming. Wide horizontal seamless-looking painted cyclorama, aspect 3:1. Eye-level front-on wall panorama of a graveyard chandler: apothecary drawers, mourning ribbons, brass candle moulds, beeswax tapers, glass bottles on deep side shelves; central third plain and dim for a real merchant sprite and goods on a separate stage. The lower edge meets the floor, architecture upright. No foreground counter, people, writing, interfaces, stage curtains or framing."
+      },
+      {
+        "id": "VestryHall",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/VestryHall.jpg",
+        "prompt": "Original illustrated scenery for a late-medieval paper theatre strategy RPG called Whispering Graveyard. Painterly antique engraved storybook illustrations, physical brushwork, smoky verdigris slate, weathered limestone and restrained amber candlelight, legible medium values, calm, macabre and welcoming. A 3:1 wide panoramic backdrop of the cemetery employment registry, a long gothic vestry with shallow limestone arches, alcoves full of bound payroll ledgers, high narrow stained-glass windows with diffuse blue dawn, tiny amber lamps at the ends. Level camera faces the rear wall squarely. The middle half and lower third calm and readable behind a row of 8 separate foreground characters. No desks in front, people, words, UI, stage curtains, or theatrical borders."
+      },
+      {
+        "id": "HiringOffice",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/HiringOffice.png",
+        "prompt": "One single freestanding fully isolated medieval gothic building facade sprite, on genuine transparent alpha. Flat paper theatre scenic cutout, front orthographic view, broad square silhouette, whole roof seen, feet of facade level on bottom. All space surrounding roof, sides and porch must be clear empty transparent pixels. No ground plane, backdrop, drop shadow, people, words or frame. Late medieval illustrated fantasy game hand-painted woodcut crosshatching, dusty plum shadows, muted lilac slate roof, mossy stone, a few warm amber highlights, matches a moonlit graveyard. Subject: Hiring guild lodge with a carved blank ledger plaque, oxidized green canopy and a pair of brass lamps"
+      },
+      {
+        "id": "Chandlery",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/Chandlery.png",
+        "prompt": "One single freestanding fully isolated medieval gothic building facade sprite, on genuine transparent alpha. Flat paper theatre scenic cutout, front orthographic view, broad square silhouette, whole roof seen, feet of facade level on bottom. All space surrounding roof, sides and porch must be clear empty transparent pixels. No ground plane, backdrop, drop shadow, people, words or frame. Late medieval illustrated fantasy game hand-painted woodcut crosshatching, dusty plum shadows, muted lilac slate roof, mossy stone, a few warm amber highlights, matches a moonlit graveyard. Subject: Open candle merchant's shop, warm amber shop window and shelves of tall cream funeral candles under a maroon awning"
+      },
+      {
+        "id": "KeepersRest",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/KeepersRest.png",
+        "prompt": "One single freestanding fully isolated medieval gothic building facade sprite, on genuine transparent alpha. Flat paper theatre scenic cutout, front orthographic view, broad square silhouette, whole roof seen, feet of facade level on bottom. All space surrounding roof, sides and porch must be clear empty transparent pixels. No ground plane, backdrop, drop shadow, people, words or frame. Late medieval illustrated fantasy game hand-painted woodcut crosshatching, dusty plum shadows, muted lilac slate roof, mossy stone, a few warm amber highlights, matches a moonlit graveyard. Subject: Shelter for grave keepers, mossy slate lean-to, rolled blankets, cut firewood and a small copper kettle"
+      },
+      {
+        "id": "SextonOffice",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/SextonOffice.png",
+        "prompt": "One single freestanding fully isolated medieval gothic building facade sprite, on genuine transparent alpha. Flat paper theatre scenic cutout, front orthographic view, broad square silhouette, whole roof seen, feet of facade level on bottom. All space surrounding roof, sides and porch must be clear empty transparent pixels. No ground plane, backdrop, drop shadow, people, words or frame. Late medieval illustrated fantasy game hand-painted woodcut crosshatching, dusty plum shadows, muted lilac slate roof, mossy stone, a few warm amber highlights, matches a moonlit graveyard. Subject: Sexton's stone office with a little exterior arch bell and a posting board with blank ivory paper sheets"
+      },
+      {
+        "id": "MourningSquare",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/MourningSquare.jpg",
+        "prompt": "Game production panoramic painted stage BACKCLOTH, ultra-wide 3:1. Medieval gothic paper theatre, thin etched cross-hatching over rich opaque gouache, beautifully legible side architecture and quiet middle/lower area for live actors and scenery. Eye-level camera, level horizon. No scenery frames or curtains, no lettering or people, no foreground objects or UI. Town: rain-washed cemetery market square at late golden afternoon, a bell tower, half-timbered slate roofs, muted ochre and faded olive bunting high over a lane. Frame center open; separate foreground shops will be placed later."
+      },
+      {
+        "id": "WatchCloister",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/WatchCloister.jpg",
+        "prompt": "Game production panoramic painted stage BACKCLOTH, ultra-wide 3:1. Medieval gothic paper theatre, thin etched cross-hatching over rich opaque gouache, beautifully legible side architecture and quiet middle/lower area for live actors and scenery. Eye-level camera, level horizon. No scenery frames or curtains, no lettering or people, no foreground objects or UI. Camp: ruined roofless cloister beside a gravekeeper's camp in the blue hour, broken stone arches sit to either side and reveal a teal fern ravine; amber fire glow from below, blue moss in the cracks. Still peaceful, very different from an open cemetery skyline. No painted campfire or tents in front."
+      },
+      {
+        "id": "EstateSale",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/EstateSale.jpg",
+        "prompt": "Game production panoramic painted stage BACKCLOTH, ultra-wide 3:1. Medieval gothic paper theatre, thin etched cross-hatching over rich opaque gouache, beautifully legible side architecture and quiet middle/lower area for live actors and scenery. Eye-level camera, level horizon. No scenery frames or curtains, no lettering or people, no foreground objects or UI. Auction chamber: inside a private late-medieval chapel converted to the auctioneer's salon. Burgundy brocade on walls, tarnished gilding, high arched skylights and old picture frames to the sides, candlelit amber wood panel at center; entirely clear center for an actual table and teller, no tables painted in."
+      },
+      {
+        "id": "MortuaryOffice",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/MortuaryOffice.jpg",
+        "prompt": "Game production panoramic painted stage BACKCLOTH, ultra-wide 3:1. Medieval gothic paper theatre, thin etched cross-hatching over rich opaque gouache, beautifully legible side architecture and quiet middle/lower area for live actors and scenery. Eye-level camera, level horizon. No scenery frames or curtains, no lettering or people, no foreground objects or UI. Archive and claims office for a cemetery: tall crooked shelves full of bundled vellum, cubbyholes of tiny rolled obituaries, hanging teal glass lamps, oxidized copper counterweights high at the sides, neutral center, dusty green and umber warm interior."
+      },
+      {
+        "id": "YewPath",
+        "path": "Assets/RaidPartyManager/Art/ServiceStages/Graveyard/YewPath.jpg",
+        "prompt": "Game production panoramic painted stage BACKCLOTH, ultra-wide 3:1. Medieval gothic paper theatre, thin etched cross-hatching over rich opaque gouache, beautifully legible side architecture and quiet middle/lower area for live actors and scenery. Eye-level camera, level horizon. No scenery frames or curtains, no lettering or people, no foreground objects or UI. Hidden graveyard garden: winding processional path between massive dark yews, white dog roses, low old mossed stone and a few small funerary lanterns. Pale dawn peach opening at the centre above blue-green ground mist; a horizontal rear cyclorama, no figures."
+      },
+      {
+        "id": "RattleCase",
+        "path": "Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/RattleCase.png",
+        "prompt": "A single animated prop sprite sheet on TRUE transparent alpha, a wide 2:1 strip with exactly TWO equally sized square cells, no outlines around cells. Same ONE little medieval funerary estate auction casket in both cells, same fixed camera looking slightly down and from the front, feet baseline identical, isolated entire box with breathing room. LEFT lid CLOSED, RIGHT same lid OPEN with softly lit dark interior, no items showing. Antiquarian fantasy paper cutout, carved and engraved hand painted game art, warm rim light. No stage, floor plane, grids, background colour, text, symbols that resemble lettering, shadows outside the silhouette, or people. Subject: a small russet round-lidded walnut coffer with conspicuous jangling brass bells on the clasps."
+      },
+      {
+        "id": "HerbalCase",
+        "path": "Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/HerbalCase.png",
+        "prompt": "A single animated prop sprite sheet on TRUE transparent alpha, a wide 2:1 strip with exactly TWO equally sized square cells, no outlines around cells. Same ONE little medieval funerary estate auction casket in both cells, same fixed camera looking slightly down and from the front, feet baseline identical, isolated entire box with breathing room. LEFT lid CLOSED, RIGHT same lid OPEN with softly lit dark interior, no items showing. Antiquarian fantasy paper cutout, carved and engraved hand painted game art, warm rim light. No stage, floor plane, grids, background colour, text, symbols that resemble lettering, shadows outside the silhouette, or people. Subject: a sage-green, tapered apothecary chest with pale herb sprigs and a glass vial tied to its narrow brass handle."
+      },
+      {
+        "id": "IronCase",
+        "path": "Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/IronCase.png",
+        "prompt": "A single animated prop sprite sheet on TRUE transparent alpha, a wide 2:1 strip with exactly TWO equally sized square cells, no outlines around cells. Same ONE little medieval funerary estate auction casket in both cells, same fixed camera looking slightly down and from the front, feet baseline identical, isolated entire box with breathing room. LEFT lid CLOSED, RIGHT same lid OPEN with softly lit dark interior, no items showing. Antiquarian fantasy paper cutout, carved and engraved hand painted game art, warm rim light. No stage, floor plane, grids, background colour, text, symbols that resemble lettering, shadows outside the silhouette, or people. Subject: a massive squat charcoal-black iron strongbox, riveted steel bands and a large copper lock. Heavy rectangular silhouette."
+      },
+      {
+        "id": "RecordPigeonholes + SealPress",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/RecordPigeonholes.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/SealPress.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: a tall battered freestanding timber pigeonhole cabinet packed with individually tied ivory document rolls with seals. Right cell: a low iron hand screw printing press with blue-black ink and a crooked pile of broadsheets on its little carved workbench. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "FuneralBarrow + StoneUrn",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/FuneralBarrow.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/StoneUrn.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: a mossy gravekeeper's low two-wheeled wooden bier barrow with a coil of ivy and a diagonally resting iron spade. Right cell: a tall rounded gothic stone memorial urn, lichened carved base and a few white lilies in its mouth. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "VigilStove + BlanketBench",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/VigilStove.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/BlanketBench.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: a blue patinated iron brazier on tripod legs with a small copper kettle hanging over glowing coals. Right cell: a low hand-hewn bench piled with folded mourning blankets and a rolled blue cloak. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders.",
+        "alphaCleanup": "Remove the paper backdrop, cast shadows, and white between the legs and hanging kettle. Preserve both silhouettes on transparent alpha."
+      },
+      {
+        "id": "WreathCart + BellStand",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/WreathCart.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/BellStand.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: a little florist handcart laden with hanging wood rings entwined with marigold and pale funeral wreaths. Right cell: a tall weathered standing iron bell frame with three differently sized bronze handbells and a trailing frayed pull rope. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "LotCabinet + DrapedReliquary",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/LotCabinet.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/DrapedReliquary.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: a freestanding tall burgundy velvet-lined estate exhibitor cabinet containing silver cups, small bronzes and an hourglass; no boxes. Right cell: a low gilt pedestal covered in wine velvet bearing an antique bronze bust and draped pearl mourning beads. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "CandleRack + VestmentStand",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/CandleRack.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/VestmentStand.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: an old iron votive candle rack with many short pale beeswax tapers and amber flames, drips down the deep frame. Right cell: a freestanding arched timber wardrobe rail with two hanging olive and midnight-blue mourning vestments, a hat on the peg. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "BuoyRack + LobsterPots",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/BuoyRack.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/LobsterPots.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: a freestanding tarred dock rack with faded vermilion and cream wooden fishing buoys on hanging lines. Right cell: two stacked wicker lobster traps, with a purple knotted rope and a little green glass float. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "CanvasBundles + HerbDryer",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/CanvasBundles.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/HerbDryer.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: two low canvas expedition bedrolls lashed to battered russet leather packs and a tin cooking pot. Right cell: a freestanding rough birch tripod herb drying rack with bundled alpine plants and foraged blue-green leaves. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "ChandlerShelf + GuildTrophies",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/ChandlerShelf.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/GuildTrophies.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: a freestanding narrow merchant shelf crammed with coloured glass oil flasks, coils of candle wick and mismatched tins. Right cell: a freestanding dark guild display stand bearing a scuffed shield and small bronze tournament trophies on a deep green cloth. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      },
+      {
+        "id": "TackleChest + PorterDolly",
+        "paths": [
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/TackleChest.png",
+          "Assets/RaidPartyManager/Art/ServiceStages/SetProps/PorterDolly.png"
+        ],
+        "prompt": "Production game art asset sheet for an illustrated dark-fantasy paper theatre RPG. Two DIFFERENT standalone scenic stage props side-by-side in exactly two equal square cells of one wide 2:1 transparent PNG. Left cell: an open low shipwright's tool chest on short plank trestles holding a wooden mallet, auger, tarpot and brass calipers. Right cell: a standing two wheel porter's handcart loaded with a strapped canvas bale and a tied blue sailcloth parcel. Treat each as a separate isolated full-object illustration with clear transparent gutters and a shared baseline near the bottom; leave 8% side margins and a transparent gap down the exact centre. Entire silhouettes visible, centered in each cell. Hand painted ink engraving and opaque gouache, detailed leather and wood edges, broad shapes legible from an audience seat, muted jewel colours, warm edge light on upper left, softly dark edges. Three-quarter front view from just above eye level; stand sturdily on the ground. Transparent negative space through holes and behind the props. No scenery or wall, no common ground, no floor or cast shadows, no badges, no writing, no people, no labels or cell borders."
+      }
+    ]
+  }
 }

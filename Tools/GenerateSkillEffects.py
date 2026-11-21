@@ -36,6 +36,20 @@ STYLES = (
     ("Intimidate",    "#4c335f", "#c583f3", "#ffe0a1"),
     ("Earthquake",    "#4a2a38", "#dc8242", "#ffe0a0"),
     ("CloudPiercer",  "#1b596d", "#65ddf5", "#f4ffff"),
+    ("HookArrow", "#4b426a", "#d19cff", "#fff7d6"),
+    ("TwinCover", "#294e56", "#76c2c7", "#eaffdf"),
+    ("FieldMedic", "#25594e", "#80d597", "#fff4ce"),
+    ("ColdTide", "#1c4372", "#63cbdc", "#f0ffff"),
+    ("BronzeMirror", "#663629", "#d8995d", "#fff0ae"),
+    ("NightWatch", "#553b58", "#edb354", "#ffedb1"),
+    ("SiegeBolt", "#503327", "#e88148", "#ffe2a1"),
+    ("Intercept", "#30435b", "#8ca9be", "#e8ffff"),
+    ("BackPay", "#75481a", "#e8c660", "#fff5be"),
+    ("ThunderVerdict", "#3e286c", "#997bf7", "#fff4b1"),
+    ("BlockadeSalvo", "#623728", "#fa9e42", "#ffefbd"),
+    ("DeepwaterSurge", "#164456", "#56cac6", "#d1fbff"),
+    ("BurialEdict", "#3e223e", "#bf6380", "#ffe1ba"),
+    ("LongNightPrayer", "#343568", "#8badee", "#fff2ce"),
 )
 
 
@@ -336,9 +350,95 @@ def cloud_piercer(f, t, _):
             f.arc(48+14*ripple, 49, 7+13*ripple, 8+20*ripple, 266, 448, 2)
     f.star(x+2, y-3, 7)
 
+def hook_arrow(f, t, _):
+    x = 20 + 47*smooth(t)
+    f.arc(x, 49, 13, 18, 290, 465, 3)
+    arrow(f, (x-15, 67), (x+8, 39))
+
+def shield_face(f, x, y, size):
+    f.line([(x-size, y-size), (x, y-size-3), (x+size, y-size), (x+size, y+3),
+            (x, y+size+6), (x-size, y+3), (x-size, y-size)], 3)
+
+def twin_cover(f, t, _):
+    d = 5 + 12*smooth(t)
+    for x in (48-d, 48+d):
+        shield_face(f, x, 48, 11)
+
+def field_medic(f, t, _):
+    f.line([(48, 30), (48, 65)], 5)
+    f.line([(31, 48), (65, 48)], 5)
+    f.arc(48, 48, 18+13*t, 18+13*t, 30, 280)
+
+def cold_tide(f, t, _):
+    for i in range(3):
+        x, y = 19+25*i, 53+6*sin(pi*(t+i/3))
+        f.arc(x, y, 13, 12, 175, 360, 3)
+        f.gem(x+7, y-13*t, 3, 9)
+
+def bronze_mirror(f, t, _):
+    for size in (13, 20, 23+13*smooth(t)):
+        f.arc(48, 48, size, size, width=2)
+    f.star(43+12*t, 42, 5)
+
+def night_watch(f, t, _):
+    f.line([(37, 37), (60, 37), (56, 64), (41, 64), (37, 37)], 2)
+    f.arc(48, 37, 7, 11, 180, 360)
+    f.gem(48, 52, 4, 5+3*sin(pi*t))
+
+def siege_bolt(f, t, _):
+    x = 15+62*smooth(t)
+    for offset in (-4, 4): f.line([(x-24, 48+offset), (x, 48+offset)], 2)
+    f.line([(x-5, 37), (x+12, 48), (x-5, 59)], 4)
+
+def intercept(f, t, _):
+    x = 28+20*smooth(t/.4)
+    shield_face(f, x, 48, 19)
+    for y in (35, 47, 59):
+        f.line([(x-25, y), (x-12, y)], 2)
+
+def back_pay(f, t, _):
+    for i in range(3):
+        y = 66-8*i-12*smooth(t)
+        f.arc(48, y, 13, 6, width=3)
+    f.star(48, 34-12*t, 6)
+
+def thunder_verdict(f, t, _):
+    for dx in (-19, 0, 19):
+        x = 48+dx
+        f.line([(x+6, 17), (x-4, 42), (x+5, 43), (x-6, 64+13*smooth(t))], 3)
+
+def blockade_salvo(f, t, rng):
+    for offset in (0, 16):
+        x, y = 20 + 46*smooth(t), 64 - 36*smooth(t) + offset
+        f.line([(x-16, y+11), (x, y)], 3)
+        f.star(x, y, 3 + 7*pulse(t, .25, .70))
+
+def deepwater_surge(f, t, rng):
+    for i in range(3):
+        r = 8 + 7*i + 15*smooth(t)
+        f.arc(48, 49, r, r*.65, 30+165*t, 310+165*t, 3)
+    for i in range(5):
+        a = i*2*pi/5 - pi/2
+        f.gem(48+cos(a)*(20+13*t), 49+sin(a)*(20+13*t), 2, 4)
+
+def burial_edict(f, t, rng):
+    f.line([(30, 42), (24, 24), (39, 34), (48, 19), (57, 34), (72, 24), (66, 42), (30, 42)], 2)
+    y = 45 + 22*smooth(t)
+    f.line([(48, y-10), (48, y+7)], 3)
+    f.gem(48, y+7, 5, 9)
+    f.arc(48, 73, 8+24*t, 4+6*t, 0, 360, 2)
+
+def long_night_prayer(f, t, rng):
+    y = 51 - 5*smooth(t)
+    f.line([(48,y-23),(68,y-14),(64,y+9),(48,y+23),(32,y+9),(28,y-14),(48,y-23)], 2)
+    f.star(48, y-1, 5+7*pulse(t))
+    f.arc(48, 74, 12+17*t, 4+4*t, 0, 360)
+
 DRAWINGS = (war_cry, fire, ice, sunshine, stone_guard, healing, volley, meteor, sweep, lightning,
             toxic, feast, sidestep, golden_bell, fiery_eyes, reaping, anthem, intimidate,
-            earthquake, cloud_piercer)
+            earthquake, cloud_piercer, hook_arrow, twin_cover, field_medic, cold_tide, bronze_mirror,
+            night_watch, siege_bolt, intercept, back_pay, thunder_verdict,
+            blockade_salvo, deepwater_surge, burial_edict, long_night_prayer)
 
 
 def render_skill(number, palette, render):
@@ -362,7 +462,7 @@ def preview(sets):
     frames = []
     font = ImageFont.load_default()
     for i in range(FRAMES):
-        board = Image.new("RGBA", (624, 502), "#10151e")
+        board = Image.new("RGBA", (624, 10+123*((len(sets)+4)//5)), "#10151e")
         label = ImageDraw.Draw(board)
         for n, skill in enumerate(sets):
             x, y = 10 + (n%5)*122, 10 + (n//5)*123

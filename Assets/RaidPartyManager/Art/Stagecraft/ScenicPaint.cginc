@@ -1,5 +1,13 @@
 #ifndef RPM_SCENIC_PAINT
 #define RPM_SCENIC_PAINT
+float2 GaitOffset(float2 uv, float4 walk)
+{
+    float lane = walk.z > 0 ? uv.x : 1 - uv.x;
+    float leg = smoothstep(.35,.62,lane) * 2 - 1;
+    float knees = 1 - smoothstep(.09,.47,uv.y);
+    return float2(walk.z * (leg * walk.x * walk.w * knees + (.045 - .025 * walk.x) * uv.y),
+        max(0,leg * walk.y) * .06 * knees + .025 * abs(walk.y) * (1-knees));
+}
 // Keep the dry-brush marks registered to the prop when it moves under the lights.
 half3 ScenicPigment(half3 rgb, float2 uv)
 {

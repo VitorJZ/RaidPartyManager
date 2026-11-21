@@ -12,6 +12,7 @@ namespace RaidPartyManager.Presentation
     // Geometry is authored in metres. Interaction rectangles are projected back onto the UI panel.
     internal abstract class ServiceStage : IDisposable
     {
+        protected const float CompanySpriteSize = 1.62f;
         protected enum Surface { Backdrop, Solid, Paper, Shadow, Flame, Embers, ForestGround, Decking, ScenicFlat }
         protected readonly Camera camera;
         protected readonly Transform stage;
@@ -28,6 +29,7 @@ namespace RaidPartyManager.Presentation
         private readonly Color previousColor;
         private MeshRenderer cyclorama, ground;
         private Texture2D paintedScene;
+        private float panoramaRepeats, panoramaVerticalOffset;
         private Vector2 metresPerTile;
         private float framedAspect;
         private readonly Dictionary<int, MeshRenderer> company = new();
@@ -49,7 +51,7 @@ namespace RaidPartyManager.Presentation
                     // Leave the counter, price cards and town doorways clear behind the visitors.
                     float z = -5.3f + .42f * ((place-1) % 2);
                     float x = -1.83f - .86f * (place-1);
-                    actor = Flat("Company " + place, new Vector3(x,.80f,z),1.62f,1.62f,image);
+                    actor = Flat("Company " + place, new Vector3(x,.80f,z),CompanySpriteSize,CompanySpriteSize,image);
                     company[place] = actor;
                 }
                 actor.enabled = true;
@@ -110,6 +112,7 @@ namespace RaidPartyManager.Presentation
         public void FrameCamera()
         {
             AnimateCompany();
+            Dressing.Scenery?.Apply(cyclorama, properties);
             if (framedAspect == camera.aspect) return;
             framedAspect = camera.aspect;
             house.Frame(camera);
@@ -130,7 +133,8 @@ namespace RaidPartyManager.Presentation
                 ground.SetPropertyBlock(properties);
             }
             if (cyclorama == null) return;
-            var uv = house.DressPanorama(cyclorama.transform, paintedScene);
+            var uv = house.DressPanorama(cyclorama.transform, paintedScene, panoramaRepeats);
+            uv.w += panoramaVerticalOffset;
             cyclorama.GetPropertyBlock(properties);
             properties.SetVector("_MainTex_ST", uv);
             cyclorama.SetPropertyBlock(properties);
@@ -182,17 +186,24 @@ namespace RaidPartyManager.Presentation
             Shadow(foot,width*.94f,height*.47f,.38f);
         }
 
-        protected void HangBackdrop(string name, Texture2D image)
+        protected void HangBackdrop(string name, Texture2D image, float horizontalRepeats = 1, float verticalOffset = 0)
         {
             paintedScene = image;
+            panoramaRepeats = horizontalRepeats;
+            panoramaVerticalOffset = verticalOffset;
             cyclorama = Flat(name, Vector3.zero, 1, 1, image, Surface.Backdrop);
             Dressing.Sky = cyclorama;
+            Dressing.Scenery = new SceneryFlipbook(image);
+            Dressing.Scenery.Apply(cyclorama, properties);
             cyclorama.GetComponent<MeshFilter>().sharedMesh = house.PanoramaPattern;
             FitScenery();
         }
 
         protected MeshRenderer Box(string name, Vector3 centre, Vector3 size, Texture2D texture, Color tint) =>
             Shape(name, PrimitiveType.Cube, centre, size, texture, tint, Surface.Solid);
+
+        protected void GraveyardFloor() =>
+            Deck(art.graveyardStone, new Vector2(5.4f, 1.8f), new Color(.78f, .75f, .83f));
 
         protected void Deck(Texture2D texture, Vector2 tileSize, Color tint, bool feather = false)
         {
@@ -244,7 +255,7 @@ namespace RaidPartyManager.Presentation
             softPaint.SetFloat("_FlameTime", time);
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             house.Unbind(stage);
             stage.gameObject.SetActive(false);

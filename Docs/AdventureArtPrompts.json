@@ -230,5 +230,26 @@
       "path": "Assets/RaidPartyManager/Art/Events/Ink/09-Ambush-Ink.png",
       "reference": "Docs/Previews/EventArt.jpg"
     }
-  ]
+  ],
+  "talentMarket": {
+    "generator": "Built-in ImageGen",
+    "assets": [
+      {
+        "art": "Assets/RaidPartyManager/Art/ServiceStages/MarketHall.jpg",
+        "prompt": "A panoramic scenic backcloth painting for a fantasy paper theatre Unity RPG. Ultra-wide landscape composition 3:1. Interior of the dockside hiring guild, a proud but faded medieval employment exchange with dark teal painted oak beams, tall luminous arched windows and pale misty port cranes visible beyond, symmetrical central golden brass scales-of-wages medallion high on the rear plaster wall framed by faded oxblood pennants. Wings have small cubbyholes for scrolls. Wall and architecture occupy the entire image, straight-on stage audience eye level, columns vertical; restrained contrast with comfortable quiet midtones across the lower midsection behind eight live character cutouts. Hand-painted gouache on theatrical linen, ink-edged European fantasy storybook illustration, warm ochre highlights and sea-green shadows. No foreground floor, no desk, no characters, no lettering, no HUD, no borders or framing curtains."
+      },
+      {
+        "art": "Assets/RaidPartyManager/Art/ServiceStages/RegistryDesk.png",
+        "prompt": "One isolated portable stage prop: a complete antique dockside hiring clerk desk, a carved dark walnut counter with burnished brass fittings, a large open cream employment ledger, squat wax-seal press, three tied paper rolls. Frontal orthographic theatrical cardboard cutout, slightly visible tabletop, low and wide 3:2 silhouette, feet aligned to a flat baseline, no cut-off corners. Rich hand-painted gouache and ink fantasy storybook style, tarnished sea-green painted inset panels, antique gold rim lighting from the upper left. Large clearly legible forms at small game scale. Transparent background outside the prop. No lettering, no text, no people, no background, no free-floating shadow."
+      },
+      {
+        "art": "Assets/RaidPartyManager/Art/ServiceStages/GuildParquet.jpg",
+        "prompt": "Square seamless repeating albedo texture for the floor of a medieval fantasy hiring exchange. Straight-down orthographic hand-painted worn honey-brown and muted deep teal stained wood in a herringbone parquet pattern. Broad recognizable planks alternating direction, fine old grain, occasional tiny iron nail heads, painterly brush edges. Warm amber midtones, low contrast, uniform neutral lighting with seamless edges on all four sides. Only continuous flat wood surface, no furniture, no rugs, no borders, no cast shadows, no perspective, no text."
+      },
+      {
+        "art": "Assets/RaidPartyManager/Art/ServiceStages/ContractBoard.png",
+        "prompt": "One portable free-standing roster board from a dockside medieval fantasy employment exchange. A tall elegant dark walnut A-frame with sea-green trim, a shallow honey-brass arched crest with a small heraldic key motif, six ivory paper contracts clipped in two columns with distinct vermilion wax seals, weighted wooden feet meeting one horizontal baseline. Little brush strokes on the contracts are indistinct; no readable letters, numbers or digital UI. Front elevation slightly showing one frame side, painted as a sturdy theatrical cardboard scenic cutout, crisp hand-painted gouache and ink with worn wood grain, warm light from upper left, restrained antique-gold highlights. Sole complete object on genuine transparent background. No people, no floor, no extraneous props."
+      }
+    ]
+  }
 }

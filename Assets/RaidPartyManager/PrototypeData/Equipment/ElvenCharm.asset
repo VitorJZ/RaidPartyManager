@@ -16,10 +16,10 @@ MonoBehaviour:
   displayName: "精灵护符"
   effect: 2
   icon: {fileID: 2800000, guid: 912bd7e76a64462eae9d1898eef38259, type: 3}
-  description: "抵挡1次致命伤害，并恢复一半的生命值"
+  description: "抵挡一次致命伤害，使生命值恢复至上限的一半，触发后消耗"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0
   healthBonus: 0
   shopTier: 1
-  shopPrice: 35
+  shopPrice: 30

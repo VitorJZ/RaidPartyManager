@@ -71,6 +71,7 @@ namespace RaidPartyManager.Battle
                 : allies.AsEnumerable();
             return action.Target switch
             {
+                EnemyTargetRule.Front when action.Kind == EnemyActionKind.Attack => FrontAttackTargets(actor).Take(1),
                 EnemyTargetRule.Front => opponents.Take(1),
                 EnemyTargetRule.Rear => opponents.TakeLast(1),
                 EnemyTargetRule.LowestHealth => opponents.OrderBy(unit => (double)unit.Health / unit.Stats.Health).Take(1),
@@ -112,7 +113,7 @@ namespace RaidPartyManager.Battle
                         var attack = new ActionDefinition("enemy-configured", action.Name, ActionKind.Attack,
                             TargetRule.AnyEnemy, Math.Max(0, modifier), damageType: action.DamageType);
                         if (Hit(actor, target, attack, kind, DecisionReason.Default, visual: cue,
-                                falloff: Math.Max(0, -modifier), firstTarget: first, reactions: reactions) &&
+                                falloff: Math.Max(0, -modifier), firstTarget: first, reactions: reactions, singleTarget: targets.Length == 1) &&
                             actor.Health > 0 && target.Health > 0 && action.Status.HasValue)
                             GrantStatus(actor, target, action.Status.Value, action.Layers, kind: BattleEventKind.Effect,
                                 delayDecay: action.DelayDecay);

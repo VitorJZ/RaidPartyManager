@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e69d6322f0d4dd7a160fe2c6ff12661, type: 3}
+  m_Name: ColdSoulReliquary
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
+  id: cold-soul-reliquary
+  displayName: "冷魂圣匣"
+  effect: 53
+  icon: {fileID: 2800000, guid: d473feb56be9540f94737f41124578ab, type: 3}
+  description: "开战时自己获得5点护甲，前后紧邻的友方各获得3点护甲。护盾持续期间，受护者每次攻击命中施加2层寒冷。"
+  attackBonus: 0
+  defenseBonus: 0
+  specialDefenseBonus: 0
+  healthBonus: 0
+  shopTier: 0
+  shopPrice: 100
+  rewardBossId: EnemySepulchralMatron

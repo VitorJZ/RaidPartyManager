@@ -36,7 +36,7 @@ namespace RaidPartyManager.Presentation
                 adventure = new AdventureRun(run, content.CharacterCatalog, content.StartingEquipment, true);
                 adventure.Inspect(NodeKind.Camp);
             }
-            stage = new CampStage(transform, root, stageArt, fireArtwork);
+            stage = new CampStage(transform, root, stageArt, fireArtwork, adventure.InGraveyard);
             Render();
         }
 
@@ -75,10 +75,9 @@ namespace RaidPartyManager.Presentation
             actions.style.right = Length.Percent(21);
             var buttons = PrototypeStyle.Row();
             actions.Add(buttons);
-            AddChoice("招募", "camp-recruit", ShowRecruits, adventure.CampRecruits.Count > 0);
             AddChoice("升阶", "camp-evolve", () => AdventureWidgets.EvolutionChoices(OpenChoice("升阶"), adventure, content,
                 adventure.EvolveAtCamp, CompleteChoice), adventure.EvolutionCandidates.Count > 0);
-            AddChoice("休息", "camp-rest", () => { if (adventure.Rest()) Render(); });
+            AddChoice("休息", "camp-rest", () => { if (adventure.Rest()) { GameAudio.Play(SoundCue.CampRest); Render(); } });
             var message = PrototypeStyle.Text(string.IsNullOrEmpty(adventure.Current.Message)
                 ? "任选一项。休息为在场的存活队员恢复 30% 最大生命。" : adventure.Current.Message, 14, PrototypeStyle.Ink);
             message.style.backgroundColor = new Color(0, 0, 0, 0.65f);
@@ -96,32 +95,6 @@ namespace RaidPartyManager.Presentation
                 button.SetEnabled(adventure.CanUseCamp && available);
                 buttons.Add(button);
             }
-        }
-
-        private void ShowRecruits()
-        {
-            var choices = OpenChoice("招募一位同伴");
-            foreach (var candidate in adventure.CampRecruits)
-                AdventureWidgets.Character(choices, candidate, content, "camp-recruit-" + candidate.Id, () =>
-                {
-                    if (adventure.RecruitAtCamp(candidate.Id))
-                    {
-                        CompleteChoice();
-                        return;
-                    }
-
-                    choices.Clear();
-                    AdventureWidgets.RecruitReplacement(choices, candidate, run, content, member =>
-                    {
-                        if (adventure.RecruitAtCamp(candidate.Id, member))
-                            CompleteChoice();
-                    });
-                    AdventureWidgets.Action(choices, "返回招募名单", "camp-recruit-back", () =>
-                    {
-                        root.Q("camp-choice").RemoveFromHierarchy();
-                        ShowRecruits();
-                    });
-                });
         }
 
         private ScrollView OpenChoice(string title)

@@ -8,6 +8,7 @@ namespace RaidPartyManager.Presentation
     {
         internal readonly Transform Root;
         internal MeshRenderer Sky, Floor;
+        internal SceneryFlipbook Scenery;
         internal readonly Dictionary<MeshRenderer, Player> Cast = new();
         internal readonly HashSet<MeshRenderer> Flown = new();
         internal readonly HashSet<MeshRenderer> Atmosphere = new();
@@ -21,8 +22,10 @@ namespace RaidPartyManager.Presentation
         {
             internal readonly bool Right, Seated;
             internal readonly Texture2D Walk, Idle;
-            internal Player(bool right, Texture2D walk = null, Texture2D idle = null, bool seated = false)
-            { Right = right; Walk = walk; Idle = idle; Seated = seated; }
+            internal readonly float WalkHeight, WalkLift;
+            internal Player(bool right, Texture2D walk = null, Texture2D idle = null, bool seated = false,
+                float walkHeight = 0, float walkLift = 0)
+            { Right = right; Walk = walk; Idle = idle; Seated = seated; WalkHeight = walkHeight; WalkLift = walkLift; }
         }
     }
 }

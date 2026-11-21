@@ -43,8 +43,9 @@ namespace RaidPartyManager.Presentation
             headline.Add(heading);
             Add(headline);
 
+            var voice = EmployeeVoice.For(member?.Personality ?? character.Personality);
             var personality = AddText(this, "personality",
-                $"{PersonalityText(character.Personality)} · {PersonalityDescription(character.Personality)}", 12);
+                $"{voice.Name} · {voice.Description}", 12);
             personality.style.marginTop = 7;
             if (!string.IsNullOrWhiteSpace(character.TraitText))
             {

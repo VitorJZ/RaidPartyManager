@@ -20,13 +20,7 @@ namespace RaidPartyManager.Presentation
         {
             this.sheet = sheet;
             this.facesLeft = facesLeft;
-            (stride, lift) = profession switch
-            {
-                Profession.Archer => (0.105f, 0.074f),
-                Profession.Mage => (0.078f, 0.052f),
-                Profession.Support => (0.068f, 0.048f),
-                _ => (0.084f, 0.062f)
-            };
+            (stride, lift) = MotionFor(profession);
             pickingMode = PickingMode.Ignore;
             if (stage == null)
                 generateVisualContent += Draw;
@@ -45,6 +39,14 @@ namespace RaidPartyManager.Presentation
                 Add(paper);
             }
         }
+
+        internal static (float Stride, float Lift) MotionFor(Profession profession) => profession switch
+        {
+            Profession.Archer => (0.105f, 0.074f),
+            Profession.Mage => (0.078f, 0.052f),
+            Profession.Support => (0.068f, 0.048f),
+            _ => (0.084f, 0.062f)
+        };
 
         public void ShowFrame(int index)
         {

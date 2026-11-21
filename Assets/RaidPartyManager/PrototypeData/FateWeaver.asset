@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 14
   traitPower: 0
   traitText: "战斗开始时，使一名队友在本场战斗里进阶"
-  personality: 12
+  personality: 8
   attack: 5
   defense: 2
   specialDefense: 2

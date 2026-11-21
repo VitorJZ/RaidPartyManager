@@ -13,6 +13,31 @@ MonoBehaviour:
   m_Name: ServiceStageArt
   m_EditorClassIdentifier: 
   shader: {fileID: 4800000, guid: d2cd23da58bb46588491f23491ba94e7, type: 3}
+  mourningSquare: {fileID: 2800000, guid: 6c866ef579bc422f91d7beec04f92b33, type: 3}
+  watchCloister: {fileID: 2800000, guid: 6422d7a988b34db88c844e6cc89ee5b6, type: 3}
+  estateSale: {fileID: 2800000, guid: 73e866aca7c844ff9b51c79c65f6bdd7, type: 3}
+  mortuaryOffice: {fileID: 2800000, guid: eb145e3880324a4e8fbb89f4965440a6, type: 3}
+  yewPath: {fileID: 2800000, guid: 51228636ccda4eceb5da36b671d7f570, type: 3}
+  recordPigeonholes: {fileID: 2800000, guid: 79fdb457c8434f55b91e76433a747c99, type: 3}
+  sealPress: {fileID: 2800000, guid: a4fb41a999d84d748b0bb993060697b4, type: 3}
+  funeralBarrow: {fileID: 2800000, guid: 7c37e9129a264b449075b5549336667d, type: 3}
+  stoneUrn: {fileID: 2800000, guid: 85cb454c3443485e99986044689ec7df, type: 3}
+  vigilStove: {fileID: 2800000, guid: f31219daace749309e927b577dc6f916, type: 3}
+  blanketBench: {fileID: 2800000, guid: d4eb03daed4a432fb3142708323656aa, type: 3}
+  wreathCart: {fileID: 2800000, guid: 46e49a9f2e40493182ba309f9fb32e35, type: 3}
+  bellStand: {fileID: 2800000, guid: 61507e41d45643168d6f8623122e6b58, type: 3}
+  lotCabinet: {fileID: 2800000, guid: f7f23bdc16874e4894507115ba307949, type: 3}
+  drapedReliquary: {fileID: 2800000, guid: 0d4a8a05239b4589a1741cdcdd652be1, type: 3}
+  candleRack: {fileID: 2800000, guid: c246925d1b0c45cab46e08a4b4e9aaaa, type: 3}
+  vestmentStand: {fileID: 2800000, guid: 6ccafe4e887a47188be80d2948717d19, type: 3}
+  buoyRack: {fileID: 2800000, guid: 69f5550cd81e4ccb89f026f6e6f18bee, type: 3}
+  lobsterPots: {fileID: 2800000, guid: 749f25ee12fc497582f2f463c92a13cb, type: 3}
+  canvasBundles: {fileID: 2800000, guid: 3819252c36c54664894a4ab7dfcd282a, type: 3}
+  herbDryer: {fileID: 2800000, guid: 11fd63a43bf44673bb4bd664af403f36, type: 3}
+  chandlerShelf: {fileID: 2800000, guid: 72c31fc9fdd74b069ef16d98b9ef06fb, type: 3}
+  guildTrophies: {fileID: 2800000, guid: c0264cd1067b40cb92e50f50a5528be4, type: 3}
+  tackleChest: {fileID: 2800000, guid: 1ce673439951433bb25ecbf7db4c7114, type: 3}
+  porterDolly: {fileID: 2800000, guid: 05a34c2fbfa74e37869f0735ad974c40, type: 3}
   campSky: {fileID: 2800000, guid: abad079608fc4e1f98770fbf8d83e3a8, type: 3}
   bark: {fileID: 2800000, guid: 8c85e736f27a450285863002e870741c, type: 3}
   endGrain: {fileID: 2800000, guid: 9525a78567064a318c01424339879a53, type: 3}
@@ -21,12 +46,29 @@ MonoBehaviour:
   timber: {fileID: 2800000, guid: 963780983bc943638ddd8fa53d870b07, type: 3}
   cobbles: {fileID: 2800000, guid: ae56cadf9e704d13bc6b975d15fe562d, type: 3}
   counterFront: {fileID: 2800000, guid: c46f674be0a04579badf8b4332fe3d74, type: 3}
+  graveyardStone: {fileID: 2800000, guid: ae56cadf9e704d13bc6b975d15fe562d, type: 3}
+  cemeteryGate: {fileID: 2800000, guid: 0a1af8b43b1641dd9e7eb00f15370b85, type: 3}
+  lanternTree: {fileID: 2800000, guid: e32a25d96a2c44a5b08f5d5e7ff99195, type: 3}
+  bellArch: {fileID: 2800000, guid: afcf819fa7ac4bf4b331f195ab54e73d, type: 3}
+  wakeShop: {fileID: 2800000, guid: b8f0e0ed236f47ccb103d2547ebeda32, type: 3}
+  vestryHall: {fileID: 2800000, guid: b2114a31b1834227967e689ffd1e702d, type: 3}
+  graveyardFacilities:
+  - {fileID: 2800000, guid: d5c256b2b1da4549b555565a6c4ae870, type: 3}
+  - {fileID: 2800000, guid: 76e6382b72de42b8a7ab99b6ba0c1aa7, type: 3}
+  - {fileID: 2800000, guid: fed1a6b29d6e4e6daa436e7dc21a3d49, type: 3}
+  - {fileID: 2800000, guid: 4da63a82f0994933838d30c198a099b7, type: 3}
+  graveyardSky: {fileID: 2800000, guid: 86013047caba450ba1dc9906b17e30e5, type: 3}
+  gravestones: {fileID: 2800000, guid: f68fad52db2249b9a3e610b2f478b3e0, type: 3}
   mooring: {fileID: 2800000, guid: 562fb0156c9a4eb5b4c0df13c0c0bee8, type: 3}
   firewood: {fileID: 2800000, guid: 9d10c3b5d4fc4d9b94b9a98e34859676, type: 3}
   parcel: {fileID: 2800000, guid: a3a7e5809add4595b83759e72ff53f78, type: 3}
   creel: {fileID: 2800000, guid: 44f3d274e4544714bf25e5f01966c784, type: 3}
   seatBack: {fileID: 2800000, guid: af94142bf2b8414ca9fe93bc961908e1, type: 3}
   ferns: {fileID: 2800000, guid: 5d22633fb2b7487993a8811b24b6e0a3, type: 3}
+  marketHall: {fileID: 2800000, guid: 7f5c4b332bb644f7aae491325743aabd, type: 3}
+  registryDesk: {fileID: 2800000, guid: 4399cca391c94af89ad1b93ab6076938, type: 3}
+  contractBoard: {fileID: 2800000, guid: 8a1be4fff94045608c69697c28c58c70, type: 3}
+  guildParquet: {fileID: 2800000, guid: 6ea0372709324b268a3e1787a706a5c8, type: 3}
   facilities:
   - {fileID: 2800000, guid: c6afdb3c25b24a20a1b6e152ff0ab0d7, type: 3}
   - {fileID: 2800000, guid: 63384a64a40841a192689eed25a406ed, type: 3}

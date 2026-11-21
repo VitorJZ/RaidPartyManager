@@ -26,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 10
   traitPower: 30
   traitText: "每3回合，若仍然存活，对所有敌方单位造成30点雷电伤害"
-  personality: 12
+  personality: 9
   attack: 0
   defense: 2
   specialDefense: 2

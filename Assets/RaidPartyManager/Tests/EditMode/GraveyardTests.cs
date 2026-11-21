@@ -251,13 +251,13 @@ namespace RaidPartyManager.Tests
         }
 
         private static CharacterDefinition Enemy(EnemyBehaviorDefinition profile) => new("fixture", "敌人", Profession.Warrior,
-            Personality.Reckless, new Stats(8, 1, 1, 100), 10, Basic, rank: EnemyRank.Normal, enemyBehavior: profile);
+            Personality.Frank, new Stats(8, 1, 1, 100), 10, Basic, rank: EnemyRank.Normal, enemyBehavior: profile);
 
         private static Combatant Dummy(string id, int position, int health = 999, Side side = Side.Party)
         {
             var shield = new ActionDefinition("guard", "守护", ActionKind.Shield, TargetRule.Self, 1, 1);
             var stats = new Stats(0, 2, 2, 999);
-            var character = new CharacterDefinition(id, id, Profession.Warrior, Personality.Cautious, stats, 10, Basic, shield);
+            var character = new CharacterDefinition(id, id, Profession.Warrior, Personality.Worrier, stats, 10, Basic, shield);
             return new Combatant(id, character, side, position, stats, health);
         }
 

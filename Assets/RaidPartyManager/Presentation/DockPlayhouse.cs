@@ -4,6 +4,8 @@ using UnityEngine.UIElements;
 
 namespace RaidPartyManager.Presentation
 {
+    internal enum StageTurn { Automatic, Forward, Reverse }
+
     // The venue survives scene loads. Each node leases it for the lifetime of its own scenery.
     [DefaultExecutionOrder(200)]
     public sealed class DockPlayhouse : MonoBehaviour
@@ -96,7 +98,7 @@ namespace RaidPartyManager.Presentation
         internal Bounds DeckBounds => deckFrame.bounds;
         internal Bounds SceneryOpening => new Bounds(opening.position, opening.lossyScale);
 
-        internal Vector4 DressPanorama(Transform cloth, Texture image)
+        internal Vector4 DressPanorama(Transform cloth, Texture image, float repeats = 1)
         {
             var deck = DeckBounds;
             float radius = deck.size.z;
@@ -107,8 +109,8 @@ namespace RaidPartyManager.Presentation
             cloth.position = new Vector3(deck.center.x, deck.max.y, deck.min.z);
             cloth.localScale = new Vector3(radius, height, radius);
             // U follows the entire 180-degree sweep at constant arc length.
-            float v = Mathf.Min(1, (float)image.width / image.height * height / (Mathf.PI * radius));
-            return new Vector4(1, v, 0, (1-v)*.5f);
+            float v = Mathf.Min(1, (float)image.width / image.height * repeats * height / (Mathf.PI * radius));
+            return new Vector4(repeats, v, (1 - repeats) * .5f, (1 - v) * .5f);
         }
 
         // Project the physical lip of the portal into the same panel as its hanging signs.
@@ -205,17 +207,17 @@ namespace RaidPartyManager.Presentation
             if (!performance.Crossing) gameObject.SetActive(false);
         }
 
-        internal static void ChangeSet(Action next, bool toSigns = false)
+        internal static void ChangeSet(Action next, bool toSigns = false, StageTurn turn = StageTurn.Automatic)
         {
             if (current == null || current.panel == null) { next(); return; }
             current.performance.EndFirstEntrance();
-            if (AdventureFlow.OnRoute)
+            if (AdventureFlow.OnRoute || turn != StageTurn.Automatic)
             {
                 // Allow an early selection during the initial curtain cue to proceed on the open stage.
                 current.cue = Cue.Playing;
                 current.travel = 1;
                 current.ApplyCue();
-                current.performance.Change(next, toSigns);
+                current.performance.Change(next, toSigns, turn);
                 return;
             }
             if (current.cue is Cue.Closing or Cue.Closed) return;

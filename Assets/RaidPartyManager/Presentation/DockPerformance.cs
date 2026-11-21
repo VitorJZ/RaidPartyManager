@@ -18,6 +18,7 @@ namespace RaidPartyManager.Presentation
         private Material panorama;
         private float time;
         private bool toSigns;
+        private float turnDirection;
         private Action move;
         private VisualElement curtainGuard;
         private readonly MaterialPropertyBlock ink = new();
@@ -56,11 +57,12 @@ namespace RaidPartyManager.Presentation
             if (!Crossing) Clear();
         }
 
-        internal void Change(Action callback, bool signs)
+        internal void Change(Action callback, bool signs, StageTurn turn)
         {
             if (Busy || live == null) return;
             move = callback;
             toSigns = signs;
+            turnDirection = turn == StageTurn.Reverse ? -1 : 1;
             if (cue == Cue.Picking)
             {
                 SetCue(Cue.Fold);
@@ -105,6 +107,8 @@ namespace RaidPartyManager.Presentation
         internal void Tick(VisualElement panel)
         {
             if (live == null || panel == null) return;
+            oldSet?.AnimateBackdrop();
+            newSet?.AnimateBackdrop();
             if (openingCast != null)
             {
                 entranceTime += Mathf.Min(Time.unscaledDeltaTime,.08f);
@@ -148,8 +152,10 @@ namespace RaidPartyManager.Presentation
                     break;
                 case Cue.Turn:
                     float t = Mathf.SmoothStep(0, 1, time/1.4f);
-                    boards.Turn(180 * t);
-                    panorama.SetFloat("_Roll", t);
+                    boards.Turn(turnDirection * 180 * t);
+                    panorama.SetFloat("_Roll", turnDirection * t);
+                    if (oldSet.Scenery != null) panorama.SetTexture("_MainTex", oldSet.Scenery.Current);
+                    if (newSet.Scenery != null) panorama.SetTexture("_NextTex", newSet.Scenery.Current);
                     venue.SetMoonVisible(t >= .5f ? newSet.Moon : oldSet.Moon);
                     if (t < 1) break;
                     FreeMachine();
