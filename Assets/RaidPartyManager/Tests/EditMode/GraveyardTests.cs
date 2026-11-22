@@ -69,7 +69,7 @@ namespace RaidPartyManager.Tests
         [Test]
         public void EveryAuthoredActionCanBeSelectedAndResolvedUsingItsRealProfile()
         {
-            foreach (var enemy in Load().EnemyRoster)
+            foreach (var enemy in Load().EnemyRoster.Where(e => e.Rank != EnemyRank.Boss))
             {
                 int cumulative = 0;
                 foreach (var action in enemy.EnemyBehavior.Actions)
@@ -155,6 +155,21 @@ namespace RaidPartyManager.Tests
                 Is.EqualTo(normal.Single(entry => entry.ActionName == attack).Amount + 1));
             Assert.That(phased.Count(entry => entry.VisualCue == BattleVisualCue.GraveyardPhase), Is.EqualTo(1));
             Assert.That(half.AdvanceRound().Any(entry => entry.VisualCue == BattleVisualCue.GraveyardPhase), Is.False);
+        }
+
+        [TestCase("WhisperingGraveyard", "EnemyNamelessKing", "葬王点名", "赦免")]
+        [TestCase("WhisperingGraveyard", "EnemySepulchralMatron", "守柩祈祷", "护柩回生")]
+        [TestCase("ClockworkCapital", "EnemyRoyalEngine", "汽笛鸣响", "终点清场")]
+        [TestCase("ClockworkCapital", "EnemyAstralGovernor", "星轨定位", "星光折返")]
+        [TestCase("ClockworkCapital", "EnemyCrucibleRegent", "炉温上升", "全城开炉")]
+        public void BossPatternsResolveTheirDistinctSecondBeat(string region, string id, string setup, string result)
+        {
+            var data = AssetDatabase.LoadAssetAtPath<EncounterAsset>($"Assets/RaidPartyManager/PrototypeData/{region}Encounter.asset").ToData();
+            var boss = data.EnemyRoster.Single(e => e.Id == id);
+            var fight = new BattleSimulator(random: new FixedRoll()).Start(Request(boss, helper: true, enemyHealth: boss.BaseStats.Health - 6));
+            var log = Enumerable.Range(0, 5).SelectMany(_ => fight.AdvanceRound()).Where(e => e.ActorId == "enemy").ToArray();
+            Assert.That(log.Any(e => e.ActionName == setup), Is.True);
+            Assert.That(log.Any(e => e.ActionName == result), Is.True);
         }
 
         [Test]

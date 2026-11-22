@@ -55,17 +55,9 @@ namespace RaidPartyManager.Presentation
             }
         }
 
-        internal DockRouteSigns(Texture2D stone, Texture townIcon, string buttonName, Action returnToTown, Func<bool> visible = null)
-            : this(stone, true, visible)
-        {
-            name = "town-return-sign";
-            AddBoard(buttonName, townIcon, 1, () => { returnToTown(); return true; }, null, "返回城镇");
-        }
-
-        private void AddBoard(string id, Texture icon, int direction, Func<bool> choose, RouteStop? stop, string tooltip = null)
+        private void AddBoard(string id, Texture icon, int direction, Func<bool> choose, RouteStop? stop)
         {
             var button = new Button(() => { if (landed && !committed) committed = choose(); }) { name = id, userData = stop };
-            if (tooltip != null) button.tooltip = tooltip;
             button.SetEnabled(false);
             button.style.position = Position.Absolute;
             button.style.marginLeft = button.style.marginRight = button.style.marginTop = button.style.marginBottom = 0;
@@ -83,7 +75,7 @@ namespace RaidPartyManager.Presentation
             Add(button);
         }
 
-        private DockRouteSigns(Texture2D stone, bool fill, Func<bool> visible = null)
+        private DockRouteSigns(Texture2D stone, bool fill)
         {
             GameAudio.Play(SoundCue.UiMapReveal, .40f);
             pickingMode = PickingMode.Ignore;
@@ -98,17 +90,6 @@ namespace RaidPartyManager.Presentation
                 var eye = Camera.main;
                 var house = DockPlayhouse.Current;
                 if (panel == null || boards.Count == 0 || eye == null || house == null || DockPlayhouse.Moving || committed) return;
-                if (visible != null)
-                {
-                    bool show = visible();
-                    var display = show ? DisplayStyle.Flex : DisplayStyle.None;
-                    if (style.display.value != display)
-                    {
-                        style.display = display;
-                        foreach (var post in stones) post.Foot.gameObject.SetActive(show);
-                    }
-                    if (!show) return;
-                }
                 if (!(layout.width > 0)) return;
                 if (dropStart < 0)
                 {

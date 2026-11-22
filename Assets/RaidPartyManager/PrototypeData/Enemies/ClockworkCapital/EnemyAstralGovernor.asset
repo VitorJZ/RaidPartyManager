@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 0
   traitPower: 0
-  traitText: "子午光针（54%） / 群星合相（30%） / 反向星历（16%）"
+  traitText: "从前到后轮流锁定一人，下次行动发射星光。被锁定者持盾时反射星光，令摄政获得2层虚弱。"
   personality: 1
   attack: 11
   defense: 3

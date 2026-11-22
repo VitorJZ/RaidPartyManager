@@ -368,8 +368,8 @@ namespace RaidPartyManager.Presentation
             teamButton.style.backgroundColor = due ? new Color(.35f, .065f, .065f) : PrototypeStyle.Inset;
             teamButton.Q("team-icon")?.MarkDirtyRepaint();
             teamButton.tooltip = due ? "右击队员续约 · " + string.Join("、", party.Members
-                .Where(m => m.Contract.EndDay - party.Day <= 3)
-                .Select(m => $"{m.Character.Name}剩 {m.Contract.EndDay - party.Day} 天")) : "编队 · 右击队员查看合约";
+                .Where(m => m.ContractEndDay - party.Day <= 3)
+                .Select(m => $"{m.Character.Name}剩 {m.ContractEndDay - party.Day} 天")) : "编队 · 右击队员查看合约";
             if (!party.CanAdvanceDay) gold.text += "　出发前请续约";
         }
 

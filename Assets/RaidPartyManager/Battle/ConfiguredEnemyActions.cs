@@ -33,6 +33,8 @@ namespace RaidPartyManager.Battle
                 Report(BattleEventKind.Effect, actor, actor, request.CapitalField ? "炉压过载" : "墓园第二阶段", ActionKind.Shield,
                     detail: $"此后伤害招式的攻击修正 +{profile.PhaseAttackBonus}", visual: BattleVisualCue.GraveyardPhase);
 
+            if (TryBossTurn(actor, profile)) return true;
+
             if (chargedEnemyActions.Remove(actor, out var charged))
             {
                 ReportCountdown(actor, BattleCountdownKind.EnemyCharge, 0);
@@ -88,9 +90,9 @@ namespace RaidPartyManager.Battle
             };
         }
 
-        private void ExecuteConfiguredEnemyAction(Unit actor, EnemyActionDefinition action, BattleVisualCue cue)
+        private void ExecuteConfiguredEnemyAction(Unit actor, EnemyActionDefinition action, BattleVisualCue cue, Unit[] targets = null)
         {
-            var targets = ConfiguredEnemyTargets(actor, action).ToArray();
+            targets ??= ConfiguredEnemyTargets(actor, action).ToArray();
             if (targets.Length == 0)
             {
                 var target = TargetableOpponents(actor).FirstOrDefault();

@@ -255,6 +255,8 @@ namespace RaidPartyManager.Tests
         {
             var founder = Create(42, false).CheckpointForExit();
             founder.Party.Members = founder.Party.Members.Take(1).ToArray();
+            founder.Party.Members[0].Contract.EndDay = 2;
+            founder.Party.Members[0].Contract.BasePaid = true;
             var run = AdventureRun.RestoreCheckpoint(founder, content.CharacterCatalog, gear);
             var member = run.Party.Members.Single();
             var form = content.CharacterCatalog.First(c => c.Personality != member.Personality && c.PositionSlots == 1 &&
@@ -266,21 +268,21 @@ namespace RaidPartyManager.Tests
             int upfront = wage + 1;
             Assert.That(run.Party.SetContract(member.Id, 5, terms, upfront), Is.False);
             Assert.That(run.Party.SetContract(member.Id, 12, terms, upfront), Is.True);
-            var agreement = run.Party.Members.Single().Contract;
+            var agreement = run.Party.Members.Single().Renewals.Single();
             Assert.That(agreement.InstallmentsPaid, Is.Zero);
-            Assert.That(agreement.NextDueDay, Is.EqualTo(3));
+            Assert.That(agreement.NextDueDay, Is.EqualTo(4));
             Assert.That(agreement.InterestPercent, Is.EqualTo(WageInstallments.PremiumPercent(member.Personality)));
             Assert.That(run.Party.Expenses.Single().Amount, Is.EqualTo(upfront));
             long outlay = upfront;
-            for (int day = 2; day <= 7; day++)
+            for (int day = 2; day <= 8; day++)
             {
                 var saved = UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(UnityEngine.JsonUtility.ToJson(run.CheckpointForExit()));
                 saved.Options = new[] { NodeKind.Town };
                 run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
                 Assert.That(run.EnterRoute(0), Is.True);
                 var current = run.Party.Members.Single();
-                int periods = (day - 1) / 2;
-                if (day % 2 == 1) outlay += agreement.ScheduledPayment(periods);
+                int periods = (day - 2) / 2;
+                if (day > 2 && day % 2 == 0) outlay += agreement.ScheduledPayment(periods);
                 Assert.That(current.Contract.InstallmentsPaid, Is.EqualTo(periods));
                 Assert.That(current.Character.Personality, Is.EqualTo(member.Personality));
                 Assert.That(run.Party.Gold, Is.EqualTo(balance - outlay));
@@ -292,7 +294,7 @@ namespace RaidPartyManager.Tests
 
         [TestCase(true)]
         [TestCase(false)]
-        public void LeavingAnInstallmentDealSettlesItsBalanceExactlyOnce(bool sell)
+        public void FutureInstallmentsStartOnlyWhenThePreviousContractEnds(bool sell)
         {
             var run = Create();
             var party = run.Party;
@@ -301,21 +303,22 @@ namespace RaidPartyManager.Tests
             var rates = new PerformanceBonuses { Installments = new WageInstallments { Enabled = true, Count = 3, IntervalDays = 4 }};
             int deposit = wage + 1;
             Assert.That(party.SetContract(member.Id, 12, rates, deposit), Is.True);
-            var terms = party.Members.First(m => m.Id == member.Id).Contract;
+            var terms = party.Members.First(m => m.Id == member.Id).Renewals.Single();
             int before = party.Gold;
             int offer = party.TransferOffer(member.Id);
             if (sell)
             {
                 Assert.That(party.SellMember(member.Id), Is.True);
                 Assert.That(party.SellMember(member.Id), Is.False);
-                Assert.That(party.Gold, Is.EqualTo(before + offer - terms.CurrentReleaseFee - (12 * wage - deposit)));
+                Assert.That(party.Gold, Is.EqualTo(before + offer - member.Contract.ExitCost));
             }
             else
             {
                 Assert.That(party.SetContract(member.Id, 12, default, 12L * wage), Is.True);
-                Assert.That(party.Gold, Is.EqualTo(before - 12 * wage - terms.CurrentReleaseFee - (12 * wage - deposit)));
+                Assert.That(party.Gold, Is.EqualTo(before - 12 * wage));
             }
-            Assert.That(party.Expenses.Single(e => e.Reason.Contains("结清旧合同分期")).Amount, Is.EqualTo(12 * wage - deposit));
+            if (sell) Assert.That(party.Expenses.Any(e => e.Reason.Contains("违约金")), Is.False);
+            else Assert.That(party.Members.First(m => m.Id == member.Id).Renewals.Last().StartDay, Is.EqualTo(terms.EndDay));
         }
 
         [TestCase(Personality.Caring, 100)]
@@ -338,8 +341,8 @@ namespace RaidPartyManager.Tests
             int bid = financed ? wage : wage + 1;
             int before = party.Gold;
             Assert.That(party.SetContract(member.Id, 1, terms, bid), Is.True);
-            var deal = party.Members.First().Contract;
-            Assert.That(deal.EndDay, Is.EqualTo(party.Day + 1));
+            var deal = party.Members.First().Renewals.Single();
+            Assert.That(deal.EndDay, Is.EqualTo(member.Contract.EndDay + 1));
             Assert.That(deal.BaseTotal, Is.EqualTo(bid));
             Assert.That(party.Gold, Is.EqualTo(before - bid));
             Assert.That(deal.ScheduledInterest, Is.Zero);
@@ -353,6 +356,7 @@ namespace RaidPartyManager.Tests
             var saved = Create(17, false).CheckpointForExit();
             saved.Options = new[] { NodeKind.Town };
             foreach (var starter in saved.Party.Members) starter.Contract.BasePaid = true;
+            saved.Party.Members[0].Contract.EndDay = 2;
             var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
             var party = run.Party;
             var member = party.Members.First();
@@ -360,6 +364,13 @@ namespace RaidPartyManager.Tests
             var terms = new PerformanceBonuses { Installments = new WageInstallments { Enabled = true, Count = 1, IntervalDays = 1 } };
             Assert.That(party.SetContract(member.Id, 5, terms, 5L * wage - 2), Is.True);
             Assert.That(party.TrySpendGold(party.Gold), Is.True);
+            Assert.That(run.EnterRoute(0), Is.True);
+            Assert.That(party.PayrollDebt, Is.Zero);
+            Assert.That(run.Leave(), Is.True);
+            saved = run.CheckpointForExit();
+            saved.Options = new[] { NodeKind.Town };
+            run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            party = run.Party;
             Assert.That(run.EnterRoute(0), Is.True);
             Assert.That(party.PayrollDebt, Is.GreaterThanOrEqualTo(2));
             party.AddGold(1);
@@ -388,8 +399,9 @@ namespace RaidPartyManager.Tests
             var signed = run.Party.Members.Single().Contract;
             Assert.That(run.Party.SetContract(member.Id, int.MaxValue - run.Party.Day, default, (long)int.MaxValue * wage), Is.False);
             Assert.That(run.Party.Members.Single().Contract, Is.SameAs(signed));
+            Assert.That(run.Party.Members.Single().Renewals.Single().StartDay, Is.EqualTo(signed.EndDay));
             Assert.That(run.EnterRoute(0), Is.True);
-            Assert.That(run.Party.Gold, Is.EqualTo(balance - 12 * wage));
+            Assert.That(run.Party.Gold, Is.EqualTo(balance - 12 * wage - signed.DailyWage));
         }
 
         [Test]
@@ -565,7 +577,7 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.EmployeeProfileFor(starter.Id).Goals.Any(goal => goal.Kind == EmployeeGoalKind.Raise), Is.False);
             Assert.That(run.Party.SetContract(starter.Id, 12, default, 12 * raise.Target), Is.True);
             var renewed = run.Party.Members.Single(member => member.Id == starter.Id);
-            Assert.That(renewed.Contract.DailyWage, Is.EqualTo(raise.Target));
+            Assert.That(renewed.Renewals.Last().DailyWage, Is.EqualTo(raise.Target));
 
             var json = UnityEngine.JsonUtility.ToJson(run.CheckpointForExit());
             run = AdventureRun.RestoreCheckpoint(UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(json), content.CharacterCatalog, gear);
@@ -598,7 +610,7 @@ namespace RaidPartyManager.Tests
             var run = Create();
             var member = run.Party.Members.First();
             var terms = new PerformanceBonuses { Appearance = 7, Kill = 13, DamageTaken = 5, Shield = 11 };
-            Assert.That(run.Party.SetContract(member.Id, 10, terms), Is.True);
+            member.Contract.Rates = terms;
             run.Inspect(NodeKind.NormalBattle);
             var enemies = run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
             var foe = enemies[0];
@@ -1346,7 +1358,7 @@ namespace RaidPartyManager.Tests
             else if (eventKind != AdventureEventKind.Ambush)
             {
                 Assert.That(run.Current.Rewards.Count, Is.EqualTo(kind == NodeKind.NormalBattle ? 1 : 2));
-                Assert.That(run.Current.Rewards.All(e => kind == NodeKind.Boss ? e.RewardBossId == enemies[0].Character.Id : e.Tier >= 1), Is.True);
+                Assert.That(run.Current.Rewards.All(e => kind == NodeKind.Boss ? e.RewardBossId == enemies[0].Character.Id : e.CanDropInBattle && !e.BossExclusive), Is.True);
                 int count = run.Party.Inventory.Count;
                 Assert.That(run.ClaimReward(0), Is.True); Assert.That(run.ClaimReward(1), Is.False);
                 Assert.That(run.Party.Inventory.Count, Is.EqualTo(count + 1));
@@ -1409,8 +1421,8 @@ namespace RaidPartyManager.Tests
             Assert.That(guaranteed.HasUnclaimed, Is.False);
         }
 
-        [TestCase(0, 0)] [TestCase(9, 0)] [TestCase(10, 1)] [TestCase(39, 1)]
-        [TestCase(40, 2)] [TestCase(99, 2)]
+        [TestCase(0, 0)] [TestCase(14, 0)] [TestCase(15, 1)] [TestCase(44, 1)]
+        [TestCase(45, 2)] [TestCase(99, 2)]
         public void BossBonusRollUsesExactTierBoundariesAndIncludesRegularStoneArmor(int roll, int expectedTier)
         {
             var ordinaryT0 = gear.First(item => !item.BossExclusive && item.Tier == 0);
@@ -1452,9 +1464,27 @@ namespace RaidPartyManager.Tests
             Assert.That(costs.Count(cost => cost == 3), Is.EqualTo(2));
         }
 
+        [TestCase(false, .019, 0)] [TestCase(false, .02, 1)]
+        [TestCase(true, .039, 0)] [TestCase(true, .04, 1)]
+        public void RegularBattlesOfferOnlyNonExclusiveEquipmentAtTierZero(bool elite, double roll, int expectedTier)
+        {
+            var random = new RewardSample();
+            var route = Create(random: random);
+            route.Inspect(elite ? NodeKind.EliteBattle : NodeKind.NormalBattle);
+            var foes = route.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
+            route.BindBattle("drop-test");
+            random.Fraction = roll;
+            var victory = new BattleResult("drop-test", BattleOutcome.Victory, foes.ToDictionary(e => e.Id, _ => 0), Array.Empty<BattleEvent>());
+            Assert.That(route.SettleBattle(victory, out _), Is.True);
+            var item = route.Current.Rewards[0];
+            Assert.That(item.Tier, Is.EqualTo(expectedTier));
+            Assert.That(item.AvailableInRegularPool, Is.True);
+        }
+
         private sealed class RewardSample : Random
         {
             public double Fraction = 0.5;
+            public override double NextDouble() => Fraction;
             public override int Next(int maxValue) => (int)(Fraction * maxValue);
         }
 

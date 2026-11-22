@@ -92,7 +92,7 @@ namespace RaidPartyManager.Tests
             using (var right = PointerUpEvent.GetPooled(new Event
                 { type = EventType.MouseUp, button = 1, mousePosition = outgoing.worldBound.center }))
                 Send(outgoing, right);
-            Assert.That(root.Q<Button>("sign-crew-contract").text, Is.EqualTo("签订新合同"));
+            Assert.That(root.Q<Button>("sign-crew-contract").text, Is.EqualTo("签署续约合同"));
             var party = (PartyRun)typeof(CampPrototype).GetField("run", BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(Object.FindAnyObjectByType<CampPrototype>());
             int salary = 18 * (int)(root.Q<LongField>("contract-signing-fee").value / 12);
@@ -122,9 +122,9 @@ namespace RaidPartyManager.Tests
                 Send(preserved, right);
             var contract = battleRoot.Q("crew-contract");
             var terms = contract.Query<Label>().ToList();
-            Assert.That(terms.Any(label => label.text.Contains("剩余 18 天")), Is.True);
+            Assert.That(terms.Any(label => label.text.Contains("已签续约合同") && label.text.Contains("共 18 天")), Is.True);
             Assert.That(terms.Any(label => label.text.Contains("每挡下 5 点敌方伤害 6 金币")), Is.True);
-            Assert.That(battleRoot.Q<Button>("sign-crew-contract").text, Is.EqualTo("签订新合同"));
+            Assert.That(battleRoot.Q<Button>("sign-crew-contract").text, Is.EqualTo("签署续约合同"));
             Assert.That(contract.Q<Toggle>("bonus-shield").value, Is.True);
             Assert.That(contract.Q<IntegerField>("bonus-shield-amount").value, Is.EqualTo(6));
 

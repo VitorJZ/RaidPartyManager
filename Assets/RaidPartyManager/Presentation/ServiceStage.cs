@@ -36,11 +36,12 @@ namespace RaidPartyManager.Presentation
         private int idleCel = -1;
         protected DockSet Dressing => house.Set;
 
-        internal void ShowCompany(PartyRun party, EncounterData content)
+        internal void ShowCompany(PartyRun party, EncounterData content, Predicate<string> visible = null)
         {
             foreach (var actor in company.Values) actor.enabled = false;
             foreach (var unit in party.CaptureFormation(Side.Party))
             {
+                if (visible != null && !visible(unit.Id)) continue;
                 int place = unit.Position;
                 var idle = content.BattleSpriteFor(unit.Character.Id);
                 var image = idle ?? content.BattlePortraitFor(unit.Character.Id) ?? content.PortraitFor(unit.Character.Id);

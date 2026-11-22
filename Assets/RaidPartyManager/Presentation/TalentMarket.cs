@@ -202,7 +202,7 @@ namespace RaidPartyManager.Presentation
             brokerBubble.Add(tail);
             UpdateBrokerBubble();
             panel.Add(brokerBubble);
-            AdventureFlow.AddTownReturnSign(panel, stageArt.graveyardStone, "close-town-recruit", Leave, () => dialogue == null);
+            AdventureFlow.AddTownReturnSign(panel, "close-town-recruit", Leave, () => dialogue == null);
             panel.Add(header);
             panel.Add(empty);
             panel.Add(profile);

@@ -88,15 +88,15 @@ namespace RaidPartyManager.Presentation
         private void OpenQuest()
         {
             town.Clear();
-            var back = PrototypeStyle.Button("←", "close-town-quest", () => topBar.WhenRewardsArrive(() => {
+            var board = ContractPanel.Sheet($"{run.RegionName}委托", out var paper);
+            var back = HangingSign.Exit("close-town-quest", () => topBar.WhenRewardsArrive(() => {
                 Render();
                 serviceSigns[(int)TownService.Quest].Focus();
-            }));
-            back.tooltip = "返回城镇";
-            back.style.width = 40;
-            back.style.fontSize = 21;
-            back.style.marginRight = 12;
-            var board = ContractPanel.Sheet($"{run.RegionName}委托", out var paper, back);
+            }), belowTopBar: true);
+            back.tooltip = "下拉返回城镇";
+            back.style.right = StyleKeyword.Auto;
+            back.style.left = Length.Percent(9);
+            board.Add(new StageSignMask(back));
             board.name = "town-quest-board";
             board.style.top = RunTopBar.Height;
             paper.Add(ContractPanel.Text("战斗胜利时记录进度。完成后可在任意城镇交付。", 14));
@@ -106,7 +106,7 @@ namespace RaidPartyManager.Presentation
                 paper.Add(ContractPanel.Text($"{job.Rank} · {job.Title}", 19));
                 paper.Add(ContractPanel.Text($"{job.Objective}　{run.QuestProgress}/{job.Target}", 16));
                 var claim = PrototypeStyle.Button($"领取报酬 · {run.TownQuestGold} 金币", "town-quest-act", () => {
-                    if (topBar.CollectReward(board.Q<Button>("town-quest-act"), run.ClaimCommission)) Render();
+                    if (topBar.CollectReward(board.Q<Button>("town-quest-act"), run.ClaimCommission)) OpenQuest();
                 }, true);
                 claim.SetEnabled(run.QuestProgress >= job.Target);
                 paper.Add(claim);
@@ -116,7 +116,7 @@ namespace RaidPartyManager.Presentation
                 foreach (var job in run.Current.Commissions)
                 {
                     var accept = PrototypeStyle.Button("", "town-quest-offer-" + job.Difficulty, () => {
-                        if (run.AcceptCommission(job.Id)) Render();
+                        if (run.AcceptCommission(job.Id)) OpenQuest();
                     });
                     accept.style.alignItems = Align.FlexStart;
                     accept.Add(PrototypeStyle.Text($"{job.Rank} · {job.Title}　{run.CommissionReward(job)} 金币", 16, PrototypeStyle.Accent));

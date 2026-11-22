@@ -51,6 +51,8 @@ namespace RaidPartyManager.Run
         public Personality Personality { get; }
         public EmployeeAttributes EmployeeAttributes { get; }
         public CrewContract Contract { get; }
+        public IReadOnlyList<CrewContract> Renewals { get; }
+        public int ContractEndDay => (Renewals.LastOrDefault() ?? Contract)?.EndDay ?? 0;
         public CampTraining Training { get; }
         public int MarketValue => PlayerMarket.Value(Character, Trait, LearnedSkills, Training.Sessions);
         public int SkillSlotCount => SkillSlotsFor(Character) + (Trait == PlayerTrait.Scholar ? 1 : 0);
@@ -61,12 +63,13 @@ namespace RaidPartyManager.Run
 
         internal MemberView(string id, CharacterDefinition character, int? position, int health, Stats stats, string[] slots,
             SkillBookDefinition[] learnedSkills, bool isAway, PlayerTrait trait, CrewContract contract,
-            EmployeeAttributes employeeAttributes, Personality personality, CampTraining training)
+            EmployeeAttributes employeeAttributes, Personality personality, CampTraining training, CrewContract[] renewals)
         {
             Trait = trait;
             EmployeeAttributes = employeeAttributes;
             Personality = personality;
             Contract = contract;
+            Renewals = Array.AsReadOnly(renewals);
             Id = id;
             Character = character;
             Training = training;
@@ -96,6 +99,8 @@ namespace RaidPartyManager.Run
             public EmployeeAttributes Attributes;
             public EmployeeCareer Career;
             public CrewContract Contract;
+            public readonly List<CrewContract> Renewals = new();
+            public CrewContract LastContract => Renewals.LastOrDefault() ?? Contract;
             public string[] Slots = new string[Rules.EquipmentSlots];
             public readonly SkillBookDefinition[] LearnedSkills = new SkillBookDefinition[3];
 
@@ -150,7 +155,7 @@ namespace RaidPartyManager.Run
                     .Select(item => new CheckpointItem { Id = item.Id, Definition = item.Definition.Id }).ToArray(),
                 Members = members.Select(member => new CheckpointMember
                 {
-                    Trait = member.Trait, Contract = member.Contract?.Copy(), EmployeeAttributes = member.Attributes,
+                    Trait = member.Trait, Contract = member.Contract?.Copy(), Renewals = member.Renewals.Select(c => c.Copy()).ToArray(), EmployeeAttributes = member.Attributes,
                     EmployeeCareer = member.Career,
                     Id = member.Id, StartingCharacter = member.Start.Character.Id, StartingPosition = member.Start.Position,
                     StartingHealth = member.Start.Health, InitialStatuses = CaptureStatuses(member.Start.StartingStatuses),
@@ -205,6 +210,12 @@ namespace RaidPartyManager.Run
                     Career = entry.EmployeeCareer.Initialized ? entry.EmployeeCareer :
                         new EmployeeCareer { ServiceDays = Math.Max(0, saved.Day - (entry.Contract?.StartDay ?? saved.Day)) }
                 };
+                foreach (var next in entry.Renewals ?? Array.Empty<CrewContract>())
+                {
+                    if (member.LastContract == null || next == null || next.StartDay != member.LastContract.EndDay || !next.ValidAt(saved.Day))
+                        throw new ArgumentException("Invalid renewal schedule.");
+                    member.Renewals.Add(next.Copy());
+                }
                 for (int i = 0; i < member.Slots.Length; i++)
                     if (!string.IsNullOrEmpty(entry.Slots[i]))
                         member.Slots[i] = party.inventory[entry.Slots[i]].Id;
@@ -310,7 +321,7 @@ namespace RaidPartyManager.Run
                     PlayerMarket.GearAndPosition(member.Trait, member.Slots.Count(s => s != null), member.Position,
                         formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member)), member.Slots,
                     member.LearnedSkills, member.IsAway, member.Trait, member.Contract, member.Attributes, member.Start.Character.Personality,
-                    member.Training)).ToArray();
+                    member.Training, member.Renewals.ToArray())).ToArray();
             }
         }
 

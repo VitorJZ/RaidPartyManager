@@ -254,7 +254,7 @@ namespace RaidPartyManager.Domain
             Tier = tier;
             Price = price;
             RewardBossId = rewardBossId;
-            CanDropInBattle = !BossExclusive && canDropInBattle && tier is >= 1 and <= 3;
+            CanDropInBattle = canDropInBattle && AvailableInRegularPool && tier is >= 0 and <= 3;
         }
     }
 

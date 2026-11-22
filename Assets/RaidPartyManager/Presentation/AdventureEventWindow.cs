@@ -281,7 +281,8 @@ namespace RaidPartyManager.Presentation
                     choices.Choice(option.text, (city ? "capital-" : "grave-") + option.key, () =>
                     {
                         if (!(city ? run.ChooseCapital(int.Parse(option.key)) : run.ChooseGrave(option.key))) return;
-                        stage.CueGraveAction();
+                        if (visit.Event == AdventureEventKind.SoulWard) stage.SyncPatients(run, content, true);
+                        else stage.CueGraveAction();
                         choices.Reset(false);
                         choices.SetEnabled(false);
                         schedule.Execute(() =>

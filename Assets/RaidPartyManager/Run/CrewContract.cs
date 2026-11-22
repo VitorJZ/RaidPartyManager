@@ -181,7 +181,7 @@ namespace RaidPartyManager.Run
         private int talentSeed;
         public int Day { get; private set; }
         public long PayrollDebt { get; private set; }
-        public bool NeedsRenewal => members.Any(m => m.Contract != null && m.Contract.EndDay - Day <= 3);
+        public bool NeedsRenewal => members.Any(m => m.Contract != null && m.LastContract.EndDay - Day <= 3);
 
         internal void StartContracts(int seed, int day = 1)
         {
@@ -226,9 +226,9 @@ namespace RaidPartyManager.Run
         }
 
         private CrewContract NegotiatedContract(CharacterDefinition character, EmployeeAttributes ratings, int expected,
-            int days, PerformanceBonuses terms, long? fee)
+            int days, PerformanceBonuses terms, long? fee, int? start = null)
         {
-            var draft = CrewContract.Quote(character, Day, days, expected, terms, fee ?? (terms.Installments.Enabled ? 0 : (long)expected * days));
+            var draft = CrewContract.Quote(character, start ?? Day, days, expected, terms, fee ?? (terms.Installments.Enabled ? 0 : (long)expected * days));
             if (draft == null || draft.DailyWage < CrewContract.MinimumWage(expected, terms, ratings)) return null;
             return draft;
         }
@@ -245,13 +245,12 @@ namespace RaidPartyManager.Run
         {
             var m = FindMember(id);
             if (m == null || activeBattle != null) return false;
-            var draft = NegotiatedContract(m.Character, m.Attributes, ExpectedWage(m), days, bonuses, signingFee);
-            if (draft == null || draft.DueAtSigning > Gold || (m.Contract?.ExitCost ?? 0) > Gold - draft.DueAtSigning) return false;
-            Gold -= (int)(m.Contract?.ExitCost ?? 0);
-            RecordExitExpenses(m);
+            var draft = NegotiatedContract(m.Character, m.Attributes, ExpectedWage(m), days, bonuses, signingFee, m.LastContract?.EndDay);
+            if (draft == null || draft.DueAtSigning > Gold) return false;
             PaySigningWage(m.Character.Name, draft);
             draft.RecordSigningPayment();
-            m.Contract = draft;
+            if (m.Contract == null) m.Contract = draft;
+            else m.Renewals.Add(draft);
             RefreshEmployeeGoals(m);
             return true;
         }
@@ -340,7 +339,7 @@ namespace RaidPartyManager.Run
             return paid;
         }
 
-        public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 && m.Contract.EndDay > Day + 1);
+        public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 && m.LastContract.EndDay > (long)Day + 1);
 
         internal void AdvanceDay()
         {
@@ -379,6 +378,11 @@ namespace RaidPartyManager.Run
                 }
                 else if (!contract.BasePaid && !contract.Plan.Enabled)
                     Pay(contract.DailyWage, member.Character.Name + " · 每日工资");
+                if (contract.EndDay == Day && member.Renewals.Count > 0)
+                {
+                    member.Contract = member.Renewals[0];
+                    member.Renewals.RemoveAt(0);
+                }
             }
             members.RemoveAll(m => m.Contract.EndDay <= Day);
             DeployReserveIfNeeded();

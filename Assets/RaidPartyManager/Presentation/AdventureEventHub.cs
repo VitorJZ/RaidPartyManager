@@ -72,7 +72,7 @@ namespace RaidPartyManager.Presentation
             eventWindow = null;
             root.style.backgroundColor = PrototypeStyle.Background;
             HideBackdrop();
-            if (run == null || run.IsInspection && run.Current == null)
+            if (run?.IsInspection == true && run.Current == null)
                 sceneryPlayback = SceneryFlipbook.Animate(root, assets.Backdrop);
             root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
             root.style.unityBackgroundImageTintColor = new Color(0.25f, 0.28f, 0.32f, 1);
@@ -82,6 +82,8 @@ namespace RaidPartyManager.Presentation
             if (run == null)
             {
                 var content = assets.Encounter;
+                root.style.backgroundColor = Color.clear;
+                stage = new DockEventStage(transform, root, stageArt, false);
                 var candidates = AdventureFlow.DrawStarters(content, new System.Random());
                 root.Add(new StarterDraftView(content, candidates, selected =>
                 {
@@ -279,7 +281,7 @@ namespace RaidPartyManager.Presentation
                         Render();
                     }
                     else PrototypeSceneMenu.OpenScene("EventSelect");
-                }, topBar, () => stage.ShowCompany(run.Party, assets.Encounter), () => StartCoroutine(ExitTeller()));
+                }, topBar, () => stage.ShowEventCompany(run, assets.Encounter), () => StartCoroutine(ExitTeller()));
                 body.Add(eventWindow);
             }
             else AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(current.Kind));
@@ -329,7 +331,7 @@ namespace RaidPartyManager.Presentation
                 screen.Q("adventure-party")?.RemoveFromHierarchy();
                 if (run.IsInspection) RenderParty();
                 if (run.Current != null || !DockPlayhouse.HoldingSet)
-                    stage?.ShowCompany(run.Party, assets.Encounter);
+                    stage?.ShowEventCompany(run, assets.Encounter);
                 eventWindow?.RefreshAfterPartyEdit();
             }, () => changed = true);
         }

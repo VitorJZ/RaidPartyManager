@@ -6,7 +6,7 @@ using UnityEngine.UIElements;
 
 namespace RaidPartyManager.Presentation
 {
-    internal sealed class DockEventStage : ServiceStage
+    internal sealed partial class DockEventStage : ServiceStage
     {
         internal bool Cemetery { get; }
         internal bool Capital { get; }
@@ -135,9 +135,15 @@ namespace RaidPartyManager.Presentation
                     FloorProp("Yew path ferns", art.ferns, -4.2f, -.15f, 2.9f, -8);
                     FloorProp("Leaning markers", art.gravestones, 4.5f, .85f, 2.55f, 7);
                     break;
+                case AdventureEventKind.SoulWard:
+                    HangBackdrop("Soul ward cloister", art.watchCloister);
+                    GraveyardFloor();
+                    FloorProp("Infirmary stove", art.vigilStove, -4.4f, .75f, 1.8f, -7);
+                    FloorProp("Infirmary linen cupboard", art.vestmentStand, 4.4f, 1.1f, 1.8f, 7);
+                    BuildWardBeds();
+                    break;
                 case AdventureEventKind.Pallbearer:
                 case AdventureEventKind.BellRope:
-                case AdventureEventKind.SoulWard:
                 case AdventureEventKind.SoupQueue:
                     HangBackdrop("Watch cloister", art.watchCloister);
                     GraveyardFloor();
@@ -236,7 +242,7 @@ namespace RaidPartyManager.Presentation
         private float gravePhaseStarted;
         private int gravePhase;
         private bool graveCuePlaying;
-        internal bool GraveCueFinished => !graveCuePlaying;
+        internal bool GraveCueFinished => !graveCuePlaying && !PatientsMoving;
         internal void CueGraveAction()
         {
             if (graveProp == null) return;
@@ -289,6 +295,7 @@ namespace RaidPartyManager.Presentation
                 Box("Auctioneer's rostrum", new Vector3(mark.x, .205f, mark.z), new Vector3(1.15f,.41f,.94f),
                     art.timber, new Color(.54f,.43f,.38f));
             }
+            if (kind == AdventureEventKind.SoulWard) mark = new Vector3(3.5f, .95f, .05f);
             resident = Flat("Dock storyteller", mark, 1.9f*tellerStrip.width/tellerStrip.height,1.9f,tellerStrip);
             SetFrame(resident,tellerStrip,AnimationCels.Count,0);
             residentMark = mark;
@@ -313,6 +320,11 @@ namespace RaidPartyManager.Presentation
                     Dressing.Hinges[cases[i]] = new Vector2(Table.x, Table.z);
                 }
                 returningWide = visit.Resolved;
+                return;
+            }
+            if (kind == AdventureEventKind.SoulWard)
+            {
+                SyncPatients(run, assets.Encounter, false);
                 return;
             }
             propArt = EventProp(kind.Value);
@@ -490,6 +502,7 @@ namespace RaidPartyManager.Presentation
         internal void Tick()
         {
             FrameCamera();
+            if (!DockPlayhouse.Moving) AnimatePatients();
             if (chest != null) AnimateChest();
             int nextBeat = AnimationCels.Loop(Time.unscaledTimeAsDouble, 2.5);
             if (cases[0] != null) AnimateCases();

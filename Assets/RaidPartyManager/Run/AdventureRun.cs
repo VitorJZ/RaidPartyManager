@@ -934,7 +934,10 @@ namespace RaidPartyManager.Run
         private EquipmentDefinition RollBattleReward(bool elite, IEnumerable<string> excluded = null)
         {
             double roll = random.NextDouble();
-            int tier = roll < (elite ? 0.5 : 0.3) ? 1 : random.Next(2, 4);
+            double rareChance = elite ? .04 : .02;
+            if (roll < rareChance && battleRewardTickets.Any(item => item.Tier == 0))
+                return PickItem(battleRewardTickets.Where(item => item.Tier == 0), excluded);
+            int tier = roll < rareChance + (elite ? .5 : .3) ? 1 : random.Next(2, 4);
             return PickItem(battleRewardTickets.Where(item => item.Tier == tier), excluded);
         }
 

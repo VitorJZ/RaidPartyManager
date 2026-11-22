@@ -337,7 +337,7 @@ namespace RaidPartyManager.Presentation
                 hp.text = member == null ? "—" : "无合约";
                 if (member?.Contract != null)
                 {
-                    int days = Math.Max(0, member.Contract.EndDay - run.Day);
+                    int days = Math.Max(0, member.ContractEndDay - run.Day);
                     hp.text = $"合约剩余 {days} 天";
                     if (days <= 3) hp.style.color = (Color)new Color32(255, 115, 103, 255);
                 }
@@ -414,7 +414,7 @@ namespace RaidPartyManager.Presentation
             var popup = ContractPanel.Negotiate(member.Character, run.Day, member.Trait, 0, member.Contract,
                 run.ExpectedDailyWage(member.Id), member.EmployeeAttributes,
                 (days, terms, fee) => run.SetContract(member.Id, days, terms, fee),
-                () => { CloseModal(); RenderEditedRoster(); closed?.Invoke(); });
+                () => { CloseModal(); RenderEditedRoster(); closed?.Invoke(); }, member.Renewals);
             OpenModal(member.Id, popup, "close-contract");
         }
 

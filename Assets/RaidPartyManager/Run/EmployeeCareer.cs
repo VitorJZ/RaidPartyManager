@@ -97,7 +97,7 @@ namespace RaidPartyManager.Run
                 Add(EmployeeThought.Arrears);
             if (member.Contract is { } contract)
             {
-                int remaining = contract.EndDay - Day;
+                int remaining = member.LastContract.EndDay - Day;
                 if (remaining <= 3) Add(EmployeeThought.Renewal, remaining);
                 int expected = ExpectedWage(member);
                 if (Underpaid(member, expected)) Add(EmployeeThought.LowPay, contract.DailyWage, expected);
@@ -151,7 +151,7 @@ namespace RaidPartyManager.Run
 
         private static bool Underpaid(Member member, int expected)
         {
-            var contract = member.Contract;
+            var contract = member.LastContract;
             if (member.Attributes.Loyalty < 4 && member.Attributes.Obedience < 4)
                 return contract.DailyWage < expected;
             return contract.DailyWage < CrewContract.MinimumWage(expected, contract.AgreedRates, member.Attributes);
@@ -288,7 +288,7 @@ namespace RaidPartyManager.Run
             if (career.Raise.Kind == EmployeeGoalKind.Raise && member.Contract != null)
             {
                 int expected = ExpectedWage(member);
-                if (member.Contract.DailyWage < career.Raise.Target && !Underpaid(member, expected))
+                if (member.LastContract.DailyWage < career.Raise.Target && !Underpaid(member, expected))
                     career.Raise = default;
                 else if (career.Raise.Target > expected)
                     career.Raise = Goal(EmployeeGoalKind.Raise, expected);
@@ -298,13 +298,13 @@ namespace RaidPartyManager.Run
             FinishGoal(member, ref career.Relationship);
             if (member.Contract is { } contract)
             {
-                if (career.Renewal.Kind == EmployeeGoalKind.None && contract.EndDay - Day <= 3 && Day <= int.MaxValue - 10)
+                if (career.Renewal.Kind == EmployeeGoalKind.None && member.LastContract.EndDay - Day <= 3 && Day <= int.MaxValue - 10)
                     career.Renewal = Goal(EmployeeGoalKind.Renewal, Day + 10);
                 int expected = ExpectedWage(member);
                 if (career.Raise.Kind == EmployeeGoalKind.None && career.ServiceDays >= 2 &&
                     Underpaid(member, expected) && expected > career.HighestWage)
                     career.Raise = Goal(EmployeeGoalKind.Raise, expected);
-                career.HighestWage = Math.Max(career.HighestWage, contract.DailyWage);
+                career.HighestWage = Math.Max(career.HighestWage, member.LastContract.DailyWage);
             }
             if (career.Relationship.Kind == EmployeeGoalKind.None && career.RivalIncidents >= 2 &&
                 FindCurrentRival(member) is { } rival)
@@ -401,8 +401,8 @@ namespace RaidPartyManager.Run
                 EmployeeGoalKind.Tenure => career.ServiceDays - goal.Baseline,
                 EmployeeGoalKind.Equipment => goal.Progress,
                 EmployeeGoalKind.Training => member.LearnedSkills.Any(skill => skill?.Id == goal.SubjectId) ? 1 : 0,
-                EmployeeGoalKind.Raise => member.Contract?.DailyWage ?? 0,
-                EmployeeGoalKind.Renewal => member.Contract?.EndDay ?? 0,
+                EmployeeGoalKind.Raise => member.LastContract?.DailyWage ?? 0,
+                EmployeeGoalKind.Renewal => member.LastContract?.EndDay ?? 0,
                 EmployeeGoalKind.SeparateLineups => FindCurrentRival(member) == null ? goal.Target : goal.Progress,
                 _ => 0
             };

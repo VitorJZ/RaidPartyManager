@@ -19,6 +19,7 @@ namespace RaidPartyManager.Run
         private GraveVisit graveVisit;
         private static readonly string[] AuctionNames = { "叮当匣", "药香匣", "沉重匣" };
         private static readonly int[] AuctionPrices = { 6, 8, 12 };
+        public string WardPatient(int bed) => bed == 0 ? graveVisit?.Member : graveVisit?.Second;
         public int AuctionInspected => graveVisit?.Inspected ?? -1;
         public int AuctionKindAt(int slot) => graveVisit.Order[slot];
         public string AuctionNameAt(int slot) => AuctionNames[AuctionKindAt(slot)];

@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 0
   traitPower: 0
-  traitText: "守墓哀光（60%） / 长夜摇篮（25%） / 墓园寒眠（15%）"
+  traitText: "每隔一次行动为存活随从加4盾，自身回复4生命。随从阵亡后改为哀悼，自身获得1层破绽。"
   personality: 1
   attack: 10
   defense: 2

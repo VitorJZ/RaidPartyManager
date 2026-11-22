@@ -72,6 +72,8 @@ def effect(action: dict) -> str:
 
 
 def actions_table(enemy: dict) -> str:
+    if enemy.get("mechanic"):
+        return enemy["mechanic"]
     lines = ["| 行动 | 自由行动抽取概率 | 目标 | 效果 | 时机 |", "| --- | --- | --- | --- | --- |"]
     for action in enemy["actions"]:
         timing = "先蓄力，下次可行动时释放" if action.get("charge") else "本次行动"

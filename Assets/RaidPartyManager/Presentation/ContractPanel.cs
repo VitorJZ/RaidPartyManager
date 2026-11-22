@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using RaidPartyManager.Domain;
 using RaidPartyManager.Run;
 using UnityEngine;
@@ -51,7 +52,7 @@ namespace RaidPartyManager.Presentation
 
         public static string Summary(CharacterDefinition c, CrewContract contract)
         {
-            string text = $"让{c.Name}成为玩家的讨伐队成员。第 {contract.StartDay} 天签约，第 {contract.EndDay} 天到期，共 {contract.Days} 天。折算日薪 {contract.BaseTotal / (decimal)contract.Days:0.##} 金币。";
+            string text = $"{c.Name}的讨伐队成员合同。第 {contract.StartDay} 天生效，第 {contract.EndDay} 天到期，共 {contract.Days} 天。折算日薪 {contract.BaseTotal / (decimal)contract.Days:0.##} 金币。";
             if (contract.DeferredTerms) text += $" 签字费 {contract.SigningFee} 金币。";
             if (!contract.Plan.Enabled) return text + (contract.BasePaid ? "合同底薪已付清。" : "");
             text += $" 分 {contract.Plan.Count} 期，间隔 {contract.Plan.IntervalDays} 天。尚待结清 {contract.Outstanding} 金币。";
@@ -62,14 +63,18 @@ namespace RaidPartyManager.Presentation
         }
 
         public static VisualElement Negotiate(CharacterDefinition c, int day, PlayerTrait talent, int tradeQuote,
-            CrewContract current, int expectedWage, EmployeeAttributes ratings, Func<int, PerformanceBonuses, long, bool> sign, Action close)
+            CrewContract current, int expectedWage, EmployeeAttributes ratings, Func<int, PerformanceBonuses, long, bool> sign, Action close, IReadOnlyList<CrewContract> renewals = null)
         {
-            var view = Sheet(c.Name + " · 讨伐队合约", out var paper);
+            int startDay = (renewals?.LastOrDefault() ?? current)?.EndDay ?? day;
+            var view = Sheet(c.Name + (current == null ? " · 讨伐队合约" : " · 续约合同"), out var paper);
             paper.Add(Text(PlayerMarket.Describe(talent), 15));
             if (current != null)
             {
                 paper.Add(Text(Summary(c, current) + $" 剩余 {current.EndDay - day} 天。", 16));
                 paper.Add(Text(Terms(current), 14));
+                if (renewals != null)
+                    foreach (var agreement in renewals)
+                        paper.Add(Text("已签续约合同 · " + Summary(c, agreement) + " " + Terms(agreement, pending: true), 14));
             }
             else paper.Add(Text($"人才市场转会费　{tradeQuote} 金币", 17));
 
@@ -80,12 +85,12 @@ namespace RaidPartyManager.Presentation
             edits.Add(fee);
             edits.Add(Text($"期望日薪 {expectedWage} 金币。不分期时，签字费是整份合同的报价。", 14));
             edits.Add(Text("额外薪资", 16));
-            var rates = current?.AgreedRates ?? default;
+            var rates = (renewals?.LastOrDefault() ?? current)?.AgreedRates ?? default;
             var appearance = Bonus("出场费", "每次出场", "appearance", rates.Appearance);
             var kill = Bonus("击杀奖", "每击杀 1 名敌人", "kill", rates.Kill);
             var damage = Bonus("承伤奖", "每场每损失 5 点生命", "damage", rates.DamageTaken);
             var shield = Bonus("抗伤奖", "每场护盾每挡下 5 点敌方伤害", "shield", rates.Shield);
-            var plan = current?.Plan ?? default;
+            var plan = (renewals?.LastOrDefault() ?? current)?.Plan ?? default;
             int premium = WageInstallments.PremiumPercent(c.Personality);
             var installments = new Toggle { name = "installment-enabled", text = "分期支付底薪", value = false };
             edits.Add(installments);
@@ -106,9 +111,9 @@ namespace RaidPartyManager.Presentation
             edits.Add(schedule);
             var quote = PrototypeStyle.Text("", 15, Seal);
             quote.name = "contract-preview";
-            var submit = PrototypeStyle.Button("签订新合同", "sign-crew-contract", () => {
+            var submit = PrototypeStyle.Button(current == null ? "签订新合同" : "签署续约合同", "sign-crew-contract", () => {
                 var terms = ReadRates();
-                var draft = CrewContract.Quote(c, day, length.value, expectedWage, terms, fee.value);
+                var draft = CrewContract.Quote(c, startDay, length.value, expectedWage, terms, fee.value);
                 if (draft == null) return;
                 if (draft.DailyWage < CrewContract.MinimumWage(expectedWage, terms, ratings))
                 {
@@ -171,13 +176,13 @@ namespace RaidPartyManager.Presentation
                 int days = length.value;
                 bool financed = installments.value;
                 schedule.style.display = financed ? DisplayStyle.Flex : DisplayStyle.None;
-                var draft = CrewContract.Quote(c, day, days, expectedWage, terms, fee.value);
+                var draft = CrewContract.Quote(c, startDay, days, expectedWage, terms, fee.value);
                 submit.SetEnabled(draft != null && (financed || fee.value > 0));
                 payments.text = "";
                 pages.style.display = DisplayStyle.None;
                 if (draft == null)
                 {
-                    quote.text = days < 1 || days > int.MaxValue - day ? "请输入至少 1 天的有效期限。" :
+                    quote.text = days < 1 || days > int.MaxValue - startDay ? "请输入至少 1 天的有效期限。" :
                         !terms.Valid ? "已勾选的奖励至少为 1 金币。" :
                         !terms.Installments.Fits(days) ? "间隔和期数至少为 1，最后一期须在合同期内。" :
                         "请检查签字费。分期首付可为零，最高为整份合同的底薪。";
@@ -192,7 +197,7 @@ namespace RaidPartyManager.Presentation
                         int i = (int)k;
                         long principal = draft.PrincipalAt(i);
                         long amount = draft.ScheduledPayment(i);
-                        lines.Add($"第 {i} 期　 第 {day + i * interval.value} 天　 {amount} 金币（本金 {principal}，利息 {amount - principal}）");
+                        lines.Add($"第 {i} 期　 第 {startDay + i * interval.value} 天　 {amount} 金币（本金 {principal}，利息 {amount - principal}）");
                     }
                     payments.text = string.Join("\n", lines);
                     pages.style.display = count.value > pageSize ? DisplayStyle.Flex : DisplayStyle.None;
@@ -200,16 +205,14 @@ namespace RaidPartyManager.Presentation
                 }
                 string breakdown = financed ? $"底薪 {draft.BaseTotal}，签字费抵扣 {fee.value}，按期付清共计利息 {draft.ScheduledInterest} 金币。" :
                     $"合同总价 {fee.value} 金币，折算日薪 {fee.value / (decimal)days:0.##} 金币。";
-                quote.text = $"第 {draft.EndDay} 天到期。{breakdown} 新合同当前违约金 {draft.CurrentReleaseFee} 金币。";
-                if (current?.ExitCost > 0)
-                    quote.text += $" 旧合同需结清工资和利息 {current.Outstanding}、违约金 {current.CurrentReleaseFee} 金币。";
-                decimal due = (decimal)draft.DueAtSigning + tradeQuote + (current?.ExitCost ?? 0);
+                quote.text = $"第 {startDay} 天生效，第 {draft.EndDay} 天到期。{breakdown} 生效时违约金 {draft.CurrentReleaseFee} 金币。";
+                decimal due = (decimal)draft.DueAtSigning + tradeQuote;
                 quote.text += $"\n签约当天合计支付 {due} 金币。";
                 if (current == null) quote.text = $"让{c.Name}成为玩家的讨伐队成员。\n" + quote.text;
             }
         }
 
-        private static string Terms(CrewContract c)
+        private static string Terms(CrewContract c, bool pending = false)
         {
             var rates = c.AgreedRates;
             var parts = new List<string>();
@@ -218,7 +221,7 @@ namespace RaidPartyManager.Presentation
             if (rates.DamageTaken > 0) parts.Add($"每场每损失 5 点生命 {rates.DamageTaken} 金币");
             if (rates.Shield > 0) parts.Add($"每场护盾每挡下 5 点敌方伤害 {rates.Shield} 金币");
             string bonuses = parts.Count == 0 ? "无" : string.Join("，", parts);
-            return $"当前违约金 {c.CurrentReleaseFee} 金币。额外薪资　{bonuses}。";
+            return (pending ? "到期接续后履行。" : $"当前违约金 {c.CurrentReleaseFee} 金币。") + $"额外薪资　{bonuses}。";
         }
     }
 }

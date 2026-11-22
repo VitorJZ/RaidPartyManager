@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 0
   traitPower: 0
-  traitText: "葬王剑（65%） / 王命葬列（25%） / 敕令禁生（10%）"
+  traitText: "葬王点名生命比例最低者，下次行动审判。生命过半或有护盾可获赦免。"
   personality: 1
   attack: 10
   defense: 3

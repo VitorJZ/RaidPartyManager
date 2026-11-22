@@ -340,17 +340,21 @@ namespace RaidPartyManager.Presentation
             }
         }
 
-        internal static void AddTownReturnSign(VisualElement parent, Texture2D stone, string buttonName,
+        internal static void AddTownReturnSign(VisualElement parent, string buttonName,
             Action returnToTown, Func<bool> visible = null)
         {
-            var sign = new DockRouteSigns(stone, routeArt.NodeIcon(NodeKind.Town), buttonName, returnToTown, visible);
-            parent.Add(new StageSignMask(sign));
+            var sign = HangingSign.Exit(buttonName, () => { if (visible == null || visible()) returnToTown(); });
+            sign.tooltip = "下拉返回城镇";
+            var mask = new StageSignMask(sign) { name = "town-return-sign" };
+            parent.Add(mask);
+            if (visible != null)
+                sign.schedule.Execute(() => sign.style.display = visible() ? DisplayStyle.Flex : DisplayStyle.None).Every(16);
         }
 
         internal static void AddServiceNavigation(VisualElement parent, Texture2D stone, RunTopBar bar, Func<bool> visible = null)
         {
             if (FromTownFacility)
-                AddTownReturnSign(parent, stone, "return-event-select", () => bar.WhenRewardsArrive(ReturnFromNode), visible);
+                AddTownReturnSign(parent, "return-event-select", () => bar.WhenRewardsArrive(ReturnFromNode), visible);
             else if (OnRoute && Active.CanChooseFollowing)
                 AddFollowingSigns(parent, stone, bar);
             else

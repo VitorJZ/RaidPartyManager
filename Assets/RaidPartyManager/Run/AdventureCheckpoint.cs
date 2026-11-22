@@ -162,6 +162,7 @@ namespace RaidPartyManager.Run
         public EmployeeAttributes EmployeeAttributes;
         public EmployeeCareer EmployeeCareer;
         public CrewContract Contract;
+        public CrewContract[] Renewals;
         public string StartingCharacter;
         public int StartingPosition;
         public int StartingHealth;

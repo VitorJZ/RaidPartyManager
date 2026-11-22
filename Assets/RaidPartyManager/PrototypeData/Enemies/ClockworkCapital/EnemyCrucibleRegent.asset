@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 0
   traitPower: 0
-  traitText: "坩埚重槌（54%） / 全城开炉（30%） / 熔芯回流（16%）"
+  traitText: "每次行动升温，第三次灼烧前两人。行动时有寒冷便消耗1层，炉温归零并跳过攻击。"
   personality: 1
   attack: 12
   defense: 5

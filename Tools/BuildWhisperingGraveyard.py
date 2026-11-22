@@ -225,7 +225,7 @@ def make_definition(enemy: dict) -> None:
     body += "  usePortraitInBattle: 0\n"
     body += f'  profession: {PROFESSIONS.index(enemy["profession"])}\n  enemyRank: {RANKS.index(enemy["rank"])}\n'
     body += f'  positionSlots: {enemy["slots"]}\n  rosterNumber: 0\n  stage: 1\n  reach: {1 if enemy["reach"] == "Melee" else 2}\n'
-    summary = " / ".join(f'{a["name"]}（{a["weight"]}%）' for a in enemy["actions"])
+    summary = enemy.get("mechanic") or " / ".join(f'{a["name"]}（{a["weight"]}%）' for a in enemy["actions"])
     body += f'  fixedTrait: 0\n  traitPower: 0\n  traitText: {json.dumps(summary, ensure_ascii=False)}\n  personality: 1\n'
     for field in ("attack", "defense", "specialDefense", "health"):
         body += f"  {field}: {enemy[field]}\n"
