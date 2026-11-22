@@ -10,14 +10,15 @@ namespace RaidPartyManager.Presentation
 
         private static readonly Vector3 CounterEye = new(0, 2.76f, -8.05f);
         private static readonly Quaternion CounterAngle = Quaternion.LookRotation(new Vector3(0, 1.26f, -2.7f) - CounterEye);
-        private static readonly int[] Idle = { 0, 0, 1, 2, 3, 3, 2, 1 };
+        private readonly Texture2D storytellerIdle;
+        private const int CounterPortraitPixels = 330;
         private const float ItemSize = .61f;
         private const float CounterHeight = 1.02f;
         private readonly MeshRenderer merchant;
         private readonly Texture2D reactions;
         private readonly Transform[] tabletop = new Transform[4];
         private readonly Transform[] priceFaces = new Transform[4];
-        private readonly Vector3 merchantCentre = new(0, 1.02f, -1.65f);
+        private readonly Vector3 merchantCentre = new(0, 1.65f, -1.65f);
         private int lastCel = -1;
         private Expression lastExpression;
         private Vector3 wideEye;
@@ -29,20 +30,25 @@ namespace RaidPartyManager.Presentation
         internal bool CounterReady => CounterFocused && counterFocus >= 1f && focus <= 0;
         internal bool WideView => !CounterFocused && !RecruitmentFocused && counterFocus <= 0 && focus <= 0;
 
-        public ShopStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D interior, Texture2D reactions, bool graveyard) :
-            base(owner, panel, art)
+        public ShopStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D interior, Texture2D reactions, bool graveyard, bool capital = false) :
+            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Interior) : StageLighting.For(graveyard, StageVenue.Interior))
         {
             this.reactions = reactions;
-            HangBackdrop(graveyard ? "Cemetery chandlery" : "Harbour chandlery", graveyard ? art.wakeShop : interior);
-            if (graveyard) GraveyardFloor();
-            else Deck(art.timber, DockPlayhouse.PlankTile, new Color(.76f, .77f, .79f));
+            if (capital) DressCapital(1);
+            else
+            {
+                HangBackdrop(graveyard ? "Cemetery chandlery" : "Harbour chandlery", graveyard ? art.wakeShop : interior);
+                if (graveyard) GraveyardFloor();
+                else Deck(art.timber, DockPlayhouse.PlankTile, new Color(.76f, .77f, .79f));
+            }
             FloorProp("Cloth deliveries",art.parcel,4.62f,-.95f,1.48f,-8);
-            FloorProp(graveyard ? "Mortuary tapers" : "Oil merchant's shelves", graveyard ? art.candleRack : art.chandlerShelf,
+            if (!capital) FloorProp(graveyard ? "Mortuary tapers" : "Oil merchant's shelves", graveyard ? art.candleRack : art.chandlerShelf,
                 -3.9f, .65f, 2.18f, -6);
-            FloorProp(graveyard ? "Funeral urn" : "Tackle by the counter", graveyard ? art.stoneUrn : art.tackleChest,
+            if (!capital) FloorProp(graveyard ? "Funeral urn" : "Tackle by the counter", graveyard ? art.stoneUrn : art.tackleChest,
                 3.67f, -.54f, graveyard ? 1.18f : 1.9f, 8);
-            if (!graveyard) FloorProp("Creel by the loading bay",art.creel,-3.48f,-1.6f,1.23f,9);
-            merchant = Flat("shop-merchant", merchantCentre, 2.04f, 2.04f, art.residents[1]);
+            if (!capital && !graveyard) FloorProp("Creel by the loading bay",art.creel,-3.48f,-1.6f,1.23f,9);
+            storytellerIdle = Resources.Load<Texture2D>("StoryEvents/Cast/BrokerIdle");
+            merchant = Flat("shop-merchant", merchantCentre, 2f, 1.62f, storytellerIdle);
             Dressing.Cast[merchant] = new DockSet.Player(true);
             SetMerchant(Expression.Idle, 0, 0);
             var wood = new Color(.82f, .73f, .62f);
@@ -110,11 +116,17 @@ namespace RaidPartyManager.Presentation
 
         public void SetMerchant(Expression expression, float time, float celebration)
         {
-            int frame = expression == Expression.Idle ? Idle[Mathf.FloorToInt(time * 3.6f) % Idle.Length] : (int)expression - 1;
+            bool idle = expression == Expression.Idle;
+            int frame = AnimationCels.Loop(time, 1.2);
             if (lastCel != frame || lastExpression != expression)
             {
-                SetFrame(merchant, expression == Expression.Idle ? art.residents[1] : reactions,
-                    expression == Expression.Idle ? 4 : 3, frame);
+                var uv = idle ? BrokerIdleFrame(frame, CounterPortraitPixels) : AnimationCels.UV((expression == Expression.Delighted ? AnimationCels.Count : 0) + frame, 8, 8);
+                merchant.GetPropertyBlock(properties);
+                merchant.transform.localScale = new Vector3(1.62f * (idle ? 410f / CounterPortraitPixels :
+                    reactions.width / (float)reactions.height), 1.62f, 1);
+                properties.SetTexture("_MainTex", idle ? storytellerIdle : reactions);
+                properties.SetVector("_MainTex_ST", uv);
+                merchant.SetPropertyBlock(properties);
                 lastCel = frame;
                 lastExpression = expression;
             }
@@ -135,7 +147,7 @@ namespace RaidPartyManager.Presentation
         public void UpdateCamera(float elapsed)
         {
             if (wideAspect != camera.aspect) CaptureWideView();
-            counterFocus = Mathf.MoveTowards(counterFocus, CounterFocused ? 1 : 0, elapsed / .45f);
+            counterFocus = Mathf.MoveTowards(counterFocus, CounterFocused ? 1 : 0, elapsed / .32f);
             focus = Mathf.MoveTowards(focus, RecruitmentFocused ? 1 : 0, elapsed / .46f);
             float counter = Mathf.SmoothStep(0, 1, counterFocus);
             float recruit = Mathf.SmoothStep(0, 1, focus);

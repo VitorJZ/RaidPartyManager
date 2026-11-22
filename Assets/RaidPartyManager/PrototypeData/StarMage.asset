@@ -17,6 +17,7 @@ MonoBehaviour:
   portrait: {fileID: 2800000, guid: bf40ff962d2b420396e55b17fbd991df, type: 3}
   campSeatedSprite: {fileID: 2800000, guid: 73cc9fb44a944a54856bf4d8fea90191, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 31e108cc52fb4d4e8778d23fd926eec6, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: d5fc23bb4d6e53c9858e0a54072a4b57, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: ac71ebb467064456972a03152cb7618e, type: 3}
   profession: 1
   rosterNumber: 16

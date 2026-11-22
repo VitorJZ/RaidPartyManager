@@ -203,7 +203,7 @@ namespace RaidPartyManager.Presentation
             if (isArrow)
                 end -= direction * width * 0.43f;
             var center = Vector2.Lerp(start, end, progress);
-            SetImage(view, projectile, new Rect(0, 0, projectile.width, projectile.height));
+            SetImage(view, projectile, AnimationCels.RectFor(projectile, AnimationCels.At(progress)));
             view.tintColor = critical ? new Color(1f, 0.34f, 0.28f) : Color.white;
             view.style.rotate = new Rotate(new Angle(isArrow ? Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg : 0f));
             SetBounds(view, new Rect(center - new Vector2(width, height) * 0.5f, new Vector2(width, height)));
@@ -222,7 +222,7 @@ namespace RaidPartyManager.Presentation
             float lift = 0;
             if (now < poseStart || now >= returnAt)
             {
-                int index = Mathf.Min(5, Mathf.FloorToInt((now < poseStart ? approaching : retreating) * 6f));
+                int index = AnimationCels.At(now < poseStart ? approaching : retreating);
                 if (sprite.UsesPortrait && walkSheet == sprite.Sheet)
                 {
                     SetImage(movingImage, walkSheet, new Rect(0, 0, walkSheet.width, walkSheet.height));
@@ -232,9 +232,7 @@ namespace RaidPartyManager.Presentation
                 }
                 else
                 {
-                    int width = walkSheet.width / 3;
-                    int height = walkSheet.height / 2;
-                    SetImage(movingImage, walkSheet, new Rect(index % 3 * width, index / 3 * height, width, height));
+                    SetImage(movingImage, walkSheet, AnimationCels.RectFor(walkSheet, index));
                 }
                 movingImage.SetInk(Color.white);
             }

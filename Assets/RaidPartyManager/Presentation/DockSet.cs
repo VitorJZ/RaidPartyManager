@@ -11,8 +11,10 @@ namespace RaidPartyManager.Presentation
         internal SceneryFlipbook Scenery;
         internal readonly Dictionary<MeshRenderer, Player> Cast = new();
         internal readonly HashSet<MeshRenderer> Flown = new();
+        internal readonly List<DockRoadpost> Roadposts = new();
         internal readonly HashSet<MeshRenderer> Atmosphere = new();
-        internal bool Moon, NativeEntrance;
+        internal bool Moon, NativeEntrance, RoadstonesLanded;
+        internal StageLighting Lighting;
         internal readonly Dictionary<MeshRenderer, Vector2> Hinges = new();
         internal Vector2 HingeFor(MeshRenderer mesh) => Hinges.TryGetValue(mesh, out var hinge) ? hinge :
             new Vector2(mesh.transform.position.x, mesh.transform.position.z);

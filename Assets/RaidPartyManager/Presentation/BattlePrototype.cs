@@ -16,7 +16,7 @@ namespace RaidPartyManager.Presentation
     [RequireComponent(typeof(UIDocument))]
     public sealed class BattlePrototype : MonoBehaviour
     {
-        private enum Phase { Preparation, Entering, Playback, RoundBreak, Settlement }
+        private enum Phase { Preparation, Entering, Playback, Settlement }
 
         [SerializeField] private EncounterAsset encounter;
         [SerializeField] private Texture2D battleLogParchment;
@@ -58,6 +58,7 @@ namespace RaidPartyManager.Presentation
         private EncounterData content;
         [SerializeField] private BattleStageArt stageArt;
         private BattleStage stage;
+        private BossRoomArt bossRoom;
         private DockEventStage eventStage;
         private Action finishEventBattle;
 
@@ -78,7 +79,6 @@ namespace RaidPartyManager.Presentation
         private AdventureRun adventure;
         private IReadOnlyList<Combatant> preparedEnemies;
         private Phase phase;
-        private bool pauseRequested;
         private BattleSession battle;
         private BattleLoadout battleLoadout;
         private IReadOnlyList<BattleEvent> roundEvents;
@@ -95,13 +95,15 @@ namespace RaidPartyManager.Presentation
         private VisualElement actionLayer;
         private VisualElement numberLayer;
         private VisualElement meteorLayer;
-        private VisualElement entranceLayer;
+        private VisualElement entranceLayer, battleFooter, formationDivider;
         private bool enemyEntranceScheduled;
         private ScrollView logView;
-        private double? settingsOpenedAt;
-        private double pausedTime;
+        private bool settingsOpen;
+        private VisualElement document;
 
-        private double PlaybackNow => (settingsOpenedAt ?? Time.unscaledTimeAsDouble) - pausedTime;
+        private int playbackSpeed = 1;
+        private double clockOrigin, playbackAtOrigin;
+        private double PlaybackNow => playbackAtOrigin + (Time.unscaledTimeAsDouble - clockOrigin) * playbackSpeed;
         private BattleCharacterDetails characterDetails;
         private BattleStatusTooltip statusTooltip;
         private EquipmentTooltip equipmentTooltip;
@@ -148,14 +150,17 @@ namespace RaidPartyManager.Presentation
 
         private void Initialize()
         {
-            root = GetComponent<UIDocument>().rootVisualElement;
+            document = GetComponent<UIDocument>().rootVisualElement;
+            root = new VisualElement { name = "battle-screen" };
+            PrototypeStyle.Fill(root);
+            document.Add(root);
             if (encounter == null)
             {
                 root.Add(new Label("Assign the prototype encounter asset to BattlePrototype."));
                 return;
             }
 
-            PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
+            PrototypeStyle.ApplySystemFont(document, out localFont, out localFontAsset);
             statusTooltip = new BattleStatusTooltip(root);
 
             content = encounter.ToData();
@@ -183,15 +188,16 @@ namespace RaidPartyManager.Presentation
             ClearImpactEffects();
             statusTooltip?.Hide();
             HideEquipmentTooltip();
-            PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
+            PrototypeStyle.ClearDocument(document, localFont, localFontAsset);
             stage?.Dispose();
             stage = null;
         }
 
         private void ResetDemo(bool reroll = false)
         {
-            settingsOpenedAt = null;
-            pausedTime = 0;
+            settingsOpen = false;
+            playbackSpeed = 1;
+            playbackAtOrigin = clockOrigin = Time.unscaledTimeAsDouble;
             entrance.Clear(unitCards);
             ClearAction();
             ClearImpactEffects();
@@ -208,7 +214,6 @@ namespace RaidPartyManager.Presentation
             preparedEnemies = victoryRewards != null ? Array.Empty<Combatant>() :
                 adventure != null ? adventure.PrepareEnemies(content.EnemyRoster, content.EnemyFormations) : enemyRun.CaptureFormation(Side.Enemy);
             phase = Phase.Preparation;
-            pauseRequested = false;
             battle = null;
             battleLoadout = null;
             roundEvents = null;
@@ -227,16 +232,20 @@ namespace RaidPartyManager.Presentation
             battleLog.Clear();
             var backgrounds = battleBackgrounds.Where(texture => texture != null).ToArray();
             battleBackground = backgrounds.Length > 0 ? backgrounds[draftRandom.Next(backgrounds.Length)] : null;
-            if (adventure != null)
+            if (gameObject.scene.name == "ClockworkCapital" && backgrounds.Length == 3)
+            {
+                var boss = preparedEnemies.FirstOrDefault(e => e.Character.Rank == EnemyRank.Boss);
+                int district = boss?.Character.Id switch
+                {
+                    "EnemyRoyalEngine" => 0, "EnemyCrucibleRegent" => 1, "EnemyAstralGovernor" => 2,
+                    _ => adventure == null ? draftRandom.Next(3) : Mathf.Clamp((adventure.Stage - 1) / 3, 0, 2)
+                };
+                battleBackground = backgrounds[district];
+            }
+            else if (adventure != null)
                 battleBackground = backgrounds.FirstOrDefault(texture =>
-                    texture.name.StartsWith(adventure.InGraveyard ? "04-" : "01-")) ?? battleBackground;
-            stage?.Dispose();
-            stage = null;
-            var scenery = stageArt != null ? stageArt.For(battleBackground) : null;
-            if (eventStage != null)
-                stage = eventStage.BattleCast(root,stageArt,PlaybackNow);
-            else if (scenery != null && Camera.main is { } sceneCamera)
-                stage = new BattleStage(transform, sceneCamera, root, stageArt, scenery, PlaybackNow);
+                    texture.name.StartsWith(adventure.InCapital ? "07-" : adventure.InGraveyard ? "04-" : "01-")) ?? battleBackground;
+            DressBattleStage(true);
             if (victoryRewards != null)
             {
                 phase = Phase.Settlement;
@@ -246,6 +255,24 @@ namespace RaidPartyManager.Presentation
             if (eventStage == null) entrance.Add(run.CaptureFormation(Side.Party), content, stage);
             enemyEntranceScheduled = false;
             RenderPreparation();
+        }
+
+        private void DressBattleStage(bool reset = false)
+        {
+            var enemies = victoryRewards != null ? adventure?.Current?.Battle?.Enemies : preparedEnemies;
+            var boss = enemies?.FirstOrDefault(unit => unit.Character.Rank == EnemyRank.Boss);
+            var room = boss != null && eventStage == null
+                ? Resources.Load<BossRoomArt>("BossRooms/" + boss.Character.Id) : null;
+            if (!reset && room == bossRoom) return;
+            bossRoom = room;
+            stage?.Dispose();
+            stage = null;
+            battleSprites.Clear();
+            var scenery = bossRoom != null ? bossRoom.Dress() : stageArt?.For(battleBackground);
+            if (eventStage != null)
+                stage = eventStage.BattleCast(root, stageArt, PlaybackNow);
+            else if (scenery != null && stageArt != null && Camera.main is { } sceneCamera)
+                stage = new BattleStage(transform, sceneCamera, root, stageArt, scenery, PlaybackNow);
         }
 
         private bool AutoStarts => eventStage != null || adventure is { IsInspection: false };
@@ -271,7 +298,8 @@ namespace RaidPartyManager.Presentation
                 return;
             bool bossBattle = preparedEnemies.Any(enemy => enemy.Character.Rank == EnemyRank.Boss);
             var request = run.BeginBattle(preparedEnemies, content.TickLimit, adventure != null || bossBattle ? null : content.VictoryReward,
-                content.RecruitmentPool, content.CharacterCatalog, adventure?.Current?.Kind is NodeKind.EliteBattle or NodeKind.Boss);
+                content.RecruitmentPool, content.CharacterCatalog, adventure?.Current?.Kind is NodeKind.EliteBattle or NodeKind.Boss,
+                adventure?.InCapital == true || gameObject.scene.name == "ClockworkCapital");
             adventure?.BindBattle(request.Id);
             GameAudio.Play(SoundCue.UiBattleStart);
             battle = new BattleSimulator().Start(request);
@@ -320,37 +348,6 @@ namespace RaidPartyManager.Presentation
             Render();
         }
 
-        private void ToggleRoundPause()
-        {
-            if (phase == Phase.RoundBreak)
-            {
-                ResumeBattle();
-                return;
-            }
-
-            if (phase is Phase.Entering or Phase.Playback)
-            {
-                pauseRequested = !pauseRequested;
-                UpdatePauseButton(root.Q<Button>("battle-pause"));
-            }
-        }
-
-        private void ResumeBattle()
-        {
-            pauseRequested = false;
-            BeginNextRound();
-        }
-
-        private void SwapBetweenRounds(int from, int to)
-        {
-            if (phase == Phase.RoundBreak && battle.TrySwapPartyPositions(from, to))
-            {
-                GameAudio.Play(SoundCue.UiSwapPositions);
-                ReadPartyStats();
-                ResumeBattle();
-            }
-        }
-
         private void ReadPartyEnergy()
         {
             foreach (var entry in battle.ReadPartyEnergy())
@@ -365,16 +362,18 @@ namespace RaidPartyManager.Presentation
 
         private void Update()
         {
-            if (settingsOpenedAt.HasValue)
-                return;
-
             // Entrance steps advance only when presented. Start the action clock after the curtain opens.
             if (DockPlayhouse.Moving)
                 return;
 
             double now = PlaybackNow;
             if (entrance.Active)
-                entrance.Show(now, entranceLayer, unitCards);
+                entrance.Show(now, entranceLayer, unitCards, playbackSpeed);
+            if (battleFooter != null && !Mathf.Approximately(battleFooter.style.opacity.value, entrance.HudOpacity))
+            {
+                battleFooter.style.opacity = entrance.HudOpacity;
+                formationDivider.style.opacity = entrance.HudOpacity;
+            }
             if (phase == Phase.Entering && !entrance.Active)
                 BeginNextRound();
             else if (phase == Phase.Playback)
@@ -446,7 +445,7 @@ namespace RaidPartyManager.Presentation
             float baseline = foot.height > 0 ? 1 - (foot.yMax - 3 - root.worldBound.yMin) / root.layout.height : .3f;
             float focus = actionPlayback != null && visualAction.ActorId != null && unitCards.TryGetValue(visualAction.ActorId, out var actor)
                 ? (actor.BodyBounds.center.x - root.worldBound.center.x) / (root.layout.width * .5f) : 0;
-            stage.Update(PlaybackNow, baseline, focus, settingsOpenedAt.HasValue ? 0 : Time.unscaledDeltaTime);
+            stage.Update(PlaybackNow, baseline, focus, Time.unscaledDeltaTime * playbackSpeed);
         }
 
         private void AdvancePlayback(double now)
@@ -646,6 +645,12 @@ namespace RaidPartyManager.Presentation
                                 impactEffects.Add(new BattleEffectPlayback(entry.TargetId, effect, now, AnimationScale));
                         }
                     }
+                    if (entry.CharmTriggered)
+                    {
+                        var charm = Resources.Load<Texture2D>("EquipmentEffects/ElvenCharm");
+                        if (charm != null)
+                            impactEffects.Add(new BattleEffectPlayback(entry.TargetId, charm, now, AnimationScale, charm: true));
+                    }
                     QueueSkillEffect(entry, now);
                 }
 
@@ -667,14 +672,7 @@ namespace RaidPartyManager.Presentation
 
             SyncCompletedRoundHealth();
             ReadPartyStats();
-            if (!pauseRequested)
-            {
-                BeginNextRound();
-                return;
-            }
-
-            phase = Phase.RoundBreak;
-            Render();
+            BeginNextRound();
         }
 
         // AdvanceRound simulates ahead of the actors on stage. Only reconcile after its final visible hit.
@@ -783,6 +781,9 @@ namespace RaidPartyManager.Presentation
             if (impactEffects.Any(effect => effect.SkillBookId == entry.SkillBookId &&
                 effect.TargetId == entry.TargetId && effect.ActiveAt(now)))
                 return;
+            // The cloud gathers over the caster. The bolt hits the enemies on the following round.
+            if (entry.SkillBookId == "skill-book-30" && entry.Kind == BattleEventKind.SkillVisual)
+                atlas = Resources.Load<Texture2D>("ThunderGathering");
             impactEffects.Add(new BattleEffectPlayback(entry.TargetId, atlas, now, AnimationScale, entry.SkillBookId));
         }
 
@@ -932,20 +933,9 @@ namespace RaidPartyManager.Presentation
             bool defeat = phase == Phase.Settlement && victoryRewards == null;
             bool setup = phase == Phase.Preparation || defeat;
             topBar = new RunTopBar(root, run, content, setup ? OpenPartyEditor : null, actions: BattleControls(defeat),
-                settingsChanged: SetSettingsOpen,
+                settingsChanged: SetSettingsOpen, modalRoot: document,
                 openEnemyEditor: setup && content.EnemyRoster.Count > 0 && adventure == null ? OpenEnemyEditor : null);
             root.Add(topBar);
-            if (phase is Phase.Entering or Phase.Playback or Phase.RoundBreak)
-            {
-                var pause = PrototypeStyle.Button("", "battle-pause", ToggleRoundPause, true);
-                pause.style.alignSelf = Align.Center;
-                pause.style.flexShrink = 0;
-                pause.style.minWidth = 100;
-                pause.style.marginTop = 7;
-                UpdatePauseButton(pause);
-                root.Add(pause);
-            }
-
             var page = new ScrollView { name = "prototype" };
             page.style.flexGrow = 1;
             page.style.minHeight = 0;
@@ -959,23 +949,6 @@ namespace RaidPartyManager.Presentation
             var arena = new VisualElement { name = "battlefield" };
             arena.style.marginTop = StyleKeyword.Auto;
             arena.style.flexShrink = 0;
-            if (phase == Phase.RoundBreak)
-            {
-                var hint = PrototypeStyle.Text("长按一名队员，拖到另一名存活队员上交换站位。", 13, PrototypeStyle.Muted);
-                hint.style.marginBottom = 8;
-                arena.Add(hint);
-                var locked = battle.Formation.Where(unit => unit.Side == Side.Party)
-                    .Select(unit => (unit.Character.Name, Reason: battle.PositionLockReason(unit.Position)))
-                    .Where(unit => unit.Reason != null)
-                    .Select(unit => $"{unit.Name}（{unit.Reason}）").ToArray();
-                if (locked.Length > 0)
-                {
-                    var notice = PrototypeStyle.Text($"锁定站位  {string.Join("、", locked)}", 13, PrototypeStyle.Accent);
-                    notice.name = "formation-lock-reasons";
-                    notice.style.marginBottom = 6;
-                    arena.Add(notice);
-                }
-            }
             bool showEnemies = battle != null || phase == Phase.Preparation && CanPreviewEnemies();
             int largestEnemy = showEnemies ? (battle?.Formation ?? preparedEnemies)
                 .Where(unit => unit.Side == Side.Enemy).Select(unit => unit.Character.PositionSlots).DefaultIfEmpty(1).Max() : 1;
@@ -987,6 +960,7 @@ namespace RaidPartyManager.Presentation
             divider.style.width = 24;
             divider.visible = showEnemies;
             PrototypeStyle.Middle(divider);
+            formationDivider = divider;
             opposingLines.Add(divider);
             opposingLines.Add(BuildLine(Side.Enemy, portraitHeight, showEnemies));
             arena.Add(opposingLines);
@@ -1000,7 +974,7 @@ namespace RaidPartyManager.Presentation
             arena.Add(entranceLayer);
             page.Add(arena);
             if (entrance.Active)
-                entrance.Show(PlaybackNow, entranceLayer, unitCards);
+                entrance.Show(PlaybackNow, entranceLayer, unitCards, playbackSpeed);
 
             // A falling meteor can extend above the arena without changing the scrollable area.
             meteorLayer = new VisualElement { name = "battle-meteor-layer", pickingMode = PickingMode.Ignore };
@@ -1010,6 +984,8 @@ namespace RaidPartyManager.Presentation
             root.Add(meteorLayer);
 
             var footer = BuildFooter(previousInspection);
+            battleFooter = footer;
+            footer.style.opacity = divider.style.opacity = entrance.HudOpacity;
             root.Add(footer);
             if (stage != null)
             {
@@ -1030,12 +1006,6 @@ namespace RaidPartyManager.Presentation
                 footer.SetEnabled(false);
                 RenderVictory();
             }
-        }
-
-        private void UpdatePauseButton(Button button)
-        {
-            button.text = phase == Phase.RoundBreak ? "继续" : pauseRequested ? "取消暂停" : "暂停";
-            button.tooltip = phase == Phase.RoundBreak ? "继续自动战斗" : pauseRequested ? "已预约回合结束时暂停" : "在当前回合结束时暂停";
         }
 
         private VisualElement BattleControls(bool defeat)
@@ -1061,13 +1031,25 @@ namespace RaidPartyManager.Presentation
             {
                 Phase.Entering => "入场",
                 Phase.Playback => $"第 {battle.Round} 回合",
-                Phase.RoundBreak => $"第 {battle.Round} 回合结束",
                 _ => "战斗结算"
             }, 13, PrototypeStyle.Accent);
             label.name = "battle-phase";
             label.style.marginRight = 6;
             label.style.whiteSpace = WhiteSpace.NoWrap;
             controls.Add(label);
+            if (phase is Phase.Entering or Phase.Playback)
+            {
+                var speed = PrototypeStyle.Button($"倍速 {playbackSpeed}×", "battle-speed", null);
+                speed.clicked += () =>
+                {
+                    playbackAtOrigin = PlaybackNow;
+                    clockOrigin = Time.unscaledTimeAsDouble;
+                    playbackSpeed = playbackSpeed == 1 ? 2 : 1;
+                    speed.text = $"倍速 {playbackSpeed}×";
+                };
+                speed.tooltip = "切换 1 倍或 2 倍战斗播放速度";
+                controls.Add(speed);
+            }
             if (defeat)
             {
                 if (adventure == null)
@@ -1080,21 +1062,15 @@ namespace RaidPartyManager.Presentation
 
         private void SetSettingsOpen(bool open)
         {
-            double now = Time.unscaledTimeAsDouble;
+            settingsOpen = open;
             if (open)
             {
-                settingsOpenedAt = now;
                 HideCharacterDetails();
                 statusTooltip.Hide();
                 HideEquipmentTooltip();
             }
-            else if (settingsOpenedAt.HasValue)
-            {
-                pausedTime += now - settingsOpenedAt.Value;
-                settingsOpenedAt = null;
-                if (phase == Phase.Settlement && victoryRewards != null && !victoryRewards.HasUnclaimed && LootChoices.Count == 0)
-                    ContinueVictory();
-            }
+            else if (phase == Phase.Settlement && victoryRewards != null && !victoryRewards.HasUnclaimed && LootChoices.Count == 0)
+                ContinueVictory();
         }
 
         private void OpenPartyEditor()
@@ -1119,6 +1095,7 @@ namespace RaidPartyManager.Presentation
             root.Q<RunTopBar>().EditParty(() =>
             {
                 preparedEnemies = enemyRun.CaptureFormation(Side.Enemy);
+                DressBattleStage();
                 RenderPreparation();
             }, () =>
             {
@@ -1150,9 +1127,6 @@ namespace RaidPartyManager.Presentation
                 return line;
 
             var positions = PrototypeStyle.Row(isParty ? "party-positions" : "enemy-positions");
-            var drag = isParty && phase == Phase.RoundBreak
-                ? new FormationSwap(positions, (from, to) => SwapBetweenRounds(from.Position.Value, to.Position.Value))
-                : null;
             for (int index = 0; index < Rules.Positions; index++)
             {
                 int slot = isParty ? Rules.Positions - index : index + 1;
@@ -1166,13 +1140,6 @@ namespace RaidPartyManager.Presentation
                 slotView.style.marginLeft = slotView.style.marginRight = 4;
                 positions.Add(slotView);
                 index += width - 1;
-                if (drag != null && card?.CanSwap == true && !battle.IsPositionLocked(card.Slot))
-                    drag.Register(new FormationSwap.Slot
-                    {
-                        View = card, Border = card.Q("combatant-portrait"), Position = card.Slot,
-                        Artwork = card.Artwork, Name = card.CharacterName, CanDrag = true, CanDrop = true,
-                        Borderless = card.HasBattleSprite
-                    });
             }
             line.Add(positions);
             return line;
@@ -1220,7 +1187,7 @@ namespace RaidPartyManager.Presentation
                 sprite.style.top = 5 + portraitHeight - PortraitHeight(character.PositionSlots);
                 sprite.RemoveFromHierarchy();
             }
-            var card = new BattleUnitCard(side, position, id, character, content.PortraitFor(character?.Id),
+            var card = new BattleUnitCard(side, id, character, content.PortraitFor(character?.Id),
                 maximumHealth, currentHealth, shield, PlaybackNow, portraitHeight,
                 statusIcon: content.StatusIcon, battleSprite: sprite, statusTooltip: statusTooltip);
             card.Refresh(currentHealth, shield, PlaybackNow, statuses.GetValueOrDefault(id),
@@ -1305,11 +1272,16 @@ namespace RaidPartyManager.Presentation
             slots.style.paddingTop = slots.style.paddingBottom = 3;
             slots.style.paddingLeft = slots.style.paddingRight = 2;
             var equippedItems = new EquipmentDefinition[equipment?.Count ?? Rules.EquipmentSlots];
+            var disabledSlots = new bool[equippedItems.Length];
             for (int slot = 0; slot < equippedItems.Length; slot++)
             {
                 var held = inventory.FirstOrDefault(item => item.Id == equipment?[slot])?.Definition;
                 equippedItems[slot] = held;
-                slots.Add(EquipmentTile($"equipment-slot-{slot + 1}", held, slot + 1));
+                bool disabled = phase == Phase.Playback && held != null && battleLoadout?.Disabled.Contains(equipment[slot]) == true;
+                disabledSlots[slot] = disabled;
+                var tile = EquipmentTile($"equipment-slot-{slot + 1}", held, slot + 1, disabled);
+                tile.style.width = tile.style.height = Mathf.Min(30, 92 / equippedItems.Length);
+                slots.Add(tile);
             }
             card.Add(slots);
 
@@ -1350,8 +1322,8 @@ namespace RaidPartyManager.Presentation
             energyBars[id] = bar;
             card.Add(bar);
 
-            if (phase == Phase.Playback || phase == Phase.RoundBreak)
-                RegisterCharacterInspection(portrait, position, id, character, equippedItems, skills, previousInspection);
+            if (phase == Phase.Playback)
+                RegisterCharacterInspection(portrait, position, id, character, equippedItems, disabledSlots, skills, previousInspection);
             return card;
         }
 
@@ -1376,7 +1348,7 @@ namespace RaidPartyManager.Presentation
                 bar[i].style.backgroundColor = i < energy.Remaining ? AvailableEnergy : Color.white;
         }
 
-        private VisualElement EquipmentTile(string name, EquipmentDefinition item, int? slot = null)
+        private VisualElement EquipmentTile(string name, EquipmentDefinition item, int? slot = null, bool disabled = false)
         {
             var view = new VisualElement { name = name };
             view.style.width = view.style.height = 30;
@@ -1395,12 +1367,12 @@ namespace RaidPartyManager.Presentation
             }
 
             var artwork = content.IconFor(item.Id);
-            view.Add(new EquipmentIcon(item, artwork));
-            RegisterEquipmentTooltip(view, item, artwork);
+            view.Add(new EquipmentIcon(item, artwork, disabled: disabled));
+            RegisterEquipmentTooltip(view, item, artwork, disabled);
             return view;
         }
 
-        private void RegisterEquipmentTooltip(VisualElement view, EquipmentDefinition item, Texture2D artwork)
+        private void RegisterEquipmentTooltip(VisualElement view, EquipmentDefinition item, Texture2D artwork, bool disabled = false)
         {
             view.RegisterCallback<PointerEnterEvent>(evt =>
             {
@@ -1408,7 +1380,7 @@ namespace RaidPartyManager.Presentation
                     return;
                 HideEquipmentTooltip();
                 equipmentTooltipAnchor = view;
-                equipmentTooltip = new EquipmentTooltip(item, artwork);
+                equipmentTooltip = new EquipmentTooltip(item, artwork, disabled: disabled);
                 equipmentTooltip.ShowAbove(root, view);
             });
             view.RegisterCallback<PointerLeaveEvent>(_ =>
@@ -1426,7 +1398,7 @@ namespace RaidPartyManager.Presentation
         }
 
         private void RegisterCharacterInspection(VisualElement portrait, int position, string id, CharacterDefinition character,
-            IReadOnlyList<EquipmentDefinition> equipment, IReadOnlyList<SkillBookDefinition> skills, Vector2? previousInspection)
+            IReadOnlyList<EquipmentDefinition> equipment, IReadOnlyList<bool> disabledSlots, IReadOnlyList<SkillBookDefinition> skills, Vector2? previousInspection)
         {
             portrait.RegisterCallback<PointerEnterEvent>(evt =>
             {
@@ -1464,7 +1436,7 @@ namespace RaidPartyManager.Presentation
                 inspectionPointer = pointer;
                 var member = run.Members.FirstOrDefault(m => m.Id == id);
                 var details = new BattleCharacterDetails(position, character, equipment, skills, content.IconFor,
-                    member?.Trait ?? PlayerTrait.None, member?.Personality ?? character.Personality);
+                    member?.Trait ?? PlayerTrait.None, member?.Personality ?? character.Personality, disabledSlots);
                 characterDetails = details;
                 details.RegisterCallback<GeometryChangedEvent>(_ => details.PositionAt(root, portrait));
                 root.Add(details);
@@ -1513,7 +1485,7 @@ namespace RaidPartyManager.Presentation
                 topBar.WhenRewardsArrive(ContinueVictory);
                 return;
             }
-            if (leavingVictory || settingsOpenedAt.HasValue)
+            if (leavingVictory || settingsOpen)
                 return;
 
             leavingVictory = true;
@@ -1544,6 +1516,8 @@ namespace RaidPartyManager.Presentation
             var heading = PrototypeStyle.Text("胜利", 26, PrototypeStyle.Accent);
             PrototypeStyle.Middle(heading);
             panel.Add(heading);
+            if (adventure?.Current?.Battle?.Kind == NodeKind.Boss)
+                panel.Add(PrototypeStyle.Text("首领已击败，全队恢复 50% 最大生命值。", 15, PrototypeStyle.Ink));
 
             var rewards = new ScrollView(ScrollViewMode.Vertical);
             rewards.style.flexShrink = 1;

@@ -35,7 +35,6 @@ namespace RaidPartyManager.Presentation
         private readonly Dictionary<int, MeshRenderer> company = new();
         private int idleCel = -1;
         protected DockSet Dressing => house.Set;
-        internal Vector2 Anchor(float x) => camera.WorldToViewportPoint(house.FlyBarEye(x));
 
         internal void ShowCompany(PartyRun party, EncounterData content)
         {
@@ -70,23 +69,23 @@ namespace RaidPartyManager.Presentation
         private void AnimateCompany()
         {
             if (company.Count == 0) return;
-            int frame = Mathf.FloorToInt(Time.unscaledTime * 5) % 8;
+            int frame = AnimationCels.Loop(Time.unscaledTimeAsDouble, 1.6);
             if (frame == idleCel) return;
             idleCel = frame;
             foreach (var pair in company)
             {
                 var actor = pair.Value;
                 if (!actor.enabled || Dressing.Cast[actor].Idle == null) continue;
-                int cel = (frame + pair.Key) % 8;
+                int cel = (frame + 2 * pair.Key) % AnimationCels.Count;
                 actor.GetPropertyBlock(properties);
                 properties.SetTexture("_MainTex", Dressing.Cast[actor].Idle);
-                properties.SetVector("_MainTex_ST",new Vector4(.125f,.25f,cel*.125f,.75f));
+                properties.SetVector("_MainTex_ST",AnimationCels.UV(cel, AnimationCels.Count, 4));
                 actor.SetPropertyBlock(properties);
             }
         }
         protected virtual float PropScale => 1f;
 
-        protected ServiceStage(Transform owner, VisualElement panel, ServiceStageArt art)
+        protected ServiceStage(Transform owner, VisualElement panel, ServiceStageArt art, StageLighting lighting)
         {
             this.art = art;
             camera = Camera.main;
@@ -106,6 +105,10 @@ namespace RaidPartyManager.Presentation
             softPaint = new Material(paint) { renderQueue = 3000 };
             softPaint.SetFloat("_DepthWrite", 0);
             house = DockPlayhouse.Bind(stage, panel);
+            house.SetLighting(lighting);
+            lighting.Apply(paint);
+            lighting.Apply(backdropPaint);
+            lighting.Apply(softPaint);
             FrameCamera();
         }
 
@@ -186,6 +189,22 @@ namespace RaidPartyManager.Presentation
             Shadow(foot,width*.94f,height*.47f,.38f);
         }
 
+        protected static Texture2D CapitalArt(string id) => Resources.Load<Texture2D>("Clockwork/" + id);
+
+        protected void DressCapital(int district)
+        {
+            var (back, left, right) = district switch
+            {
+                1 => ("Furnace", "BoilerUnion", "StreetCurrent"),
+                2 => ("Meridian", "LastMeridian", "ElectionPress"),
+                _ => ("Terminus", "Gate", "WrongSwitch")
+            };
+            HangBackdrop(back, CapitalArt(back));
+            Deck(CapitalArt("IronDeck"), new Vector2(3.1f, 2.4f), new Color(.76f,.77f,.75f));
+            FloorProp(left, CapitalArt(left), -4.9f, .55f, 2.5f, -7);
+            FloorProp(right, CapitalArt(right), 4.8f, -1.25f, 1.9f, 8);
+        }
+
         protected void HangBackdrop(string name, Texture2D image, float horizontalRepeats = 1, float verticalOffset = 0)
         {
             paintedScene = image;
@@ -224,11 +243,27 @@ namespace RaidPartyManager.Presentation
             return r;
         }
 
+        protected static Vector4 BrokerIdleFrame(int frame, int visiblePixels = 512)
+        {
+            var uv = AnimationCels.UV(frame);
+            float crop = uv.y * visiblePixels / 512f;
+            uv.w += uv.y - crop;
+            uv.y = crop;
+            return uv;
+        }
+
+        protected void PoseBroker(MeshRenderer actor, int frame)
+        {
+            actor.GetPropertyBlock(properties);
+            properties.SetVector("_MainTex_ST", BrokerIdleFrame(frame));
+            actor.SetPropertyBlock(properties);
+        }
+
         protected void SetFrame(MeshRenderer flat, Texture2D texture, int count, int frame)
         {
             flat.GetPropertyBlock(properties);
             properties.SetTexture("_MainTex", texture);
-            properties.SetVector("_MainTex_ST", new Vector4(1f / count, 1, (float)frame / count, 0));
+            properties.SetVector("_MainTex_ST", count == AnimationCels.Count ? AnimationCels.UV(frame) : new Vector4(1f / count, 1, (float)frame / count, 0));
             flat.SetPropertyBlock(properties);
         }
 

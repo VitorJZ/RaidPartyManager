@@ -125,21 +125,6 @@ def war_cry(f, t, _):
         f.gem(48+side*(17+18*t), 39-11*t, 3, 7)
     f.star(48, 50, 6+8*pulse(t))
 
-def fire(f, t, rng):
-    expansion = smooth(t*1.9)
-    f.arc(48, 76, 12+30*expansion, 5+4*expansion, 8, 350, 3)
-    for i, offset in enumerate((-27, -18, -8, 2, 12, 22, 28)):
-        x = 48+offset
-        sway = 7*sin(t*10+i*1.45)
-        growth = pulse(t + i*.017, .28, .52)
-        tip = 72-(12+38*growth)*rng.uniform(.77, 1.18)
-        f.draw.polygon([(x-8, 77), (x-10, 60), (x+sway, tip), (x+sway+2, tip+13),
-                        (x+8, 60), (x+9, 73)], fill=f.shadow)
-        f.draw.polygon([(x-6, 73), (x-6, 61), (x+sway, tip+2),
-                        (x+5, 63), (x+6, 72)], fill=f.mid)
-        f.draw.polygon([(x-2, 74), (x-4, 64), (x+sway*.5, tip+14), (x+4, 70)], fill=f.light)
-    for i in range(6):
-        f.gem(17+12*i+3*sin(t*9+i), 62-(t+.1)*(19+i*3), 2, 3)
 
 def ice(f, t, _):
     growth = smooth(t/.29)
@@ -385,10 +370,6 @@ def night_watch(f, t, _):
     f.arc(48, 37, 7, 11, 180, 360)
     f.gem(48, 52, 4, 5+3*sin(pi*t))
 
-def siege_bolt(f, t, _):
-    x = 15+62*smooth(t)
-    for offset in (-4, 4): f.line([(x-24, 48+offset), (x, 48+offset)], 2)
-    f.line([(x-5, 37), (x+12, 48), (x-5, 59)], 4)
 
 def intercept(f, t, _):
     x = 28+20*smooth(t/.4)
@@ -402,10 +383,6 @@ def back_pay(f, t, _):
         f.arc(48, y, 13, 6, width=3)
     f.star(48, 34-12*t, 6)
 
-def thunder_verdict(f, t, _):
-    for dx in (-19, 0, 19):
-        x = 48+dx
-        f.line([(x+6, 17), (x-4, 42), (x+5, 43), (x-6, 64+13*smooth(t))], 3)
 
 def blockade_salvo(f, t, rng):
     for offset in (0, 16):
@@ -413,13 +390,6 @@ def blockade_salvo(f, t, rng):
         f.line([(x-16, y+11), (x, y)], 3)
         f.star(x, y, 3 + 7*pulse(t, .25, .70))
 
-def deepwater_surge(f, t, rng):
-    for i in range(3):
-        r = 8 + 7*i + 15*smooth(t)
-        f.arc(48, 49, r, r*.65, 30+165*t, 310+165*t, 3)
-    for i in range(5):
-        a = i*2*pi/5 - pi/2
-        f.gem(48+cos(a)*(20+13*t), 49+sin(a)*(20+13*t), 2, 4)
 
 def burial_edict(f, t, rng):
     f.line([(30, 42), (24, 24), (39, 34), (48, 19), (57, 34), (72, 24), (66, 42), (30, 42)], 2)
@@ -434,11 +404,12 @@ def long_night_prayer(f, t, rng):
     f.star(48, y-1, 5+7*pulse(t))
     f.arc(48, 74, 12+17*t, 4+4*t, 0, 360)
 
-DRAWINGS = (war_cry, fire, ice, sunshine, stone_guard, healing, volley, meteor, sweep, lightning,
+# A None entry uses the checked-in painted strip.
+DRAWINGS = (war_cry, None, ice, sunshine, stone_guard, healing, volley, meteor, sweep, lightning,
             toxic, feast, sidestep, golden_bell, fiery_eyes, reaping, anthem, intimidate,
             earthquake, cloud_piercer, hook_arrow, twin_cover, field_medic, cold_tide, bronze_mirror,
-            night_watch, siege_bolt, intercept, back_pay, thunder_verdict,
-            blockade_salvo, deepwater_surge, burial_edict, long_night_prayer)
+            night_watch, None, intercept, back_pay, None,
+            blockade_salvo, None, burial_edict, long_night_prayer)
 
 
 def render_skill(number, palette, render):
@@ -447,7 +418,7 @@ def render_skill(number, palette, render):
         t = i/(FRAMES-1)
         frame = Frame(palette)
         render(frame, t, Random(1000 + number))
-        rising = number in (2, 4, 6, 11, 17)
+        rising = number in (4, 6, 11, 17)
         frame.sparks(Random(4000 + number), t, count=17 if rising else 10, rise=22 if rising else 0)
         opacity = (.34 + .66*smooth(t/.17)) * (1 - .97*smooth((t-.64)/.36))
         mask = frame.image.getchannel("A")
@@ -484,11 +455,18 @@ def main():
     rendered = []
     for number, (style, draw) in enumerate(zip(STYLES, DRAWINGS), 1):
         name, *palette = style
+        path = ART / f"{number:02d}-{name}.png"
+        if draw is None:
+            with Image.open(path) as sheet:
+                if sheet.size != (FRAMES * CELL, CELL) or sheet.mode != "RGBA":
+                    raise ValueError(f"Unexpected format for painted effect {path}")
+                rendered.append([sheet.crop((i * CELL, 0, (i + 1) * CELL, CELL)) for i in range(FRAMES)])
+            continue
         frames = render_skill(number, palette, draw)
         sheet = Image.new("RGBA", (FRAMES*CELL, CELL))
         for i, frame in enumerate(frames):
             sheet.paste(frame, (i*CELL, 0))
-        sheet.save(ART / f"{number:02d}-{name}.png", optimize=True)
+        sheet.save(path, optimize=True)
         rendered.append(frames)
     if args.preview:
         preview(rendered)

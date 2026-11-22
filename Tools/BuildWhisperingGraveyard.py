@@ -1,8 +1,8 @@
 """Assemble ImageGen pose grids into the runtime's existing atlas formats.
 
-This performs layout/slicing only. Enemy drawings come from the retained ImageGen
+This assembles the painted key poses and bakes motion-compensated inbetweens. Enemy drawings come from the retained ImageGen
 sources, never from recoloring an existing enemy. Reruns preserve stable GUIDs.
-Requires Python 3.10+ and Pillow. Run from any directory, optionally --allow-missing
+Requires Python 3.10+, Pillow, NumPy and OpenCV. Run from any directory, optionally --allow-missing
 while image generation is in progress. Final validation requires all 30 sources.
 """
 from __future__ import annotations
@@ -14,6 +14,7 @@ import re
 import uuid
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
+from AnimationCels import COUNT, sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "Docs/WhisperingGraveyard.json"
@@ -49,7 +50,7 @@ def meta(path: Path, kind: str = "file") -> None:
         head += "MonoImporter:\n  externalObjects: {}\n  serializedVersion: 2\n  defaultReferences: []\n  executionOrder: 0\n  icon: {instanceID: 0}\n  userData:\n  assetBundleName:\n  assetBundleVariant:\n"
     else:
         head += "DefaultImporter:\n  externalObjects: {}\n  userData:\n  assetBundleName:\n  assetBundleVariant:\n"
-    target.write_text("\n".join(line.rstrip() for line in head.splitlines()) + "\n", encoding="utf-8", newline="\n")
+    target.write_bytes(("\n".join(line.rstrip() for line in head.splitlines()) + "\n").encode("utf-8"))
 
 
 def folder(path: Path) -> None:
@@ -70,6 +71,9 @@ def ref(path: Path, file_id=2800000, kind=3) -> str:
 def save_image(image: Image.Image, path: Path) -> None:
     image.save(path, optimize=True)
     meta(path, "texture")
+    if max(image.size) > 2048:
+        importer = Path(str(path) + ".meta")
+        importer.write_text(importer.read_text().replace("maxTextureSize: 2048", "maxTextureSize: 4096"))
 
 
 def pack(frames: list[Image.Image], cols: int, rows: int, wide=False) -> Image.Image:
@@ -103,37 +107,90 @@ def pose_frames(source: Image.Image) -> list[list[Image.Image]]:
 
 def special_fx(enemy: dict) -> Image.Image:
     action = enemy["actions"][1]
-    color = (101, 220, 174) if action["kind"] in ("Heal", "Shield") else (
-        (124, 198, 245) if action.get("status") == "Chill" else (166, 135, 211))
-    strip = Image.new("RGBA", (1024, 128))
-    for frame in range(8):
+    status = action.get("status")
+    shield = action["kind"] == "Shield" or status == "Resolve"
+    healing = action["kind"] == "Heal"
+    cold = status == "Chill"
+    physical = action["kind"] == "Attack" and action.get("damage") != "Magic"
+    tint = ((117, 211, 186) if healing or shield else (128, 203, 245) if cold else
+            (170, 198, 87) if status == "Poison" else (244, 159, 80) if status == "Ember" else
+            (208, 166, 120) if physical else (174, 140, 211))
+    variation = enemy["number"] * .71
+    strip = Image.new("RGBA", (COUNT * 128, 128))
+    for frame in range(COUNT):
+        t = frame / (COUNT - 1)
+        wave = 1 - (1-t)**2
+        alpha = int(248 * math.sin(math.pi * (frame + .6) / COUNT)**.65)
         image = Image.new("RGBA", (128, 128))
-        d = ImageDraw.Draw(image)
-        progress = frame / 7
-        radius = 9 + int(progress * 44)
-        alpha = int(220 * math.sin(math.pi * (frame + 1) / 9))
-        d.ellipse((64-radius, 64-radius, 64+radius, 64+radius), outline=(*color, alpha), width=3)
-        for mote in range(7):
-            a = mote * math.tau / 7 + progress
-            x, y = 64 + int(math.cos(a) * radius), 64 + int(math.sin(a) * radius)
-            d.rectangle((x-2, y-2, x+2, y+2), fill=(*color, alpha))
-        if action["kind"] == "Heal":
-            d.rectangle((60, 38, 68, 84), fill=(*color, alpha))
-            d.rectangle((43, 55, 85, 63), fill=(*color, alpha))
-        strip.alpha_composite(image, (frame * 128, 0))
+        pen = ImageDraw.Draw(image)
+        ink = tuple(int(c*.47) for c in tint) + (alpha,)
+        color = (*tint, alpha)
+        glint = tuple((c + 255)//2 for c in tint) + (alpha,)
+        radius = 5 + 47 * wave
+        if healing or status == "Poison" or status == "Ember":
+            # Two winding ribbons leave a clear window over the receiving character.
+            for band in (-1, 1):
+                path = []
+                for j in range(19):
+                    u = j / 18
+                    x = 64 + band * math.sin(u*5 + variation + 3*t) * (8 + (1-u)*radius*.5)
+                    y = 96 - (12+64*wave)*u - 17*t
+                    path.append((x,y))
+                pen.line(path, fill=ink, width=5)
+                pen.line(path, fill=color, width=2)
+        elif shield:
+            x = 7 + radius*.62
+            y = 9 + radius*.76
+            outline = [(64,60-y),(64+x,61-y*.65),(64+x*.83,64+y*.42),(64,65+y),
+                       (64-x*.83,64+y*.42),(64-x,61-y*.65),(64,60-y)]
+            pen.polygon(outline,fill=(*tint,alpha//7))
+            pen.line(outline,fill=color,width=3)
+            pen.line(outline[:2],fill=glint,width=2)
+        elif physical or cold:
+            for j in range(6):
+                theta = variation + j * math.tau / 6
+                x,y=64+math.cos(theta)*radius,64+math.sin(theta)*radius*.72
+                tip=(x+math.cos(theta)*9,y+math.sin(theta)*11)
+                base=(x-math.cos(theta)*14,y-math.sin(theta)*14)
+                pen.polygon([tip,(x-math.sin(theta)*4,y+math.cos(theta)*4),base,
+                             (x+math.sin(theta)*4,y-math.cos(theta)*4)],fill=color,outline=ink)
+                pen.line((base,tip), fill=glint)
+        else:
+            for j in range(3):
+                angle = variation*45 + j*120 + 42*t
+                pen.arc((64-radius,64-radius*.74,64+radius,64+radius*.74),
+                        angle,angle+89,fill=color,width=3)
+        for j in range(8):
+            angle = variation + j * math.tau/8 + .45*t
+            distance = (7 + 47*t) * (.68 + .3*abs(math.sin(j*2+variation)))
+            x, y = 64 + math.cos(angle)*distance, 64 + math.sin(angle)*distance - 8*t
+            pen.line((x-2,y,x+2,y),fill=glint,width=1)
+            pen.line((x,y-2,x,y+2),fill=glint,width=1)
+        strip.paste(image, (frame*128, 0))
     return strip
+
+
+def preview_font(size: int):
+    for path in ("/System/Library/Fonts/STHeiti Medium.ttc", "C:/Windows/Fonts/msyh.ttc",
+                 "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"):
+        if Path(path).is_file():
+            return ImageFont.truetype(path, size)
+    return ImageFont.load_default()
 
 
 def make_art(enemy: dict) -> Image.Image:
     prefix = enemy["id"]
     source_path = ART / "Sources" / (prefix + "-Source.png")
     meta(source_path, "texture")
-    rows = pose_frames(Image.open(source_path))
-    save_image(pack(rows[0] + rows[2] + rows[4] + rows[5], 8, 4), ART / (prefix + "-Combat.png"))
-    save_image(pack(rows[2], 4, 2, wide=True), ART / (prefix + "-Attack.png"))
-    save_image(pack([rows[1][i] for i in (0, 1, 2, 4, 5, 6)], 3, 2), ART / (prefix + "-Walk.png"))
-    save_image(pack(rows[3], 4, 2, wide=True), ART / (prefix + "-Special.png"))
-    save_image(special_fx(enemy), ART / (prefix + "-SpecialFX.png"))
+    with Image.open(source_path) as source:
+        keys = pose_frames(source)
+    rows = [sequence(row, loop=index < 2, secondary=index < 2) for index, row in enumerate(keys)]
+    save_image(pack(rows[0] + rows[2] + rows[4] + rows[5], COUNT, 4), ART / (prefix + "-Combat.png"))
+    save_image(pack(rows[2], 4, 4, wide=True), ART / (prefix + "-Attack.png"))
+    save_image(pack(rows[1], 4, 4), ART / (prefix + "-Walk.png"))
+    save_image(pack(rows[3], 4, 4, wide=True), ART / (prefix + "-Special.png"))
+    if prefix not in ("NamelessKing", "SepulchralMatron"):
+        save_image(special_fx(enemy), ART / (prefix + "-SpecialFX.png"))
     portrait = Image.new("RGBA", (256, 384))
     pose = rows[0][0]
     pose = pose.crop(pose.getbbox())
@@ -143,16 +200,16 @@ def make_art(enemy: dict) -> Image.Image:
     pose = pose.resize((round(pose.width * factor), round(pose.height * factor)), Image.Resampling.NEAREST)
     portrait.alpha_composite(pose, ((256 - pose.width) // 2, 374 - pose.height))
     save_image(portrait, ART / (prefix + "-Portrait.png"))
-    sequence = []
-    font = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 16)
+    preview_frames = []
+    font = preview_font(16)
     for row, label in enumerate(("待机", "移动", "普攻", "特技", "受击", "倒下")):
         for frame in rows[row]:
             preview = Image.new("RGB", (256, 242), (24, 27, 38))
             preview.paste(frame, (32, 30), frame)
             d = ImageDraw.Draw(preview)
             d.text((10, 6), f'{enemy["number"]} {enemy["name"]} / {label}', fill=(215, 218, 224), font=font)
-            sequence.append(preview)
-    sequence[0].save(PREVIEWS / (prefix + ".gif"), save_all=True, append_images=sequence[1:], duration=115, loop=0, disposal=2)
+            preview_frames.append(preview)
+    preview_frames[0].save(PREVIEWS / (prefix + ".gif"), save_all=True, append_images=preview_frames[1:], duration=58, loop=0, disposal=2)
     return portrait
 
 
@@ -182,7 +239,7 @@ def make_definition(enemy: dict) -> None:
         body += f'      layers: {action.get("layers", 0)}\n      requiresCharge: {int(action.get("charge", False))}\n      delayDecay: {int(action.get("delayDecay", False))}\n'
     body += f'    openingShield: {enemy.get("openingShield", 0)}\n    phaseThresholdPercent: {enemy.get("phaseThreshold", 0)}\n    phaseAttackBonus: {enemy.get("phasePower", 0)}\n'
     asset = ASSETS / ("Enemy" + prefix + ".asset")
-    asset.write_text(body, encoding="utf-8", newline="\n")
+    asset.write_bytes(body.encode("utf-8"))
     meta(asset, "asset")
 
 
@@ -221,7 +278,7 @@ def make_encounter(enemies: list[dict], formations: list[dict]) -> None:
 
 
 def contact_sheet(enemies: list[dict], portraits: dict) -> None:
-    font = ImageFont.truetype("C:/Windows/Fonts/msyh.ttc", 18)
+    font = preview_font(18)
     sheet = Image.new("RGB", (1200, 5 * 252 + 50), (24, 27, 38))
     draw = ImageDraw.Draw(sheet)
     draw.text((18, 12), "低语墓园  23 普通 / 5 精英 / 2 Boss", font=font, fill=(210, 225, 221))

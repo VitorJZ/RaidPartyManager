@@ -12,37 +12,28 @@ namespace RaidPartyManager.Presentation
         private readonly Label healthLabel;
         private readonly VisualElement healthFill;
         private readonly VisualElement portrait;
-        private readonly VisualElement badges;
+        private readonly VisualElement badges, caption, life, conditions;
         private readonly Func<StatusKind, Texture2D> statusIcon;
         private readonly BattleStatusTooltip statusTooltip;
         private readonly BattleSpriteView battleSprite;
         private readonly Color sideColor;
 
-        public int Slot { get; }
-        public bool CanSwap { get; }
-        public bool HasBattleSprite => battleSprite != null;
-        public Texture2D Artwork { get; }
-        public string CharacterName { get; }
         public Rect BodyBounds => battleSprite?.Figure.worldBound ?? portrait.worldBound;
         public int PositionSlots { get; }
 
-        public BattleUnitCard(Side side, int position, string unitId, CharacterDefinition character,
+        public BattleUnitCard(Side side, string unitId, CharacterDefinition character,
             Texture2D art, int maximumHealth, int health, int shield, double now, float portraitHeight,
             Func<StatusKind, Texture2D> statusIcon = null, BattleSpriteView battleSprite = null,
             BattleStatusTooltip statusTooltip = null)
         {
-            Slot = position;
             PositionSlots = character.PositionSlots;
-            CanSwap = side == Side.Party && health > 0;
-            Artwork = art;
-            CharacterName = character.Name;
             this.maximumHealth = maximumHealth;
             this.statusIcon = statusIcon;
             this.statusTooltip = statusTooltip;
             this.battleSprite = battleSprite;
             sideColor = side == Side.Party ? PrototypeStyle.Ally : PrototypeStyle.Enemy;
 
-            var life = new VisualElement { name = "health-bar", pickingMode = PickingMode.Ignore };
+            life = new VisualElement { name = "health-bar", pickingMode = PickingMode.Ignore };
             life.style.width = Length.Percent(76);
             life.style.maxWidth = PositionSlots switch { 1 => 104, 2 => 150, _ => 188 };
             life.style.alignSelf = Align.Center;
@@ -88,15 +79,7 @@ namespace RaidPartyManager.Presentation
             else
                 ProfessionFrame.AddTo(portrait, character.Profession, art);
 
-            var positionTag = PrototypeStyle.Text(position.ToString("00"), 11, side == Side.Party ? PrototypeStyle.Ally : PrototypeStyle.Enemy);
-            positionTag.name = "position-tag";
-            positionTag.style.position = Position.Absolute;
-            positionTag.style.top = positionTag.style.left = 5;
-            positionTag.style.backgroundColor = PrototypeStyle.Background;
-            positionTag.style.paddingLeft = positionTag.style.paddingRight = 4;
-            portrait.Add(positionTag);
-
-            var caption = PrototypeStyle.Row("combatant-caption");
+            caption = PrototypeStyle.Row("combatant-caption");
             caption.style.paddingLeft = caption.style.paddingRight = 5;
             caption.style.paddingTop = caption.style.paddingBottom = 4;
             caption.style.minHeight = 27;
@@ -114,7 +97,7 @@ namespace RaidPartyManager.Presentation
             Add(portrait);
             Add(life);
 
-            var conditions = new VisualElement { name = $"status-row-{unitId}" };
+            conditions = new VisualElement { name = $"status-row-{unitId}" };
             conditions.style.minHeight = 29;
             conditions.style.marginTop = 3;
             Add(conditions);
@@ -124,6 +107,11 @@ namespace RaidPartyManager.Presentation
             conditions.Add(badges);
 
             Refresh(health, shield, now);
+        }
+
+        public void SetEntranceHudOpacity(float opacity)
+        {
+            caption.style.opacity = life.style.opacity = conditions.style.opacity = opacity;
         }
 
         public void SetEntranceVisible(bool visible)

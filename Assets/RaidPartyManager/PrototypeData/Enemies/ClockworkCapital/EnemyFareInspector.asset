@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyFareInspector
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyFareInspector
+  displayName: "铜面稽查"
+  portrait: {fileID: 2800000, guid: cf9cc432186b51a697b648fc7411f5c0, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 2ae8727f78995d5eb95fe05aeb889d40, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: de8bb170cc315d169e0f22392b32ba13, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 5ac182e088da5f4ab38b25ea0826a30b, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 7ce29f4bb4215d1e9304f0f264cf06c2, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: d9f8e01d65ba57f5b302cbc54ce22073, type: 3}
+  usePortraitInBattle: 0
+  profession: 0
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "罚票猛击（66%） / 稽查铁幕（34%）"
+  personality: 1
+  attack: 7
+  defense: 5
+  specialDefense: 1
+  health: 35
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "罚票猛击"
+      weight: 66
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "稽查铁幕"
+      weight: 34
+      kind: 3
+      target: 5
+      power: 9
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

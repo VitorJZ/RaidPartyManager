@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb2409f7638047119eb89974ed723517, type: 3}
+  m_Name: EnemyDrownedLanternRay
+  m_EditorClassIdentifier: 
+  roomName: 沉灯船腹
+  backdrop:
+  - {fileID: 2800000, guid: 2a6437e990a952faaf243b77dd294f85, type: 3}
+  - {fileID: 2800000, guid: adcf69cc684e56d9bd71b006e14eaa4f, type: 3}
+  - {fileID: 2800000, guid: c0744844daca5d03b27066a2e61e127d, type: 3}
+  - {fileID: 2800000, guid: 9b60646663ee57809eed5811ae3071c8, type: 3}
+  - {fileID: 2800000, guid: 6ed4d1d5baa35b57b2fbc6e7062410f6, type: 3}
+  - {fileID: 2800000, guid: 10b32aa221aa59ec857a25ef12dfecb3, type: 3}
+  - {fileID: 2800000, guid: c3be8cb5d14d584990b0898bce201838, type: 3}
+  - {fileID: 2800000, guid: d6a56eb585c85090a3cef1207555b7f1, type: 3}
+  - {fileID: 2800000, guid: 2cd9f9ab4afc50ab85ade0908544d514, type: 3}
+  - {fileID: 2800000, guid: 596323b3cdb7540daab968ccb14b4b92, type: 3}
+  - {fileID: 2800000, guid: ccb7dbe43db95300a01586cd31038ebf, type: 3}
+  - {fileID: 2800000, guid: 6b1d89be51f35e14a9d109a4ff59b3c0, type: 3}
+  - {fileID: 2800000, guid: a36031e9f83d5c7f9a3d51fbd3e70df7, type: 3}
+  - {fileID: 2800000, guid: cee9c7f19fe851179701517e9440bd78, type: 3}
+  - {fileID: 2800000, guid: 2abdb5b5964251b784dbc2d3a4f848c1, type: 3}
+  - {fileID: 2800000, guid: 785ba15a1e5e53e09f73b3989ff6c6e4, type: 3}
+  floor: {fileID: 2800000, guid: 39589b9c02135d87ad22af87ddf6ff36, type: 3}
+  leftWing: {fileID: 2800000, guid: c7619708a8b251b38db25d98f23c96da, type: 3}
+  rightWing: {fileID: 2800000, guid: bfc933fd1679523db4bf14736d5aa686, type: 3}
+  leftMark: {x: 0.16, y: 0.77, z: 3.55}
+  rightMark: {x: 0.82, y: 0.63, z: 2.55}
+  floorTile: {x: 3.0, y: 1.8}
+  keyLight: {x: 0.72, y: 1.02, z: 1.18, w: 4.3}
+  rimLight: {x: 0.36, y: 0.95, z: 1.24, w: -1}
+  mist: {x: 0.13, y: 0.42, z: 0.51, w: 0.11}
+  mistHeight: 1.9
+  loopSeconds: 4.6

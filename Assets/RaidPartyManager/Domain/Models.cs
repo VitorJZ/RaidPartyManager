@@ -11,7 +11,7 @@ namespace RaidPartyManager.Domain
     {
         None, DamageLimit, GainEmberWhenHit, RepeatTargetDamage, ArcherVolley, PoisonOnHit,
         MissingHealthDamage, EscalatingAttack, PermanentAttackOnKill, IgnoreMagicDefense, LightningChant,
-        Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, BlessAlly, RevealEnemies,
+        Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, ChorusArmory, RevealEnemies,
         PiercingArrow, BorrowAllyAttack, HealAlly, FirstDamageToTarget, HealOnDamage, DrawAttacks,
         ExposeMeleeAttacker, GoldOnSurvival, AccessoryOnSurvival, ShopDiscount,
         EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack,
@@ -61,6 +61,9 @@ namespace RaidPartyManager.Domain
     {
         public const int Positions = 4;
         public const int EquipmentSlots = 3;
+        public static int PersonalEquipmentSlots(PlayerTrait talent) => EquipmentSlots + (talent == PlayerTrait.Warehouse ? 1 : 0);
+        public static bool ValidEquipmentSlots(int count, PlayerTrait talent) =>
+            count == PersonalEquipmentSlots(talent) || count == PersonalEquipmentSlots(talent) + 1;
         public const int DefaultEnergy = 2;
         public const int MaximumEnergy = 8;
 
@@ -83,7 +86,7 @@ namespace RaidPartyManager.Domain
 
         public static BattleEnergy Full(IEnumerable<EquipmentDefinition> equipment)
         {
-            int capacity = equipment.Any(item => item.Effect == EquipmentEffect.EchoChalice) ? 4 : Rules.DefaultEnergy;
+            int capacity = Rules.DefaultEnergy + 2 * equipment.Count(item => item.Effect == EquipmentEffect.EchoChalice);
             return new BattleEnergy(capacity, capacity);
         }
     }
@@ -232,6 +235,7 @@ namespace RaidPartyManager.Domain
         public bool CanDropInBattle { get; }
         public string RewardBossId { get; }
         public bool BossExclusive => !string.IsNullOrEmpty(RewardBossId);
+        public bool AvailableInRegularPool => !BossExclusive && Effect != EquipmentEffect.CoinDevourer;
         public bool IsPotion => Effect is EquipmentEffect.VigorPotion or EquipmentEffect.SwiftPotion or
             EquipmentEffect.ResolvePotion or EquipmentEffect.GreedPotion or EquipmentEffect.ThornsPotion or
             EquipmentEffect.PurityPotion;
@@ -261,7 +265,7 @@ namespace RaidPartyManager.Domain
         LightningWhip, ToxicMist, FleshFeast, Sidestep, GoldenBell, FieryEyes, CrimsonReap,
         HeroicAnthem, Intimidate, Earthquake, CloudPiercer,
         HookArrow, TwinCover, FieldMedic, ColdTide, BronzeMirror, NightWatch, SiegeBolt, Intercept, BackPay, ThunderVerdict,
-        BlockadeSalvo, DeepwaterSurge, BurialEdict, LongNightPrayer
+        BlockadeSalvo, DeepwaterSurge, BurialEdict, LongNightPrayer, ExpressClearance, MeridianTransit, AnnealingOrder
     }
 
     public sealed class SkillBookDefinition : EquipmentDefinition
@@ -272,7 +276,7 @@ namespace RaidPartyManager.Domain
 
         public SkillBookDefinition(string id, string name, string description, SkillRequirement requirement, int cost, int tier,
             SkillEffect skillEffect = SkillEffect.None, string rewardBossId = null)
-            : base(id, name, default, description, tier: tier, price: 0, rewardBossId: rewardBossId)
+            : base(id, name, default, description, tier: tier, price: !string.IsNullOrEmpty(rewardBossId) ? 100 : tier switch { 0 => 50, 1 => 35, 2 => 25, _ => 15 }, rewardBossId: rewardBossId)
         {
             if (cost < 1 || cost > Rules.MaximumEnergy)
                 throw new ArgumentOutOfRangeException(nameof(cost));
@@ -326,7 +330,7 @@ namespace RaidPartyManager.Domain
             Equipment = Array.AsReadOnly(equipment?.ToArray() ?? Array.Empty<EquipmentDefinition>());
             EquipmentSlots = Array.AsReadOnly(equipmentSlots?.ToArray() ?? Array.Empty<string>());
             LearnedSkills = Array.AsReadOnly(learnedSkills?.Where(skill => skill != null).ToArray() ?? Array.Empty<SkillBookDefinition>());
-            if (EquipmentSlots.Count != 0 && (EquipmentSlots.Count != Rules.EquipmentSlots + (talent == PlayerTrait.Warehouse ? 1 : 0) ||
+            if (EquipmentSlots.Count != 0 && (!Rules.ValidEquipmentSlots(EquipmentSlots.Count, talent) ||
                 EquipmentSlots.Count(slot => slot != null) != Equipment.Count))
                 throw new ArgumentException("Combat equipment slots must match the supplied equipped instances.", nameof(equipmentSlots));
             StartingStatuses = new System.Collections.ObjectModel.ReadOnlyDictionary<StatusKind, int>(
@@ -345,13 +349,14 @@ namespace RaidPartyManager.Domain
         public int PartyGold { get; }
         public int RecruitLimit { get; }
         public bool HardFight { get; }
+        public bool CapitalField { get; }
 
         public string PallbearerId { get; }
         public int GraveBell { get; }
 
         public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit,
             IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null,
-            int partyGold = 0, int recruitLimit = Rules.Positions, bool hardFight = false, string pallbearerId = null, int graveBell = 0)
+            int partyGold = 0, int recruitLimit = Rules.Positions, bool hardFight = false, string pallbearerId = null, int graveBell = 0, bool capitalField = false)
         {
             if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0 || partyGold < 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
@@ -370,6 +375,7 @@ namespace RaidPartyManager.Domain
             RecruitLimit = recruitLimit;
             PallbearerId = pallbearerId;
             GraveBell = graveBell;
+            CapitalField = capitalField;
             HardFight = hardFight || units.Any(u => u.Side == Side.Enemy && u.Character.Rank is EnemyRank.Elite or EnemyRank.Boss);
             RecruitmentPool = Array.AsReadOnly(recruitmentPool?.ToArray() ?? Array.Empty<CharacterDefinition>());
             CharacterCatalog = new System.Collections.ObjectModel.ReadOnlyDictionary<string, CharacterDefinition>(
@@ -384,14 +390,16 @@ namespace RaidPartyManager.Domain
         public IReadOnlyDictionary<string, IReadOnlyList<string>> Slots { get; }
         public IReadOnlyList<string> Consumed { get; }
         public IReadOnlyList<string> Stolen { get; }
+        public IReadOnlyList<string> Disabled { get; }
 
         public BattleLoadout(IEnumerable<KeyValuePair<string, IReadOnlyList<string>>> slots, IEnumerable<string> consumed,
-            IEnumerable<string> stolen = null)
+            IEnumerable<string> stolen = null, IEnumerable<string> disabled = null)
         {
             Slots = new System.Collections.ObjectModel.ReadOnlyDictionary<string, IReadOnlyList<string>>(
                 slots.ToDictionary(entry => entry.Key, entry => (IReadOnlyList<string>)Array.AsReadOnly(entry.Value.ToArray())));
             Consumed = Array.AsReadOnly(consumed.ToArray());
             Stolen = Array.AsReadOnly(stolen?.ToArray() ?? Array.Empty<string>());
+            Disabled = Array.AsReadOnly(disabled?.ToArray() ?? Array.Empty<string>());
         }
     }
 
@@ -424,6 +432,7 @@ namespace RaidPartyManager.Domain
         private readonly DamageBreakdown damageTaken;
         public IReadOnlyList<(DamageType Type, int Amount)> DamageTaken => damageTaken.Parts;
         public bool PoisonDamage { get; }
+        public bool CharmTriggered { get; }
         public int ShieldAbsorbed { get; }
         public BattleCountdown? Countdown { get; }
 
@@ -435,7 +444,8 @@ namespace RaidPartyManager.Domain
             IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified,
             BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
             BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
-            bool poisonDamage = false, BattleCountdown? countdown = null, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null)
+            bool poisonDamage = false, BattleCountdown? countdown = null, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null,
+            bool charmTriggered = false)
         {
             Tick = tick;
             Kind = kind;
@@ -462,6 +472,7 @@ namespace RaidPartyManager.Domain
             this.damageTaken = new DamageBreakdown(damageTaken);
             PoisonDamage = poisonDamage;
             ShieldAbsorbed = shieldAbsorbed;
+            CharmTriggered = charmTriggered;
             Countdown = countdown;
             CopiedTraitSource = copiedTraitSource;
         }

@@ -41,6 +41,7 @@ namespace RaidPartyManager.Run
     {
         public bool Initialized;
         public bool LastBattleAttended;
+        public int LastStartingPosition;
         public long LastBattleBlocked, LastBattleContribution;
         public string RecordedEpitaph;
         public EmployeeGoal Inscription;
@@ -99,7 +100,7 @@ namespace RaidPartyManager.Run
                 int remaining = contract.EndDay - Day;
                 if (remaining <= 3) Add(EmployeeThought.Renewal, remaining);
                 int expected = ExpectedWage(member);
-                if (contract.DailyWage < expected) Add(EmployeeThought.LowPay, contract.DailyWage, expected);
+                if (Underpaid(member, expected)) Add(EmployeeThought.LowPay, contract.DailyWage, expected);
             }
             int urgent = thoughts.Count;
             Recall(career.LatestMemory);
@@ -110,7 +111,7 @@ namespace RaidPartyManager.Run
             if (career.QuietBattles >= 2) Add(EmployeeThought.SelfDoubt);
             var rival = FindCurrentRival(member);
             if (rival != null && career.RivalIncidents >= 2) Add(EmployeeThought.Rivalry, rival.Character.Name);
-            if (career.Development.Kind == EmployeeGoalKind.Equipment) Add(EmployeeThought.Equipment, career.Development.SubjectName);
+            if (career.Development.Kind == EmployeeGoalKind.Equipment) Add(EmployeeThought.Equipment, career.Development.SubjectName, career.Development.Target - career.Development.Progress);
             if (career.Development.Kind == EmployeeGoalKind.Training) Add(EmployeeThought.Training, career.Development.SubjectName);
             if (career.GoalsCompleted > 0 && member.Attributes.Satisfaction >= 4) Add(EmployeeThought.Appreciation);
             if (thoughts.Count == 0) Add(career.Appearances == 0 ? EmployeeThought.Debut : EmployeeThought.Steady);
@@ -148,17 +149,24 @@ namespace RaidPartyManager.Run
 
         public int ExpectedDailyWage(string memberId) => FindMember(memberId) is { } member ? ExpectedWage(member) : 0;
 
+        private static bool Underpaid(Member member, int expected)
+        {
+            var contract = member.Contract;
+            if (member.Attributes.Loyalty < 4 && member.Attributes.Obedience < 4)
+                return contract.DailyWage < expected;
+            return contract.DailyWage < CrewContract.MinimumWage(expected, contract.AgreedRates, member.Attributes);
+        }
+
         private static int ExpectedWage(Member member)
         {
-            int basis = CrewContract.ExpectedWage(member.Character, member.Trait, member.LearnedSkills);
+            int basis = CrewContract.ExpectedWage(member.Character, member.Trait, member.LearnedSkills, member.Training.Sessions);
             var career = member.Career;
             double work = career.Damage + (double)career.DamageTaken + career.Blocked * .5 +
                 career.Healed * 1.5 + career.Kills * 5.0;
-            var ratings = member.Attributes;
-            // More established employees earn a premium. Pay preference increases the slope, loyalty softens it.
-            double leverage = .50 + .16 * ratings.PayPreference + .07 * (5 - ratings.Loyalty);
-            double premium = Math.Min(1.5, Math.Floor(work / 30) * .16 * leverage);
-            return basis + (int)Math.Round(basis * premium, MidpointRounding.AwayFromZero);
+            double ceiling = .20 + .03 * member.Attributes.PayPreference;
+            double premium = ceiling * work / (work + 100.0);
+            int increase = (int)Math.Round(basis * premium, MidpointRounding.AwayFromZero);
+            return basis + Math.Min(basis * 35 / 100, increase);
         }
 
         private Member FindCurrentRival(Member member)
@@ -170,6 +178,7 @@ namespace RaidPartyManager.Run
         private void SettleEmployeeBattle(BattleResult result, HashSet<string> participants)
         {
             var employees = members.Where(member => participants.Contains(member.Id)).ToDictionary(member => member.Id);
+            var starters = activeBattle.Combatants.Where(unit => unit.Side == Side.Party).ToDictionary(unit => unit.Id);
             var enemies = activeBattle.Combatants.Where(unit => unit.Side == Side.Enemy).Select(unit => unit.Id).ToHashSet();
             foreach (var member in members) { member.Career.LastBattleBlocked = 0; member.Career.LastBattleAttended = participants.Contains(member.Id); }
             var lastAttacker = new Dictionary<string, Member>();
@@ -243,6 +252,11 @@ namespace RaidPartyManager.Run
                 {
                     member.Career.LastBattleContribution = contributions[member.Id];
                     member.Career.Appearances++;
+                    if (starters.TryGetValue(member.Id, out var starter)) member.Career.LastStartingPosition = starter.Position;
+                    var wish = member.Career.Development;
+                    if (wish.Kind == EmployeeGoalKind.Equipment && starter != null &&
+                        starter.Equipment.Any(item => item.Id == wish.SubjectId))
+                        member.Career.Development.Progress++;
                     member.Career.MissedBattles = 0;
                     member.Career.QuietBattles = contributions[member.Id] < 4 ? member.Career.QuietBattles + 1 : 0;
                     if (result.Outcome == BattleOutcome.Victory)
@@ -271,6 +285,14 @@ namespace RaidPartyManager.Run
             FinishGoal(member, ref career.Inscription);
             FinishGoal(member, ref career.Work);
             FinishGoal(member, ref career.Development);
+            if (career.Raise.Kind == EmployeeGoalKind.Raise && member.Contract != null)
+            {
+                int expected = ExpectedWage(member);
+                if (member.Contract.DailyWage < career.Raise.Target && !Underpaid(member, expected))
+                    career.Raise = default;
+                else if (career.Raise.Target > expected)
+                    career.Raise = Goal(EmployeeGoalKind.Raise, expected);
+            }
             FinishGoal(member, ref career.Raise);
             FinishGoal(member, ref career.Renewal);
             FinishGoal(member, ref career.Relationship);
@@ -280,7 +302,7 @@ namespace RaidPartyManager.Run
                     career.Renewal = Goal(EmployeeGoalKind.Renewal, Day + 10);
                 int expected = ExpectedWage(member);
                 if (career.Raise.Kind == EmployeeGoalKind.None && career.ServiceDays >= 2 &&
-                    contract.DailyWage < expected && expected > career.HighestWage)
+                    Underpaid(member, expected) && expected > career.HighestWage)
                     career.Raise = Goal(EmployeeGoalKind.Raise, expected);
                 career.HighestWage = Math.Max(career.HighestWage, contract.DailyWage);
             }
@@ -349,7 +371,7 @@ namespace RaidPartyManager.Run
                     .OrderByDescending(gear => EquipmentInterest(member.Character.Profession, gear.Bonus))
                     .FirstOrDefault();
                 if (item != null)
-                    return Goal(EmployeeGoalKind.Equipment, 1, subjectId: item.Id, subjectName: item.Name);
+                    return Goal(EmployeeGoalKind.Equipment, employeeRandom.Next(1, 4), subjectId: item.Id, subjectName: item.Name);
             }
             return Goal(EmployeeGoalKind.Tenure, 5, member.Career.ServiceDays);
         }
@@ -377,7 +399,7 @@ namespace RaidPartyManager.Run
                 EmployeeGoalKind.Kills => career.Kills - goal.Baseline,
                 EmployeeGoalKind.Victories => career.Victories - goal.Baseline,
                 EmployeeGoalKind.Tenure => career.ServiceDays - goal.Baseline,
-                EmployeeGoalKind.Equipment => EquipmentOf(member).Any(item => item.Id == goal.SubjectId) ? 1 : 0,
+                EmployeeGoalKind.Equipment => goal.Progress,
                 EmployeeGoalKind.Training => member.LearnedSkills.Any(skill => skill?.Id == goal.SubjectId) ? 1 : 0,
                 EmployeeGoalKind.Raise => member.Contract?.DailyWage ?? 0,
                 EmployeeGoalKind.Renewal => member.Contract?.EndDay ?? 0,

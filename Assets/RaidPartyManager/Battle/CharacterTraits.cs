@@ -7,7 +7,6 @@ namespace RaidPartyManager.Battle
 {
     public sealed partial class BattleSession
     {
-        private static readonly StatusKind[] BlessingStatuses = { Vigor, Swift, Resolve, Undying, Ember, Thorns };
         private static readonly ActionDefinition HealAllyAction = new ActionDefinition(
             "trait-heal", "治疗", ActionKind.Heal, TargetRule.WoundedAlly, 0, healingScalesWithAttack: true);
 
@@ -21,7 +20,7 @@ namespace RaidPartyManager.Battle
                 var source = available[random.Next(available.Length)];
                 unit.CopiedTrait = source.Trait;
                 unit.CopiedTraitPower = source.TraitPower;
-                Report(BattleEventKind.Effect, unit, unit, "复制特性", ActionKind.Shield, detail: source.Name, copiedTraitSource: source);
+                Report(BattleEventKind.Effect, unit, unit, "复制被动", ActionKind.Shield, detail: source.Name, copiedTraitSource: source);
             }
 
             foreach (var unit in units.Where(unit => unit.Health > 0 && unit.Trait == EvolveAlly).ToArray())
@@ -53,12 +52,6 @@ namespace RaidPartyManager.Battle
                         foreach (var enemy in Opponents(unit))
                             GrantStatus(unit, enemy, Poison, unit.TraitPower,
                                 "幽雾炼药", BattleVisualCue.RoundStartPoison, BattleEventKind.Effect);
-                        break;
-                    case BlessAlly:
-                        var allies = living.Where(ally => ally != unit && ally.Input.Side == unit.Input.Side).ToArray();
-                        if (allies.Length > 0)
-                            GrantStatus(unit, allies[random.Next(allies.Length)], BlessingStatuses[random.Next(BlessingStatuses.Length)], 1,
-                                "颂歌祝福", BattleVisualCue.RoundStartBlessing, BattleEventKind.Effect);
                         break;
                     case BorrowAllyAttack:
                         var behind = living.FirstOrDefault(ally => ally.Input.Side == unit.Input.Side &&

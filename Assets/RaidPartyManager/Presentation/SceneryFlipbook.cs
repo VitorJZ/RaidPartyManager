@@ -5,8 +5,9 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class SceneryFlipbook
     {
-        internal const int FrameCount = 6;
+        internal const int FrameCount = AnimationCels.Count;
         private readonly Texture2D[] frames = new Texture2D[FrameCount];
+        private readonly double seconds = 1.5;
         private static readonly int MainTex = Shader.PropertyToID("_MainTex");
 
         internal SceneryFlipbook(Texture2D source)
@@ -16,7 +17,13 @@ namespace RaidPartyManager.Presentation
                 frames[i] = Resources.Load<Texture2D>($"SceneryCels/{format}/{i}/{source.name}") ?? source;
         }
 
-        internal Texture2D Current => frames[(int)(Time.unscaledTimeAsDouble * 4) % FrameCount];
+        internal SceneryFlipbook(Texture2D[] cels, float seconds)
+        {
+            frames = cels;
+            this.seconds = seconds;
+        }
+
+        internal Texture2D Current => frames[AnimationCels.Loop(Time.unscaledTimeAsDouble, seconds)];
 
         internal void Apply(MeshRenderer renderer, MaterialPropertyBlock block)
         {
@@ -41,7 +48,7 @@ namespace RaidPartyManager.Presentation
                 else element.style.backgroundImage = new StyleBackground(cel);
             }
             Draw();
-            return element.schedule.Execute(Draw).Every(100);
+            return element.schedule.Execute(Draw).Every(40);
         }
     }
 }

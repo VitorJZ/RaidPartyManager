@@ -74,7 +74,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void EachLivingUnitActsOnceAndOneRoundBreakSwapChangesTheRearTarget()
+        public void EachLivingUnitActsOnceAndTheRearTargetKeepsItsSlot()
         {
             var enemy = Unit("enemy", Side.Enemy, 1, basic: Attack("rear", TargetRule.RearEnemy), attack: 1);
             var guard = Unit("guard", Side.Party, 1, interval: 2, attack: 1);
@@ -82,21 +82,15 @@ namespace RaidPartyManager.Tests
             var down = Unit("down", Side.Party, 4, hp: 0);
             var session = new BattleSimulator().Start(new BattleRequest("rounds", new[] { enemy, guard, archer, down }, 12));
 
-            Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
             var first = session.AdvanceRound().Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
             Assert.That(first.Select(entry => entry.ActorId), Is.EquivalentTo(new[] { "enemy", "guard", "archer" }));
             Assert.That(first.Single(entry => entry.ActorId == "enemy").TargetId, Is.EqualTo("archer"));
-            Assert.That(session.TrySwapPartyPositions(1, 2), Is.False);
-            Assert.That(session.TrySwapPartyPositions(1, 4), Is.False);
-            Assert.That(session.TrySwapPartyPositions(1, 3), Is.True);
-            Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
 
             var second = session.AdvanceRound().Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
             Assert.That(second.Select(entry => entry.ActorId), Is.EquivalentTo(new[] { "enemy", "guard", "archer" }));
-            Assert.That(second.Single(entry => entry.ActorId == "enemy").TargetId, Is.EqualTo("guard"));
+            Assert.That(second.Single(entry => entry.ActorId == "enemy").TargetId, Is.EqualTo("archer"));
             session.AdvanceRound();
-            Assert.That(session.Result.PartyPositionsById["guard"], Is.EqualTo(3));
-            Assert.That(session.TrySwapPartyPositions(1, 3), Is.False);
+            Assert.That(session.Result.PartyPositionsById["guard"], Is.EqualTo(1));
         }
 
         [Test]
@@ -173,6 +167,23 @@ namespace RaidPartyManager.Tests
             var result = new BattleSimulator(new FixedOptionPolicy(1)).Simulate(request);
             Assert.That(FirstAction(result, actor.Id).TargetId, Is.EqualTo(rear.Id));
             Assert.Throws<System.InvalidOperationException>(() => new BattleSimulator(new FixedOptionPolicy(9)).Simulate(request));
+        }
+
+        [Test]
+        public void ChaliceAddsToTheCapacityEarnedForExpensiveSkills()
+        {
+            var baseUnit = Unit("party", Side.Party, 1, maxHealth: 100);
+            var enemy = Unit("enemy", Side.Enemy, 1, maxHealth: 200, attack: 1);
+            var book = new SkillBookDefinition("warcry", "战争咆哮", "", SkillRequirement.None, 4, 2, SkillEffect.WarCry);
+            var cup = new EquipmentDefinition("cup", "余响圣杯", default, effect: EquipmentEffect.EchoChalice);
+            var hero = new Combatant(baseUnit.Id, baseUnit.Character, baseUnit.Side, 1, baseUnit.Stats, baseUnit.Health,
+                new[] { cup }, learnedSkills: new[] { book });
+            var battle = new BattleSimulator().Start(new BattleRequest("capacity", new[] { hero, enemy }, 6));
+            for (int round = 1; round <= 4; round++)
+            {
+                battle.AdvanceRound();
+                Assert.That(battle.ReadPartyEnergy().Single().Value.Capacity, Is.EqualTo(System.Math.Min(6, round + 3)));
+            }
         }
 
         [TestCase(false, 2)]

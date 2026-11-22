@@ -61,7 +61,7 @@ namespace RaidPartyManager.Presentation
             var pose = FramingFor(character.RosterNumber);
             float bodyHeight = CompanySpriteSize * pose.sideSpan;
             float frontHeight = front == null ? CompanySpriteSize : bodyHeight / pose.frontSpan;
-            float frontWidth = front == null ? frontHeight : frontHeight * (front.width / 3f) / (front.height / 2f);
+            float frontWidth = front == null ? frontHeight : frontHeight * front.width / front.height;
             var actor = new RecruitActor
             {
                 Body = Flat("Recruit front " + character.Id, mark, frontWidth, frontHeight, front),
@@ -120,11 +120,11 @@ namespace RaidPartyManager.Presentation
             {
                 bool front = !walking && actor.Front != null;
                 bool synthesizedWalk = walking && actor.Walk == null;
-                int frame = walking ? (int)(actor.Elapsed * 13f) % 6 : front ? (int)(Time.unscaledTime * 5 + seed) % 6 : 0;
+                int frame = walking ? AnimationCels.Loop(actor.Elapsed, 6f / 13f) : front ? AnimationCels.Loop(Time.unscaledTime + seed / 5f, 1.2) : 0;
                 int cel = synthesizedWalk ? 0 : frame;
-                int columns = front || walking && actor.Walk != null ? 3 : 8;
-                int rows = columns == 3 ? 2 : 4;
-                float phase = frame * 2 * Mathf.PI / 6;
+                int columns = front || walking && actor.Walk != null ? 4 : AnimationCels.Count;
+                const int rows = 4;
+                float phase = frame * 2 * Mathf.PI / AnimationCels.Count;
                 actor.Body.GetPropertyBlock(properties);
                 properties.SetTexture("_MainTex", texture);
                 properties.SetVector("_MainTex_ST", new Vector4((walking ? -1f : 1f) / columns, 1f / rows,

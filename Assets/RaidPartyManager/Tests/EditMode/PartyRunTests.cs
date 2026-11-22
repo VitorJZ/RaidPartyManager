@@ -48,6 +48,34 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void GearWishCountsOnlyBattlesStartedByItsOwnerWhileWearingTheRequestedItem()
+        {
+            var party = MakeRun();
+            var armor = party.Inventory.Single();
+            EmployeeGoal Wish() => party.EmployeeProfileFor("a").Goals.Single(g => g.Kind == EmployeeGoalKind.Equipment);
+            int wanted = Wish().Target;
+            Assert.That(wanted, Is.InRange(1, 3));
+            void Fight()
+            {
+                var battle = party.BeginBattle(Enemies(), 20, null);
+                var done = Result(battle.Id, BattleOutcome.Victory, 10, 10, 0);
+                Assert.That(party.TryFinishBattle(done, out _), Is.True);
+                Assert.That(party.TryFinishBattle(done, out _), Is.False);
+            }
+            Assert.That(party.TryEquip("b", 0, armor.Id), Is.True);
+            Fight();
+            Assert.That(Wish().Progress, Is.Zero);
+            Assert.That(party.TryEquip("a", 0, armor.Id), Is.True);
+            for (int i = 0; i < wanted; i++)
+            {
+                Assert.That(Wish().Progress, Is.EqualTo(i));
+                Fight();
+            }
+            Assert.That(party.EmployeeProfileFor("a").Career.EquipmentWishFulfilled, Is.True);
+            Assert.That(party.Members[0].EmployeeAttributes.Satisfaction, Is.EqualTo(4));
+        }
+
+        [Test]
         public void EmployeeDossierAccumulatesActualContributionsAndCompletesGoalsOnce()
         {
             var run = MakeRun();
@@ -56,10 +84,9 @@ namespace RaidPartyManager.Tests
                 Is.EquivalentTo(new[] { EmployeeGoalKind.Appearances, EmployeeGoalKind.Equipment }));
             var armor = run.Inventory.Single();
             Assert.That(run.TryEquip("a", 0, armor.Id), Is.True);
-            Assert.That(run.Members[0].EmployeeAttributes.Satisfaction, Is.EqualTo(4));
-            Assert.That(run.EmployeeProfileFor("a").Career.LastCompleted.Kind, Is.EqualTo(EmployeeGoalKind.Equipment));
+            Assert.That(run.Members[0].EmployeeAttributes.Satisfaction, Is.EqualTo(3));
             Assert.That(run.TryEquip("a", 0, armor.Id), Is.True);
-            Assert.That(run.EmployeeProfileFor("a").Career.GoalsCompleted, Is.EqualTo(1));
+            Assert.That(run.EmployeeProfileFor("a").Career.GoalsCompleted, Is.Zero);
 
             for (int i = 0; i < 2; i++)
             {
@@ -84,8 +111,7 @@ namespace RaidPartyManager.Tests
             Assert.That(profile.Career.Healed, Is.EqualTo(4));
             Assert.That(profile.Career.Appearances, Is.EqualTo(2));
             Assert.That(run.EmployeeProfileFor("b").Career.Kills, Is.EqualTo(2));
-            Assert.That(profile.Career.LastCompleted.Kind, Is.EqualTo(EmployeeGoalKind.Appearances));
-            Assert.That(profile.Career.GoalsCompleted, Is.EqualTo(2));
+            Assert.That(profile.Career.WorkGoalsCompleted, Is.EqualTo(1));
             Assert.That(profile.Goals.Any(goal => goal.Kind == EmployeeGoalKind.SeparateLineups && goal.SubjectId == "b"), Is.True);
             Assert.That(profile.Thoughts.Any(thought => thought.Contains("分开上阵")), Is.True);
 
@@ -176,21 +202,20 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void RoundBreakSwapPersistsIntoTheNextBattle()
+        public void CombatPreservesTheDeploymentForTheNextBattle()
         {
             var run = MakeRun();
             var simulator = new BattleSimulator();
             var session = simulator.Start(run.BeginBattle(Enemies(), 10, Loot));
             session.AdvanceRound();
-            Assert.That(session.TrySwapPartyPositions(1, 2), Is.True);
             session.AdvanceRound();
 
             Assert.That(session.Result.Outcome, Is.EqualTo(BattleOutcome.Victory));
             Assert.That(run.TrySettle(session.Result, out _), Is.True);
-            Assert.That(run.Members.Select(member => member.Position), Is.EqualTo(new[] { 2, 1 }));
+            Assert.That(run.Members.Select(member => member.Position), Is.EqualTo(new[] { 1, 2 }));
 
             var next = run.BeginBattle(Enemies(), 10, Loot);
-            Assert.That(next.Combatants.Single(unit => unit.Id == "b").Position, Is.EqualTo(1));
+            Assert.That(next.Combatants.Single(unit => unit.Id == "b").Position, Is.EqualTo(2));
         }
 
         [Test]

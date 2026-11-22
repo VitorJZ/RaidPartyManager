@@ -32,5 +32,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/TalentMarket.unity
     guid: d26926908ea3497daefb6dec2a0ebc2c
+  - enabled: 1
+    path: Assets/Scenes/ClockworkCapital.unity
+    guid: 3ad4d1aa80be5ac3bb4f87ebcabd3946
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}

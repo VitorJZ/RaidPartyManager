@@ -33,7 +33,7 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.ApplySystemFont(root, out font, out fontAsset);
             run = AdventureFlow.TalentMarketRun(assets);
             var candidates = run.Current.Recruits.Where(c => run.Party.Members.All(m => m.Character.Id != c.Id)).ToArray();
-            stage = new TalentMarketStage(transform, root, stageArt, candidates, assets.Encounter, run.InGraveyard);
+            stage = new TalentMarketStage(transform, root, stageArt, candidates, assets.Encounter, run.InGraveyard, run.InCapital);
             returnRequested = false;
             root.style.backgroundColor = Color.clear;
             marketTargets = new (Button Entry, Label Price)[candidates.Length];
@@ -89,7 +89,7 @@ namespace RaidPartyManager.Presentation
             title.style.backgroundColor = PrototypeStyle.PanelColor;
             title.style.paddingLeft = title.style.paddingRight = 10;
             header.Add(title);
-            header.Add(PrototypeStyle.Button("返回城镇", "close-town-recruit", Leave));
+
             var empty = PrototypeStyle.Text(NoCandidates, 15, PrototypeStyle.Accent);
             empty.style.display = candidates.Count == 0 ? DisplayStyle.Flex : DisplayStyle.None;
             empty.style.position = Position.Absolute;
@@ -111,11 +111,16 @@ namespace RaidPartyManager.Presentation
                 int index = i;
                 var c = candidates[i];
                 var trait = run.Party.TalentFor(c);
+                var training = run.Party.TownCandidateTraining(c);
+                var stats = c.BaseStats + training.Bonus;
                 int signingPrice = run.Party.SigningPrice(c);
-                int expectedWage = CrewContract.ExpectedWage(c, trait);
+                int expectedWage = CrewContract.ExpectedWage(c, trait, trainingSessions: training.Sessions);
+                var ratings = EmployeeAttributes.Starting;
+                string trainingInfo = training.Sessions > 0
+                    ? $"已训练 {training.Sessions}/{CampTraining.Limit} 次 · {training.Describe()}\n" : "";
                 string info = $"{c.Name}　{AdventureFlow.ProfessionName(c.Profession)}　{c.Stage} 阶　" +
-                    $"攻击 {c.BaseStats.Attack}　防御 {c.BaseStats.Defense}　特防 {c.BaseStats.SpecialDefense}　生命 {c.BaseStats.Health}\n" +
-                    $"期望日薪 {expectedWage} 金币\n" + c.TraitText + "　" + PlayerMarket.Describe(trait) + "\n性格 · " + EmployeeVoice.For(c.Personality).Name;
+                    $"攻击 {stats.Attack}　防御 {stats.Defense}　特防 {stats.SpecialDefense}　生命 {stats.Health}\n" + trainingInfo +
+                    $"期望日薪 {expectedWage} 金币\n" + (string.IsNullOrEmpty(c.TraitText) ? "" : "被动 · " + c.TraitText + "\n") + PlayerMarket.Describe(trait) + "\n性格 · " + EmployeeVoice.For(c.Personality).Name;
                 var entry = PrototypeStyle.Button("", "town-recruit-" + c.Id, () => {
                     if (run.Party.Members.Count >= PartyRun.RosterLimit)
                     {
@@ -124,10 +129,10 @@ namespace RaidPartyManager.Presentation
                     }
                     HideProfile();
                     VisualElement contract = null;
-                    contract = ContractPanel.Negotiate(c, run.Party.Day, trait, signingPrice, null, expectedWage,
-                        (days, terms, clause, wage) =>
+                    contract = ContractPanel.Negotiate(c, run.Party.Day, trait, signingPrice, null, expectedWage, ratings,
+                        (days, terms, fee) =>
                         {
-                            if (!run.ChooseTownRecruit(c.Id, days, terms, clause, wage)) return false;
+                            if (!run.ChooseTownRecruit(c.Id, days, terms, fee)) return false;
                             GameAudio.Play(SoundCue.CompanionJoin);
 
                             stage.BeginDeparture(index, Time.unscaledTime);
@@ -197,6 +202,7 @@ namespace RaidPartyManager.Presentation
             brokerBubble.Add(tail);
             UpdateBrokerBubble();
             panel.Add(brokerBubble);
+            AdventureFlow.AddTownReturnSign(panel, stageArt.graveyardStone, "close-town-recruit", Leave, () => dialogue == null);
             panel.Add(header);
             panel.Add(empty);
             panel.Add(profile);

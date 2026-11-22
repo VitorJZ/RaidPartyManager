@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyFlueSweep
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyFlueSweep
+  displayName: "烟囱清扫机"
+  portrait: {fileID: 2800000, guid: a39b751c81555b23898c1119be7ea225, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 420bfa316c945c08b06e00d59f11aa2d, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: e35a1f67f8b65f51a5e1c7e09b50770f, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: be0e225a28c3562d88f6044e6be57dab, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: fe91b0fea6c3513ab2dd22e4459acece, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 3d1f4e89ad98563aa6dc0cbaac943315, type: 3}
+  usePortraitInBattle: 0
+  profession: 3
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "长刷击（66%） / 扬灰蔽目（34%）"
+  personality: 1
+  attack: 6
+  defense: 2
+  specialDefense: 4
+  health: 31
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "长刷击"
+      weight: 66
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "扬灰蔽目"
+      weight: 34
+      kind: 1
+      target: 7
+      power: 0
+      damageType: 0
+      status: 9
+      layers: 2
+      requiresCharge: 0
+      delayDecay: 1
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

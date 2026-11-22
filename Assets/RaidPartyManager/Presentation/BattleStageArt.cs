@@ -8,11 +8,12 @@ namespace RaidPartyManager.Presentation
         [Serializable]
         public sealed class Set
         {
+            [NonSerialized] internal BossRoomArt room;
             public Texture2D region;
             public Texture2D backcloth;
             public Texture2D floor;
             public Texture2D upstage;
-            public bool moored;
+            public bool moored, clockwork;
             public bool turntable;
             public Texture2D leftWing;
             public Texture2D rightWing;

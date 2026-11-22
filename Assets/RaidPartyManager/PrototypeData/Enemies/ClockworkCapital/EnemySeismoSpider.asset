@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemySeismoSpider
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemySeismoSpider
+  displayName: "描震蛛"
+  portrait: {fileID: 2800000, guid: 332d79c2285f52849d1541fdc2c69e5b, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: f6bd5d4f2380561ca929cba4db508b59, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 8afe9f4367a1577c8ba2c05893256885, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 83531d207e475f0d9d6f7a33ab04d007, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 4918b476d1795d0aaf49c83dfb66b4d6, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 11d52385e90b5df5990cd1f2a01b5aca, type: 3}
+  usePortraitInBattle: 0
+  profession: 2
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "探针（63%） / 余震笔迹（37%）"
+  personality: 1
+  attack: 7
+  defense: 3
+  specialDefense: 2
+  health: 29
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "探针"
+      weight: 63
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "余震笔迹"
+      weight: 37
+      kind: 0
+      target: 9
+      power: -2
+      damageType: 0
+      status: 8
+      layers: 1
+      requiresCharge: 1
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

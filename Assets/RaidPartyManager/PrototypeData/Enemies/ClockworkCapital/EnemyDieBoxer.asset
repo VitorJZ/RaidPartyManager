@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyDieBoxer
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyDieBoxer
+  displayName: "冲床拳师"
+  portrait: {fileID: 2800000, guid: fdeb02b38d65505c9fa6c9219b2027e8, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: e9300a473cb35b64930d30562b044ecb, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 5ace823c62235c65bbcc91b481684e0b, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 09369efd022154d28b93fc35661ee7e6, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 8bc674444a1f520c951e534c472f22d5, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: f6265f47c5165238af1b564483dbc78c, type: 3}
+  usePortraitInBattle: 0
+  profession: 0
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "落模拳（63%） / 双模冲压（37%）"
+  personality: 1
+  attack: 8
+  defense: 4
+  specialDefense: 1
+  health: 32
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "落模拳"
+      weight: 63
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "双模冲压"
+      weight: 37
+      kind: 0
+      target: 7
+      power: 4
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 1
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

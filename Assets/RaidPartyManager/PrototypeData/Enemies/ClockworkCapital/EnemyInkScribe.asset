@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyInkScribe
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyInkScribe
+  displayName: "复写吏"
+  portrait: {fileID: 2800000, guid: 634e42e91fdb5b729f825efc3b7f46d9, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 68a206c3cf2a54b78ed6a70f11b66325, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 2f324ff47af857e386df46247248c9b5, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: a3faa72e6b195955a03430ed8b82175a, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: ddc70fc9ee1c53128d017c8cbfe5bfcd, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: fcc5786ec80a5209a60d45f30e1e77bc, type: 3}
+  usePortraitInBattle: 0
+  profession: 1
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "墨针（66%） / 复写毒墨（34%）"
+  personality: 1
+  attack: 7
+  defense: 2
+  specialDefense: 4
+  health: 29
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 1
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "墨针"
+      weight: 66
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 1
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "复写毒墨"
+      weight: 34
+      kind: 0
+      target: 8
+      power: 0
+      damageType: 1
+      status: 7
+      layers: 2
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

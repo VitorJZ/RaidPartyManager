@@ -43,23 +43,9 @@ namespace RaidPartyManager.Run
             return true;
         }
 
-        internal static EmployeeAttributes Roll(Random random, int minimum = 1) => new EmployeeAttributes
+        public static EmployeeAttributes Starting => new EmployeeAttributes
         {
-            Loyalty = random.Next(minimum, 6),
-            Obedience = random.Next(minimum, 6),
-            PayPreference = random.Next(minimum, 6),
-            PlayingTime = random.Next(minimum, 6),
-            Satisfaction = 3,
-            Hardiness = random.Next(minimum, 6)
+            Loyalty = 3, Obedience = 3, PayPreference = 3, PlayingTime = 3, Satisfaction = 3, Hardiness = 3
         };
-
-        internal static EmployeeAttributes ForLegacySave(string characterId)
-        {
-            // Match the original character-based profile when no ratings were saved.
-            uint seed = 2166136261;
-            foreach (char letter in characterId)
-                seed = unchecked((seed ^ letter) * 16777619);
-            return Roll(new Random(unchecked((int)seed)));
-        }
     }
 }

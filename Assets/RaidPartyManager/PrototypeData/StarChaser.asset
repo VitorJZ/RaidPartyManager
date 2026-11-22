@@ -17,6 +17,7 @@ MonoBehaviour:
   portrait: {fileID: 2800000, guid: caa1e01debab4a4da73d33e976d61b92, type: 3}
   campSeatedSprite: {fileID: 2800000, guid: 1ab3dcc1c1c1429faede0300b50994df, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 5a1f84f5729f4435a1e78c5bfb3f1c55, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 54179d6feb225d8186aae7867cb0d439, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: bc8d8a274ca0406c9660801fab5653db, type: 3}
   profession: 2
   rosterNumber: 12
@@ -24,7 +25,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 4
   traitPower: 0
-  traitText: "场上每有1个其他友方射手，额外攻击1次"
+  traitText: "每有1名存活的其他友方射手，额外攻击1次。连射途中也按当前存活人数结算。"
   personality: 4
   attack: 6
   defense: 1

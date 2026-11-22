@@ -11,6 +11,8 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class AdventureEventWindow : VisualElement
     {
+        private static bool StagedStory(AdventureEventKind? kind) => GraveStories.Contains(kind) || CapitalStories.Contains(kind);
+
         internal static readonly Color PaperInk = new Color32(48, 30, 19, 255);
         internal static readonly Color PaperAccent = new Color32(109, 52, 24, 255);
         internal static readonly Color PaperMuted = new Color32(92, 65, 42, 255);
@@ -29,7 +31,6 @@ namespace RaidPartyManager.Presentation
         private bool choosingChestCompanion;
         private readonly TreasureChestView treasureChest;
         private bool awaitingSigns, leftTable, leaving;
-        private readonly Texture2D timber;
 
         internal AdventureEventWindow(AdventureRun run, AdventureContentAsset art, Texture2D timber, DockEventStage stage, Action close, RunTopBar topBar, Action refreshCast, Action startEncounter)
         {
@@ -37,7 +38,7 @@ namespace RaidPartyManager.Presentation
             this.topBar = topBar;
             this.refreshCast = refreshCast;
             this.startEncounter = startEncounter;
-            this.stage = stage; this.timber = timber;
+            this.stage = stage;
             name = "event-window";
             PrototypeStyle.Fill(this);
             style.overflow = Overflow.Hidden;
@@ -187,7 +188,7 @@ namespace RaidPartyManager.Presentation
                 var available = run.ForgeInputs.Select(item => item.Id).ToHashSet();
                 forge.RemoveAll(id => !available.Contains(id));
             }
-            if (GraveStories.Contains(visit.Event) || visit.PendingRecruit != null || visit.Event is AdventureEventKind.Forge or AdventureEventKind.LockedChest or
+            if (StagedStory(visit.Event) || visit.PendingRecruit != null || visit.Event is AdventureEventKind.Forge or AdventureEventKind.LockedChest or
                 AdventureEventKind.Ambush or AdventureEventKind.AscensionTrial or AdventureEventKind.LostTraveler)
                 RenderChoices();
         }
@@ -205,7 +206,7 @@ namespace RaidPartyManager.Presentation
                 !GraveStories.Contains(visit.Event) && visit.Event != AdventureEventKind.LockedChest && visit.PendingRecruit == null)
                 choices.Choice("向对方告辞", "decline-event", Decline);
             choices.Arrange();
-            if ((!run.IsInspection || visit.Event.HasValue && !GraveStories.Contains(visit.Event)) && visit.Resolved && !awaitingSigns)
+            if ((!run.IsInspection || visit.Event.HasValue && !StagedStory(visit.Event)) && visit.Resolved && !awaitingSigns)
             {
                 awaitingSigns = true;
                 topBar.WhenRewardsArrive(() => schedule.Execute(() =>
@@ -213,7 +214,7 @@ namespace RaidPartyManager.Presentation
                     if (stage.GraveCueFinished && enabledInHierarchy && !leaving && run.Current == visit && (visit.Event is not (AdventureEventKind.HatTrick or AdventureEventKind.Alchemist) || leftTable || stage.RevealFinished))
                     {
                         if (run.IsInspection) Leave();
-                        else AdventureFlow.AddFollowingSigns(this, timber, topBar);
+                        else AdventureFlow.AddFollowingSigns(this, stage.RouteStone, topBar);
                     }
                 }).Every(25).Until(() => leaving || run.Current != visit || this.Q<DockRouteSigns>() != null));
             }
@@ -224,6 +225,19 @@ namespace RaidPartyManager.Presentation
             refreshCast();
             topBar.Refresh();
             var visit = run.Current;
+            var speech = this.Q<TellerSpeech>()?.Q<Label>("event-description");
+            if (speech != null && visit.Event is { } topic)
+                speech.text = topic switch
+                {
+                    _ when visit.Resolved => visit.Message,
+                    _ when StagedStory(topic) && !string.IsNullOrEmpty(visit.Message) => visit.Message,
+                    _ when visit.PendingRecruit != null => "队伍满了。拉下哪位老队员的牌子，他就会离队，把位置让给新人。",
+                    AdventureEventKind.LockedChest when choosingChestCompanion => "选一位留下开锁的队员。要是还想带他赶路，拉下「返回」就能重选。",
+                    AdventureEventKind.Forge when run.ForgeInputs.Count < 2 => "这炉要用两件旧装备。您背包里的闲置装备还没凑够，可以整理装备，也可以拉下告辞牌离开。",
+                    AdventureEventKind.Investor when run.InvestmentPaid => "两件装备已经交给你们了。船也出港了，咱们继续赶路吧。",
+                    AdventureEventKind.Investor when !visit.InvestorAvailable => "船主今天已经收好账本，这一趟不能再投钱了。",
+                    _ => AdventureFlow.Narrative(topic)
+                };
             if (exit != null)
             {
                 exit.name = visit.Resolved ? "finish-event" : "close-event";
@@ -241,7 +255,7 @@ namespace RaidPartyManager.Presentation
             }
             if (visit.Resolved)
             {
-                if (hatGame == null) choices.Note(PaperText(visit.Message, 17, PaperAccent));
+                if (speech == null && hatGame == null) choices.Note(PaperText(visit.Message, 17, PaperAccent));
                 return;
             }
             if (visit.Battle?.Settled == true)
@@ -254,14 +268,19 @@ namespace RaidPartyManager.Presentation
                 AdventureWidgets.RecruitReplacement(choices, run, content, RenderChoices);
                 return;
             }
-            if (!string.IsNullOrEmpty(visit.Message)) choices.Note(PaperText(visit.Message, 14, PaperAccent));
-            if (GraveStories.Contains(visit.Event))
+            if (!StagedStory(visit.Event) && !string.IsNullOrEmpty(visit.Message))
+                choices.Note(PaperText(visit.Message, 14, PaperAccent));
+            if (StagedStory(visit.Event))
             {
-                foreach (var option in run.GraveChoices())
+                bool city = CapitalStories.Contains(visit.Event);
+                var offers = city
+                    ? CapitalStories.For(visit.Event.Value).Choices.Select((c, i) => (key: i.ToString(), text: c.Label, ready: run.CanTakeCapitalChoice(c)))
+                    : run.GraveChoices().Select(o => (key: o.key, text: o.text, ready: true));
+                foreach (var option in offers)
                 {
-                    choices.Choice(option.text, "grave-" + option.key, () =>
+                    choices.Choice(option.text, (city ? "capital-" : "grave-") + option.key, () =>
                     {
-                        if (!run.ChooseGrave(option.key)) return;
+                        if (!(city ? run.ChooseCapital(int.Parse(option.key)) : run.ChooseGrave(option.key))) return;
                         stage.CueGraveAction();
                         choices.Reset(false);
                         choices.SetEnabled(false);
@@ -271,7 +290,7 @@ namespace RaidPartyManager.Presentation
                             choices.SetEnabled(true);
                             RenderChoices();
                         }).Every(25).Until(() => leaving || run.Current != visit || choices.enabledSelf);
-                    });
+                    }, option.ready);
                 }
                 return;
             }
@@ -279,14 +298,9 @@ namespace RaidPartyManager.Presentation
             {
                 case AdventureEventKind.Investor:
                     if (run.InvestmentPaid || !visit.InvestorAvailable)
-                    {
-                        choices.Note(PaperText(run.InvestmentPaid
-                            ? "泊位空了。缆桩上系着一张短笺，写着「多谢」。"
-                            : "创业者合上账本，夹起图纸。“今天就到这儿吧，改日再聊。”", 16));
                         break;
-                    }
                     if (run.Investment > 0)
-                        choices.Note(PaperText("她翻开账本，你认出了自己上回留下的签名。", 16));
+                        choices.Note(PaperText($"账本还在。此前已投入 {run.Investment}／50 金币。", 16));
                     var amount = new IntegerField("出资金额") { name = "investment-amount", value = Math.Min(run.Party.Gold, 1) };
                     amount.style.marginTop = amount.style.marginBottom = 15;
                     amount.labelElement.style.color = PaperInk;
@@ -294,32 +308,34 @@ namespace RaidPartyManager.Presentation
                     amount.labelElement.style.width = 110;
                     choices.Note(amount);
                     choices.Note(PaperText($"可投入 1～{run.Party.Gold} 金币", 13, PaperMuted));
-                    AdventureWidgets.Action(choices, "出一份力", "event-invest",
+                    AdventureWidgets.Action(choices, "投入填写的金额", "event-invest",
                         () => Collect("event-invest", () => run.Donate(amount.value)), run.Party.Gold > 0);
-                    AdventureWidgets.Action(choices, "把金币全留给她", "event-invest-all",
+                    AdventureWidgets.Action(choices, "投入全部金币", "event-invest-all",
                         () => Collect("event-invest-all", () => run.Donate(run.Party.Gold)), run.Party.Gold > 0);
                     break;
                 case AdventureEventKind.FoundCoins:
                     AdventureWidgets.Action(choices, "拾起钱袋", "event-collect-coins", () => Collect("event-collect-coins", run.CollectCoins));
                     break;
                 case AdventureEventKind.LostTraveler:
-                    choices.Note(PaperText("你打算怎么搭话？", 18, PaperAccent));
                     foreach (var recruit in visit.Recruits)
                     {
                         var profession = recruit.Profession;
-                        var option = AdventureWidgets.Action(choices, $"“你是{AdventureFlow.ProfessionName(profession)}？”",
+                        AdventureWidgets.Action(choices, $"邀请{AdventureFlow.ProfessionName(profession)}同行",
                             "event-profession-" + profession, () => { if (run.ChooseProfession(profession) && run.Current.PendingRecruit == null) GameAudio.Play(SoundCue.CompanionJoin); RenderChoices(); },
                             !run.Party.Members.Any(member => member.Character.Id == recruit.Id));
-                        CharacterChoicePreview.Attach(option, recruit, content.PortraitFor(recruit.Id));
                     }
-                    if (visit.Professions.Count == 0) choices.Note(PaperText("旅行者问清了路，笑着向你们道别。", 15));
+                    if (visit.Professions.Count == 0) choices.Note(PaperText("这次没有可以邀请的旅人，可以继续赶路。", 15));
                     break;
                 case AdventureEventKind.Forge:
                     choices.Note(PaperText($"挑两件背包里的旧物  {forge.Count}／2", 17, PaperAccent));
-                    AdventureWidgets.Action(choices, "把旧物交给铁匠", "event-forge-confirm",
+                    AdventureWidgets.Action(choices, "确认消耗两件装备", "event-forge-confirm",
                         () => Collect("event-forge-confirm", () =>
                         {
-                            if (!run.Forge(forge[0], forge[1])) return false;
+                            if (!run.Forge(forge[0], forge[1]))
+                            {
+                                RenderChoices();
+                                return false;
+                            }
                             GameAudio.Play(SoundCue.ForgeComplete);
                             return true;
                         }), forge.Count == 2);
@@ -352,13 +368,13 @@ namespace RaidPartyManager.Presentation
                     break;
                 }
                 case AdventureEventKind.AscensionTrial:
-                    AdventureWidgets.Action(choices, "收下台阶上的包裹", "event-trial-gift",
+                    AdventureWidgets.Action(choices, "拿包裹离开", "event-trial-gift",
                         () => Collect("event-trial-gift", run.TakeTrialGift));
-                    AdventureWidgets.Action(choices, "跨过门槛，接受挑战", "event-trial-battle", StartBattle,
+                    AdventureWidgets.Action(choices, "挑战精英，争取升阶", "event-trial-battle", StartBattle,
                         run.Party.CanStartBattle && run.EvolutionCandidates.Count > 0);
                     break;
                 case AdventureEventKind.Ambush:
-                    AdventureWidgets.Action(choices, "拔出武器，迎上去", "event-ambush-battle", StartBattle, run.Party.CanStartBattle);
+                    AdventureWidgets.Action(choices, "迎战伏兵", "event-ambush-battle", StartBattle, run.Party.CanStartBattle);
                     break;
                 case AdventureEventKind.Alchemist:
                     ShowPotionBottles(visit);

@@ -9,11 +9,18 @@ namespace RaidPartyManager.Presentation
         private const float SkillArtworkScale = 0.61f;
         private static Texture2D skillBookScroll;
 
-        public EquipmentIcon(EquipmentDefinition item, Texture2D artwork = null, bool showScroll = true)
+        public EquipmentIcon(EquipmentDefinition item, Texture2D artwork = null, bool showScroll = true, bool disabled = false)
         {
             name = "equipment-icon";
             pickingMode = PickingMode.Ignore;
             style.flexGrow = 1;
+            if (disabled)
+            {
+                var grayscale = new FilterFunction(FilterFunctionType.Grayscale);
+                grayscale.AddParameter(new FilterParameter(1f));
+                style.filter = new System.Collections.Generic.List<FilterFunction> { grayscale };
+                style.opacity = .72f;
+            }
             if (artwork == null)
                 generateVisualContent += context => Paint(context.painter2D, contentRect, item);
             else

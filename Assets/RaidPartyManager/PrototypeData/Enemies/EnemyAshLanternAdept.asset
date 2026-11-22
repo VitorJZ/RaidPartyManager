@@ -16,6 +16,7 @@ MonoBehaviour:
   displayName: "灰灯术徒"
   portrait: {fileID: 2800000, guid: 3eca7bad609b49f6afc8352a27fc497d, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 83ace5df988b42fb9671c2360e9a7203, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 8af5195aec10542eb0d10b264a289e20, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 55b3053dcb6e4937885acdd5e1ee2035, type: 3}
   profession: 1
   enemyRank: 1

@@ -2,6 +2,10 @@ Shader "RaidPartyManager/Dock Playhouse"
 {
     Properties
     {
+        [HideInInspector] _StageKey ("Front bar colour and position", Vector) = (0,0,0,-4.4)
+        [HideInInspector] _StageBack ("Back bar colour and focus", Vector) = (1,1,1,-.6)
+        [HideInInspector] _StageMist ("Mist colour and density", Vector) = (0,0,0,0)
+        [HideInInspector] _MistHeight ("Low mist height", Float) = 1
         _Grain ("Timber grain", 2D) = "gray" {}
         _HouseLight ("House lights", Range(0,1)) = 1
         _Cloth ("Curtain", Float) = 0
@@ -23,10 +27,11 @@ Shader "RaidPartyManager/Dock Playhouse"
             #pragma vertex vert
             #pragma fragment frag
             #include "UnityCG.cginc"
+            #include "../Stagecraft/StageLighting.cginc"
             sampler2D _Grain;
             float _Cloth, _Travel, _HouseLight;
             struct In { float4 p:POSITION; float3 n:NORMAL; float4 c:COLOR; float2 uv:TEXCOORD0; };
-            struct Out { float4 p:SV_POSITION; float3 n:TEXCOORD0; float2 uv:TEXCOORD1; float4 c:COLOR; float3 local:TEXCOORD2; };
+            struct Out { float4 p:SV_POSITION; float3 n:TEXCOORD0; float2 uv:TEXCOORD1; float4 c:COLOR; float3 local:TEXCOORD2; float3 world:TEXCOORD3; };
             Out vert(In v)
             {
                 Out o;
@@ -37,6 +42,7 @@ Shader "RaidPartyManager/Dock Playhouse"
                 }
                 o.p=UnityObjectToClipPos(v.p);
                 o.local=v.p.xyz;
+                o.world=mul(unity_ObjectToWorld,v.p).xyz;
                 o.n=UnityObjectToWorldNormal(v.n); o.uv=v.uv; o.c=v.c;
                 return o;
             }
@@ -84,6 +90,8 @@ Shader "RaidPartyManager/Dock Playhouse"
                 #ifndef UNITY_COLORSPACE_GAMMA
                     ink=GammaToLinearSpace(ink);
                 #endif
+                if (_StageKey.x > 0)
+                    ink = StageAir(StageExposure(ink,i.world,normalize(i.n),false,0), i.world);
                 return half4(ink,1);
             }
             ENDCG

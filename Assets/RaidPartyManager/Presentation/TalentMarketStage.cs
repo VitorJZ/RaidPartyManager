@@ -39,9 +39,10 @@ namespace RaidPartyManager.Presentation
         internal bool HasDepartures => Array.Exists(departures, departure => departure != null);
 
         internal TalentMarketStage(Transform owner, VisualElement panel, ServiceStageArt art,
-            IReadOnlyList<CharacterDefinition> candidates, EncounterData content, bool graveyard) : base(owner, panel, art)
+            IReadOnlyList<CharacterDefinition> candidates, EncounterData content, bool graveyard, bool capital = false) : base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Interior) : StageLighting.For(graveyard, StageVenue.Interior))
         {
-            if (graveyard)
+            if (capital) DressCapital(2);
+            else if (graveyard)
             {
                 HangBackdrop("Cemetery vestry", art.vestryHall);
                 GraveyardFloor();
@@ -51,9 +52,9 @@ namespace RaidPartyManager.Presentation
                 HangBackdrop("Hiring guild hall", art.marketHall, horizontalRepeats: 2f, verticalOffset: .13f);
                 Deck(art.guildParquet, new Vector2(2.3f, 2.3f), new Color(.66f, .64f, .60f));
             }
-            FloorProp(graveyard ? "Vestry vestments" : "Guild trophies", graveyard ? art.vestmentStand : art.guildTrophies,
+            if (!capital) FloorProp(graveyard ? "Vestry vestments" : "Guild trophies", graveyard ? art.vestmentStand : art.guildTrophies,
                 -4.85f, .36f, 2.1f, -8);
-            FloorProp(graveyard ? "Parish records" : "Porters' baggage", graveyard ? art.recordPigeonholes : art.porterDolly,
+            if (!capital) FloorProp(graveyard ? "Parish records" : "Porters' baggage", graveyard ? art.recordPigeonholes : art.porterDolly,
                 4.96f, .64f, graveyard ? 1.85f : 1.48f, 7);
             FloorProp("Registry desk", art.registryDesk, -3.75f, -1.3f, 3.25f, -7);
             FloorProp("Contract board", art.contractBoard, 3.75f, -.9f, 1.9f, 7);
@@ -76,7 +77,7 @@ namespace RaidPartyManager.Presentation
                 var texture = front ?? content.PortraitFor(c.Id);
                 var pose = ShopStage.FramingFor(c.RosterNumber);
                 float height = front == null ? StandingHeight : StandingHeight / pose.frontBodySpan;
-                float width = height * texture.width / texture.height * (front == null ? 1f : 2f / 3f);
+                float width = height * texture.width / texture.height;
                 var foot = new Vector3((i - (candidates.Count - 1) * .5f) * Spacing, .01f, Depth);
                 float lift = height * (.5f - (front == null ? 0 : pose.frontInset));
                 var actor = Flat("Market performer " + i, foot + Vector3.up * lift, width, height, texture);
@@ -95,14 +96,11 @@ namespace RaidPartyManager.Presentation
 
         internal void Animate(float time)
         {
-            int frame = Mathf.FloorToInt(time * 5) % 6;
+            int frame = AnimationCels.Loop(time, 1.2);
             if (frame != lastFrame)
             {
-                // The six painted cels are centred on the boots, so the performer stays planted.
-                broker.GetPropertyBlock(properties);
-                properties.SetVector("_MainTex_ST", new Vector4(410f/1536f, .5f,
-                    (165f + (frame % 3) * 415f)/1536f, frame < 3 ? .5f : 0));
-                broker.SetPropertyBlock(properties);
+                // The painted cels are centred on the boots, so the performer stays planted.
+                PoseBroker(broker, frame);
             }
             for (int i = 0; i < actors.Length; i++)
             {
@@ -112,9 +110,9 @@ namespace RaidPartyManager.Presentation
                     continue;
                 }
                 if (frame == lastFrame || !animated[i] || !actors[i].enabled) continue;
-                int cel = (frame + i) % 6;
+                int cel = (frame + 2*i) % AnimationCels.Count;
                 actors[i].GetPropertyBlock(properties);
-                properties.SetVector("_MainTex_ST", new Vector4(1f / 3, .5f, cel % 3 / 3f, cel < 3 ? .5f : 0));
+                properties.SetVector("_MainTex_ST", AnimationCels.UV(cel));
                 actors[i].SetPropertyBlock(properties);
             }
             lastFrame = frame;
@@ -151,13 +149,13 @@ namespace RaidPartyManager.Presentation
             var walk = departure.Player.Walk ?? departure.Player.Idle;
             if (walk != null)
             {
-                int cel = Mathf.FloorToInt(walking * 13f) % 6;
+                int cel = AnimationCels.Loop(walking, 6f / 13f);
                 if (cel != departure.WalkCel)
                 {
                     if (departure.WalkCel < 0)
                     {
                         float height = departure.Player.WalkHeight;
-                        float ratio = synthesized ? walk.width / (2f * walk.height) : walk.width * 2f / (walk.height * 3f);
+                        float ratio = (float)walk.width / walk.height * (synthesized ? 4f / AnimationCels.Count : 1f);
                         actor.transform.localScale = new Vector3(height * ratio, height, 1);
                         if (synthesized)
                             actor.GetComponent<MeshFilter>().sharedMesh = walkMesh ??= ShopStage.MakeRecruitWalkMesh();
@@ -165,12 +163,12 @@ namespace RaidPartyManager.Presentation
                     departure.WalkCel = cel;
                     actor.GetPropertyBlock(properties);
                     properties.SetTexture("_MainTex", walk);
-                    // The six travel cels face right on the sheet.
-                    properties.SetVector("_MainTex_ST", synthesized ? new Vector4(-.125f, .25f, .125f, .75f) :
-                        new Vector4(-1f / 3, .5f, (cel % 3 + 1) / 3f, cel < 3 ? .5f : 0));
+                    // The travel cels face right on the sheet.
+                    properties.SetVector("_MainTex_ST", synthesized ? AnimationCels.UV(0, AnimationCels.Count, 4, true) :
+                        AnimationCels.UV(cel, mirror: true));
                     if (synthesized)
                     {
-                        float phase = cel * (2f * Mathf.PI / 6f);
+                        float phase = cel * (2f * Mathf.PI / AnimationCels.Count);
                         properties.SetVector("_Walk", new Vector4(Mathf.Cos(phase), Mathf.Sin(phase), -1, strides[index]));
                     }
                     actor.SetPropertyBlock(properties);

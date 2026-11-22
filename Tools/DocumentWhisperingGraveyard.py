@@ -82,7 +82,7 @@ def actions_table(enemy: dict) -> str:
 def doc(enemies: list[dict]) -> str:
     lines = ["# 低语墓园", "", "2026-11-19 · 第 2 层区域 · 23 普通、5 精英、2 Boss", "",
              "设计依据是同步 Obsidian 的《区域图鉴》《敌人图鉴》《遭遇与难度》。原区域效果留空，本次继续留空。敌人生命、招式与视觉均为本次新增的初始配置。", "",
-             "## 试玩入口", "", "从主菜单选择「低语墓园」，或打开 `Assets/Scenes/WhisperingGraveyard.unity`。设置中的「敌方编辑」包含这 30 名敌人，可用来搭配普通、精英和 Boss 遭遇。角色编辑、装备背包、回合间换位、结算和重置沿用现有流程。", "",
+             "## 试玩入口", "", "通关码头后进入第二层低语墓园。在编辑器中可打开 `Assets/Scenes/WhisperingGraveyard.unity`。设置中的「敌方编辑」包含这 30 名敌人，可用来搭配普通、精英和 Boss 遭遇。角色编辑、装备背包、回合间换位、结算和重置沿用现有流程。", "",
              "墓园和码头使用独立的敌阵缓存与敌人池。每次随机开局从三套普通预设中抽取；在「设置 → 敌方编辑」可载入全部 10 套预设（3 普通、5 精英、2 首领），也可以继续手动换位、换怪。正式讨伐仍使用码头路线。预设名单见[敌阵预设](EnemyFormations.md)。", "",
              "## 规则与难度", "",
              "普通敌人攻击 4–6、生命 16–26。精英和 Boss 的加强数值见下方清单，以 JSON 配置源为准。精英占 2 格，Boss 占 3 格，随从加主单位总计最多 4 格。攻击修正先加到攻击，再经过现有防御、特防、闪避、状态与装备伤害链。", "",
@@ -101,14 +101,14 @@ def doc(enemies: list[dict]) -> str:
     lines += ["## 数据与美术制作", "",
               "`Docs/WhisperingGraveyard.json` 是本批配置源。`EnemyBehaviorDefinition` 只包含纯数据，`EnemyBehaviorSpec` 从 Unity 资源转换，`ConfiguredEnemyActions` 负责随机、目标、蓄力和伤害结算。`CharacterDefinition` 新增可选的行为配置，已有敌人继续使用原行为。枚举新值只追加。", "",
               "内置 ImageGen 为每个敌人独立生成透明 8×6 原图，参考现有敌人像素绘制。原图每行 8 帧，依次为待机、移动、普攻、特技、受击、倒下。`Sources/` 保留生成结果，提示词见 `WhisperingGraveyardArtPrompts.json`。", "",
-              "`python Tools/BuildWhisperingGraveyard.py` 将原图按格拆分并装配到现有图集格式。没有重新描画角色。运行时使用待机 8、移动 6、普攻 8、特技 8、受击 4、倒下 8 帧。攻击和特技在第 5 帧生效。特效环与状态反馈由代码绘制，回放时钟与暂停、倍速共用。美术资源、定义和 .meta 一并保留，GUID 可重复生成。", "",
+              "`python Tools/BuildWhisperingGraveyard.py` 将原画按格拆分并补间。待机、移动、普攻、特技、受击、倒下及命中特效均为 16 帧。攻击与特技按原有动作时间生效，首领使用专属彩绘特效，回放时钟与暂停、倍速共用。美术资源、定义和 .meta 一并保留，GUID 可重复生成。", "",
               "## 修改与交接", "",
               "数值与行动先修改 JSON，再运行 `python Tools/BuildWhisperingGraveyard.py --data-only` 更新 Unity 定义。美术替换保留同一 ID 的原图文件名，运行完整装配命令并检查 GIF。行为扩展先调整 Domain 契约和 Content 转换，再实现 Battle 结算，最后更新相关测试。", "",
               "已依据用户提供的本地图鉴完成合并，完整文件见 [Bestiary-WithGraveyard.xlsx](Bestiary-WithGraveyard.xlsx)。保留原 8 个工作表，在敌人图鉴末尾追加 30 名敌人、62 项行动与 30 张立绘，现共 53 名敌人。新增第三行为、所属区域、占格与立绘列。原有 23 名敌人及其他工作表的内容、公式和格式保留。此操作更新本地副本，未回写在线共享原表。", "",
               "`WhisperingGraveyard.xlsx` 保留为独立增补快照，另含固定阵容试算。直接修改 Excel 不会自动回写 JSON 或 Unity。完整图鉴合并使用 `Tools/MergeGraveyardWorkbook.mjs`，由 artifact-tool 写入新内容，再由 `Tools/PreserveGraveyardWorkbook.py` 恢复原有未改动的原生文件部件，复读验证后交付。", "",
               "`python Tools/DocumentWhisperingGraveyard.py --sync-obsidian` 更新本页、同步库内的墓园说明及成品素材；新增目录为 `敌人图鉴/低语墓园` 和 `Unity资源/Enemies/WhisperingGraveyard`。", "",
               "## 验证", "",
-              "Edit Mode 的 `GraveyardTests` 检查数量、占格、素材导入、每个招式、无目标回退、死亡过滤、蓄力换位、群攻、Boss 半血阶段、开场护盾和固定种子一致性。`GraveyardPlaybackTests` 验证主菜单入口、区域切换、背景和实际动作图集播放。", "",
+              "Edit Mode 的 `GraveyardTests` 检查数量、占格、素材导入、每个招式、无目标回退、死亡过滤、蓄力换位、群攻、Boss 半血阶段、开场护盾和固定种子一致性。`GraveyardPlaybackTests` 验证主菜单选项、区域切换、背景和实际动作图集播放。", "",
               "`RecordReproducibleDifficultySamples` 对 11 组遭遇分别运行 100 个固定种子，用一阶未配装和二阶八件装备两套队伍，共 2200 场。测试直接读取 Unity 敌阵预设；己方站位和配装见该测试。输出 `Logs/Graveyard/Balance.csv`，本次归档见下表和 `WhisperingGraveyardBalance.csv`。测试结果仅用于比较这两套固定配置；战斗规则变更后需要重新跑样。", ""]
     results = []
     for mode in ("EditMode", "PlayMode"):

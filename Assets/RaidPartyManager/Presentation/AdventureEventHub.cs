@@ -143,14 +143,14 @@ namespace RaidPartyManager.Presentation
             if (!string.IsNullOrEmpty(run.ReturnMessage))
                 screen.Add(PrototypeStyle.Text(run.ReturnMessage, 17, PrototypeStyle.Accent));
 
-            var hint = PrototypeStyle.Text("任选一幕试演。墓园事件结算后可阅读结果，拉动出口牌返回。", 13, PrototypeStyle.Muted);
+            var hint = PrototypeStyle.Text("任选一幕试演。墓园和遗都事件结算后可阅读结果，拉动出口牌返回。", 13, PrototypeStyle.Muted);
             hint.style.marginTop = hint.style.marginBottom = 10; screen.Add(hint);
             var scroll = new ScrollView { name = "event-catalog" }; scroll.style.flexGrow = 1; scroll.style.minHeight = 0;
             var grid = PrototypeStyle.Row(); grid.style.flexWrap = Wrap.Wrap; scroll.Add(grid); screen.Add(scroll);
             foreach (AdventureEventKind kind in Enum.GetValues(typeof(AdventureEventKind)))
             {
                 var captured = kind;
-                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, GraveStories.Contains(kind) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
+                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, (GraveStories.Contains(kind) || CapitalStories.Contains(kind)) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
                 { if (run.Inspect(NodeKind.Event, captured)) PresentVisit(); }, kind == AdventureEventKind.FoundCoins);
             }
             foreach (var kind in new[] { NodeKind.Town, NodeKind.Camp, NodeKind.NormalBattle, NodeKind.EliteBattle, NodeKind.Boss, NodeKind.TreasureChest })
@@ -166,22 +166,22 @@ namespace RaidPartyManager.Presentation
         private void RenderRoute()
         {
             if (run.Current != null) return;
-            if (stage != null && stage.Cemetery != run.InGraveyard)
+            if (stage != null && (stage.Cemetery != run.InGraveyard || stage.Capital != run.InCapital))
             {
                 stage.Dispose();
                 stage = null;
             }
-            stage ??= new DockEventStage(transform, root, stageArt, false, graveyard: run.InGraveyard);
-            if (run.Stage == 1 && (run.InGraveyard || !DockPlayhouse.HoldingSet))
+            stage ??= new DockEventStage(transform, root, stageArt, false, graveyard: run.InGraveyard, capital: run.InCapital, cityDistrict: Mathf.Clamp((run.Stage - 1) / 3, 0, 2));
+            if (run.Stage == 1 && (run.InGraveyard || run.InCapital || !DockPlayhouse.HoldingSet))
                 stage.ShowCompany(run.Party, assets.Encounter);
             HideBackdrop();
             root.style.backgroundColor = Color.clear;
-            screen.Add(new StageSignMask(new DockRouteSigns(run, assets, stageArt.timber, stage.Anchor, EnterRoute, NextFloor)));
+            screen.Add(new StageSignMask(new DockRouteSigns(run, assets, stageArt.graveyardStone, EnterRoute, NextFloor)));
         }
 
         private void NextFloor()
         {
-            if (!run.Party.HasBorrowedName) { if (run.NextFloor()) Render(); return; }
+            if (!run.Party.HasBorrowedName) { AdvanceFloor(); return; }
             if (body.Q("grave-name-register") != null) return;
             var page = new VisualElement { name = "grave-name-register" };
             PrototypeStyle.Fill(page);
@@ -197,12 +197,19 @@ namespace RaidPartyManager.Presentation
                 page.Add(PrototypeStyle.Button(candidate, "reclaim-" + candidate, () =>
                 {
                     if (!run.Party.ReclaimName(candidate)) { prompt.text = "笔迹对不上。再仔细看一次。"; return; }
-                    if (run.NextFloor()) Render();
+                    AdvanceFloor();
                 }));
             body.Add(page);
         }
 
-        private bool EnterRoute(int index)
+        private void AdvanceFloor()
+        {
+            if (!run.NextFloor()) return;
+            if (run.IsInspection) Render();
+            else DockPlayhouse.ChangeSet(() => PrototypeSceneMenu.OpenScene("EventSelect"), turn: StageTurn.Forward);
+        }
+
+        private bool EnterRoute(int index, StageTurn turn)
         {
             if (!run.EnterRoute(index))
             {
@@ -217,7 +224,7 @@ namespace RaidPartyManager.Presentation
             }
             GameAudio.Play(SoundCue.UiMapMarker);
             var kind = run.Current.Kind;
-            AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(kind));
+            AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(kind), turn: turn);
             return true;
         }
 
@@ -253,7 +260,7 @@ namespace RaidPartyManager.Presentation
             var current = run.Current;
             if (current.Kind is NodeKind.Event or NodeKind.TreasureChest || current.Battle?.Settled == true)
             {
-                stage ??= new DockEventStage(transform, root, stageArt, current.Kind == NodeKind.TreasureChest, current.Event, run.InGraveyard && !current.Event.HasValue);
+                stage ??= new DockEventStage(transform, root, stageArt, current.Kind == NodeKind.TreasureChest, current.Event, run.InGraveyard && !current.Event.HasValue, run.InCapital, Mathf.Clamp((run.Stage - 1) / 3, 0, 2));
                 HideBackdrop();
                 root.style.backgroundColor = Color.clear;
                 screen.style.display = DisplayStyle.None;
@@ -268,7 +275,7 @@ namespace RaidPartyManager.Presentation
                 {
                     if (run.IsInspection)
                     {
-                        if (current.Event.HasValue && !GraveStories.Contains(current.Event)) run = AdventureFlow.Select(assets, true, true);
+                        if (current.Event.HasValue && !GraveStories.Contains(current.Event) && !CapitalStories.Contains(current.Event)) run = AdventureFlow.Select(assets, true, true);
                         Render();
                     }
                     else PrototypeSceneMenu.OpenScene("EventSelect");
@@ -334,14 +341,14 @@ namespace RaidPartyManager.Presentation
             button.style.height = 136; button.style.marginLeft = button.style.marginRight = 5;
             button.style.marginBottom = 9; button.style.paddingLeft = button.style.paddingRight = 7;
             var image = new Image { image = art, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
-            if (strip) image.sourceRect = new Rect(0,0,art.width/4,art.height);
+            if (strip) image.sourceRect = AnimationCels.RectFor(art, 0);
             image.style.height = 76; button.Add(image);
             var heading = PrototypeStyle.Text(title, 17, PrototypeStyle.Accent); PrototypeStyle.Middle(heading); button.Add(heading);
             var caption = PrototypeStyle.Text(description, 11, PrototypeStyle.Muted); PrototypeStyle.Middle(caption); button.Add(caption);
             parent.Add(button); return button;
         }
 
-        private static string Gate(AdventureEventKind kind) => GraveStories.Contains(kind) ? "低语墓园 · 随机事件" : kind switch
+        private static string Gate(AdventureEventKind kind) => CapitalStories.Contains(kind) ? "机巧遗都 · 随机事件" : GraveStories.Contains(kind) ? "低语墓园 · 随机事件" : kind switch
         {
             AdventureEventKind.Investor => "首层第 3 关之后 · 每层一次",
             AdventureEventKind.Ambush => "全局事件",

@@ -5,24 +5,35 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class TownStage : ServiceStage
     {
+        private const int ShopSlot = 1;
+        private const float SignY = 3.73f, SignWidth = 2.44f, SignHeight = .67f, SignDepth = .61f;
         private static readonly float[] Centres = { -4.98f, -1.66f, 1.66f, 4.98f };
         private static readonly float[] Depths = { .18f, .69f, .72f, .20f };
-        private static readonly int[] Poses = { 0, 0, 1, 2, 3, 3, 2, 1 };
         private static readonly float[] Tempo = { 2.5f, 3.6f, 2.1f, 3.1f };
         private readonly MeshRenderer[] cast = new MeshRenderer[4];
+        private const float PegY = SignY + SignHeight * .32f;
+        private readonly Transform[,] cords = new Transform[4, 2];
+        private readonly Transform flyBeam;
+        private float rigAspect;
         private readonly int[] frame = { -1, -1, -1, -1 };
 
-        public TownStage(Transform owner, VisualElement panel, ServiceStageArt art, bool graveyard) :
-            base(owner, panel, art)
+        public TownStage(Transform owner, VisualElement panel, ServiceStageArt art, bool graveyard, bool capital = false) :
+            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Outdoors) : StageLighting.For(graveyard, StageVenue.Outdoors))
         {
-            HangBackdrop(graveyard ? "Cemetery square" : "Distant harbour", graveyard ? art.mourningSquare : art.townSky);
-            if (graveyard) GraveyardFloor();
-            else Deck(art.cobbles, new Vector2(1.8f, .78f), new Color(.80f, .78f, .76f));
+            if (capital) DressCapital(0);
+            else
+            {
+                HangBackdrop(graveyard ? "Cemetery square" : "Distant harbour", graveyard ? art.mourningSquare : art.townSky);
+                if (graveyard) GraveyardFloor();
+                else Deck(art.cobbles, new Vector2(1.8f, .78f), new Color(.80f, .78f, .76f));
+            }
+            flyBeam = Fly(Box("Town sign fly beam", new Vector3(0, 0, -.25f), new Vector3(13, .24f, .84f),
+                art.timber, Color.white));
             for (int i = 0; i < 4; i++)
             {
                 int first = stage.childCount;
                 float x = Centres[i], z = Depths[i];
-                var image = (graveyard ? art.graveyardFacilities : art.facilities)[i];
+                var image = capital ? CapitalArt("Facility" + i) : (graveyard ? art.graveyardFacilities : art.facilities)[i];
                 float height = Mathf.Min(4.28f, 3.45f * image.height / image.width);
                 float width = height * image.width / image.height;
                 var centre = new Vector3(x, height / 2, z);
@@ -39,9 +50,11 @@ namespace RaidPartyManager.Presentation
                 Shadow(new Vector3(x, 0, z), width * 1.08f, 1.10f);
                 for (int j = first; j < stage.childCount; j++)
                     Dressing.Hinges[stage.GetChild(j).GetComponent<MeshRenderer>()] = new Vector2(x,z);
+                HangVenueSign(i, x, z);
                 var foot = new Vector3(x - .40f, 0, z - .82f);
-                float size = i == 1 ? 1.91f : 2.08f;
-                cast[i] = Flat("Resident " + i, foot + Vector3.up * (size / 2), size, size, art.residents[i]);
+                float size = i == ShopSlot ? 1.91f : 2.08f;
+                float castWidth = i == ShopSlot ? size * 410f / 512f : size;
+                cast[i] = Flat("Resident " + i, foot + Vector3.up * (size / 2), castWidth, size, art.residents[i]);
                 Dressing.Cast[cast[i]] = new DockSet.Player(true);
                 Shadow(foot, size * .65f, .50f);
             }
@@ -51,7 +64,7 @@ namespace RaidPartyManager.Presentation
                 FloorProp("Square bell stand", art.bellStand, 4.45f, -1.65f, 1.24f, 7);
                 FloorProp("Square lantern yew", art.lanternTree, 6.6f, -.65f, 1.55f, 7);
             }
-            else
+            else if (!capital)
             {
                 FloorProp("Quayside catch basket", art.creel, 3.12f, -6.45f, 1.19f, -12);
                 FloorProp("Dockside hand truck", art.porterDolly, -4.9f, -2.36f, 1.15f, -8);
@@ -62,19 +75,64 @@ namespace RaidPartyManager.Presentation
 
         public void Animate(float time)
         {
+            if (rigAspect != camera.aspect)
+            {
+                rigAspect = camera.aspect;
+                FitFlyBeam();
+            }
             for (int i = 0; i < cast.Length; i++)
             {
-                int next = Poses[(Mathf.FloorToInt(time * Tempo[i]) + i * 2) % Poses.Length];
+                int next = i == ShopSlot ? AnimationCels.Loop(time, 1.2) :
+                    AnimationCels.Loop(time + i * 2 / Tempo[i], 8f / Tempo[i]);
                 if (next == frame[i]) continue;
                 frame[i] = next;
-                SetFrame(cast[i], art.residents[i], 4, next);
+                if (i == ShopSlot) PoseBroker(cast[i], next);
+                else SetFrame(cast[i], art.residents[i], AnimationCels.Count, next);
+            }
+        }
+
+        private Transform Fly(MeshRenderer mesh)
+        {
+            Dressing.Flown.Add(mesh);
+            return mesh.transform;
+        }
+
+        private void HangVenueSign(int index, float x, float facadeZ)
+        {
+            float z = facadeZ - SignDepth;
+            var brass = new Color(.90f, .68f, .34f);
+            var cord = new Color(.60f, .44f, .25f);
+            Fly(Box("Hanging placard " + index, new Vector3(x, SignY, z),
+                new Vector3(SignWidth, SignHeight, .14f), art.timber, new Color(.55f, .39f, .26f)));
+            for (int side = 0; side < 2; side++)
+            {
+                float eye = x + (side == 0 ? -.35f : .35f) * SignWidth;
+                cords[index, side] = Fly(Box("Sign cord", new Vector3(eye, PegY, z - .084f),
+                    new Vector3(.034f, 1, .034f), art.timber, cord));
+                Fly(Shape("Sign stud", PrimitiveType.Sphere, new Vector3(eye, PegY, z - .095f),
+                    new Vector3(.075f, .075f, .048f), Texture2D.whiteTexture, brass, Surface.Solid));
+            }
+        }
+
+        private void FitFlyBeam()
+        {
+            var beam = flyBeam.GetComponent<MeshRenderer>().bounds;
+            float depth = camera.WorldToViewportPoint(beam.max).z;
+            float underside = camera.ViewportToWorldPoint(new Vector3(.5f, 1.08f, depth)).y;
+            flyBeam.position = new Vector3(beam.center.x, underside + beam.extents.y, beam.center.z);
+            foreach (var rope in cords)
+            {
+                var position = rope.position;
+                rope.position = new Vector3(position.x, (underside + PegY) / 2, position.z);
+                rope.localScale = new Vector3(.034f, underside - PegY, .034f);
             }
         }
 
         public void PlaceService(VisualElement button, int i)
         {
-            float x = Centres[i], z = Depths[i] - .50f;
-            Pin(button, new Vector3(x - 1.48f, 3.90f, z), new Vector3(x + 1.48f, -.95f, z));
+            float x = Centres[i], z = Depths[i] - SignDepth - .075f;
+            Pin(button, new Vector3(x - SignWidth / 2, SignY + SignHeight / 2, z),
+                new Vector3(x + SignWidth / 2, SignY - SignHeight / 2, z));
         }
     }
 }

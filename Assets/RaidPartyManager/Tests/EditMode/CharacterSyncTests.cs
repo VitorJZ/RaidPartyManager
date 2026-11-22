@@ -44,13 +44,12 @@ namespace RaidPartyManager.Tests
                 var sprite = scene.BattleSpriteFor(entry.Id);
                 var attack = scene.BattleAttackFor(entry.Id);
                 var walk = scene.BattleWalkFor(entry.Id);
-                Assert.That(sprite != null && sprite.width % 8 == 0 && sprite.height % 4 == 0, Is.True,
+                Assert.That(sprite != null && sprite.width % 16 == 0 && sprite.width / 16 == sprite.height / 4, Is.True,
                     $"Missing or invalid idle and hit atlas for {entry.Name}.");
-                Assert.That(attack != null && attack.width % 4 == 0 && attack.height % 2 == 0, Is.True,
+                Assert.That(attack != null && attack.width % 4 == 0 && attack.height % 4 == 0, Is.True,
                     $"Missing or invalid attack atlas for {entry.Name}.");
-                if (entry.Reach == AttackReach.Melee)
-                    Assert.That(walk != null && walk.width % 3 == 0 && walk.height % 2 == 0, Is.True,
-                        $"Missing or invalid six-frame walk atlas for {entry.Name}.");
+                Assert.That(walk != null && walk.width % 4 == 0 && walk.height == walk.width, Is.True,
+                    $"Missing or invalid sixteen-frame walk atlas for {entry.Name}.");
             }
         }
 

@@ -41,11 +41,11 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D portrait;
         [SerializeField] private bool usePortraitInBattle;
         [SerializeField] private Texture2D campSeatedSprite;
-        [Tooltip("Eight columns. Rows contain 8 idle, 8 action, 4 hit and 8 death poses.")]
+        [Tooltip("Sixteen columns per motion: idle, action, hit and death.")]
         [SerializeField] private Texture2D battleSpriteSheet;
-        [Tooltip("Optional full-width attack poses in four columns and two rows.")]
+        [Tooltip("Optional full-width attack poses in four columns and four rows.")]
         [SerializeField] private Texture2D battleAttackSheet;
-        [Tooltip("Six walking frames in three columns and two rows.")]
+        [Tooltip("Sixteen walking frames in four columns and four rows.")]
         [SerializeField] private Texture2D battleWalkSheet;
         [SerializeField] private Texture2D battleSpecialSheet;
         [SerializeField] private Texture2D battleSpecialEffect;

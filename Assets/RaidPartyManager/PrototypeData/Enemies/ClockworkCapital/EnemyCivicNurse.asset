@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyCivicNurse
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyCivicNurse
+  displayName: "白瓷值班护士"
+  portrait: {fileID: 2800000, guid: 15ba01d942125ce1af21d59835b10cf3, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 5102a398fdc250c2a7901dd4ed4a0edf, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: b869a929a8f057029872bbb30cc8081f, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 005355061e8157b99f3981778384e0fb, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 7228a1a708d25834bba09b645d7558ac, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 59459bae54c056879afb57e6b864e268, type: 3}
+  usePortraitInBattle: 0
+  profession: 3
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "消毒针（66%） / 无菌隔离罩（34%）"
+  personality: 1
+  attack: 6
+  defense: 3
+  specialDefense: 5
+  health: 29
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 1
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "消毒针"
+      weight: 66
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 1
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "无菌隔离罩"
+      weight: 34
+      kind: 3
+      target: 6
+      power: 9
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

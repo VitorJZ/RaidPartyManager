@@ -326,3 +326,33 @@ MonoBehaviour:
     tier: 0
     rewardBossId: EnemySepulchralMatron
     description: "清除所有存活友方的负面状态，再各恢复5点生命并获得5点护盾。"
+  - number: 35
+    displayName: 清轨通令
+    icon: {fileID: 2800000, guid: af6b1662df4e5893868631311efccac0, type: 3}
+    battleEffect: {fileID: 2800000, guid: 0f5a651a8b1d598cad2d43cab759cbb9, type: 3}
+    requirement: 5
+    cost: 2
+    skillEffect: 33
+    tier: 0
+    rewardBossId: EnemyRoyalEngine
+    description: 对最前两名敌人各造成（攻击力+4）点物理伤害，存活目标各获2层破绽。
+  - number: 36
+    displayName: 子午过境
+    icon: {fileID: 2800000, guid: 4c049954d2f45946af1d40c2801be14d, type: 3}
+    battleEffect: {fileID: 2800000, guid: abf64542292e5bd5abf0efc55dfb6eab, type: 3}
+    requirement: 1
+    cost: 3
+    skillEffect: 34
+    tier: 0
+    rewardBossId: EnemyAstralGovernor
+    description: 对所有敌人各造成（攻击力+2）点魔法伤害。
+  - number: 37
+    displayName: 全员退火
+    icon: {fileID: 2800000, guid: 85863f69cc5a5aceb06066af77ea5e39, type: 3}
+    battleEffect: {fileID: 2800000, guid: 1ffcb83bb2b35e639d9577eb0ace6bee, type: 3}
+    requirement: 2
+    cost: 2
+    skillEffect: 35
+    tier: 0
+    rewardBossId: EnemyCrucibleRegent
+    description: 为所有存活友方各恢复4点生命并给予6点护盾。

@@ -1,13 +1,6 @@
 // The suspended practical and its landing spot are in world space.
 // The uniform belongs to one stage material. The HUD is drawn by its own panel.
 float4 _MoonWorld, _MoonLanding;
-float _MoonSurface;
-#define MOON_SKY 1
-#define MOON_BOARDS 2
-#define MOON_PAPER 3
-#define MOON_HAZE 4
-#define MOON_SHADOW 5
-
 float2 MoonShadowOnDeck(float3 surfacePosition)
 {
     float travel = max(0, surfacePosition.y) / max(.1, _MoonWorld.y - surfacePosition.y);

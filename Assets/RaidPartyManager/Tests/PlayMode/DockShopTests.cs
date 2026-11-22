@@ -23,7 +23,47 @@ namespace RaidPartyManager.Tests
             .GetMethod("ResetPlaySession", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
 
         [UnityTest]
-        public IEnumerator MenuShopSupportsExpressionsCancellationPurchaseAndSharedInventory()
+        public IEnumerator SellingEquipmentAndBooksAtTheCounterPaysTheDisplayedPriceOnce()
+        {
+            yield return SceneManager.LoadSceneAsync("DockShop");
+            yield return null;
+            var shop = Object.FindAnyObjectByType<DockShop>();
+            var root = shop.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(DockShop).GetField("party", Private).GetValue(shop);
+            var content = (EncounterData)typeof(DockShop).GetField("content", Private).GetValue(shop);
+            var crown = party.AddEquipment(content.StartingEquipment.First(item => item.Effect == EquipmentEffect.FacelessCrown));
+            party.AddEquipment(crown.Definition);
+            var book = party.AddEquipment(content.SkillBooks.First(item => item.BossExclusive));
+            int count = party.BackpackItems.Count;
+            Press(root, "shop-counter");
+            yield return WaitForCounter(root);
+            Press(root, "shop-sell");
+            string crownId = crown.Definition.Id;
+            string bookId = book.Definition.Id;
+            Press(root, "sell-item-" + crownId);
+            Press(root, "sell-more-" + crownId);
+            Press(root, "sell-item-" + bookId);
+            var checkout = root.Q<Button>("shop-confirm-sale");
+            Assert.That(checkout.text, Does.Contain("3 件").And.Contain("300 金币"));
+            Press(root, "sell-less-" + crownId);
+            Press(root, "sell-item-" + bookId);
+            Assert.That(checkout.text, Does.Contain("1 件").And.Contain("100 金币"));
+            Assert.That(party.BackpackItems.Count, Is.EqualTo(count));
+            Press(root, "sell-more-" + crownId);
+            Press(root, "sell-item-" + bookId);
+            Press(root, "shop-confirm-sale");
+            Assert.That(root.Q("sell-item-" + bookId), Is.Null);
+            Assert.That(root.Q("sell-item-" + crownId), Is.Null);
+            Assert.That(checkout.enabledSelf, Is.False);
+            Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  1299"));
+            Assert.That(party.BackpackItems.Count, Is.EqualTo(count - 3));
+            Press(root, "shop-close-sale");
+            yield return WaitForCounter(root);
+            Assert.That(root.Q("shop-sale-window"), Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator ShopSupportsExpressionsCancellationPurchaseAndSharedInventory()
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");
             yield return null;
@@ -34,8 +74,8 @@ namespace RaidPartyManager.Tests
             Press(battleRoot, "open-settings");
             Press(battleRoot, "return-main-menu");
             yield return WaitForScene("MainMenu");
-            Press(MenuRoot(), "open-shop");
-            yield return WaitForScene("DockShop");
+            yield return SceneManager.LoadSceneAsync("DockShop");
+            yield return null;
 
             var shop = Object.FindAnyObjectByType<DockShop>();
             var root = shop.GetComponent<UIDocument>().rootVisualElement;
@@ -79,23 +119,23 @@ namespace RaidPartyManager.Tests
             yield return WaitForCounter(root);
             Assert.That(Camera.main.transform.position.z, Is.GreaterThan(wideEye.z + 3));
             AssertPriceSigns(root, stage);
-            var sheet = ((ServiceStageArt)typeof(DockShop).GetField("stageArt", Private).GetValue(shop)).residents[1];
+            var sheet = Resources.Load<Texture2D>("StoryEvents/Cast/BrokerIdle");
             var faces = (Texture2D)typeof(DockShop).GetField("merchantReactions", Private).GetValue(shop);
             Assert.That(sheet, Is.Not.Null);
             Assert.That(faces, Is.Not.Null);
             Assert.That(faces, Is.Not.SameAs(sheet));
             Move(root, root.worldBound.min + Vector2.one * 2);
-            AssertFace(merchant, sheet, 4);
+            AssertFace(merchant, sheet);
             var high = OfferViews(root).First(view => OfferTier(shop, view) == 1);
             var medium = OfferViews(root).Single(view => OfferTier(shop, view) == 2);
             var low = OfferViews(root).Single(view => OfferTier(shop, view) == 3);
             int price = Price(high);
             Enter(high);
-            AssertFace(merchant, faces, 3, 1);
+            AssertFace(merchant, faces, 1);
             Enter(medium);
-            AssertFace(merchant, faces, 3, 0);
+            AssertFace(merchant, faces, 0);
             Enter(low);
-            AssertFace(merchant, faces, 3, 0);
+            AssertFace(merchant, faces, 0);
 
             var display = stage.Find("Table stock " + high.name.Split('-').Last());
             var counterTop = stage.Find("Counter top").GetComponent<MeshRenderer>();
@@ -126,15 +166,15 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo($"金币  {999 - price}"));
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 1));
             Assert.That(root.Q<Label>("shop-feedback").text, Does.Contain("共享背包"));
-            AssertFace(merchant, faces, 3, 2);
+            AssertFace(merchant, faces, 0);
             Enter(medium);
-            AssertFace(merchant, faces, 3, 2);
+            AssertFace(merchant, faces, 0);
 
             yield return new WaitForSecondsRealtime(0.12f);
             Assert.That(Mathf.Abs(merchant.transform.position.y-restY), Is.GreaterThan(0.004f));
             yield return new WaitForSecondsRealtime(1.1f);
             Assert.That(merchant.transform.position.y, Is.EqualTo(restY).Within(0.01f));
-            AssertFace(merchant, faces, 3, 0);
+            AssertFace(merchant, faces, 0);
 
             var background = root.Q("shop-counter-background");
             Assert.That(root.panel.Pick(blank), Is.SameAs(background));
@@ -149,7 +189,7 @@ namespace RaidPartyManager.Tests
             Press(root, "shop-counter");
             yield return WaitForCounter(root);
             yield return HoldToBuy(root, low);
-            AssertFace(merchant, faces, 3, 2);
+            AssertFace(merchant, faces, 0);
             Assert.That(InventoryCount(), Is.EqualTo(startingItems + 2));
             Press(root, "open-settings");
             Press(root, "return-main-menu");
@@ -177,7 +217,7 @@ namespace RaidPartyManager.Tests
             var camera = Camera.main;
             var target = new RenderTexture(1280,720,24);
             target.Create();
-            var sheet = ((ServiceStageArt)typeof(DockShop).GetField("stageArt", Private).GetValue(shop)).residents[1];
+            var sheet = Resources.Load<Texture2D>("StoryEvents/Cast/BrokerIdle");
             var faces = (Texture2D)typeof(DockShop).GetField("merchantReactions", Private).GetValue(shop);
             // Compare the actual rendered face from a fixed camera position, independent of pointer parallax.
             var originalTarget = camera.targetTexture;
@@ -203,7 +243,7 @@ namespace RaidPartyManager.Tests
             try
             {
                 Move(root, root.worldBound.min + Vector2.one * 2);
-                AssertFace(merchant, sheet, 4);
+                AssertFace(merchant, sheet);
                 var idle = FacePixels();
                 var high = OfferViews(root).First(view => OfferTier(shop, view) == 1);
                 Color32[] happy = null;
@@ -212,14 +252,14 @@ namespace RaidPartyManager.Tests
                     var offer = OfferViews(root).Single(view => OfferItem(shop, view).Name == item);
                     Move(root, offer.worldBound.center);
                     Assert.That(root.Q<Label>("equipment-tooltip-name").text, Does.Contain(item));
-                    AssertFace(merchant,faces,3,0);
+                    AssertFace(merchant, faces, 0);
                     happy = FacePixels();
                     Assert.That(ChangedPixels(idle, happy), Is.GreaterThan(idle.Length / 50), item);
                     Move(root, root.worldBound.min + Vector2.one*2);
                     Assert.That(ChangedPixels(idle, FacePixels()), Is.LessThan(idle.Length / 200), item);
                 }
                 Enter(high);
-                AssertFace(merchant,faces,3,1);
+                AssertFace(merchant, faces, 1);
                 Assert.That(ChangedPixels(happy, FacePixels()), Is.GreaterThan(idle.Length / 50));
             }
             finally
@@ -230,13 +270,26 @@ namespace RaidPartyManager.Tests
             }
         }
 
-        private static void AssertFace(MeshRenderer merchant, Texture sheet, int frames, int frame = -1)
+        private static void AssertFace(MeshRenderer merchant, Texture sheet, int frame = -1)
         {
             var paint = new MaterialPropertyBlock();
             merchant.GetPropertyBlock(paint);
             Assert.That(paint.GetTexture("_MainTex"), Is.SameAs(sheet));
-            if (frame >= 0) Assert.That(paint.GetVector("_MainTex_ST").z, Is.EqualTo((float)frame/frames).Within(.001f));
-            Assert.That(paint.GetVector("_MainTex_ST").x, Is.EqualTo(1f/frames).Within(.001f));
+            var uv = paint.GetVector("_MainTex_ST");
+            if (frame < 0)
+            {
+                Assert.That(sheet.name, Is.EqualTo("BrokerIdle"));
+                Assert.That(uv.x, Is.EqualTo(.25f).Within(.001f));
+                Assert.That(uv.y, Is.EqualTo(330f / 2048f).Within(.001f));
+            }
+            else
+            {
+                Assert.That(sheet.name, Is.EqualTo("BrokerPortraits"));
+                Assert.That(uv.x, Is.EqualTo(.125f));
+                Assert.That(uv.y, Is.EqualTo(.125f));
+                int row = 7 - Mathf.RoundToInt(uv.w * 8);
+                Assert.That(row / 2, Is.EqualTo(frame));
+            }
         }
 
         private static Color32[] ReadFace(RenderTexture target, Rect face)
@@ -281,7 +334,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Label>("shop-feedback").text, Is.EqualTo("金币不足"));
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  0"));
             AssertFace(shop.transform.Find("Service theatre/shop-merchant").GetComponent<MeshRenderer>(),
-                ((ServiceStageArt)typeof(DockShop).GetField("stageArt", Private).GetValue(shop)).residents[1], 4);
+                Resources.Load<Texture2D>("StoryEvents/Cast/BrokerIdle"));
 
             funds.SetValue(shop, 999);
             typeof(DockShop).GetMethod("RefreshGold", Private).Invoke(shop, null);

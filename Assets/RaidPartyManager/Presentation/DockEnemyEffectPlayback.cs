@@ -63,7 +63,7 @@ namespace RaidPartyManager.Presentation
             source = caster.center;
             target = body.center;
             size = Mathf.Clamp(Mathf.Min(body.width, body.height) * 0.48f, 26f, 82f);
-            phase = Mathf.Clamp01((float)((now - startsAt) / (endsAt - startsAt)));
+            phase = AnimationCels.Phase((float)((now - startsAt) / (endsAt - startsAt)));
             glow = Mathf.Clamp01(phase * 9f) * (1f - Mathf.SmoothStep(0.30f, 1f, phase));
             if (canvas.parent != layer)
                 layer.Add(canvas);

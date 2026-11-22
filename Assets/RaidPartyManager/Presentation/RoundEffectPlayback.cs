@@ -123,7 +123,7 @@ namespace RaidPartyManager.Presentation
 
             target = body.center;
             radius = Mathf.Clamp(Mathf.Min(body.width, body.height) * 0.46f, 25, 65);
-            progress = Mathf.Clamp01((float)((now - startedAt) / duration));
+            progress = AnimationCels.Phase((float)((now - startedAt) / duration));
             opacity = Mathf.Clamp01(progress * 8f) * (1f - Mathf.SmoothStep(0.53f, 1f, progress));
             float labelWidth = Mathf.Min(layer.layout.width, Mathf.Clamp(caption.text.Sum(letter => letter > 127 ? 13 : 7) + 14, 92, 190));
             caption.style.width = labelWidth;

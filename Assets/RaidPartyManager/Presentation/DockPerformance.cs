@@ -65,10 +65,12 @@ namespace RaidPartyManager.Presentation
             turnDirection = turn == StageTurn.Reverse ? -1 : 1;
             if (cue == Cue.Picking)
             {
+                oldSet.TakeRoadposts(live);
                 SetCue(Cue.Fold);
                 return;
             }
             oldSet = new DockSetSnapshot(live, venue.DeckBounds);
+            oldSet.TakeRoadposts(live);
             SetLive(false);
             SetCue(Cue.WalkOff);
         }
@@ -104,20 +106,20 @@ namespace RaidPartyManager.Presentation
             }
         }
 
-        internal void Tick(VisualElement panel)
+        internal void Tick(VisualElement panel, float elapsed)
         {
             if (live == null || panel == null) return;
             oldSet?.AnimateBackdrop();
             newSet?.AnimateBackdrop();
             if (openingCast != null)
             {
-                entranceTime += Mathf.Min(Time.unscaledDeltaTime,.08f);
+                entranceTime += elapsed;
                 openingCast.CastAt(entranceTime/.78f, true, entranceTime);
                 if (entranceTime >= .8f) EndFirstEntrance();
             }
             if (cue == Cue.Live || cue == Cue.Picking) return;
             Mask(panel, true);
-            time += Mathf.Min(Time.unscaledDeltaTime, .08f);
+            time += elapsed;
             switch (cue)
             {
                 case Cue.WalkOff:
@@ -153,6 +155,9 @@ namespace RaidPartyManager.Presentation
                 case Cue.Turn:
                     float t = Mathf.SmoothStep(0, 1, time/1.4f);
                     boards.Turn(turnDirection * 180 * t);
+                    var lighting = StageLighting.Crossfade(oldSet.Lighting, newSet.Lighting, t);
+                    venue.LightTimber(lighting);
+                    lighting.Apply(panorama);
                     panorama.SetFloat("_Roll", turnDirection * t);
                     if (oldSet.Scenery != null) panorama.SetTexture("_MainTex", oldSet.Scenery.Current);
                     if (newSet.Scenery != null) panorama.SetTexture("_NextTex", newSet.Scenery.Current);
@@ -202,6 +207,7 @@ namespace RaidPartyManager.Presentation
             drum.transform.localScale = newSet.Sky.transform.lossyScale;
             drum.GetComponent<MeshFilter>().sharedMesh = venue.PanoramaPattern;
             panorama = new Material(Resources.Load<Shader>("RollHarbourCloth"));
+            oldSet.Lighting.Apply(panorama);
             void Print(string key, MeshRenderer source)
             {
                 source.GetPropertyBlock(ink);

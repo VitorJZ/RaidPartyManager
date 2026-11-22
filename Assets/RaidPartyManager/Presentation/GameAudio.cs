@@ -5,12 +5,16 @@ using UnityEngine.SceneManagement;
 
 namespace RaidPartyManager.Presentation
 {
+    internal enum VolumeChannel { Master, Ambience, Effects }
+
     internal sealed class GameAudio : MonoBehaviour
     {
         private static GameAudio instance;
+        private static bool volumePrefsDirty;
         private SoundBank bank;
         private AudioSource effects, atmosphere;
         private SoundCue environment;
+        private float ambienceFade, ambienceGain;
         private readonly Dictionary<SoundCue, double> lastPlayed = new();
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -23,7 +27,40 @@ namespace RaidPartyManager.Presentation
             instance.bank = Resources.Load<SoundBank>("MistboundSounds");
             instance.effects = instance.Source(false);
             instance.atmosphere = instance.Source(true);
+            instance.ApplyVolumes();
             SceneManager.sceneLoaded += instance.SceneLoaded;
+        }
+
+        internal static int Volume(VolumeChannel channel) =>
+            Mathf.Clamp(PlayerPrefs.GetInt("Audio.Volume." + channel, 100), 0, 100);
+
+        internal static void SetVolume(VolumeChannel channel, int percent)
+        {
+            percent = Mathf.Clamp(percent, 0, 100);
+            if (Volume(channel) == percent) return;
+            PlayerPrefs.SetInt("Audio.Volume." + channel, percent);
+            volumePrefsDirty = true;
+            if (instance != null) instance.ApplyVolumes();
+        }
+
+        private void ApplyVolumes()
+        {
+            float master = Volume(VolumeChannel.Master) / 100f;
+            effects.volume = master * (Volume(VolumeChannel.Effects) / 100f);
+            ambienceGain = master * (Volume(VolumeChannel.Ambience) / 100f);
+            atmosphere.volume = ambienceFade * ambienceGain;
+        }
+
+        internal static void SaveVolumes()
+        {
+            if (!volumePrefsDirty) return;
+            PlayerPrefs.Save();
+            volumePrefsDirty = false;
+        }
+
+        private void OnApplicationPause(bool paused)
+        {
+            if (paused) SaveVolumes();
         }
 
         private AudioSource Source(bool loop)
@@ -47,7 +84,7 @@ namespace RaidPartyManager.Presentation
         internal static void SetScene(string scene, AdventureRun run)
         {
             if (instance == null) return;
-            bool cemetery = run?.InGraveyard == true || GraveStories.Contains(run?.Current?.Event);
+            bool cemetery = run?.InCapital == true || CapitalStories.Contains(run?.Current?.Event) || run?.InGraveyard == true || GraveStories.Contains(run?.Current?.Event);
             instance.environment = scene switch
             {
                 "Camp" => SoundCue.AmbCampfire,
@@ -63,15 +100,17 @@ namespace RaidPartyManager.Presentation
             var next = bank.Clip(environment);
             if (atmosphere.clip != next)
             {
-                atmosphere.volume = Mathf.MoveTowards(atmosphere.volume, 0, Time.unscaledDeltaTime * .9f);
-                if (atmosphere.volume > 0 && atmosphere.isPlaying) return;
+                ambienceFade = Mathf.MoveTowards(ambienceFade, 0, Time.unscaledDeltaTime * .9f);
+                atmosphere.volume = ambienceFade * ambienceGain;
+                if (ambienceFade > 0 && atmosphere.isPlaying) return;
                 atmosphere.Stop();
-                atmosphere.volume = 0;
+                ambienceFade = 0;
                 atmosphere.clip = next;
                 if (next != null) atmosphere.Play();
             }
             if (next != null)
-                atmosphere.volume = Mathf.MoveTowards(atmosphere.volume, .44f, Time.unscaledDeltaTime * .65f);
+                ambienceFade = Mathf.MoveTowards(ambienceFade, .44f, Time.unscaledDeltaTime * .65f);
+            atmosphere.volume = ambienceFade * ambienceGain;
         }
 
         internal static void Play(SoundCue cue, float gain = .64f)

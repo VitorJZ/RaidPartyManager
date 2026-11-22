@@ -11,9 +11,10 @@ namespace RaidPartyManager.Battle
         public int Health { get; }
         public int ProjectedAmount { get; }
         public SkillBookDefinition Book { get; }
+        public int LastCastRound { get; }
 
         public ActionOption(ActionDefinition action, Combatant target, int health, int projectedAmount, ActionKind? kind = null,
-            SkillBookDefinition book = null)
+            SkillBookDefinition book = null, int lastCastRound = 0)
         {
             Action = action;
             Kind = kind ?? action.Kind;
@@ -21,6 +22,7 @@ namespace RaidPartyManager.Battle
             Health = health;
             ProjectedAmount = projectedAmount;
             Book = book;
+            LastCastRound = lastCastRound;
         }
     }
 
@@ -75,6 +77,20 @@ namespace RaidPartyManager.Battle
                     best = i;
             }
 
+            if (options[best].Book != null)
+            {
+                int strongest = options[best].ProjectedAmount;
+                // Consider comparable spells first, then prefer the least recently cast.
+                // Using the global best as the threshold avoids order-dependent comparisons.
+                for (int i = 0; i < options.Count; i++)
+                {
+                    var candidate = options[i];
+                    if (candidate.Book == null || (long)candidate.ProjectedAmount * 5 < (long)strongest * 4) continue;
+                    if (candidate.LastCastRound < options[best].LastCastRound ||
+                        candidate.LastCastRound == options[best].LastCastRound && BetterTarget(candidate, options[best]))
+                        best = i;
+                }
+            }
             var chosen = options[best];
             var reason = chosen.Book != null ? DecisionReason.UseSkill : chosen.Kind switch
             {

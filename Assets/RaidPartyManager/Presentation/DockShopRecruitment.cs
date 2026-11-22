@@ -183,8 +183,8 @@ namespace RaidPartyManager.Presentation
             replacementPanel?.RemoveFromHierarchy();
             if (adventure == null) { SignRecruit(candidate, replace); return; }
             var talent = party.TalentFor(candidate);
-            replacementPanel = ContractPanel.Negotiate(candidate, party.Day, talent, 0, null, CrewContract.ExpectedWage(candidate, talent),
-                (days, terms, clause, wage) => SignRecruit(candidate, replace, days, terms, clause, wage),
+            replacementPanel = ContractPanel.Negotiate(candidate, party.Day, talent, 0, null, CrewContract.ExpectedWage(candidate, talent), EmployeeAttributes.Starting,
+                (days, terms, fee) => SignRecruit(candidate, replace, days, terms, fee),
                 () => { replacementPanel?.RemoveFromHierarchy(); replacementPanel = null; if (recruitmentWindow != null) RefreshSpinControl(); });
             recruitmentWindow.Add(replacementPanel);
             RefreshSpinControl();

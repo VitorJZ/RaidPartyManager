@@ -13,9 +13,8 @@ namespace RaidPartyManager.Run
     {
         public bool Enabled;
         public int Count, IntervalDays, Amount;
-        public long Total => (long)Count * Amount;
-        public bool Fits(int duration) => !Enabled || Count >= 2 && IntervalDays >= 1 && Amount > 0 &&
-            ((long)Count - 1) * IntervalDays <= duration;
+        // Amount is read only by contracts saved with the original, fixed-payment schedule.
+        public bool Fits(int duration) => !Enabled || Count >= 1 && IntervalDays >= 1 && (long)Count * IntervalDays <= duration;
 
         public static int PremiumPercent(Personality personality) => personality switch
         {
@@ -26,12 +25,6 @@ namespace RaidPartyManager.Run
             _ => 20
         };
 
-        public static long MinimumTotal(Personality personality, int wage, int days)
-        {
-            long basis = (long)wage * days;
-            int percent = PremiumPercent(personality);
-            return basis + basis / 100 * percent + (basis % 100 * percent + 99) / 100;
-        }
     }
 
     [Serializable]
@@ -63,18 +56,69 @@ namespace RaidPartyManager.Run
         public bool BasePaid;
         public int InstallmentsPaid;
         public WageInstallments Plan => Rates.Installments;
-        public long DueAtSigning => Plan.Enabled ? Plan.Amount : BaseTotal;
-        public long Outstanding => Plan.Enabled ? (long)(Plan.Count - InstallmentsPaid) * Plan.Amount : 0;
-        public long ExitCost => Outstanding + ReleaseFee;
-        public int? NextDueDay => Plan.Enabled && InstallmentsPaid < Plan.Count
-            ? StartDay + InstallmentsPaid * Plan.IntervalDays : (int?)null;
+        // Old saves keep their signed fixed amounts and their first payment on the signing date.
+        public bool DeferredTerms;
+        public long SigningFee;
+        public int InterestPercent;
+        public long PrincipalInArrears, InterestInArrears, AccruedInterest, InterestRemainder;
+        public int Days => EndDay - StartDay;
+        public long BaseTotal => DeferredTerms && !Plan.Enabled ? SigningFee : (long)DailyWage * Days;
+        public long DueAtSigning => DeferredTerms ? SigningFee : Plan.Enabled ? Plan.Amount : BaseTotal;
+        private long Financed => BaseTotal - SigningFee;
+        public long Arrears => PrincipalInArrears + InterestInArrears;
+        public long RemainingPrincipal => !Plan.Enabled ? 0 : DeferredTerms
+            ? PrincipalAfter(InstallmentsPaid) + PrincipalInArrears : (long)(Plan.Count - InstallmentsPaid) * Plan.Amount;
+        public long Outstanding => RemainingPrincipal + InterestInArrears + AccruedInterest + (InterestRemainder > 0 ? 1 : 0);
+        public int CurrentReleaseFee => Plan.Enabled && Outstanding > 0 ? (int)Math.Min(Outstanding, ReleaseFee) : 0;
+        public long ExitCost => Outstanding + CurrentReleaseFee;
+        public int? NextDueDay => Plan.Enabled && !BasePaid && InstallmentsPaid < Plan.Count
+            ? StartDay + (InstallmentsPaid + (DeferredTerms ? 1 : 0)) * Plan.IntervalDays : (int?)null;
         internal CrewContract Copy() => (CrewContract)MemberwiseClone();
-        internal void RecordSigningPayment()
+        internal void RecordSigningPayment() => BasePaid = Outstanding == 0;
+
+        private long PrincipalAfter(int count) =>
+            Financed - (Financed / Plan.Count * count + Math.Min(count, Financed % Plan.Count));
+        public long PrincipalAt(int period) => PrincipalAfter(period - 1) - PrincipalAfter(period);
+
+        // Sum of the opening balances for the first k periods. This also supports very long contracts
+        // without constructing a payment list. Only the final interest charge rounds up.
+        private long ScheduledInterestThrough(int k)
         {
-            InstallmentsPaid = Plan.Enabled ? 1 : 0;
-            BasePaid = !Plan.Enabled;
+            long extra = Math.Min(k, Financed % Plan.Count);
+            decimal paidBalances = (decimal)(Financed / Plan.Count) * k * (k - 1) / 2
+                + (decimal)extra * (extra - 1) / 2 + (decimal)(k - extra) * extra;
+            decimal exposure = ((decimal)k * Financed - paidBalances) * Plan.IntervalDays;
+            long divisor = (long)Days * 100;
+            decimal remainder = exposure % divisor;
+            decimal whole = (exposure - remainder) / divisor * InterestPercent;
+            decimal fraction = remainder * InterestPercent / divisor;
+            // With a nearly full deposit, the principal can be paid off before the last listed period.
+            return (long)(whole + (PrincipalAfter(k) == 0 ? decimal.Ceiling(fraction) : decimal.Floor(fraction)));
         }
-        public long BaseTotal => (long)DailyWage * (EndDay - StartDay);
+
+        public long ScheduledPayment(int period) => !DeferredTerms ? Plan.Amount :
+            PrincipalAt(period) + ScheduledInterestThrough(period) - ScheduledInterestThrough(period - 1);
+        public long ScheduledInterest => !Plan.Enabled ? 0 : DeferredTerms ? ScheduledInterestThrough(Plan.Count) : 0;
+
+        internal void AccrueDay()
+        {
+            long divisor = (long)Days * 100;
+            decimal units = (decimal)RemainingPrincipal * InterestPercent + InterestRemainder;
+            AccruedInterest += (long)(units / divisor);
+            InterestRemainder = (long)(units % divisor);
+        }
+
+        internal bool ValidAt(int day)
+        {
+            if (StartDay < 1 || EndDay <= StartDay || EndDay <= day || DailyWage < 1 || !Rates.Valid || !AgreedRates.Valid) return false;
+            if (!Plan.Enabled) return !DeferredTerms || SigningFee >= Days;
+            bool validSchedule = DeferredTerms ? Plan.Fits(Days) && SigningFee >= 0 && SigningFee <= BaseTotal &&
+                InterestPercent is >= 0 and <= 20 && PrincipalInArrears >= 0 && InterestInArrears >= 0 && AccruedInterest >= 0 &&
+                InterestRemainder >= 0 && InterestRemainder < (long)Days * 100 :
+                Plan.Count >= 2 && Plan.IntervalDays > 0 && Plan.Amount > 0 && ((long)Plan.Count - 1) * Plan.IntervalDays <= Days;
+            return validSchedule && InstallmentsPaid >= (DeferredTerms ? 0 : 1) && InstallmentsPaid <= Plan.Count && !(NextDueDay <= day);
+        }
+
         public BonusTerms Bonuses;
         public PerformanceBonuses Rates;
 
@@ -82,33 +126,52 @@ namespace RaidPartyManager.Run
         public PerformanceBonuses AgreedRates => Rates.Terms == BonusTerms.None && Bonuses != BonusTerms.None
             ? (PerformanceBonuses)Bonuses : Rates;
 
-        public static int ExpectedWage(CharacterDefinition character, PlayerTrait trait, IEnumerable<SkillBookDefinition> learned = null)
+        public static int ExpectedWage(CharacterDefinition character, PlayerTrait trait, IEnumerable<SkillBookDefinition> learned = null,
+            int trainingSessions = 0)
         {
             int basis = Math.Max(1, PlayerMarket.BaseValue(character));
-            int value = PlayerMarket.Value(character, trait, learned);
+            int value = PlayerMarket.Value(character, trait, learned, trainingSessions);
             return Math.Max(1, (int)Math.Round((2 + basis / 18) * Math.Sqrt(value / (double)basis), MidpointRounding.AwayFromZero));
         }
 
-        private static long WageCredit(PerformanceBonuses rates, bool releaseClause) =>
-            rates.Appearance / 2L + rates.Kill / 3L + rates.DamageTaken / 2L + rates.Shield / 2L + (releaseClause ? 1 : 0);
+        private static long WageCredit(PerformanceBonuses rates) =>
+            rates.Appearance / 2L + rates.Kill / 3L + rates.DamageTaken / 2L + rates.Shield / 2L;
 
-        public static int MinimumWage(int expected, PerformanceBonuses bonuses, bool releaseClause)
+        public static int MinimumWage(int expected, PerformanceBonuses bonuses, EmployeeAttributes ratings)
         {
-            long credit = WageCredit(bonuses, releaseClause);
-            int fixedFloor = (int)Math.Ceiling(expected * .60);
-            return (int)Math.Max(fixedFloor, Math.Ceiling(expected * .85) - credit);
+            int discount = 10 * (Math.Max(0, ratings.Loyalty - 3) + Math.Max(0, ratings.Obedience - 3));
+            long Percent(int percent) => ((long)expected * percent + 99) / 100;
+            long baseFloor = Percent(Math.Max(40, 60 - discount / 2));
+            long askingFloor = Percent(Math.Max(50, 85 - discount)) - WageCredit(bonuses);
+            return (int)Math.Max(1, Math.Max(baseFloor, askingFloor));
         }
 
         public static CrewContract Offer(CharacterDefinition character, int day, int duration = 12,
-            PerformanceBonuses bonuses = default, bool releaseClause = false)
+            PerformanceBonuses bonuses = default)
         {
-            if (duration < 10 || duration > int.MaxValue - day) throw new ArgumentOutOfRangeException(nameof(duration));
+            if (duration < 1 || duration > int.MaxValue - day) throw new ArgumentOutOfRangeException(nameof(duration));
             if (!bonuses.Valid) throw new ArgumentOutOfRangeException(nameof(bonuses));
-            long concession = WageCredit(bonuses, releaseClause);
+            long concession = WageCredit(bonuses);
             int baseValue = PlayerMarket.BaseValue(character);
             return new CrewContract { StartDay = day, EndDay = day + duration,
                 DailyWage = (int)Math.Max(1, 2 + baseValue / 18 - concession),
-                Bonuses = bonuses.Terms, Rates = bonuses, ReleaseFee = releaseClause ? Math.Max(2, baseValue / 4) : 0 };
+                Bonuses = bonuses.Terms, Rates = bonuses };
+        }
+        // Used by both the interactive quote and the signing transaction.
+        public static CrewContract Quote(CharacterDefinition character, int day, int days, int expected,
+            PerformanceBonuses terms, long signingFee)
+        {
+            if (day < 1 || days < 1 || days > int.MaxValue - day || expected < 1 || !terms.Valid || signingFee < 0 ||
+                !terms.Installments.Fits(days)) return null;
+            bool financed = terms.Installments.Enabled;
+            long basis = (long)days * expected;
+            if (financed && signingFee > basis || !financed && signingFee / days > int.MaxValue) return null;
+            return new CrewContract {
+                DeferredTerms = true, StartDay = day, EndDay = day + days, SigningFee = signingFee,
+                DailyWage = financed ? expected : (int)(signingFee / days),
+                Bonuses = terms.Terms, Rates = terms, InterestPercent = WageInstallments.PremiumPercent(character.Personality),
+                ReleaseFee = financed ? Math.Max(2, PlayerMarket.BaseValue(character) / 4) : 0
+            };
         }
     }
 
@@ -126,6 +189,7 @@ namespace RaidPartyManager.Run
             talentSeed = seed;
             Day = day;
             foreach (var member in members) PrepareHire(member);
+            RefreshEquipmentSlots();
         }
 
         // The founding grant covers only the original agreements of a newly created company.
@@ -140,12 +204,11 @@ namespace RaidPartyManager.Run
         private void PrepareHire(Member member)
         {
             if (!member.Attributes.IsValid)
-                member.Attributes = EmployeeAttributes.Roll(employeeRandom);
+                member.Attributes = EmployeeAttributes.Starting;
             if (Day > 0 && member.Contract == null)
             {
                 member.Trait = TalentFor(member.Character);
                 member.Contract = CrewContract.Offer(member.Character, Day);
-                if (member.Trait == PlayerTrait.Warehouse) Array.Resize(ref member.Slots, Rules.EquipmentSlots + 1);
                 if (member.Trait == PlayerTrait.Sturdy && member.Health > 0) member.Health += 2;
             }
             RefreshEmployeeGoals(member);
@@ -154,22 +217,19 @@ namespace RaidPartyManager.Run
         private static Stats TraitBonus(Member m) => new Stats(m.Trait == PlayerTrait.Brawn ? 1 : 0,
             m.Trait == PlayerTrait.Tough ? 1 : 0, m.Trait == PlayerTrait.Warded ? 1 : 0, m.Trait == PlayerTrait.Sturdy ? 2 : 0);
 
-        internal CrewContract CandidateContract(CharacterDefinition candidate, int days, PerformanceBonuses terms, bool clause, int? wage)
+        internal CrewContract CandidateContract(CharacterDefinition candidate, int days, PerformanceBonuses terms, long? fee,
+            CampTraining training = default)
         {
-            if (candidate == null || Day < 1 || days < 10 || days > int.MaxValue - Day || !terms.Valid) return null;
-            return NegotiatedContract(candidate, TalentFor(candidate), null, days, terms, clause, wage);
+            if (candidate == null) return null;
+            int expected = CrewContract.ExpectedWage(candidate, TalentFor(candidate), trainingSessions: training.Sessions);
+            return NegotiatedContract(candidate, EmployeeAttributes.Starting, expected, days, terms, fee);
         }
 
-        private CrewContract NegotiatedContract(CharacterDefinition character, PlayerTrait trait, IEnumerable<SkillBookDefinition> skills,
-            int days, PerformanceBonuses terms, bool clause, int? wage, int? memberExpectation = null)
+        private CrewContract NegotiatedContract(CharacterDefinition character, EmployeeAttributes ratings, int expected,
+            int days, PerformanceBonuses terms, long? fee)
         {
-            int expected = memberExpectation ?? CrewContract.ExpectedWage(character, trait, skills);
-            int minimum = CrewContract.MinimumWage(expected, terms, clause);
-            var draft = CrewContract.Offer(character, Day, days, terms, clause);
-            draft.DailyWage = wage ?? Math.Max(minimum, draft.DailyWage);
-            if (draft.DailyWage < minimum || !terms.Installments.Fits(days)) return null;
-            if (terms.Installments.Enabled && terms.Installments.Total <
-                WageInstallments.MinimumTotal(character.Personality, draft.DailyWage, days)) return null;
+            var draft = CrewContract.Quote(character, Day, days, expected, terms, fee ?? (terms.Installments.Enabled ? 0 : (long)expected * days));
+            if (draft == null || draft.DailyWage < CrewContract.MinimumWage(expected, terms, ratings)) return null;
             return draft;
         }
 
@@ -181,18 +241,14 @@ namespace RaidPartyManager.Run
             RefreshEmployeeGoals(member);
         }
 
-        public bool SetContract(string id, int days, PerformanceBonuses bonuses, bool releaseClause, int? dailyWage = null)
+        public bool SetContract(string id, int days, PerformanceBonuses bonuses, long? signingFee = null)
         {
             var m = FindMember(id);
-            if (m == null || activeBattle != null || Day < 1 || days < 10 || days > int.MaxValue - Day ||
-                !bonuses.Valid || dailyWage is <= 0) return false;
-            var draft = NegotiatedContract(m.Character, m.Trait, m.LearnedSkills, days, bonuses, releaseClause, dailyWage, ExpectedWage(m));
-            if (draft == null) return false;
-            long previous = m.Contract?.Outstanding ?? 0;
-            int fee = !releaseClause ? m.Contract?.ReleaseFee ?? 0 : 0;
-            if (draft.DueAtSigning + previous + fee > Gold) return false;
-            TrySpendGold((int)previous, m.Character.Name + " · 结清旧合同分期");
-            TrySpendGold(fee, m.Character.Name + " · 违约金");
+            if (m == null || activeBattle != null) return false;
+            var draft = NegotiatedContract(m.Character, m.Attributes, ExpectedWage(m), days, bonuses, signingFee);
+            if (draft == null || draft.DueAtSigning > Gold || (m.Contract?.ExitCost ?? 0) > Gold - draft.DueAtSigning) return false;
+            Gold -= (int)(m.Contract?.ExitCost ?? 0);
+            RecordExitExpenses(m);
             PaySigningWage(m.Character.Name, draft);
             draft.RecordSigningPayment();
             m.Contract = draft;
@@ -201,22 +257,39 @@ namespace RaidPartyManager.Run
         }
 
         internal void PaySigningWage(string name, CrewContract draft) =>
-            TrySpendGold((int)draft.DueAtSigning, name + (draft.Plan.Enabled ? " · 第 1 期工资" : " · 整期底薪"));
+            TrySpendGold((int)draft.DueAtSigning, name + " · 签字费");
 
-        private int QuotePercent(CharacterDefinition c, int salt, int minimum, int maximum)
+        private Random CandidateRandom(CharacterDefinition c, int salt) =>
+            new Random(unchecked(talentSeed ^ (Day * 7919 + c.RosterNumber * 104729 + salt)));
+
+        private int QuotePercent(CharacterDefinition c, int salt, int minimum, int maximum) =>
+            CandidateRandom(c, salt).Next(minimum, maximum + 1);
+
+        public CampTraining TownCandidateTraining(CharacterDefinition c)
         {
-            var random = new Random(unchecked(talentSeed ^ (Day * 7919 + c.RosterNumber * 104729 + salt)));
-            return random.Next(minimum, maximum + 1);
+            var random = CandidateRandom(c, 9199);
+            int roll = random.Next(100);
+            if (roll >= 25) return default;
+            var training = CampTraining.Roll(random);
+            return roll < 5 ? training.With(CampTraining.Roll(random)) : training;
         }
 
         public int SigningPrice(CharacterDefinition c) =>
-            (PlayerMarket.Value(c, TalentFor(c)) * QuotePercent(c, 431, 101, 110) + 99) / 100;
+            (PlayerMarket.Value(c, TalentFor(c), trainingSessions: TownCandidateTraining(c).Sessions)
+                * QuotePercent(c, 431, 101, 110) + 99) / 100;
 
         public int TransferOffer(string memberId)
         {
             var m = FindMember(memberId);
-            return m == null ? 0 : Math.Max(1, PlayerMarket.Value(m.Character, m.Trait, m.LearnedSkills)
+            return m == null ? 0 : Math.Max(1, PlayerMarket.Value(m.Character, m.Trait, m.LearnedSkills, m.Training.Sessions)
                 * QuotePercent(m.Character, 173, 90, 99) / 100);
+        }
+
+        internal int BrokerBudget(string id, int opening)
+        {
+            int premium = QuotePercent(FindMember(id).Character, 283, 32, 54);
+            long room = Math.Max(12, (long)opening * premium / 100);
+            return (int)Math.Min(int.MaxValue, opening + room);
         }
 
         public bool CanSellMember(string id)
@@ -244,22 +317,27 @@ namespace RaidPartyManager.Run
         private void RecordExitExpenses(Member member)
         {
             RecordExpense(member.Character.Name + " · 结清旧合同分期", member.Contract?.Outstanding ?? 0);
-            RecordExpense(member.Character.Name + " · 违约金", member.Contract?.ReleaseFee ?? 0);
+            RecordExpense(member.Character.Name + " · 违约金", member.Contract?.CurrentReleaseFee ?? 0);
+            PayrollDebt -= member.Contract?.Arrears ?? 0;
         }
 
         private void DeployReserveIfNeeded()
         {
-            if (members.Any(IsDeployed)) return;
-            var reserve = members.FirstOrDefault(m => !m.IsAway && m.Health > 0);
-            if (reserve != null) reserve.Position = 1;
+            if (!members.Any(IsDeployed))
+            {
+                var reserve = members.FirstOrDefault(m => !m.IsAway && m.Health > 0);
+                if (reserve != null) reserve.Position = 1;
+            }
+            RefreshEquipmentSlots();
         }
 
-        private void Pay(long amount, string reason)
+        private int Pay(long amount, string reason)
         {
             int paid = (int)Math.Min(Gold, amount);
             Gold -= paid;
             RecordExpense(reason, paid);
             PayrollDebt += amount - paid;
+            return paid;
         }
 
         public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 && m.Contract.EndDay > Day + 1);
@@ -272,7 +350,28 @@ namespace RaidPartyManager.Run
             {
                 member.Career.ServiceDays++;
                 var contract = member.Contract;
-                if (contract.NextDueDay == Day)
+                if (contract.DeferredTerms && contract.Plan.Enabled)
+                {
+                    contract.AccrueDay();
+                    bool due = contract.NextDueDay == Day;
+                    long principal = due ? contract.PrincipalAt(++contract.InstallmentsPaid) : 0;
+                    bool final = contract.InstallmentsPaid == contract.Plan.Count;
+                    if (due || final)
+                    {
+                        long interest = contract.AccruedInterest;
+                        if (contract.InterestRemainder > 0 && (Day == contract.EndDay || contract.RemainingPrincipal == 0 && Gold >= principal))
+                        {
+                            interest++;
+                            contract.InterestRemainder = 0;
+                        }
+                        contract.AccruedInterest = 0;
+                        int paid = Pay(principal + interest, $"{member.Character.Name} · 第 {contract.InstallmentsPaid} 期工资");
+                        contract.PrincipalInArrears += Math.Max(0, principal - paid);
+                        contract.InterestInArrears += interest - Math.Max(0, paid - principal);
+                    }
+                    contract.BasePaid = contract.Outstanding == 0;
+                }
+                else if (contract.NextDueDay == Day)
                 {
                     contract.InstallmentsPaid++;
                     Pay(contract.Plan.Amount, $"{member.Character.Name} · 第 {contract.InstallmentsPaid} 期工资");

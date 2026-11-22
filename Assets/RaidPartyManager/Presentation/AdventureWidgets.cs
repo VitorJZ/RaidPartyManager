@@ -82,18 +82,18 @@ namespace RaidPartyManager.Presentation
             {
                 if (run.CompleteRecruit(id)) GameAudio.Play(SoundCue.CompanionJoin);
                 refresh();
-            });
+            }, revealRecruit: run.Current.Event != AdventureEventKind.LostTraveler);
         }
 
         internal static void RecruitReplacement(VisualElement parent, CharacterDefinition recruit, PartyRun party,
-            EncounterData content, Action<string> replace)
+            EncounterData content, Action<string> replace, bool revealRecruit = true)
         {
             bool onPaper = parent is EventChoiceRack;
-            var title = PrototypeStyle.Text($"{recruit.Name}愿意同行。队伍已满，请选择替换一名队员。", 17,
+            var title = PrototypeStyle.Text($"{(revealRecruit ? recruit.Name : "有位旅人")}愿意同行。队伍已满，请选择替换一名队员。", 17,
                 onPaper ? AdventureEventWindow.PaperAccent : PrototypeStyle.Accent);
             title.name = "pending-recruit-preview";
             Note(parent, title);
-            CharacterChoicePreview.Attach(title, recruit, content.PortraitFor(recruit.Id));
+            if (revealRecruit) CharacterChoicePreview.Attach(title, recruit, content.PortraitFor(recruit.Id));
             Note(parent, PrototypeStyle.Text("原队员的装备会留在背包中；暂时离队的伙伴保留名额。", 13,
                 onPaper ? AdventureEventWindow.PaperMuted : PrototypeStyle.Muted));
             foreach (var member in party.Members)
@@ -101,7 +101,7 @@ namespace RaidPartyManager.Presentation
                     () => replace(member.Id), !member.IsAway, member);
         }
 
-        internal static void Character(VisualElement parent, CharacterDefinition character, EncounterData content,
+        internal static Button Character(VisualElement parent, CharacterDefinition character, EncounterData content,
             string name, Action click, bool enabled = true, MemberView member = null)
         {
             var button = Action(parent, character.Name + "  ·  " + AdventureFlow.ProfessionName(character.Profession), name, click, enabled);
@@ -112,6 +112,7 @@ namespace RaidPartyManager.Presentation
             button.style.alignItems = Align.Center;
             button.Add(image);
             CharacterChoicePreview.Attach(button, character, content.PortraitFor(character.Id), member);
+            return button;
         }
 
         internal static void BattleRewards(EventChoiceRack parent, AdventureRun run, EncounterData content, Action refresh,

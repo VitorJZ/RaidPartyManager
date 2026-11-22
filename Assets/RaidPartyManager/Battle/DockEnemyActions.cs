@@ -41,7 +41,7 @@ namespace RaidPartyManager.Battle
                         .OrderBy(unit => (double)unit.Health / unit.Stats.Health).FirstOrDefault();
                     if (wounded == null)
                         return false;
-                    Heal(actor, wounded, 3, "补缝", BattleEventKind.Action, visual: BattleVisualCue.CaulkerMend);
+                    Heal(actor, wounded, 1, "补缝", BattleEventKind.Action, visual: BattleVisualCue.CaulkerMend);
                     return true;
                 case EnemyAnchorHermit when random.NextDouble() >= 0.65:
                     GrantStatus(actor, Opponents(actor).First(), Exposed, 1, "沉锚破防", BattleVisualCue.AnchorExpose);
@@ -158,7 +158,7 @@ namespace RaidPartyManager.Battle
         private void Scavenge(Unit actor, Unit victim)
         {
             actor.EnemyTriggered = true;
-            var items = victim.Equipped.ToArray();
+            var items = victim.Slots.Where(item => item != null).ToArray();
             if (items.Length == 0)
                 return;
             var item = items[random.Next(items.Length)];

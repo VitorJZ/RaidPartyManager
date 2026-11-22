@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "雷电戒指"
   effect: 9
   icon: {fileID: 2800000, guid: ff34ace7bf3a4795820095eaf18a4b94, type: 3}
-  description: "攻击造成雷电伤害"
+  description: "攻击造成雷电伤害，无视防御和特防"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

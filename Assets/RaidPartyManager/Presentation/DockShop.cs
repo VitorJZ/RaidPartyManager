@@ -16,7 +16,6 @@ namespace RaidPartyManager.Presentation
         private const float CelebrationDuration = 1.05f;
         private const float PurchaseHoldSeconds = .55f;
         internal static bool RecruitmentWheelVisible { get; set; } = false;
-        internal static string ServiceDescription => RecruitmentWheelVisible ? "购买物品或抽取招募候选" : "长按购买物品";
         private static PartyRun standalonePriceOwner;
         private static int standaloneRecruitPrice = ShopRecruitment.StartingPrice;
 
@@ -83,7 +82,7 @@ namespace RaidPartyManager.Presentation
             celebrationUntil = 0;
             var catalogue = stockPool.Where(item => item != null).Select(item => item.ToDefinition()).Concat(content.SkillBooks);
             var stock = adventure?.Current.Stock ?? AdventureShopOffer.Draw(catalogue, random, false);
-            stage = new ShopStage(transform, root, stageArt, backdrop, merchantReactions, adventure?.InGraveyard == true);
+            stage = new ShopStage(transform, root, stageArt, backdrop, merchantReactions, adventure?.InGraveyard == true, adventure?.InCapital == true);
             stage.ShowCompany(party, content);
             if (RecruitmentWheelVisible) PrepareRecruitment();
             Render();
@@ -112,6 +111,7 @@ namespace RaidPartyManager.Presentation
 
         private void OnDisable()
         {
+            CloseSale();
             CloseRecruitment();
             recruitment = null;
             CancelPurchaseHold();
@@ -172,7 +172,7 @@ namespace RaidPartyManager.Presentation
 
             topBar = new RunTopBar(root, party, content, OpenEditor, "open-shop-editor",
                 () => Gold, "shop-gold", expenseOverride: adventure == null ? standaloneExpenses : null);
-            if (adventure != null) AdventureFlow.AddServiceNavigation(root, stageArt.timber, topBar);
+            if (adventure != null) AdventureFlow.AddServiceNavigation(root, stageArt.graveyardStone, topBar, () => stage.WideView);
             else root.Add(new StageSignMask(HangingSign.Exit("leave-shop", () => PrototypeSceneMenu.OpenStandalone("MainMenu"))));
             RunTopBar.PlaceAtTop(root, topBar);
             stage.MountShopSigns(root);
@@ -191,6 +191,12 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Middle(closeUpHint);
             closeUpHint.pickingMode = PickingMode.Ignore;
             root.Add(closeUpHint);
+            sellEntry = PrototypeStyle.Button("出售背包物品", "shop-sell", OpenSale);
+            sellEntry.style.position = Position.Absolute;
+            sellEntry.style.right = 14;
+            sellEntry.style.top = RunTopBar.Height + 10;
+            sellEntry.style.display = DisplayStyle.None;
+            root.Add(sellEntry);
 
             feedback = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
             feedback.name = "shop-feedback";
@@ -317,7 +323,8 @@ namespace RaidPartyManager.Presentation
         private void OnKeyDown(KeyDownEvent evt)
         {
             if (evt.keyCode != KeyCode.Escape) return;
-            if (recruitmentWindow != null) CloseRecruitment();
+            if (saleWindow != null) { CloseSale(); evt.StopPropagation(); }
+            else if (recruitmentWindow != null) CloseRecruitment();
             else if (stage.CounterFocused) CloseCounter();
         }
 
@@ -332,7 +339,7 @@ namespace RaidPartyManager.Presentation
                 evt.StopPropagation();
                 return;
             }
-            if (stage.CounterReady && stockLayer.enabledInHierarchy)
+            if (saleWindow == null && stage.CounterReady && stockLayer.enabledInHierarchy)
                 Hover(offers.FirstOrDefault(offer => !offer.Sold && offer.View.worldBound.Contains(evt.position)));
         }
 
@@ -418,7 +425,8 @@ namespace RaidPartyManager.Presentation
             else counterVisit.style.display = DisplayStyle.None;
 
             bool ready = stage.CounterReady;
-            closeUpHint.style.display = ready ? DisplayStyle.Flex : DisplayStyle.None;
+            closeUpHint.style.display = ready && saleWindow == null ? DisplayStyle.Flex : DisplayStyle.None;
+            sellEntry.style.display = ready && saleWindow == null ? DisplayStyle.Flex : DisplayStyle.None;
             foreach (var offer in offers)
             {
                 if (offer.Sold) continue;
@@ -490,9 +498,9 @@ namespace RaidPartyManager.Presentation
         }
 
         private bool SignRecruit(CharacterDefinition candidate, string replacedMemberId = null, int days = 12,
-            PerformanceBonuses terms = default, bool clause = false, int? dailyWage = null)
+            PerformanceBonuses terms = default, long? signingFee = null)
         {
-            bool signed = adventure != null ? adventure.SignShopRecruit(candidate.Id, replacedMemberId, days, terms, clause, dailyWage) :
+            bool signed = adventure != null ? adventure.SignShopRecruit(candidate.Id, replacedMemberId, days, terms, signingFee) :
                 recruitment.TrySign(candidate.Id, replacedMemberId);
             if (!signed) return false;
             GameAudio.Play(SoundCue.CompanionJoin);
@@ -506,6 +514,7 @@ namespace RaidPartyManager.Presentation
 
         private void OpenEditor()
         {
+            CloseSale();
             CloseRecruitment();
             CancelPurchaseHold();
             topBar.EditParty(() => stage.ShowCompany(party, content), edited: adventure == null ? BattlePrototype.MarkPartyEdited : null);

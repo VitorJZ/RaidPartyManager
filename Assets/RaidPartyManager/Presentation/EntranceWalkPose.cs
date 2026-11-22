@@ -30,7 +30,7 @@ namespace RaidPartyManager.Presentation
                 {
                     name = "walking-paper",
                     image = sheet,
-                    sourceRect = new Rect(0, 0, sheet.width / 8, sheet.height / 4),
+                    sourceRect = new Rect(0, 0, sheet.width / AnimationCels.Count, sheet.height / 4),
                     scaleMode = ScaleMode.StretchToFill,
                     pickingMode = PickingMode.Ignore,
                     Walk = new Vector4(1, 0, facesLeft ? -1 : 1, stride)
@@ -54,7 +54,7 @@ namespace RaidPartyManager.Presentation
             frame = index;
             if (paper != null)
             {
-                float phase = index * 2 * Mathf.PI / 6;
+                float phase = index * 2 * Mathf.PI / AnimationCels.Count;
                 paper.Walk = new Vector4(Mathf.Cos(phase), Mathf.Sin(phase), facesLeft ? -1 : 1, stride);
             }
             else
@@ -67,8 +67,8 @@ namespace RaidPartyManager.Presentation
             if (frame < 0 || size.x <= 0 || size.y <= 0)
                 return;
 
-            // Contact, passing, and lift alternate between the two legs over six poses.
-            float phase = frame * 2f * Mathf.PI / 6f;
+            // Contact, passing, and lift alternate between the two legs over the walk cycle.
+            float phase = frame * 2f * Mathf.PI / AnimationCels.Count;
             float footSwing = Mathf.Cos(phase);
             float footLift = Mathf.Sin(phase);
             float rise = Mathf.Abs(footLift);
@@ -90,7 +90,7 @@ namespace RaidPartyManager.Presentation
                     Vector2 point = new Vector2(
                         size.x * (x + direction * (step + 0.045f * upperBody - 0.025f * upperBody * footSwing)),
                         size.y * (y - raisedFoot - 0.025f * rise * (1f - knees)));
-                    float frameX = (0.5f + x * (sheet.width / 8 - 1)) / sheet.width;
+                    float frameX = (0.5f + x * (sheet.width / AnimationCels.Count - 1)) / sheet.width;
                     float frameY = 1f - (0.5f + y * (sheet.height / 4 - 1)) / sheet.height;
                     mesh.SetNextVertex(new Vertex
                     {

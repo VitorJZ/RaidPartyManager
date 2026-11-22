@@ -18,7 +18,8 @@ namespace RaidPartyManager.Presentation
         private readonly Label conditions;
 
         public BattleCharacterDetails(int position, CharacterDefinition character, IReadOnlyList<EquipmentDefinition> equipment,
-            IReadOnlyList<SkillBookDefinition> skills, Func<string, Texture2D> iconFor, PlayerTrait talent, Personality personality)
+            IReadOnlyList<SkillBookDefinition> skills, Func<string, Texture2D> iconFor, PlayerTrait talent, Personality personality,
+            IReadOnlyList<bool> disabledSlots = null)
         {
             name = "battle-character-details";
             style.position = Position.Absolute;
@@ -30,7 +31,7 @@ namespace RaidPartyManager.Presentation
             Add(Field("name", $"{character.Name} · {position} 号位", 16, PrototypeStyle.Accent));
             Add(Field("personality", $"性格  {EmployeeVoice.For(personality).Name}", 12, PrototypeStyle.Muted));
             if (!string.IsNullOrWhiteSpace(character.TraitText))
-                Add(Field("trait", $"固定特性  {character.TraitText}", 12, PrototypeStyle.Muted));
+                Add(Field("trait", $"被动 · {character.TraitText}", 12, PrototypeStyle.Muted));
 
             if (talent != PlayerTrait.None) Add(Field("random-trait", PlayerMarket.Describe(talent), 12, PrototypeStyle.Accent));
             health = Field("health", "", 15, PrototypeStyle.Ally);
@@ -80,8 +81,10 @@ namespace RaidPartyManager.Presentation
             for (int slot = 0; slot < equipment.Count; slot++)
             {
                 var item = equipment[slot];
-                Add(Field($"slot-{slot + 1}", $"{slot + 1} · {item?.Name ?? "空槽"}", 13,
-                    item != null ? PrototypeStyle.Ink : PrototypeStyle.Muted));
+                bool disabled = disabledSlots?[slot] == true;
+                string name = item?.Name ?? "空槽";
+                Add(Field($"slot-{slot + 1}", $"{slot + 1} · {name}{(disabled ? " · 本场失效" : "")}", 13,
+                    item != null && !disabled ? PrototypeStyle.Ink : PrototypeStyle.Muted));
                 if (item == null)
                     continue;
                 var effect = Field($"item-effect-{slot + 1}", string.IsNullOrWhiteSpace(item.Description)
@@ -96,7 +99,7 @@ namespace RaidPartyManager.Presentation
         internal void ShowCopiedTrait(CharacterDefinition source)
         {
             var label = this.Q<Label>("battle-detail-trait");
-            if (label != null) label.text = $"本场特性 · {source.Name}　{source.TraitText}";
+            if (label != null) label.text = $"本场被动 · {source.Name}　{source.TraitText}";
         }
 
         public void Refresh(Stats stats, int currentHealth, int shield, IReadOnlyList<StatusStack> statuses,

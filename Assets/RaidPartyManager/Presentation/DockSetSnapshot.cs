@@ -12,6 +12,7 @@ namespace RaidPartyManager.Presentation
         private readonly List<Object> resources = new();
         private readonly Dictionary<(Material, Texture), Material> inks = new();
         private readonly Dictionary<Mesh, Mesh> patterns = new();
+        private readonly List<DockRoadpost> roadposts = new();
         private readonly List<Piece> pieces = new();
         private readonly List<MeshRenderer> soft = new();
         private readonly List<Transform> flown = new();
@@ -23,6 +24,7 @@ namespace RaidPartyManager.Presentation
         internal void AnimateBackdrop() => Scenery?.Apply(Sky, block);
         internal MeshRenderer Floor { get; }
         internal bool Moon { get; }
+        internal StageLighting Lighting { get; }
         private readonly float wing;
 
         private sealed class Piece
@@ -44,6 +46,7 @@ namespace RaidPartyManager.Presentation
             root = new GameObject("Travelling dock set");
             Object.DontDestroyOnLoad(root);
             Moon = set.Moon;
+            Lighting = set.Lighting;
             Scenery = set.Scenery;
             var hinges = new Dictionary<Vector2, Piece>();
             foreach (var source in set.Root.GetComponentsInChildren<MeshRenderer>())
@@ -106,6 +109,22 @@ namespace RaidPartyManager.Presentation
             }
         }
 
+        internal void TakeRoadposts(DockSet set)
+        {
+            foreach (var sign in set.Roadposts)
+            {
+                if (!sign.Foot.gameObject.activeSelf) continue;
+                var hinge = new GameObject("Roadstone hinge").transform;
+                hinge.SetParent(root.transform, false);
+                hinge.position = sign.Foot.position;
+                sign.Foot.SetParent(hinge, true);
+                sign.Travelling = true;
+                pieces.Add(new Piece { hinge = hinge, foot = hinge.position });
+                roadposts.Add(sign);
+            }
+            set.Roadposts.Clear();
+        }
+
         internal void CastAt(float fractionOnstage, bool entering, float seconds)
         {
             float on = Mathf.Clamp01(fractionOnstage);
@@ -123,10 +142,10 @@ namespace RaidPartyManager.Presentation
                 bool walking = progress < .999f || !entering;
                 if (walking && actor.player.Walk != null)
                 {
-                    int cel = Mathf.FloorToInt(seconds * 13 + i) % 6;
+                    int cel = AnimationCels.Loop(seconds + i / 13f, 6f / 13f);
                     view.GetPropertyBlock(block);
                     block.SetTexture("_MainTex", actor.player.Walk);
-                    block.SetVector("_MainTex_ST", new Vector4(1f/3, .5f, cel % 3 / 3f, .5f - cel / 3 * .5f));
+                    block.SetVector("_MainTex_ST", AnimationCels.UV(cel));
                     block.SetColor("_Color", Color.white);
                     view.SetPropertyBlock(block);
                     // All player travel sheets are painted facing stage right. Seated cards may be mirrored.
@@ -181,6 +200,7 @@ namespace RaidPartyManager.Presentation
         internal void Dispose()
         {
             root.SetActive(false);
+            foreach (var sign in roadposts) sign.Dispose();
             Object.Destroy(root);
             foreach (var resource in resources) Object.Destroy(resource);
         }

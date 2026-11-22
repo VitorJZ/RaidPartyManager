@@ -23,7 +23,9 @@ namespace RaidPartyManager.Run
         public bool FloorCleared;
         public bool Failed;
         public bool QuestActive;
-        public int QuestWins;
+        public int QuestWins; // Progress in original patrol-only saves.
+        public string CommissionId;
+        public int QuestProgress, CommissionGold;
         public string ReturnMessage;
         public RouteCheckpointNode[] Nodes;
         public NodeKind[] Options;
@@ -58,6 +60,7 @@ namespace RaidPartyManager.Run
     [Serializable]
     public sealed class ShopVisitCheckpoint
     {
+        public string[] Commissions;
         public bool Signed;
         public string[] Slots;
         public string[] Candidates;
@@ -65,7 +68,7 @@ namespace RaidPartyManager.Run
         public TownService[] UsedServices;
         public string[] TownRecruits;
         public string PendingRecruit;
-        public int BrokerRefusals, BrokerCounter;
+        public int BrokerRefusals, BrokerCounter, BrokerLastAsk;
         public string BrokerMember;
         public bool Rested;
         public string Message;
@@ -167,6 +170,7 @@ namespace RaidPartyManager.Run
         public int Position;
         public int Health;
         public int PermanentAttack, PermanentHealth;
+        public CampTraining Training;
         public bool IsAway;
         public CheckpointStatus[] Statuses;
         public string[] Slots;

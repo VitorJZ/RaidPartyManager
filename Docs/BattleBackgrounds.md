@@ -110,3 +110,5 @@ Location 终末斗兽场. A grand abandoned terminal colosseum. Vast weathered c
 ```
 
 </details>
+
+战斗、城镇设施和事件的 38 组动态布景均有 16 张连续画面，路径在 `SceneryCels/{Backdrops,Panoramas}/0…15/`。完整循环为 1.5 秒。

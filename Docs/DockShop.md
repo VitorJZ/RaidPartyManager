@@ -1,19 +1,23 @@
 # 码头商店
 
-从主菜单选择「商店」进入 `Assets/Scenes/DockShop.unity`。每次进入测试场景以 999 金币开始，金币显示在顶栏。
+在城镇选择「商店」进入 `Assets/Scenes/DockShop.unity`。每次进入测试场景以 999 金币开始，金币显示在顶栏。
 
 四件商品并排摆在柜台上，每次随机选择两件 T1 和两件 T2／T3 商品，同次访问的四件商品互不重复，四个台面位置随机排列。装备档位沿用 Excel「装备图鉴」，有售价的装备与药水按表中基价的 85% 四舍五入。技能书沿用 T1／T2／T3 各 35／25／15 金币的基价。商品界面显示名称、效果和本次售价，档位供内部配货和商人表情使用。
 
 每次进店为各商品生成一次售价，计算为 `ceil(基础价格 × 随机系数)`，系数范围为 0.7～1.3。悬停、查看近景和购买沿用本次售价，实际扣款与标价一致。
 
-| 指针或操作 | 商人反馈 |
+柜台后是人才市场的女说书人，穿着同一套高帽、假胡子和单片眼镜的戏服。
+
+| 指针或操作 | 说书人反馈 |
 | --- | --- |
-| 空白处 | 基础微笑 |
-| T2 或 T3 商品 | 更开心的笑容 |
-| T1 商品 | 最开心的笑容 |
-| 购买成功 | 切换到张嘴大笑立绘，约 1 秒内上下抖动，再恢复当前悬停对应的表情 |
+| 空白处 | 16 帧呼吸待机 |
+| T2 或 T3 商品 | 摊手招呼客人 |
+| T1 商品 | 举起金币 |
+| 买卖成交 | 笑着轻跳，约 1 秒后恢复待机或当前悬停表情 |
 
 点击柜台查看商品，镜头会推进到台面。悬停查看详情，长按商品约半秒完成购买。长按时松手或移开指针会取消。点击空白处或按 Esc，镜头退回商店全景。购买成功后扣除标价，商品从台面移除并放入当前队伍的共享背包。金币不足时显示提示。
+
+点击柜台近景中的「出售背包物品」，勾选任意多种闲置装备和未学习的技能书，用加减按钮调整同类数量，再按合计件数和金额一次结算。售价按基础价的一半向下取整，Boss 专属装备和技能书每件回收 100 金币。正式讨伐中的收入沿用队伍钱包的欠薪结清规则。
 
 ## 角色招募转盘
 
@@ -25,19 +29,19 @@
 
 每趟讨伐以 `15` 金币起价，每转一次扣除显示的费用，再加 `05`。以 `95` 金币转动后，下次显示 `00`，可免费转一次。价格在同一趟讨伐的各商店间延续。当前商店抽过卡后，保存并退出会记录八格角色、候选、已签约状态和商品成交状态。
 
-35 名角色的正视呼吸图集按图鉴编号存放于 `Art/Shop/Resources/RecruitmentFront/`。每张图集为三列两行，按从左到右、从上到下的顺序读取六帧。正视底图由内置 ImageGen 依据角色立绘及营地坐姿生成，提示为「保留每个角色的脸、装备、配色和笔触，生成透明底、正面站立的完整身形」。六帧在此基础上以固定脚底为支点，逐帧展开并放松肩胸和衣摆。侧身步行沿用战斗步态。两种朝向按角色实际有色像素的高度和脚底留白校准，人物跑到靠观众席的舞台前沿后转身。
+35 名角色的正视呼吸图集按图鉴编号存放于 `Art/Shop/Resources/RecruitmentFront/`。每张图集为四列四行，按从左到右、从上到下的顺序读取 16 帧。正视底图由内置 ImageGen 依据角色立绘及营地坐姿生成，提示为「保留每个角色的脸、装备、配色和笔触，生成透明底、正面站立的完整身形」。16 帧在此基础上以固定脚底为支点，逐帧展开并放松肩胸和衣摆。侧身步行沿用战斗步态。两种朝向按角色实际有色像素的高度和脚底留白校准，人物跑到靠观众席的舞台前沿后转身。
 
-商品和价格牌放在柜台上。通往下一站的木牌由画面上方垂下的双绳悬挂，点击区域随镜头投影。
+商品和价格牌放在柜台上。柜台远景的右侧有一块带城镇图标的石质路牌，点击返回城镇主页，再从主页选择下一站。
 
 ![商店预览](Previews/DockShop.png)
 
-背景、商人、货架和收银台分别存于 `Assets/RaidPartyManager/Art/Shop/`。商人图集为三列一行，从左往右依次是基础微笑、开心和最开心的笑容。三个表情共用人物尺度与身体姿势。成交时显示单独的透明立绘 `DockShop-Merchant-Laugh.png`。
+柜台、货架和室内背景位于 `Art/Shop/`。柜台后的女说书人和人才市场共用 `StoryEvents/Cast/` 下的素材。站姿按 4 × 4 排列，半身表情按 8 × 8 排列，每种表情占连续两行，共 16 帧。
 
 | 素材 | 用途 |
 | --- | --- |
 | [DockShop-Interior.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Interior.png) | 码头商店室内背景 |
-| [DockShop-Merchant.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Merchant.png) | 三表情透明图集 |
-| [DockShop-Merchant-Laugh.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Merchant-Laugh.png) | 成交时的张嘴大笑立绘 |
+| [BrokerIdle.png](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/Cast/BrokerIdle.png) | 女说书人 16 帧待机 |
+| [BrokerPortraits.png](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/Cast/BrokerPortraits.png) | 看货和成交时的说书人半身像 |
 | [DockShop-Shelf.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Shelf.png) | 四格透明货架 |
 | [DockShop-Counter.png](../Assets/RaidPartyManager/Art/Shop/DockShop-Counter.png) | 透明收银台 |
 

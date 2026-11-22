@@ -9,10 +9,10 @@ namespace RaidPartyManager.Presentation
     {
         private enum Motion { Idle, Action, Hit, Death }
 
-        private const int Columns = 8;
+        private const int Columns = AnimationCels.Count;
         private const int Rows = 4;
         private const int AttackColumns = 4;
-        private const int AttackRows = 2;
+        private const int AttackRows = 4;
         private const float IdleLength = 1.6f;
         private static readonly float[] HitEnds = { 0.07f, 0.17f, 0.28f, 0.40f };
         private static readonly float[] DeathEnds = { 0.08f, 0.19f, 0.32f, 0.46f, 0.60f, 0.74f, 0.87f, 1f };
@@ -218,7 +218,7 @@ namespace RaidPartyManager.Presentation
                 case Motion.Action:
                     elapsed /= actionScale;
                     bool guarding = SimpleGuard;
-                    frame = guarding ? 2 * Columns + (elapsed < 0.12f ? 0 : elapsed < 0.36f ? 1 : 3)
+                    frame = guarding ? 2 * Columns + AnimationCels.At(elapsed / actionLength)
                         : Columns + FrameAt(actionEnds, elapsed);
                     if (profession == Profession.Warrior && action == ActionKind.Attack)
                         offset = Mathf.Sin(elapsed / actionLength * Mathf.PI) * 4f;
@@ -239,7 +239,7 @@ namespace RaidPartyManager.Presentation
             figure.style.translate = new Translate(FacesLeft ? -offset : offset, lift, 0f);
             if (effectProgress >= 0f || light >= 0f)
             {
-                effectProgress = light;
+                effectProgress = light < 0 ? -1 : AnimationCels.Phase(light);
                 effects.MarkDirtyRepaint();
             }
         }
@@ -249,14 +249,12 @@ namespace RaidPartyManager.Presentation
             float progress = Mathf.Clamp01(elapsed / DeathEnds[^1]);
             if (retreatWalk != null)
             {
-                int frame = (int)(elapsed * 16f) % 6;
+                int frame = AnimationCels.Loop(elapsed, 6f / 16f);
                 if (displayedFrame != frame || figure.image != retreatWalk)
                 {
                     displayedFrame = frame;
                     figure.image = retreatWalk;
-                    int width = retreatWalk.width / 3;
-                    int height = retreatWalk.height / 2;
-                    figure.sourceRect = new Rect(frame % 3 * width, frame / 3 * height, width, height);
+                    figure.sourceRect = AnimationCels.RectFor(retreatWalk, frame);
                     figure.MarkDirtyRepaint();
                 }
             }
@@ -312,7 +310,9 @@ namespace RaidPartyManager.Presentation
             int frame = 0;
             while (frame < frameEnds.Length - 1 && elapsed >= frameEnds[frame])
                 frame++;
-            return frame;
+            float start = frame == 0 ? 0 : frameEnds[frame - 1];
+            float subpose = Mathf.InverseLerp(start, frameEnds[frame], elapsed);
+            return AnimationCels.At((frame + subpose) / frameEnds.Length);
         }
 
         private void ShowFrame(int frame)

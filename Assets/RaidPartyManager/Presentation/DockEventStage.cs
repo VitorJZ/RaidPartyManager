@@ -9,11 +9,21 @@ namespace RaidPartyManager.Presentation
     internal sealed class DockEventStage : ServiceStage
     {
         internal bool Cemetery { get; }
+        internal bool Capital { get; }
+
+        internal Texture2D RouteStone => art.graveyardStone;
 
         public DockEventStage(Transform owner, VisualElement panel, ServiceStageArt art, bool treasure,
-            AdventureEventKind? play = null, bool graveyard = false) : base(owner, panel, art)
+            AdventureEventKind? play = null, bool graveyard = false, bool capital = false, int cityDistrict = 0)
+            : base(owner, panel, art, capital || CapitalStories.Contains(play) ? StageLighting.Clockwork(VenueFor(play)) : StageLighting.For(graveyard || GraveStories.Contains(play), VenueFor(play)))
         {
             Cemetery = graveyard || GraveStories.Contains(play);
+            Capital = capital || CapitalStories.Contains(play);
+            if (Capital)
+            {
+                DressCapital(CapitalStories.Contains(play) ? CapitalStories.For(play.Value).District : cityDistrict);
+                return;
+            }
             string cloth = play switch
             {
                 AdventureEventKind.Investor => "SailLoft",
@@ -81,6 +91,15 @@ namespace RaidPartyManager.Presentation
             }
         }
 
+        private static StageVenue VenueFor(AdventureEventKind? play) => play switch
+        {
+            AdventureEventKind.Auction or AdventureEventKind.Obituary or AdventureEventKind.ClaimDesk
+                or AdventureEventKind.DeadLetters or AdventureEventKind.Sponsorship or AdventureEventKind.BorrowedName
+                or AdventureEventKind.Alchemist or AdventureEventKind.Investor or AdventureEventKind.HatTrick => StageVenue.Interior,
+            AdventureEventKind.SoupQueue or AdventureEventKind.Forge => StageVenue.Firelight,
+            _ => StageVenue.Outdoors
+        };
+
         private void DressCemetery(AdventureEventKind? play)
         {
             switch (play)
@@ -141,7 +160,8 @@ namespace RaidPartyManager.Presentation
 
         private MeshRenderer chest;
         private Light treasureLight;
-        private AdventureContentAsset chestArt;
+        private Texture2D chestOpening;
+        private Texture2D openedChest;
         private float unlockedAt = -1;
         private bool chestOpen;
         private static readonly Vector3 ChestMark = new(.9f,1.32f,-3.65f);
@@ -149,7 +169,8 @@ namespace RaidPartyManager.Presentation
         internal void PlaceChest(AdventureContentAsset assets, bool opened)
         {
             if (chest != null) return;
-            chestArt = assets;
+            chestOpening = Resources.Load<Texture2D>("StoryEvents/ChestOpening");
+            openedChest = assets.ChestOpen;
             chestOpen = opened;
             chest = Flat(Cemetery ? "Graveyard treasure chest" : "Harbour treasure chest",ChestMark,2.64f,2.64f,opened ? assets.ChestOpen : assets.ChestClosed);
             Shadow(new Vector3(ChestMark.x,0,ChestMark.z),2.48f,1.15f);
@@ -174,7 +195,8 @@ namespace RaidPartyManager.Presentation
             {
                 float shake = Mathf.Sin(elapsed*55) * 3 * (1-Mathf.Clamp01(elapsed/.24f));
                 chest.transform.rotation = Quaternion.Euler(0,0,shake);
-                SetFrame(chest,elapsed < .24f ? chestArt.ChestClosed : elapsed < .46f ? chestArt.ChestAjar : chestArt.ChestOpen,1,0);
+                if (elapsed >= .62f) SetFrame(chest, openedChest, 1, 0);
+                else SetFrame(chest, chestOpening, AnimationCels.Count, AnimationCels.At(elapsed / .62f));
                 treasureLight.intensity += Mathf.Sin(Mathf.PI*Mathf.Clamp01(elapsed/.72f)) * 1.8f;
                 if (elapsed >= .62f) GameAudio.Play(SoundCue.ChestOpen);
                 chestOpen = elapsed >= .62f;
@@ -213,41 +235,37 @@ namespace RaidPartyManager.Presentation
         private AdventureEventKind graveKind;
         private float gravePhaseStarted;
         private int gravePhase;
-        private bool graveCuePlaying, graveResting;
+        private bool graveCuePlaying;
         internal bool GraveCueFinished => !graveCuePlaying;
         internal void CueGraveAction()
         {
             if (graveProp == null) return;
             gravePhase = 0;
             gravePhaseStarted = -1;
-            SetFrame(graveProp, propArt, 3, 0);
-            SetFrame(resident, tellerStrip, 4, 1);
+            SetFrame(graveProp, propArt, AnimationCels.Count, 0);
+            SetFrame(resident, tellerStrip, AnimationCels.Count, 0);
             graveCuePlaying = true;
-            graveResting = false;
         }
 
         private void AnimateGrave()
         {
             if (!graveCuePlaying) return;
-            var cue = GraveStories.Timing(graveKind);
+            var cue = CapitalStories.Contains(graveKind) ? (lead: .32f, action: .56f, hold: .36f) : GraveStories.Timing(graveKind);
             float now = Time.unscaledTime;
             if (gravePhaseStarted < 0) gravePhaseStarted = now;
             float duration = gravePhase == 0 ? cue.lead : gravePhase == 1 ? cue.action : cue.hold;
-            if (now - gravePhaseStarted < duration) return;
-            if (gravePhase < 2)
-            {
-                gravePhase++;
-                gravePhaseStarted = now;
-                SetFrame(graveProp, propArt, 3, gravePhase);
-                SetFrame(resident, tellerStrip, 4, gravePhase + 1);
-                return;
-            }
-            graveCuePlaying = false;
-            graveResting = true;
+            int first = gravePhase == 0 ? 0 : gravePhase == 1 ? 5 : 12;
+            int end = gravePhase == 0 ? 5 : gravePhase == 1 ? 12 : AnimationCels.Count;
+            float progress = Mathf.Clamp01((now - gravePhaseStarted) / duration);
+            int cel = Mathf.Min(end - 1, first + (int)(progress * (end - first)));
+            SetFrame(graveProp, propArt, AnimationCels.Count, cel);
+            SetFrame(resident, tellerStrip, AnimationCels.Count, cel);
+            if (progress < 1) return;
+            if (++gravePhase < 3) gravePhaseStarted = now;
+            else graveCuePlaying = false;
         }
+
         private int beat = -1;
-        private static readonly int[] Gestures = { 0,0,1,1,2,2,1,3,3,0 };
-        private static readonly int[] Pecks = { 0,0,0,1,2,2,3,3,3,0 };
         internal static Texture2D EventProp(AdventureEventKind kind) =>
             Resources.Load<Texture2D>("StoryEvents/" + kind);
 
@@ -261,8 +279,9 @@ namespace RaidPartyManager.Presentation
             if (resident != null || !kind.HasValue) return;
             bool lab = kind == AdventureEventKind.Alchemist;
             bool atTable = lab || kind is AdventureEventKind.HatTrick or AdventureEventKind.Auction;
-            bool cemetery = GraveStories.Contains(kind);
-            tellerStrip = Resources.Load<Texture2D>("StoryEvents/Cast/" + (cemetery ? "GraveChronicler" : kind.Value.ToString()));
+            bool city = CapitalStories.Contains(kind);
+            bool cemetery = GraveStories.Contains(kind) || city;
+            tellerStrip = Resources.Load<Texture2D>("StoryEvents/Cast/" + (city ? (CapitalStories.For(kind.Value).District switch { 0 => "LostTraveler", 1 => "Forge", _ => "Investor" }) : cemetery ? "GraveChronicler" : kind.Value.ToString()));
             var mark = atTable ? new Vector3(Table.x+(lab ? .8f : 1.25f),.95f,Table.z+.95f) : new Vector3(kind == AdventureEventKind.Ambush ? 2.2f : 3.2f,.95f,-2.15f);
             if (kind == AdventureEventKind.Auction)
             {
@@ -270,8 +289,8 @@ namespace RaidPartyManager.Presentation
                 Box("Auctioneer's rostrum", new Vector3(mark.x, .205f, mark.z), new Vector3(1.15f,.41f,.94f),
                     art.timber, new Color(.54f,.43f,.38f));
             }
-            resident = Flat("Dock storyteller", mark, 1.9f*tellerStrip.width/(4*tellerStrip.height),1.9f,tellerStrip);
-            SetFrame(resident,tellerStrip,4,0);
+            resident = Flat("Dock storyteller", mark, 1.9f*tellerStrip.width/tellerStrip.height,1.9f,tellerStrip);
+            SetFrame(resident,tellerStrip,AnimationCels.Count,0);
             residentMark = mark;
             residentShadow = Shadow(new Vector3(mark.x,kind == AdventureEventKind.Auction ? .41f : 0,mark.z),.85f,.44f);
             Dressing.Cast[resident] = new DockSet.Player(true);
@@ -290,7 +309,7 @@ namespace RaidPartyManager.Presentation
                     Dressing.Hinges[caseShadows[i]] = new Vector2(Table.x, Table.z);
                     cases[i] = Flat("Auction case " + i, markOnTable, 1.04f, 1.04f, strip);
                     caseStrips[i] = strip;
-                    SetFrame(cases[i], strip, 2, run.AuctionInspected == i ? 1 : 0);
+                    SetFrame(cases[i], strip, AnimationCels.Count, run.AuctionInspected == i ? AnimationCels.Count - 1 : 0);
                     Dressing.Hinges[cases[i]] = new Vector2(Table.x, Table.z);
                 }
                 returningWide = visit.Resolved;
@@ -299,7 +318,7 @@ namespace RaidPartyManager.Presentation
             propArt = EventProp(kind.Value);
             bool coins = kind == AdventureEventKind.FoundCoins;
             float width = atTable ? 1.05f : coins ? 1.78f : 2.22f;
-            float height = width * propArt.height / (propArt.width / (coins ? 4f : cemetery ? 3f : 1f));
+            float height = width * propArt.height / propArt.width;
             if (height > 2.25f) { width *= 2.25f / height; height = 2.25f; }
             float x = atTable ? -2.05f : .23f, y = 0, z = atTable ? Table.z+.95f : -2.45f;
             if (lab) { width = .60f; height = width*propArt.height/propArt.width; x = Table.x-1.47f; y = Table.y+.03f; z = Table.z+.15f; }
@@ -310,10 +329,10 @@ namespace RaidPartyManager.Presentation
             {
                 graveProp = prop;
                 graveKind = kind.Value;
-                SetFrame(prop, propArt, 3, 0);
+                SetFrame(prop, propArt, AnimationCels.Count, 0);
                 CueGraveAction();
             }
-            if (coins) { gull = prop; SetFrame(gull,propArt,4,0); }
+            if (coins) { gull = prop; SetFrame(gull,propArt,AnimationCels.Count,0); }
             if (!atTable) return;
             BuildTable(lab);
             if (!lab) { BuildHats(assets.Hat); return; }
@@ -351,6 +370,7 @@ namespace RaidPartyManager.Presentation
         private readonly MeshRenderer[] cases = new MeshRenderer[3];
         private readonly MeshRenderer[] caseShadows = new MeshRenderer[3];
         private readonly Texture2D[] caseStrips = new Texture2D[3];
+        private readonly float[] caseOpening = { -1, -1, -1 };
         internal Rect AuctionTarget(int slot) => ProjectBounds(cases[slot].bounds);
         internal bool HitCase(int slot, Vector2 viewport)
         {
@@ -364,10 +384,21 @@ namespace RaidPartyManager.Presentation
             if (u < 0 || u > 1 || v < 0 || v > 1) return false;
             card.GetPropertyBlock(properties);
             var uv = properties.GetVector("_MainTex_ST");
-            return caseStrips[slot].GetPixelBilinear(u * uv.x + uv.z, v).a > .15f;
+            return caseStrips[slot].GetPixelBilinear(u * uv.x + uv.z, v * uv.y + uv.w).a > .15f;
         }
 
-        internal void OpenCase(int slot) => SetFrame(cases[slot], caseStrips[slot], 2, 1);
+        internal void OpenCase(int slot) => caseOpening[slot] = Time.unscaledTime;
+
+        private void AnimateCases()
+        {
+            for (int i = 0; i < caseOpening.Length; i++)
+            {
+                if (caseOpening[i] < 0 || !cases[i].enabled) continue;
+                int frame = AnimationCels.At((Time.unscaledTime - caseOpening[i]) / .45f);
+                SetFrame(cases[i], caseStrips[i], AnimationCels.Count, frame);
+                if (frame == AnimationCels.Count - 1) caseOpening[i] = -1;
+            }
+        }
         internal void TakeCase(int slot) => cases[slot].enabled = caseShadows[slot].enabled = false;
         internal void FocusCases(bool focus) => returningWide = !focus;
 
@@ -460,13 +491,14 @@ namespace RaidPartyManager.Presentation
         {
             FrameCamera();
             if (chest != null) AnimateChest();
-            int nextBeat = Mathf.FloorToInt(Time.unscaledTime * 4) % Gestures.Length;
+            int nextBeat = AnimationCels.Loop(Time.unscaledTimeAsDouble, 2.5);
+            if (cases[0] != null) AnimateCases();
             if (graveProp != null && !DockPlayhouse.Moving) AnimateGrave();
             if (resident != null && !graveCuePlaying && beat != nextBeat && !DockPlayhouse.Moving)
             {
                 beat = nextBeat;
-                SetFrame(resident,tellerStrip,4,graveResting ? (beat < 7 ? 0 : 1) : Gestures[beat]);
-                if (gull != null) SetFrame(gull,propArt,4,Pecks[beat]);
+                SetFrame(resident,tellerStrip,AnimationCels.Count,beat);
+                if (gull != null) SetFrame(gull,propArt,AnimationCels.Count,beat);
             }
             if (hats[0] == null && bottles[0] == null && cases[0] == null) return;
             if (lensAspect != camera.aspect)

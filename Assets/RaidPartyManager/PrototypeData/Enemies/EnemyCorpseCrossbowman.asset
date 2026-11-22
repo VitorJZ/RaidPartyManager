@@ -16,6 +16,7 @@ MonoBehaviour:
   displayName: "收尸弩手"
   portrait: {fileID: 2800000, guid: b8aa0ec89c774c619d05c03bb66ccdbe, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: 428efbaedfcf4ebd938ade6006357759, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: d54ca3537fab516e8ee6c821efb4401d, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: 4feaab2673e24cb091ac762de330e5dc, type: 3}
   battleSpecialSheet: {fileID: 2800000, guid: b0a575316d5f42b29da5e82381633117, type: 3}
   battleSpecialEffect: {fileID: 2800000, guid: 93c9bc7eca1e4cd7bfd2411c55918bd3, type: 3}

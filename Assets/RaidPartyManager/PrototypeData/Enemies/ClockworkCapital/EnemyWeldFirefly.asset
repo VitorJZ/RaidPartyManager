@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyWeldFirefly
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyWeldFirefly
+  displayName: "焊弧萤"
+  portrait: {fileID: 2800000, guid: 2b7e9fe7518753b1994974fe50fdcc2e, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 698289bdb1de5475bfab50353a5ce9a1, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 84d33fd3a19d5c87ab45bddd1bab008d, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 2d0f74e043e85e0dbdf2d26cd2fb39ed, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: ebd595d913cb501f989a0c8096ef1015, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: d51c13c11c375980aa7dff683973340e, type: 3}
+  usePortraitInBattle: 0
+  profession: 1
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "焊弧（66%） / 蓝火引燃（34%）"
+  personality: 1
+  attack: 7
+  defense: 1
+  specialDefense: 4
+  health: 25
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 1
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "焊弧"
+      weight: 66
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 1
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "蓝火引燃"
+      weight: 34
+      kind: 0
+      target: 2
+      power: 3
+      damageType: 2
+      status: 6
+      layers: 2
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

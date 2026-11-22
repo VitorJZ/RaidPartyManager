@@ -19,10 +19,66 @@ namespace RaidPartyManager.Tests
             var encounter = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
                 "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
             var stacks = encounter.StartingEquipment.GroupBy(item => item.Id).ToArray();
-            Assert.That(stacks, Has.Length.EqualTo(55));
+            Assert.That(stacks, Has.Length.EqualTo(58));
             Assert.That(stacks.All(stack => stack.Count() == 4 && encounter.IconFor(stack.Key) != null), Is.True);
             Assert.That(stacks.Select(stack => stack.First().Effect).Where(effect => effect != None),
                 Is.EquivalentTo(Enum.GetValues(typeof(EquipmentEffect)).Cast<EquipmentEffect>().Where(effect => effect is not (None or CoinDevourer))));
+        }
+
+        [Test]
+        public void DeployedChantAddsASlotToHerselfAndEveryEmployeeAndReleasesTheItemsWhenBenched()
+        {
+            var singer = Unit("singer", Side.Party, trait: CharacterTrait.ChorusArmory);
+            var ally = Unit("ally", Side.Party, 2);
+            var run = new PartyRun(new[] { singer, ally }.Select(c => new PartyMemberStart(c.Id, c.Character, c.Position, c.Health)),
+                Gear(EchoChalice));
+            var cup = run.Inventory.Single();
+            var secondCup = run.AddEquipment(cup.Definition);
+            Assert.That(run.TryEquip(singer.Id, 3, secondCup.Id), Is.True);
+            Assert.That(run.TryEquip(ally.Id, 3, cup.Id), Is.True);
+            Assert.That(run.TryPlace(ally.Id, null), Is.True);
+            Assert.That(run.Members[1].EquipmentIds[3], Is.EqualTo(cup.Id));
+            Assert.That(run.TryPlace(singer.Id, null), Is.True);
+            Assert.That(run.Members[1].EquipmentIds.Count, Is.EqualTo(3));
+            Assert.That(run.BackpackItems.Select(item => item.Id), Is.EquivalentTo(new[] { cup.Id, secondCup.Id }));
+            Assert.That(run.Members[0].EquipmentIds.Count, Is.EqualTo(3));
+            Assert.That(run.TryPlace(singer.Id, 1), Is.True);
+            Assert.That(run.Members[1].EquipmentIds[3], Is.Null);
+            Assert.That(run.Members[0].EquipmentIds[3], Is.Null);
+        }
+
+        [Test]
+        public void ChantsDeathDisablesOneItemPerEquippedAllyUntilTheNextBattle()
+        {
+            var singer = Unit("singer", Side.Party, stats: new Stats(1, 0, 0, 1), trait: CharacterTrait.ChorusArmory);
+            var mage = Unit("mage", Side.Party, 2);
+            var guard = Unit("guard", Side.Party, 3);
+            var bare = Unit("bare", Side.Party, 4);
+            var foe = Unit("foe", Side.Enemy, stats: new Stats(2, 0, 0, 200));
+            var run = new PartyRun(new[] { singer, mage, guard, bare }.Select(c => new PartyMemberStart(c.Id, c.Character, c.Position, c.Health)),
+                Gear(EchoChalice, MoneyTreeBranch));
+            var cup = run.Inventory.Single(item => item.Definition.Effect == EchoChalice);
+            var branch = run.Inventory.Single(item => item.Definition.Effect == MoneyTreeBranch);
+            var other = run.AddEquipment(new EquipmentDefinition("unchanged", "护肩", new Stats(0, 1, 0, 0)));
+            var singersCup = run.AddEquipment(cup.Definition);
+            Assert.That(run.TryEquip(singer.Id, 3, singersCup.Id), Is.True);
+            Assert.That(run.TryEquip(mage.Id, 0, other.Id), Is.True);
+            Assert.That(run.TryEquip(mage.Id, 3, cup.Id) && run.TryEquip(guard.Id, 0, branch.Id), Is.True);
+            var simulator = new BattleSimulator(random: new FixedRoll(.9));
+            var battle = simulator.Start(run.BeginBattle(new[] { foe }, 3, null));
+            var first = battle.AdvanceRound();
+            var disabled = first.Where(e => e.ActionName == "颂歌落幕").ToArray();
+            Assert.That(disabled.Select(e => e.TargetId), Is.EquivalentTo(new[] { mage.Id, guard.Id }));
+            Assert.That(disabled.Last().Loadout.Disabled, Is.EquivalentTo(new[] { cup.Id, branch.Id }));
+            Assert.That(battle.ReadPartyEnergy().Single(e => e.Key == mage.Id).Value.Capacity, Is.EqualTo(2));
+            Assert.That(run.TryApplyBattleLoadout(battle.Id, disabled.Last().Loadout), Is.True);
+            var second = battle.AdvanceRound();
+            Assert.That(second.Any(e => e.ActionName == "摇钱树枝"), Is.False);
+            while (battle.Result == null) battle.AdvanceRound();
+            Assert.That(run.TryFinishBattle(battle.Result, out _), Is.True);
+            Assert.That(run.Members.Single(m => m.Id == mage.Id).EquipmentIds[3], Is.EqualTo(cup.Id));
+            var next = simulator.Start(run.BeginBattle(new[] { foe }, 1, null));
+            Assert.That(next.ReadPartyEnergy().Single(e => e.Key == mage.Id).Value.Capacity, Is.EqualTo(4));
         }
 
         [TestCase(VigorPotion, "盛气 3", "盛气 2")]
@@ -321,10 +377,22 @@ namespace RaidPartyManager.Tests
             var result = Fight(2, Unit("party", Side.Party, health: 3, gear: Gear(ElvenCharm, ThornsPotion, ThornsPotion)),
                 Unit("enemy", Side.Enemy, stats: new Stats(30, 0, 0, 60)));
             var hits = result.Events.Where(entry => entry.Kind == BattleEventKind.Action && entry.ActorId == "enemy").ToArray();
+            Assert.That(result.Events.Where(entry => entry.CharmTriggered).ToArray(), Is.EqualTo(new[] { hits[0] }));
             Assert.That(hits[0].TargetHealth, Is.EqualTo(15));
             Assert.That(hits[1].TargetHealth, Is.Zero);
             Assert.That(result.Events.Count(entry => entry.ActionName == "荆棘" && entry.ActionKind == ActionKind.Attack),
                 Is.EqualTo(1));
+        }
+
+        [Test]
+        public void CursedCharmStillSignalsItsTargetWhenNoHealingIsPossible()
+        {
+            var unit = Unit("front", Side.Party, health: 1, gear: Gear(ElvenCharm),
+                statuses: new Dictionary<StatusKind, int> { [StatusKind.Cursed] = 4 });
+            var result = Fight(unit, Unit("enemy", Side.Enemy, stats: new Stats(40, 0, 0, 60)));
+            var trigger = result.Events.Single(entry => entry.CharmTriggered);
+            Assert.That((trigger.TargetId, trigger.TargetHealth), Is.EqualTo(("front", 1)));
+            Assert.That(result.Events.Any(entry => entry.ActionName == "精灵护符" && entry.ActionKind == ActionKind.Heal), Is.False);
         }
 
         [Test]
@@ -355,6 +423,7 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Members.Single(member => member.Id == rear.Id).EquipmentIds[1], Is.EqualTo(charms[1].Id));
 
             var shared = battle.AdvanceRound().Single(entry => entry.Loadout != null);
+            Assert.That(personal.CharmTriggered && shared.CharmTriggered, Is.True);
             Assert.That(shared.TargetId, Is.EqualTo(front.Id));
             Assert.That(shared.TargetHealth, Is.EqualTo(15));
             Assert.That(shared.Loadout.Consumed, Is.EquivalentTo(charms.Select(item => item.Id)));
@@ -600,7 +669,6 @@ namespace RaidPartyManager.Tests
                 run.BeginBattle(new[] { enemy, enemyRear }, 2, null));
             var events = battle.AdvanceRound();
 
-            Assert.That(battle.TrySwapPartyPositions(1, 2), Is.False);
             Assert.That(events.Where(entry => entry.ActionName == "古树根茎").Select(entry => entry.Amount),
                 Is.EqualTo(new[] { 3, 3 }));
         }
@@ -661,6 +729,51 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void LightningRingBypassesBothDefensesWhilePhysicalAttacksStillUseDefense()
+        {
+            var wall = Unit("wall", Side.Enemy, stats: new Stats(1, 40, 70, 100));
+            var attacker = Unit("ring", Side.Party, gear: Gear(LightningRing));
+            Assert.That(Action(Fight(attacker, wall), attacker.Id).Amount, Is.EqualTo(attacker.Stats.Attack));
+            Assert.That(Action(Fight(Unit("plain", Side.Party), wall), "plain").Amount, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void RebirthDoublesAttackBeforeDefenseAndLeavesFlatDamageAlone()
+        {
+            var attack = new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 2,
+                additionalDamage: new[] { new DamageComponent(DamageType.Fixed, 3, false) });
+            var hero = Unit("reborn", Side.Party, health: 1, basic: attack, trait: CharacterTrait.Rebirth);
+            var foe = Unit("wall", Side.Enemy, stats: new Stats(3,4,0,100));
+            var battle = new BattleSimulator(random: new FixedRoll(.9)).Start(new BattleRequest("rebirth", new[] { hero, foe }, 3));
+            battle.AdvanceRound();
+            Assert.That(battle.ReadPartyStats().Single().Value.Attack, Is.EqualTo(10));
+            var renewed = battle.AdvanceRound().First(e => e.ActorId == hero.Id && e.Kind == BattleEventKind.Action);
+            Assert.That(renewed.Amount, Is.EqualTo(11)); // (5 × 2 + 2 - 4) + 3
+        }
+
+        [Test]
+        public void ArcherDyingDuringVolleyRemovesTheRemainingBonusShot()
+        {
+            var shooter = Unit("volley", Side.Party, profession: Profession.Archer, trait: CharacterTrait.ArcherVolley);
+            var linked = Unit("linked", Side.Party, 2, health: 3, profession: Profession.Archer, gear: Gear(RedCord));
+            var third = Unit("third", Side.Party, 3, profession: Profession.Archer);
+            var foe = Unit("counter", Side.Enemy, stats: new Stats(2,0,0,100), gear: Gear(CounterHorn));
+            var battle = Fight(shooter, linked, third, foe);
+            Assert.That(battle.HealthById[linked.Id], Is.Zero);
+            Assert.That(battle.Events.Count(e => e.ActorId == shooter.Id && e.ActionName == "逐星连射"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ChalicesAddTwoEnergyPerCopyUpToEight()
+        {
+            for (int count = 0; count <= 4; count++)
+            {
+                var gear = Gear(Enumerable.Repeat(EchoChalice, count).ToArray());
+                Assert.That(BattleEnergy.Full(gear).Capacity, Is.EqualTo(Math.Min(2 + count * 2, 8)));
+            }
+        }
+
+        [Test]
         public void LionStatueBuffsAdjacentAlliesAndBranchGoldSettles()
         {
             var attacker = Unit("attacker", Side.Party, gear: Gear(MoneyTreeBranch));
@@ -673,7 +786,7 @@ namespace RaidPartyManager.Tests
             Assert.That(Action(result, attacker.Id).Amount, Is.EqualTo(attacker.Stats.Attack * 2));
             Assert.That(Action(result, holder.Id).Amount, Is.EqualTo(holder.Stats.Attack));
             Assert.That(Action(result, far.Id).Amount, Is.EqualTo(far.Stats.Attack));
-            Assert.That(result.GoldEarned, Is.EqualTo(1));
+            Assert.That(result.GoldEarned, Is.EqualTo(2));
         }
 
         [Test]
@@ -755,12 +868,12 @@ namespace RaidPartyManager.Tests
         private static Combatant Unit(string id, Side side, int position = 1, int? health = null, Stats? stats = null,
             EquipmentDefinition[] gear = null, IReadOnlyDictionary<StatusKind, int> statuses = null,
             ActionDefinition skill = null, ActionDefinition basic = null, Profession profession = Profession.Warrior,
-            AttackReach reach = AttackReach.Unspecified, int positionSlots = 1)
+            AttackReach reach = AttackReach.Unspecified, int positionSlots = 1, CharacterTrait trait = CharacterTrait.None)
         {
             var attributes = stats ?? new Stats(side == Side.Party ? 5 : 2, 0, 0, 30);
             var definition = new CharacterDefinition(id, id, profession, Personality.Caring, attributes, 1,
                 basic ?? new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0), skill,
-                reach: reach, positionSlots: positionSlots);
+                reach: reach, positionSlots: positionSlots, trait: trait);
             return new Combatant(id, definition, side, position, attributes, health ?? attributes.Health, gear, statuses);
         }
 

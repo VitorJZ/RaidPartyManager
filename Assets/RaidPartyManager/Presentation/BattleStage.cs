@@ -18,12 +18,11 @@ namespace RaidPartyManager.Presentation
         private static readonly int UV = Shader.PropertyToID("_MainTex_ST");
         private static readonly int Walk = Shader.PropertyToID("_Walk");
         private static readonly int Contact = Shader.PropertyToID("_ContactShadow");
-        // Values shared with DockMoonlight.cginc.
+        // These values identify the painted surface in PrintedScenery.shader.
         private enum Surface { Unlit, Sky, Boards, Paper, Haze, CastShadow }
-        private static readonly int MoonSurface = Shader.PropertyToID("_MoonSurface");
+        private static readonly int PaintedSurface = Shader.PropertyToID("_PaintedSurface");
         private static readonly int InkTexelSize = Shader.PropertyToID("_InkTexelSize");
         private static readonly int MoonWorld = Shader.PropertyToID("_MoonWorld");
-        private static readonly int PlayingHalfWidth = Shader.PropertyToID("_PlayingHalfWidth");
         private static readonly int MoonLanding = Shader.PropertyToID("_MoonLanding");
         private readonly bool moonlit, castOnly;
         private readonly Mesh hazeMesh;
@@ -48,7 +47,10 @@ namespace RaidPartyManager.Presentation
         private float halfWidth, halfHeight, cameraHeight, pointerX, dolly;
         private readonly double openedAt;
         private readonly float drapeAspect;
-        private bool disposed;
+        private bool disposed, shotApplied;
+        private VisualElement shotSubject;
+        private float shotHeight, shotWeight;
+        private Matrix4x4 restingLens, shotLens;
         private readonly AudienceForeground audience;
         private readonly DockPlayhouse house;
         private readonly Transform lantern;
@@ -89,8 +91,11 @@ namespace RaidPartyManager.Presentation
             if (castOnly)
             {
                 house = existingHouse;
+                house.Set.Lighting.Apply(paper);
                 paper.SetInt("_PortalTest",(int)CompareFunction.NotEqual);
                 RenderPipelineManager.beginCameraRendering += BeforeCamera;
+                RenderPipelineManager.endCameraRendering += AfterCamera;
+                Camera.onPostRender += RestoreShot;
                 Camera.onPreCull += BeforeCull;
                 Update(now,.3f,0,0);
                 return;
@@ -101,7 +106,8 @@ namespace RaidPartyManager.Presentation
             camera.backgroundColor = new Color32(25, 37, 48, 255);
             if (moonlit) paper.EnableKeyword("RPM_DOCK_MOON");
             if (moonlit || set.turntable) paper.SetInt("_PortalTest", (int)CompareFunction.NotEqual);
-            scenery = new SceneryFlipbook(set.backcloth != null ? set.backcloth : set.region);
+            scenery = set.room != null ? new SceneryFlipbook(set.room.backdrop, set.room.loopSeconds)
+                : new SceneryFlipbook(set.backcloth != null ? set.backcloth : set.region);
             sky = Flat("Cyclorama", scenery.Current, -100, Surface.Sky);
             deck = Flat("Stage floor", set.floor != null ? set.floor : set.region, -60, Surface.Boards);
             upstage = Flat("Upstage", set.upstage, set.moored ? -72 : -48);
@@ -122,6 +128,8 @@ namespace RaidPartyManager.Presentation
             if (moonlit || set.turntable)
             {
                 house = DockPlayhouse.Bind(stage.transform, panel);
+                house.SetLighting(set.room != null ? set.room.Lighting : set.clockwork ? StageLighting.Clockwork(StageVenue.Outdoors) : StageLighting.For(set.turntable));
+                house.Set.Lighting.Apply(paper);
                 house.Set.Sky = sky;
                 house.Set.Scenery = scenery;
                 house.Set.Floor = deck;
@@ -130,7 +138,10 @@ namespace RaidPartyManager.Presentation
                 deck.GetComponent<MeshFilter>().sharedMesh = house.FloorPattern;
             }
             else
+            {
+                StageLighting.Rehearsal.Apply(paper);
                 audience = new AudienceForeground(stage.transform, art.paperShader, art.seatBack, art.apronWood);
+            }
             if (moonlit)
             {
                 if (right != null)
@@ -155,9 +166,13 @@ namespace RaidPartyManager.Presentation
                 hazeVertices = new Vector3[2 * (HazeSegments + 1)];
                 haze = Flat("Moonlit harbour mist", Texture2D.whiteTexture, -52, Surface.Haze);
                 haze.GetComponent<MeshFilter>().sharedMesh = hazeMesh;
+                house.Set.Atmosphere.Add(haze);
+            }
+            if (house != null)
+            {
                 leftShadow = MakeWingShadow(left, set.leftWing);
                 rightShadow = MakeWingShadow(right, set.rightWing);
-                house.Set.Atmosphere.UnionWith(new[] { haze, leftShadow, rightShadow });
+                house.Set.Atmosphere.UnionWith(new[] { leftShadow, rightShadow });
             }
             drapeAspect = (float)art.drapery.width / art.drapery.height;
             if (house == null)
@@ -167,6 +182,8 @@ namespace RaidPartyManager.Presentation
             }
             panel.RegisterCallback<PointerMoveEvent>(OnPointer, TrickleDown.TrickleDown);
             RenderPipelineManager.beginCameraRendering += BeforeCamera;
+            RenderPipelineManager.endCameraRendering += AfterCamera;
+            Camera.onPostRender += RestoreShot;
             Camera.onPreCull += BeforeCull;
             Update(now, 0.3f, 0f, 0f);
         }
@@ -236,7 +253,7 @@ namespace RaidPartyManager.Presentation
             float deckDepth = deckBack - front.z;
             deck.transform.SetPositionAndRotation(front, Quaternion.Euler(90, 0, 0));
             deck.transform.localScale = new Vector3(deckWidth, deckDepth, 1);
-            var tile = set.turntable ? new Vector2(5.4f, 1.8f) : house != null ? DockPlayhouse.PlankTile : new Vector2(9f, 4.2f);
+            var tile = set.room != null ? set.room.floorTile : set.clockwork ? new Vector2(3.1f, 2.4f) : set.turntable ? new Vector2(5.4f, 1.8f) : house != null ? DockPlayhouse.PlankTile : new Vector2(9f, 4.2f);
             var deckUv = set.floor != null
                 ? new Vector4(deckWidth / tile.x, deckDepth / tile.y, 0, 0)
                 : new Vector4(1, .19f, 0, 0);
@@ -274,8 +291,18 @@ namespace RaidPartyManager.Presentation
                     upstage.transform.localScale = new Vector3(2.75f * set.upstage.width / set.upstage.height, 2.75f, 1);
                 }
             }
-            SetWing(left, set.leftWing, house != null ? .177f : set.rightWing == null ? .18f : .10f, house != null ? front.z + deckDepth * .72f : 3.5f, house != null ? 2.20f : 3.0f, t);
-            SetWing(right, set.rightWing, house != null ? .828f : .88f, house != null ? front.z + deckDepth * .72f : 4.6f, house != null ? 2.62f : 3.55f, t - 0.12f);
+            if (set.room != null)
+            {
+                var l = set.room.leftMark;
+                var r = set.room.rightMark;
+                SetWing(left, set.leftWing, l.x, front.z + deckDepth * l.y, l.z, t);
+                SetWing(right, set.rightWing, r.x, front.z + deckDepth * r.y, r.z, t);
+            }
+            else
+            {
+                SetWing(left, set.leftWing, house != null ? .177f : set.rightWing == null ? .18f : .10f, house != null ? front.z + deckDepth * .72f : 3.5f, house != null ? 2.20f : 3.0f, t);
+                SetWing(right, set.rightWing, house != null ? .828f : .88f, house != null ? front.z + deckDepth * .72f : 4.6f, house != null ? 2.62f : 3.55f, t - 0.12f);
+            }
             if (house != null)
             {
                 SetWing(leftDressing, set.leftDressing, .261f, front.z + .79f * deckDepth, 1.47f, t);
@@ -293,6 +320,9 @@ namespace RaidPartyManager.Presentation
             }
             if (moonlit)
                 AimMoonlight();
+            // Projected cutout shadows occupy the boards rather than the bounds of their casters.
+            if (leftShadow != null) leftShadow.bounds = deck.bounds;
+            if (rightShadow != null) rightShadow.bounds = deck.bounds;
             if (curtainLeft != null)
             {
                 SetDrape(curtainLeft, false);
@@ -307,7 +337,6 @@ namespace RaidPartyManager.Presentation
             var landing = new Vector3(.12f * halfWidth, .01f, -.45f);
             moonLamp.transform.LookAt(landing);
             float poolWidth = Mathf.Max(3.4f, .72f * halfWidth);
-            paper.SetFloat(PlayingHalfWidth, halfWidth);
             paper.SetVector(MoonWorld, source);
             paper.SetVector(MoonLanding, new Vector4(landing.x, landing.y, landing.z, poolWidth));
 
@@ -326,9 +355,7 @@ namespace RaidPartyManager.Presentation
             }
             hazeMesh.vertices = hazeVertices;
             hazeMesh.RecalculateBounds();
-            // The shadow shader moves vertices away from their caster and onto the ground.
-            if (leftShadow != null) leftShadow.bounds = deck.bounds;
-            if (rightShadow != null) rightShadow.bounds = deck.bounds;
+
         }
 
         private MeshRenderer MakeWingShadow(MeshRenderer wing, Texture2D ink)
@@ -341,7 +368,7 @@ namespace RaidPartyManager.Presentation
 
         private MeshRenderer MakeCastShadow(MeshRenderer caster)
         {
-            var cast = Sheet("Moon shadow", -53);
+            var cast = Sheet(moonlit ? "Moon shadow" : "Overhead shadow", -53);
             cast.transform.SetParent(caster.transform, false);
             return cast;
         }
@@ -413,12 +440,9 @@ namespace RaidPartyManager.Presentation
             block.SetVector(Walk, walk);
             block.SetFloat(Contact, shadow ? 1f : 0f);
             block.SetFloat("_ScenicFlat", scenic ? 1f : 0f);
-            if (moonlit)
-            {
-                block.SetFloat(MoonSurface, (float)surface);
-                if (surface == Surface.Sky || surface == Surface.Paper)
-                    block.SetVector(InkTexelSize, new Vector4(1f / texture.width, 1f / texture.height, texture.width, texture.height));
-            }
+            block.SetFloat(PaintedSurface, (float)surface);
+            if (moonlit && (surface == Surface.Sky || surface == Surface.Paper))
+                block.SetVector(InkTexelSize, new Vector4(1f / texture.width, 1f / texture.height, texture.width, texture.height));
             view.SetPropertyBlock(block);
         }
 
@@ -431,7 +455,7 @@ namespace RaidPartyManager.Presentation
             actor.body.sortingOrder = image.InMotion ? 5 : 1;
             var mesh = image.Walk.z != 0 ? walkMesh : quad;
             actor.body.GetComponent<MeshFilter>().sharedMesh = mesh;
-            if (moonlit)
+            if (house != null)
             {
                 actor.castShadow ??= MakeCastShadow(actor.body);
                 actor.castShadow.GetComponent<MeshFilter>().sharedMesh = mesh;
@@ -451,15 +475,50 @@ namespace RaidPartyManager.Presentation
             if (!actors.Remove(image, out var actor))
                 return;
             actor.body.enabled = actor.shadow.enabled = false;
-            if (moonlit) actor.castShadow.enabled = false;
+            if (actor.castShadow != null) actor.castShadow.enabled = false;
             spare.Push(actor);
         }
 
+        internal void SetBossShot(VisualElement subject, float height, float weight)
+        {
+            shotSubject = subject;
+            shotHeight = height;
+            shotWeight = weight;
+        }
+
         private void BeforeCamera(ScriptableRenderContext context, Camera rendering) => BeforeCull(rendering);
+        private void AfterCamera(ScriptableRenderContext context, Camera rendering) => RestoreShot(rendering);
+        private void RestoreShot(Camera rendering)
+        {
+            if (rendering != camera || !shotApplied) return;
+            if (camera.projectionMatrix == shotLens)
+                camera.projectionMatrix = restingLens;
+            shotApplied = false;
+        }
         private void BeforeCull(Camera rendering)
         {
-            if (rendering == camera)
-                DrawActors();
+            if (rendering != camera || shotApplied) return;
+            // Place the paper cast through the auditorium lens first. The close-up then
+            // magnifies the cast and set together without moving actors on the boards.
+            DrawActors();
+            if (shotWeight <= 0 || shotSubject?.panel == null) return;
+            var screen = panel.worldBound;
+            var body = shotSubject.worldBound;
+            if (!(screen.width > 0 && screen.height > 0 && body.width > 0 && body.height > 0)) return;
+            float fullZoom = Mathf.Clamp(Mathf.Min(screen.height * .70f / body.height,
+                screen.width * .88f / body.width), 1.25f, 2.55f);
+            float zoom = Mathf.Lerp(1, fullZoom, shotWeight);
+            float x = 2 * (body.center.x - screen.xMin) / screen.width - 1;
+            float y = 1 - 2 * (body.yMin + body.height * shotHeight - screen.yMin) / screen.height;
+            // Restrict the crop to the visible set even as the actor enters at its edge.
+            var crop = Matrix4x4.identity;
+            crop.m00 = crop.m11 = zoom;
+            crop.m03 = Mathf.Clamp((.06f - zoom * x) * shotWeight, 1 - zoom, zoom - 1);
+            crop.m13 = Mathf.Clamp((.05f - zoom * y) * shotWeight, 1 - zoom, zoom - 1);
+            restingLens = camera.projectionMatrix;
+            shotLens = crop * restingLens;
+            camera.projectionMatrix = shotLens;
+            shotApplied = true;
         }
 
         private void DrawActors()
@@ -475,7 +534,7 @@ namespace RaidPartyManager.Presentation
                 bool show = image.visible && image.image != null && rect.width > 0 && rect.height > 0 &&
                     image.resolvedStyle.opacity > 0.001f && screen.Overlaps(image.worldBound);
                 actor.body.enabled = actor.shadow.enabled = show;
-                if (moonlit) actor.castShadow.enabled = show;
+                if (actor.castShadow != null) actor.castShadow.enabled = show;
                 if (!show)
                     continue;
                 var source = image.sourceRect;
@@ -503,9 +562,9 @@ namespace RaidPartyManager.Presentation
                 var frameUV = new Vector4((source.width - 1) / texture.width, (source.height - 1) / texture.height,
                     (source.x + .5f) / texture.width, 1 - (source.yMax - .5f) / texture.height);
                 Shape(actor.body, texture, frameUV, tint, image.Walk, surface: Surface.Paper);
-                if (moonlit)
+                if (actor.castShadow != null)
                 {
-                    actor.castShadow.bounds = deck.bounds;
+                    actor.castShadow.bounds = house.DeckBounds;
                     Shape(actor.castShadow, texture, frameUV, tint, image.Walk, surface: Surface.CastShadow);
                 }
                 actor.shadow.transform.position = new Vector3(foot.x, house != null ? .004f : 0, foot.z - .43f);
@@ -551,7 +610,10 @@ namespace RaidPartyManager.Presentation
         public void Dispose()
         {
             disposed = true;
+            RestoreShot(camera);
             RenderPipelineManager.beginCameraRendering -= BeforeCamera;
+            RenderPipelineManager.endCameraRendering -= AfterCamera;
+            Camera.onPostRender -= RestoreShot;
             Camera.onPreCull -= BeforeCull;
             panel.UnregisterCallback<PointerMoveEvent>(OnPointer, TrickleDown.TrickleDown);
             if (!castOnly && camera != null)

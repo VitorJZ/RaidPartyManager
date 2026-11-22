@@ -104,3 +104,33 @@ MonoBehaviour:
     upstage: {fileID: 0}
     leftWing: {fileID: 2800000, guid: 8dba722ed4084cd7a529652c9098d163, type: 3}
     rightWing: {fileID: 0}
+  - region: {fileID: 2800000, guid: 8c7c141be3b35f648acd48d5b67f6fa8, type: 3}
+    turntable: 1
+    clockwork: 1
+    backcloth: {fileID: 2800000, guid: 8c7c141be3b35f648acd48d5b67f6fa8, type: 3}
+    floor: {fileID: 2800000, guid: dcc23f429d2259faa9af12be9af21e0b, type: 3}
+    upstage: {fileID: 2800000, guid: daff004ff42156b1814c23be0d7abe79, type: 3}
+    leftWing: {fileID: 2800000, guid: 2a140bd8f57d5f26a8831e4231847a8e, type: 3}
+    rightWing: {fileID: 2800000, guid: 00b5de7e7137534787ac53ca1c7d2274, type: 3}
+    leftDressing: {fileID: 2800000, guid: f4609fc8d2f9529991486f17be9735f5, type: 3}
+    rightDressing: {fileID: 2800000, guid: b2430eab975c51d4a313c75166ac3467, type: 3}
+  - region: {fileID: 2800000, guid: 78a860b136c85b7a8c64466e60dead65, type: 3}
+    turntable: 1
+    clockwork: 1
+    backcloth: {fileID: 2800000, guid: 78a860b136c85b7a8c64466e60dead65, type: 3}
+    floor: {fileID: 2800000, guid: dcc23f429d2259faa9af12be9af21e0b, type: 3}
+    upstage: {fileID: 2800000, guid: f407e78f9e65555388381256ff1bc34a, type: 3}
+    leftWing: {fileID: 2800000, guid: 4508f90a45ad5bf3bebc754b70bb5717, type: 3}
+    rightWing: {fileID: 2800000, guid: 240dab162725545195a6fa38db7cce9e, type: 3}
+    leftDressing: {fileID: 2800000, guid: 84a0b0002d1f5e74b40dd51ea003338f, type: 3}
+    rightDressing: {fileID: 2800000, guid: e4e8ce01c7e251738f48bbcc14e7a232, type: 3}
+  - region: {fileID: 2800000, guid: d9a623a00cbd543d9e5a467c97879291, type: 3}
+    turntable: 1
+    clockwork: 1
+    backcloth: {fileID: 2800000, guid: d9a623a00cbd543d9e5a467c97879291, type: 3}
+    floor: {fileID: 2800000, guid: dcc23f429d2259faa9af12be9af21e0b, type: 3}
+    upstage: {fileID: 2800000, guid: efeafb5735b2523399a45b114987f369, type: 3}
+    leftWing: {fileID: 2800000, guid: 757564ec1cef5073835adde12819cd1f, type: 3}
+    rightWing: {fileID: 2800000, guid: a28ef3e379145830a8f1ebc39576ff59, type: 3}
+    leftDressing: {fileID: 2800000, guid: a7499cbaed695c3989ffc4b9d8d54a30, type: 3}
+    rightDressing: {fileID: 2800000, guid: 09fcd92a5bd95fc9beab803073e296c0, type: 3}

@@ -9,23 +9,19 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class DockRouteSigns : VisualElement
     {
-        internal DockRouteSigns(AdventureRun run, AdventureContentAsset art, Texture2D timber,
-            Func<float, Vector2> anchor, Func<int,bool> enter, Action nextFloor, bool following = false)
+        private readonly List<(Button button, Texture icon, int direction)> boards = new();
+        private readonly List<Transform> arrows = new();
+        private readonly List<DockRoadpost> stones = new();
+        private bool landed, committed;
+
+        internal DockRouteSigns(AdventureRun run, AdventureContentAsset art, Texture2D stone,
+            Func<int,StageTurn,bool> enter, Action nextFloor, bool following = false) : this(stone, following)
         {
-            GameAudio.Play(SoundCue.UiMapReveal, .40f);
             name = "dock-route-signs";
-            pickingMode = PickingMode.Ignore;
-            if (following) PrototypeStyle.Fill(this);
-            else style.flexGrow = 1;
-            bool service = following && run.Current.Kind is (NodeKind.Camp or NodeKind.Town);
-            float width = service ? 58 : 82;
-            float height = service ? 34 : 47;
-            style.overflow = Overflow.Hidden;
-            var boards = new List<(HangingSign sign, float x)>();
-            bool committed = false;
-            if (!following && run.InGraveyard && run.Stage == 1 && !run.Failed)
+            if (!following && (run.InGraveyard || run.InCapital) && run.Stage == 1 && !run.Failed)
             {
-                var chapter = PrototypeStyle.Text($"第 {run.Floor} 层 · {run.RegionName}", 22, PrototypeStyle.Accent);
+                var chapter = PrototypeStyle.Text($"第 {run.Floor} 层 · {run.RegionName}" +
+                    (run.InCapital ? "\n双方非魔法伤害减半，最低 1 点。" : ""), 22, PrototypeStyle.Accent);
                 chapter.name = "route-region";
                 chapter.pickingMode = PickingMode.Ignore;
                 chapter.style.position = Position.Absolute;
@@ -35,21 +31,15 @@ namespace RaidPartyManager.Presentation
                 chapter.style.paddingLeft = chapter.style.paddingRight = 14;
                 Add(chapter);
             }
-            if (!following && (run.Failed || run.CompletedNodes == 0 && !run.FloorCleared))
+            if (run.Failed)
             {
-                var hint = PrototypeStyle.Text(run.Failed ? "本次讨伐结束" : "向下拉动路牌，选择去向", 15);
-                hint.name = "route-pull-hint";
-                hint.style.position = Position.Absolute;
-                hint.style.bottom = Length.Percent(16);
-                hint.style.alignSelf = Align.Center;
-                hint.style.backgroundColor = new Color(.09f,.075f,.06f,.86f);
-                hint.style.paddingLeft = hint.style.paddingRight = 10;
-                hint.pickingMode = PickingMode.Ignore;
-                Add(hint);
-                if (run.Failed) return;
+                var ended = PrototypeStyle.Text("本次讨伐结束", 15);
+                ended.style.alignSelf = Align.Center;
+                Add(ended);
+                return;
             }
             if (run.FloorCleared)
-                AddBoard("route-next-floor", art.RouteSignpost, 0, () => { nextFloor(); return true; }, null);
+                AddBoard("route-next-floor", art.RouteSignpost, 1, () => { nextFloor(); return true; }, null);
             else
             {
                 var options = following ? run.FollowingOptions : run.RouteOptions;
@@ -58,52 +48,117 @@ namespace RaidPartyManager.Presentation
                     if (run.SuspendedChoice.HasValue && run.SuspendedChoice != i) continue;
                     int index = i;
                     var stop = following ? run.FollowingChoice(i) : run.RouteChoice(i);
-                    float x = run.SuspendedChoice.HasValue || options.Count == 1 ? 0 : (i == 0 ? -1.68f : 1.68f);
+                    int direction = options.Count > 1 && !run.SuspendedChoice.HasValue && i == 0 ? -1 : 1;
                     AddBoard(run.SuspendedChoice.HasValue ? "route-node-current" : "route-choice-" + i,
-                        art.NodeIcon(stop.Kind.Value), x, () => enter(index), stop);
+                        art.NodeIcon(stop.Kind.Value), direction, () => enter(index, direction < 0 ? StageTurn.Reverse : StageTurn.Forward), stop);
                 }
             }
+        }
 
-            void AddBoard(string id, Texture image, float x, Func<bool> choose, RouteStop? stop)
+        internal DockRouteSigns(Texture2D stone, Texture townIcon, string buttonName, Action returnToTown, Func<bool> visible = null)
+            : this(stone, true, visible)
+        {
+            name = "town-return-sign";
+            AddBoard(buttonName, townIcon, 1, () => { returnToTown(); return true; }, null, "返回城镇");
+        }
+
+        private void AddBoard(string id, Texture icon, int direction, Func<bool> choose, RouteStop? stop, string tooltip = null)
+        {
+            var button = new Button(() => { if (landed && !committed) committed = choose(); }) { name = id, userData = stop };
+            if (tooltip != null) button.tooltip = tooltip;
+            button.SetEnabled(false);
+            button.style.position = Position.Absolute;
+            button.style.marginLeft = button.style.marginRight = button.style.marginTop = button.style.marginBottom = 0;
+            button.style.opacity = 0;
+            int index = boards.Count;
+            void Highlight(bool on)
             {
-                var sign = new HangingSign(id, "", () => { if (!committed) committed = choose(); }, timber) { userData = stop };
-                sign.style.position = Position.Absolute;
-                sign.style.left = Length.Percent(x == 0 ? 50 : x < 0 ? 35 : 65);
-                sign.style.top = -110;
-                sign.style.width = width; sign.style.height = height;
-                var icon = new Image { name = "route-node-icon", image = image, pickingMode = PickingMode.Ignore,
-                    scaleMode = ScaleMode.ScaleToFit };
-                icon.style.width = icon.style.height = height * .79f;
-                sign.Add(icon); boards.Add((sign, x)); Add(sign);
+                if (index < arrows.Count && !stones[index].Travelling) stones[index].Highlight(arrows[index], on);
             }
+            button.RegisterCallback<PointerEnterEvent>(_ => Highlight(true));
+            button.RegisterCallback<PointerLeaveEvent>(_ => Highlight(false));
+            button.RegisterCallback<FocusInEvent>(_ => Highlight(true));
+            button.RegisterCallback<FocusOutEvent>(_ => Highlight(false));
+            boards.Add((button, icon, direction));
+            Add(button);
+        }
 
-            float age = 0;
-            double last = Time.realtimeSinceStartupAsDouble;
+        private DockRouteSigns(Texture2D stone, bool fill, Func<bool> visible = null)
+        {
+            GameAudio.Play(SoundCue.UiMapReveal, .40f);
+            pickingMode = PickingMode.Ignore;
+            if (fill) PrototypeStyle.Fill(this);
+            else style.flexGrow = 1;
+            const float fallSeconds = .50f;
+            float dropStart = -1;
+            DockSet set = null;
+
             void Pose()
             {
-                double now = Time.realtimeSinceStartupAsDouble;
-                if (!DockPlayhouse.Moving) age += Mathf.Min(.05f, (float)(now-last));
-                last = now;
-                if (panel == null || !(layout.height > 0)) return;
-                var frame = panel.visualTree.worldBound;
-                // The falling board and its bridle enter through the same opening as the scenery.
-                float rail = DockPlayhouse.StageOpeningTop(panel);
-                float inset = Mathf.Max(0, rail - parent.worldBound.yMin);
-                if (Mathf.Abs(style.marginTop.value.value - inset) > .05f) style.marginTop = inset;
-                float restingTop = service ? 12 : parent.contentRect.height * (following ? .22f : .32f) - inset;
-                float t = Mathf.Clamp01(age / .65f);
-                float drop = Mathf.SmoothStep(0, 1, t) + Mathf.Sin(t*Mathf.PI)*.10f;
-                foreach (var (sign, x) in boards)
+                var eye = Camera.main;
+                var house = DockPlayhouse.Current;
+                if (panel == null || boards.Count == 0 || eye == null || house == null || DockPlayhouse.Moving || committed) return;
+                if (visible != null)
                 {
-                    if (sign.MountedInScenery) continue;
-                    float localX;
-                    if (service) localX = layout.width * .90f - width * .5f - (x < 0 ? width + 12 : 0);
-                    else if (following) localX = layout.width * (.5f + .12f * System.Math.Sign(x));
-                    else localX = this.WorldToLocal(new Vector2(frame.xMin + anchor(x).x * frame.width, 0)).x;
-                    sign.style.left = localX - width * .5f;
-                    sign.style.top = Mathf.Lerp(-110, restingTop, drop);
+                    bool show = visible();
+                    var display = show ? DisplayStyle.Flex : DisplayStyle.None;
+                    if (style.display.value != display)
+                    {
+                        style.display = display;
+                        foreach (var post in stones) post.Foot.gameObject.SetActive(show);
+                    }
+                    if (!show) return;
+                }
+                if (!(layout.width > 0)) return;
+                if (dropStart < 0)
+                {
+                    set = house.Set;
+                    foreach (var board in boards)
+                    {
+                        var stonePost = new DockRoadpost(board.direction, stone, set.Lighting);
+                        stones.Add(stonePost);
+                        set.Roadposts.Add(stonePost);
+                        arrows.Add(stonePost.AddArrow(board.icon));
+                    }
+                    dropStart = Time.unscaledTime - (set.RoadstonesLanded ? fallSeconds : 0);
+                }
+                float t = Mathf.Clamp01((Time.unscaledTime - dropStart) / fallSeconds);
+                float depth = house.DeckBounds.min.z + .27f - eye.transform.position.z;
+                float loft = Mathf.Max(4, eye.ViewportToWorldPoint(new Vector3(.5f, 1.12f, depth)).y - house.DeckBounds.max.y);
+                foreach (var stonePost in stones)
+                    if (!stonePost.Travelling) stonePost.Place(eye, house.DeckBounds, loft * (1 - t*t));
+                if (!landed && t >= 1)
+                {
+                    landed = true;
+                    if (!set.RoadstonesLanded)
+                    {
+                        set.RoadstonesLanded = true;
+                        house.LandRoadstone();
+                        GameAudio.Play(SoundCue.HitPhysical, .55f);
+                    }
+                    foreach (var board in boards) board.button.SetEnabled(true);
+                }
+                Rect frame = panel.visualTree.worldBound;
+                for (int i = 0; i < boards.Count; i++)
+                {
+                    var r = DockRoadpost.BoundsInViewport(arrows[i], eye);
+                    var corner = this.WorldToLocal(frame.min + new Vector2(r.xMin * frame.width, (1-r.yMax) * frame.height));
+                    var button = boards[i].button;
+                    button.style.left = corner.x;
+                    button.style.top = corner.y;
+                    button.style.width = r.width * frame.width;
+                    button.style.height = r.height * frame.height;
                 }
             }
+            RegisterCallback<DetachFromPanelEvent>(_ =>
+            {
+                foreach (var sign in stones)
+                {
+                    set.Roadposts.Remove(sign);
+                    if (!sign.Travelling) sign.Dispose();
+                }
+                stones.Clear(); arrows.Clear(); dropStart = -1; landed = false;
+            });
             RegisterCallback<GeometryChangedEvent>(_ => Pose());
             schedule.Execute(Pose).Every(16);
         }

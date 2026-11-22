@@ -77,8 +77,15 @@ namespace RaidPartyManager.Presentation
             preview.name = "formation-drag-preview";
             preview.pickingMode = PickingMode.Ignore;
             preview.style.position = Position.Absolute;
-            preview.style.width = PreviewWidth;
-            preview.style.height = PreviewHeight;
+            var size = new Vector2(PreviewWidth, PreviewHeight);
+            if (source.Artwork != null)
+            {
+                var pixels = new Vector2(source.Artwork.width, source.Artwork.height);
+                size = pixels * Mathf.Min(size.x / pixels.x, size.y / pixels.y);
+            }
+            preview.style.width = size.x;
+            preview.style.height = size.y;
+            preview.style.translate = new Translate(Length.Percent(-50), Length.Percent(-50));
             preview.style.backgroundColor = PrototypeStyle.PanelColor;
             PrototypeStyle.Outline(preview, PrototypeStyle.Accent, 5);
             source.View.style.opacity = 0.55f;
@@ -154,8 +161,8 @@ namespace RaidPartyManager.Presentation
         private void MovePreview()
         {
             var local = formation.WorldToLocal(pointer);
-            preview.style.left = local.x - PreviewWidth / 2f;
-            preview.style.top = local.y - PreviewHeight / 2f;
+            preview.style.left = local.x;
+            preview.style.top = local.y;
         }
 
         private void CancelPointer(int id)

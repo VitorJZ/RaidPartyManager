@@ -14,16 +14,26 @@ namespace RaidPartyManager.Battle
             var enemies = Opponents(actor).ToArray();
             var allies = units.Where(unit => unit.Input.Side == actor.Input.Side && unit.Health > 0).ToArray();
 
-            int highestCost = actor.Original.LearnedSkills.Max(book => book.Cost);
-            bool savingForSkill = false;
+            int reachableEnergy = actor.Energy.Remaining + Math.Max(0, actor.ChargeTarget - actor.Energy.Capacity);
+            int reserveCost = 0;
+            long reserveValue = 0;
             foreach (var book in actor.Original.LearnedSkills)
             {
                 bool charging = book.Cost > actor.Energy.Remaining;
-                if (charging && book.Cost > actor.Energy.Remaining + Math.Max(0, highestCost - actor.Energy.Capacity)) continue;
+                if (book.Cost > reachableEnergy) continue;
                 var action = new ActionDefinition(book.Id, book.Name, ActionKind.Shield, TargetRule.Self, 0);
                 int attack = CurrentAttack(actor);
                 switch (book.SkillEffect)
                 {
+                    case ExpressClearance:
+                        Add(actor, enemies.Take(2).Sum(e => (long)Estimate(e, attack + 4, DamageType.Physical) + 2));
+                        break;
+                    case MeridianTransit:
+                        Add(actor, enemies.Sum(e => (long)Estimate(e, attack + 2, DamageType.Magic)));
+                        break;
+                    case AnnealingOrder:
+                        Add(actor, allies.Sum(e => (long)HealingGain(e, 4) + 6));
+                        break;
                     case BlockadeSalvo:
                         Add(actor, enemies.Reverse().Take(2).Sum(e => (long)Estimate(e, attack + 3, DamageType.Physical) + 1));
                         break;
@@ -134,15 +144,23 @@ namespace RaidPartyManager.Battle
                 void Add(Unit target, long projected)
                 {
                     if (projected <= 0) return;
-                    if (charging) savingForSkill = true;
-                    else options.Add(new ActionOption(action, target.Snapshot(), target.Health,
-                            (int)Math.Min(int.MaxValue, projected), book: book));
+                    if (charging)
+                    {
+                        if (projected > reserveValue || projected == reserveValue && book.Cost < reserveCost)
+                            (reserveValue, reserveCost) = (projected, book.Cost);
+                        return;
+                    }
+                    options.Add(new ActionOption(action, target.Snapshot(), target.Health,
+                        (int)Math.Min(int.MaxValue, projected), book: book,
+                        lastCastRound: actor.LastBookCast.GetValueOrDefault(book.Id)));
                 }
 
                 int Estimate(Unit target, int power, DamageType type) =>
                     Math.Min(target.Health, ProjectedDamage(actor, target, new[] { (type, power) }));
             }
-            if (savingForSkill) options.RemoveAll(option => option.Book != null);
+            if (reserveCost > 0)
+                options.RemoveAll(option => option.Book.Cost + reserveCost > reachableEnergy &&
+                    reserveValue > option.ProjectedAmount);
         }
 
         private static int HealingGain(Unit target, int power) => target.Layers(Cursed) > 0 ? 0 :
@@ -160,6 +178,7 @@ namespace RaidPartyManager.Battle
         {
             actor.SpendEnergy(book.Cost);
             actor.LastSkillRound = Round;
+            actor.LastBookCast[book.Id] = Round;
             Report(BattleEventKind.Action, actor, actor, book.Name, ActionKind.Shield,
                 detail: $"消耗 {book.Cost} 点能量", actorEnergy: actor.Energy, skillBookId: book.Id);
 
@@ -167,6 +186,23 @@ namespace RaidPartyManager.Battle
             int attack = CurrentAttack(actor);
             switch (book.SkillEffect)
             {
+                case ExpressClearance:
+                    foreach (var enemy in Opponents(actor).OrderBy(e => e.Input.Position).Take(2).ToArray())
+                    {
+                        DamageEnemy(enemy, attack + 4, DamageType.Physical);
+                        if (enemy.Health > 0) Apply(enemy, Exposed, 2);
+                    }
+                    break;
+                case MeridianTransit:
+                    foreach (var enemy in Opponents(actor).ToArray()) DamageEnemy(enemy, attack + 2, DamageType.Magic);
+                    break;
+                case AnnealingOrder:
+                    foreach (var ally in Allies().ToArray())
+                    {
+                        Restore(ally, 4);
+                        if (ally.Health > 0) ShieldAlly(actor, ally, 6, book.Name, book.Id);
+                    }
+                    break;
                 case BlockadeSalvo:
                     foreach (var enemy in Opponents(actor).Reverse().Take(2).ToArray())
                     {

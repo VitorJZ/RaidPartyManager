@@ -30,11 +30,11 @@ namespace RaidPartyManager.Content
         public Texture2D ChestClosed => chestClosed;
         public Texture2D ChestAjar => chestAjar;
         public Texture2D ChestOpen => chestOpen;
-        public Texture2D EventArt(AdventureEventKind kind) => GraveStories.Contains(kind) ? Resources.Load<Texture2D>("StoryEvents/Playbills/" + kind) : (int)kind < eventArtwork.Length ? eventArtwork[(int)kind] : null;
+        public Texture2D EventArt(AdventureEventKind kind) => (GraveStories.Contains(kind) || CapitalStories.Contains(kind)) ? Resources.Load<Texture2D>("StoryEvents/Playbills/" + kind) : (int)kind < eventArtwork.Length ? eventArtwork[(int)kind] : null;
         public Shader EventInkShader => eventInkShader;
         public Texture2D EventInkArt(AdventureEventKind kind)
         {
-            if (GraveStories.Contains(kind)) return Resources.Load<Texture2D>("StoryEvents/" + kind);
+            if ((GraveStories.Contains(kind) || CapitalStories.Contains(kind))) return Resources.Load<Texture2D>("StoryEvents/" + kind);
             int index = (int)kind;
             return eventInkArtwork != null && index >= 0 && index < eventInkArtwork.Length ? eventInkArtwork[index] : null;
         }

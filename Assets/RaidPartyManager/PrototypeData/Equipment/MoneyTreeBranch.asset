@@ -16,10 +16,10 @@ MonoBehaviour:
   displayName: "摇钱树枝"
   effect: 47
   icon: {fileID: 2800000, guid: 7792bcd9634e4d9b89c421914e47ae34, type: 3}
-  description: "每次攻击时，获得1枚金币"
+  description: "每次攻击时，获得2枚金币"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0
   healthBonus: 0
   shopTier: 2
-  shopPrice: 0
+  shopPrice: 21

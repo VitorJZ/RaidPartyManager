@@ -14,6 +14,7 @@ namespace RaidPartyManager.Run
             if (!BrokerOpen || !Party.CanSellMember(memberId)) return false;
             if (Current.BrokerMember == memberId && Current.BrokerCounter > 0) return true;
             Current.BrokerMember = memberId;
+            Current.BrokerLastAsk = 0;
             Current.BrokerCounter = Party.TransferOffer(memberId);
             return true;
         }
@@ -23,19 +24,27 @@ namespace RaidPartyManager.Run
             if (!BrokerOpen) return MarketReply.Closed;
             if (asking < 1 || memberId != Current.BrokerMember || !Party.CanSellMember(memberId)) return MarketReply.Unavailable;
             int opening = Party.TransferOffer(memberId);
-            int ceiling = opening + Math.Max(2, opening / 5);
-            int room = ceiling - opening;
-            int acceptable = Math.Max(Current.BrokerCounter, opening + room * (Current.BrokerRefusals + 1) / BrokerPatience);
+            int counter = Current.BrokerCounter;
+            int ceiling = Math.Max(counter, Party.BrokerBudget(memberId, opening));
+            long room = ceiling - counter;
+            bool concession = Current.BrokerLastAsk > asking;
+            long acceptable = counter + room * (concession ? 60 : 25) / 100;
             if (asking <= acceptable)
             {
                 if (!Party.SellMember(memberId, asking)) return MarketReply.Unavailable;
                 Current.BrokerMember = null;
+                Current.BrokerLastAsk = 0;
                 Current.BrokerCounter = 0;
                 return MarketReply.Sold;
             }
+            Current.BrokerLastAsk = asking;
             Current.BrokerRefusals++;
             if (!BrokerOpen) return MarketReply.Closed;
-            Current.BrokerCounter = Math.Min(ceiling, opening + room * Current.BrokerRefusals / BrokerPatience);
+            // A near-budget ask can draw a stronger counter. An extravagant anchor earns a smaller step.
+            bool ambitious = asking > ceiling + room / 2;
+            int share = ambitious ? 25 : concession ? 70 : 52;
+            long step = Math.Max(3, (room * share + 50) / 100);
+            Current.BrokerCounter = (int)Math.Min(asking - 1L, counter + Math.Min(room, step));
             return MarketReply.Counteroffer;
         }
     }

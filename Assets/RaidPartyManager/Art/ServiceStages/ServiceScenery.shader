@@ -2,6 +2,10 @@ Shader "Raid Party Manager/Service Scenery"
 {
     Properties
     {
+        [HideInInspector] _StageKey ("Front bar colour and position", Vector) = (1,1,1,-4.4)
+        [HideInInspector] _StageBack ("Back bar colour and focus", Vector) = (1,1,1,-.6)
+        [HideInInspector] _StageMist ("Mist colour and density", Vector) = (0,0,0,0)
+        [HideInInspector] _MistHeight ("Low mist height", Float) = 1
         _MainTex ("Paint", 2D) = "white" {}
         _Color ("Tint", Color) = (1,1,1,1)
         _Surface ("Surface", Float) = 0
@@ -22,9 +26,10 @@ Shader "Raid Party Manager/Service Scenery"
             #pragma fragment frag
             #include "UnityCG.cginc"
             #include "../Stagecraft/ScenicPaint.cginc"
+            #include "../Stagecraft/StageLighting.cginc"
             sampler2D _MainTex;
             float4 _MainTex_ST, _Color, _FireLight, _Walk;
-            float _Surface, _FlameTime, _FireRange, _BackEdge, _PlayingZ, _Desaturation, _CutoutThreshold;
+            float _Surface, _FlameTime, _FireRange, _BackEdge, _Desaturation, _CutoutThreshold;
             struct vertex { float4 pos:POSITION; float3 normal:NORMAL; float2 uv:TEXCOORD0; };
             struct fragment { float4 pos:SV_POSITION; float2 uv:TEXCOORD0; float3 world:TEXCOORD1; float3 normal:TEXCOORD2; };
             fragment vert(vertex v)
@@ -64,25 +69,25 @@ Shader "Raid Party Manager/Service Scenery"
                 if (_Surface == 8) ink = SawnFlat(ink, _MainTex, i.uv);
                 else if (_Surface == 1) ink.rgb = ScenicPigment(ink.rgb, i.uv);
                 clip(ink.a-_CutoutThreshold);
-                if (_Surface == 0) return half4(ink.rgb * half3(.86,.91,.97), ink.a);
-                if (_Surface == 4) return ink;
+                if (_Surface == 0) return half4(StageAir(CycloramaWash(ink.rgb, i.world), i.world), ink.a);
+                if (_Surface == 4) return half4(StageAir(ink.rgb, i.world), ink.a);
                 float3 n=normalize(i.normal);
-                float diffuse=.70+.39*saturate(dot(n, normalize(float3(-.45,.84,-.48))));
-                if (_Surface == 2 || _Surface == 8) diffuse=1; // illustrated people and flats already contain brush shading
+                bool paper = _Surface == 2 || _Surface == 8;
+                float2 edgeDirection = mul((float3x3)unity_WorldToObject, BackLamp() - i.world).xy;
+                half rim = paper ? CutEdge(_MainTex, i.uv, _MainTex_ST,
+                    edgeDirection / max(.001, length(edgeDirection)), ink.a) : 0;
                 float3 delta=_FireLight.xyz-i.world;
                 float dist=length(delta);
                 float pool=pow(saturate(1-dist/max(.01,_FireRange)),2)*_FireLight.w;
                 float incidence=(_Surface==2) ? .72 : .35+.65*abs(dot(n,delta/max(.01,dist)));
-                half stagePool = StageWash(i.world, 6.8, _PlayingZ);
-                // Leave the campfire as the strongest local source when it is burning.
-                stagePool *= lerp(1, .65, saturate(_FireLight.w));
-                ink.rgb = LitStagePaint(ink.rgb, stagePool) * diffuse + pool*incidence*(ink.rgb*float3(2.8,1.14,.30)+float3(.14,.045,.007));
+                ink.rgb = StageExposure(ink.rgb, i.world, n, paper, rim)
+                    + pool*incidence*(ink.rgb*float3(2.8,1.14,.30)+float3(.14,.045,.007));
                 if (_Surface == 6)
                 {
                     float edge = smoothstep(0,6.5,_BackEdge-i.world.z);
                     ink.rgb *= lerp(float3(.46,.62,.67),float3(1,1,1),edge);
                 }
-                return ink;
+                return half4(StageAir(ink.rgb, i.world), ink.a);
             }
             ENDCG
         }

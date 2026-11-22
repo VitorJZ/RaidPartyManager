@@ -130,7 +130,7 @@ namespace RaidPartyManager.Presentation
             EmployeeGoalKind.Kills => $"再击败 {goal.Target} 名敌人",
             EmployeeGoalKind.Victories => $"随队再获胜 {goal.Target} 场",
             EmployeeGoalKind.Tenure => $"再为讨伐队效力 {goal.Target} 天",
-            EmployeeGoalKind.Equipment => $"装备「{goal.SubjectName}」",
+            EmployeeGoalKind.Equipment => $"穿戴「{goal.SubjectName}」出战 {goal.Target} 场",
             EmployeeGoalKind.Training => $"学会「{goal.SubjectName}」",
             EmployeeGoalKind.Raise => $"把日薪提高到 {goal.Target} 金币",
             EmployeeGoalKind.Renewal => $"把合约续签到第 {goal.Target} 天或之后",

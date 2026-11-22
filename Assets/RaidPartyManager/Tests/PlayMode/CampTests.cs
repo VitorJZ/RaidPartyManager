@@ -18,13 +18,31 @@ namespace RaidPartyManager.Tests
             .GetMethod("ResetPlaySession", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
 
         [UnityTest]
+        public IEnumerator CampTrainingShowsTheGainsAndDisablesTheOtherActions()
+        {
+            yield return SceneManager.LoadSceneAsync("Camp");
+            yield return null;
+            var camp = Object.FindAnyObjectByType<CampPrototype>();
+            var root = camp.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(CampPrototype).GetField("run", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(camp);
+            var member = party.Members.First();
+            Press(root, "camp-train");
+            Assert.That(root.Q<Button>("train-" + member.Id).text, Does.Contain("剩余 2 次"));
+            Press(root, "train-" + member.Id);
+            var trained = party.Members.First();
+            Assert.That(trained.Training.Sessions, Is.EqualTo(1));
+            Assert.That(root.Q<Label>("camp-message").text, Does.Contain(trained.Training.Describe()).And.Contain("剩余训练次数 1"));
+            Assert.That(root.Q<Button>("camp-rest").enabledInHierarchy, Is.False);
+            Assert.That(root.Q<Button>("camp-evolve").enabledInHierarchy, Is.False);
+            Assert.That(root.Q<Button>("camp-train").enabledInHierarchy, Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator CampMirrorsTheCurrentPartyAndKeepsRenewalsWhenReturningToBattle()
         {
-            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return SceneManager.LoadSceneAsync("Camp");
             yield return null;
-            Press(Object.FindAnyObjectByType<PrototypeSceneMenu>().GetComponent<UIDocument>().rootVisualElement,
-                "open-camp");
-            yield return WaitForScene("Camp");
             var root = Object.FindAnyObjectByType<CampPrototype>().GetComponent<UIDocument>().rootVisualElement;
             var theatre = Object.FindAnyObjectByType<CampPrototype>().transform.Find("Service theatre");
             var camera = Camera.main;
@@ -77,10 +95,11 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Button>("sign-crew-contract").text, Is.EqualTo("签订新合同"));
             var party = (PartyRun)typeof(CampPrototype).GetField("run", BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(Object.FindAnyObjectByType<CampPrototype>());
-            int salary = 18 * root.Q<IntegerField>("contract-daily-wage").value;
+            int salary = 18 * (int)(root.Q<LongField>("contract-signing-fee").value / 12);
             party.AddGold(salary);
             int initialBalance = party.Gold;
             root.Q<IntegerField>("contract-duration").value = 18;
+            root.Q<LongField>("contract-signing-fee").value = salary;
             root.Q<Toggle>("bonus-shield").value = true;
             root.Q<IntegerField>("bonus-shield-amount").value = 6;
             Press(root, "sign-crew-contract");

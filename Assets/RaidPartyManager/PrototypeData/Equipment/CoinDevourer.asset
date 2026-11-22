@@ -23,4 +23,4 @@ MonoBehaviour:
   healthBonus: 0
   shopTier: 3
   excludeFromBattleLoot: 1
-  shopPrice: 0
+  shopPrice: 13

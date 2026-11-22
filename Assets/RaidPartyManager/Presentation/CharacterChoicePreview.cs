@@ -49,7 +49,7 @@ namespace RaidPartyManager.Presentation
             personality.style.marginTop = 7;
             if (!string.IsNullOrWhiteSpace(character.TraitText))
             {
-                var trait = AddText(this, "trait", character.TraitText, 13);
+                var trait = AddText(this, "trait", "被动 · " + character.TraitText, 13);
                 trait.style.marginTop = 5;
             }
             IgnorePicking(this);

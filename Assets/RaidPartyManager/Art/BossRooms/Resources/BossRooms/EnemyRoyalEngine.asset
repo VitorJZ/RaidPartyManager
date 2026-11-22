@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb2409f7638047119eb89974ed723517, type: 3}
+  m_Name: EnemyRoyalEngine
+  m_EditorClassIdentifier: 
+  roomName: 御用终点站
+  backdrop:
+  - {fileID: 2800000, guid: ce8e33aa074d5822a44c19b7cdb43722, type: 3}
+  - {fileID: 2800000, guid: eb3a3b44567057b0b3e0a91235f03a1f, type: 3}
+  - {fileID: 2800000, guid: 659c82b5c95d5b4ab5b718253ae9cdb7, type: 3}
+  - {fileID: 2800000, guid: 969e96f4a80c5fb9b18222b2bf821c26, type: 3}
+  - {fileID: 2800000, guid: 229cd45afad056a0b203a10d7c06b54a, type: 3}
+  - {fileID: 2800000, guid: 9cf31257fed25cf19be1b448c848a5ed, type: 3}
+  - {fileID: 2800000, guid: eca94956d57d559480e3bfe1fba3c0ab, type: 3}
+  - {fileID: 2800000, guid: 1481a51f3add56c6ad703f168a0a634b, type: 3}
+  - {fileID: 2800000, guid: 5490f4b1cdab5110ae7dcf59d5207928, type: 3}
+  - {fileID: 2800000, guid: c7d6b681d7365b03b8e63ab4b259cf84, type: 3}
+  - {fileID: 2800000, guid: e6db0dba63e850c1a752eec812116195, type: 3}
+  - {fileID: 2800000, guid: a4f9d0516a5d58c99b66f0dc963cfc60, type: 3}
+  - {fileID: 2800000, guid: eb8c804ed23554289e2e10d8ba5324fb, type: 3}
+  - {fileID: 2800000, guid: a04ea0b9ce0c50f984ec1bae9614025d, type: 3}
+  - {fileID: 2800000, guid: 506676cfe98a587ea79710a2ee809041, type: 3}
+  - {fileID: 2800000, guid: f71bb77ddbea55919d120d3ef5759e70, type: 3}
+  floor: {fileID: 2800000, guid: 39d1ac8214be50eb8a4910605117dba9, type: 3}
+  leftWing: {fileID: 2800000, guid: 3457b0b2987b5101bfe38d9b6e8f4b75, type: 3}
+  rightWing: {fileID: 2800000, guid: f1d7ff693213566dbad373233dcdb8e8, type: 3}
+  leftMark: {x: 0.17, y: 0.81, z: 3.45}
+  rightMark: {x: 0.84, y: 0.68, z: 2.75}
+  floorTile: {x: 4.8, y: 2.3}
+  keyLight: {x: 1.18, y: 1.01, z: 0.79, w: -4.4}
+  rimLight: {x: 0.7, y: 0.9, z: 0.9, w: -0.6}
+  mist: {x: 0.43, y: 0.41, z: 0.35, w: 0.048}
+  mistHeight: 1.5
+  loopSeconds: 3.7

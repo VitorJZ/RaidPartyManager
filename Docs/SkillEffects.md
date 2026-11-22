@@ -1,6 +1,6 @@
 # 技能特效
 
-[动画总览](Previews/SkillEffects.gif)按技能书编号排列。技能名称、效果、目标和费用以《讨伐队经理-图鉴.xlsx》的「技能图鉴」工作表为准，2026-11-18 与 Unity 的 20 项技能逐条核对。参阅[图鉴更新记录](WorkbookUpdate.md)。
+[动画总览](Previews/SkillEffects.gif)按技能书编号排列。技能名称、效果、目标和费用以《讨伐队经理-图鉴.xlsx》的「技能图鉴」工作表为准，当前动画总览包含 34 项技能。参阅[图鉴更新记录](WorkbookUpdate.md)。
 
 | 编号 | 技能 | 画面与播放时机 |
 | --- | --- | --- |
@@ -30,13 +30,15 @@
 - 图集在 `Assets/RaidPartyManager/Art/SkillEffects`。每套是 1536 × 96 的透明 PNG，从左到右 16 帧，每帧 96 × 96。纹理使用点过滤、原始尺寸、RGBA 和无 Mipmap 设置。替换同一技能的图集时保留其 `.meta`。
 - 在 `SkillCatalog` 的技能条目上设置 `Battle Effect`。万箭齐发还绑定了 `Projectile`，同一释放动作会为每个实际目标创建一支飞行箭矢。星陨术的 `Projectile` 和 `Projectile Fragments` 分别绑定完整陨石和四块碎片。第 08 号图集只呈现命中后的冲击波。战斗按技能书 ID（例如 `skill-book-07`）查纹理。若元素石英改变了直接技能的命中元素，回放用相应的火焰或雷电图集，日志保留原技能名。熊熊烈火转成雷电后走雷电结算：忽略特防、应用雷电加成，也不会触发火伤专有的寒冷加成与清除。万箭齐发、星陨术、横扫千军共用玩法效果，但分别保留技能书 ID，因而播放不同动画。
 - 范围攻击只有首个命中条目驱动角色动作，后续命中在同一个冲击时刻应用。荆棘、反击和额外攻击在这一批命中结算后处理。治疗、伤害和状态用结算事件中的目标定位。蓄势提示、金钟罩和吞食尸体使用纯视觉事件。未生效的状态和未命中的后续横扫不产生目标动画。护盾等免伤仍可显示命中反馈。
-- 回放在结算点按目标播放图集。标准时长 0.72 秒，随战斗动画速度和暂停状态变化。结束、退场或重置时清理效果。特效与动画计时由界面处理，技能费用和结果仍由战斗模拟器结算。
+- 回放在结算点按目标播放图集。标准时长 0.72 秒，随战斗播放速度变化。结束、退场或重置时清理效果。特效与动画计时由界面处理，技能费用和结果仍由战斗模拟器结算。
+
+普通箭矢、魔法弹、敌方投射物、穿透箭及其尾粒、万箭齐发的箭矢和星陨术的陨石，各使用一张 4 × 4 的飞行动画图集。陨石的四块碎片各有 16 帧，依次排在同一张 8 × 8 图集上。运动轨迹与扣血时刻按原飞行时间计算。
 
 ## 修改与验证
 
-修改 [生成脚本](../Tools/GenerateSkillEffects.py) 中对应编号的绘制和配色。使用安装了 Pillow 的 Python 3.9+ 从项目根目录运行 `python Tools/GenerateSkillEffects.py --preview`，生成图集与预览。
+02、27、30、32 号的 PNG 是手绘风格原画图集，重建预览时直接读取。其余图集可在[生成脚本](../Tools/GenerateSkillEffects.py)修改绘制和配色。使用安装了 Pillow 的 Python 3.9+ 从项目根目录运行 `python Tools/GenerateSkillEffects.py --preview`，生成图集与预览。
 
-Unity Edit Mode 检查 20 套图集的透明通道和尺寸，并验证范围技能的目标及三种蓄势技能的延后触发。Play Mode 在战斗场景装备「战争咆哮」技能书，验证图集换帧并在回合结束前清理。万箭齐发使用三敌人验证同时出现三支飞行箭矢、三个命中特效和三次对应扣血。星陨术验证单颗陨石竖直下落、接触时整队扣血、四块碎片扩散并清理。
+Unity Edit Mode 检查 34 套图集的透明通道和尺寸，并验证范围技能的目标及三种蓄势技能的延后触发。Play Mode 在战斗场景装备「战争咆哮」技能书，验证图集换帧并在回合结束前清理。万箭齐发使用三敌人验证同时出现三支飞行箭矢、三个命中特效和三次对应扣血。星陨术验证单颗陨石竖直下落、接触时整队扣血、四块碎片扩散并清理。
 
 
 ## 万箭齐发的飞行素材
@@ -53,3 +55,19 @@ Unity Edit Mode 检查 20 套图集的透明通道和尺寸，并验证范围技
 > Use case: stylized-concept. Asset type: one midair meteor body for a dark fantasy pixel-art Unity auto battler. Transparent square PNG. Show exactly one heavy irregular angular carbon-black and violet meteor rock with a few narrow brilliant lavender-magenta glowing lava fissures and hot purple rim light. The whole silhouetted slab must read as one solid heavy boulder, about 78 percent of canvas. Compact diagonal oval, most mass at center, broad crisp angular facets with chunky hand-painted pixel clusters, charcoal outline and strong contrast. Front game-sprite view. Nearly straight on, bottom-right edge forward. Keep its entire shape cleanly readable at 72 pixels. A few hints of incandescent edges, no fire trail, smoke, halo, sparks, disconnected particles, shadow outside object, scenery, lettering, border, or UI. Truly transparent negative space outside silhouette.
 
 > Use case: precise-object-edit. Asset type: square transparent 2-by-2 sprite atlas for four physical fragments of the referenced pixel art meteor. Break the exact black-violet rock in Image 1 into FOUR detached irregular stone chunks, with bright magenta and pale lavender fracture faces on the cut edges. Put exactly one chunky fragment fully inside each quadrant of the square: NW, NE, SW, SE; one fragment centered at each of these four quadrant centers. The four pieces should look like unequal jagged quarters of the same meteor with complementary new broken faces and its old dark exterior, but leave very clear wide transparent gutters across the entire horizontal and vertical canvas midlines, plus a clear outer margin. Each chunk occupies roughly 70 percent of its own quadrant. The art matches the referenced hand-painted pixel clusters, dark silhouette, front angle and palette. True transparent alpha. No lines dividing the atlas, no slots, text, glowing aura around pieces, particles, debris outside the four pieces, or background.
+
+## 本轮重绘的特效
+
+熊熊烈火从地面窜起，火舌分开后散作余烬。攻城矢斜向砸入，碎石和铜屑从落点弹出。雷暴裁决以独立的 16 帧聚云演出提示蓄力，下一回合在敌人身上播放另一套 16 帧落雷。深水翻涌的浪峰短暂呈现巨魟的轮廓，碎浪落下后收成水纹。
+
+四套透明原画由内置 ImageGen 生成。各图使用以下共同提示，另附各技能的动作描述。
+
+> Use case: stylized-concept. Asset type: transparent animated combat VFX sprite atlas for a side-on medieval dark-fantasy pixel-art theatre RPG. Produce ONE square image 4 columns by 4 rows, exactly SIXTEEN successive cels, read left to right and top to bottom. Equal square cells of identical size, effects perfectly centered at the same ground origin in each cell with ample empty margins. No grid marks, border, text, numbers, backdrop, ground, environment, characters, panels or UI icon. First row windup, second impact, third expansion, fourth dissipates, even frame spacing. Designed to read at 96 pixels per frame with weighty pixel clusters, strong silhouette, hand-painted shaded masses, limited palette, selective highlights and no blurry photographic glow. True transparent alpha outside each isolated cel.
+
+> Blazing Fire. Molten ember orange and pale gold. A small spark ignites on the ground, a crown of three curling fire tongues surges up and outward to engulf a target, separates into tapered tongues, dies down into embers. Organic billowing shapes and charcoal red bases.
+
+> Siege bolt impact. A heavy short bronze ballista bolt tears diagonally down from upper left to lower right into an invisible target, a fan of brass splinters and small charcoal stone chips erupts, glowing dust and crescent shock wave taper out. Single decisive impact, clear motion and asymmetric silhouette.
+
+> Thunder Verdict. A fork of indigo cloud charge gathers over the target, collapses into a jagged brilliant ivory lightning strike connecting sky and ground, forks sideways into smaller violet arcs, then discharges into fading ground sparks. Irregular lightning branches, a strong bright contact point.
+
+> Deepwater Surge of a ghostly giant manta ray. Midnight teal and glacier blue currents curl into a rising watery crest, surge over the target with a fleeting manta-wing silhouette in the foam, collapse into outward white spray and falling droplets. Hand-painted rolling foam, clear silhouette.

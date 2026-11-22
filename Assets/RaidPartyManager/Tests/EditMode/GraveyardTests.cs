@@ -58,9 +58,11 @@ namespace RaidPartyManager.Tests
                     Assert.That(importer.mipmapEnabled, Is.False, enemy.Name);
                     Assert.That(importer.npotScale, Is.EqualTo(TextureImporterNPOTScale.None), enemy.Name);
                 }
-                Assert.That((content.BattleSpriteFor(enemy.Id).width, content.BattleSpriteFor(enemy.Id).height), Is.EqualTo((1536, 768)));
-                Assert.That((content.BattleAttackFor(enemy.Id).width, content.BattleAttackFor(enemy.Id).height), Is.EqualTo((1024, 384)));
-                Assert.That((content.BattleWalkFor(enemy.Id).width, content.BattleWalkFor(enemy.Id).height), Is.EqualTo((576, 384)));
+                Assert.That((content.BattleSpriteFor(enemy.Id).width, content.BattleSpriteFor(enemy.Id).height), Is.EqualTo((3072, 768)));
+                Assert.That((content.BattleAttackFor(enemy.Id).width, content.BattleAttackFor(enemy.Id).height), Is.EqualTo((1024, 768)));
+                var effect = content.BattleEffectFor(enemy.Id, BattleVisualCue.GraveyardSpecial);
+                Assert.That(effect.width, Is.EqualTo(16 * effect.height), enemy.Name);
+                Assert.That((content.BattleWalkFor(enemy.Id).width, content.BattleWalkFor(enemy.Id).height), Is.EqualTo((768, 768)));
             }
         }
 
@@ -99,7 +101,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void ChargedAttackTakesTwoActionsAndReevaluatesRearTargetAfterASwap()
+        public void ChargedAttackTakesTwoActionsAndStrikesTheRearTarget()
         {
             var profile = new EnemyBehaviorDefinition(new[] { new EnemyActionDefinition("后排重击", 100,
                 EnemyActionKind.Attack, EnemyTargetRule.Rear, 3, requiresCharge: true) });
@@ -107,9 +109,8 @@ namespace RaidPartyManager.Tests
             var first = session.AdvanceRound();
             Assert.That(first.Any(entry => entry.ActionName == "后排重击"), Is.False);
             Assert.That(first.Any(entry => entry.Countdown?.Kind == BattleCountdownKind.EnemyCharge && entry.Countdown?.Remaining == 1), Is.True);
-            Assert.That(session.TrySwapPartyPositions(1, 4), Is.True);
             var second = session.AdvanceRound();
-            Assert.That(second.Single(entry => entry.ActionName == "后排重击").TargetId, Is.EqualTo("front"));
+            Assert.That(second.Single(entry => entry.ActionName == "后排重击").TargetId, Is.EqualTo("rear"));
             Assert.That(second.Any(entry => entry.Countdown?.Kind == BattleCountdownKind.EnemyCharge && entry.Countdown?.Remaining == 0), Is.True);
         }
 

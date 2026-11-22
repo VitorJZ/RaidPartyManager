@@ -30,7 +30,7 @@ MonoBehaviour:
   traitText: "给自己叠加1层坚毅"
   personality: 1
   attack: 3
-  defense: 3
+  defense: 2
   specialDefense: 1
   health: 18
   actionInterval: 10

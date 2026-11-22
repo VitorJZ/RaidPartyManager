@@ -32,14 +32,15 @@ namespace RaidPartyManager.Presentation
         private readonly VisualElement actions;
         private readonly Button teamButton;
         private PartyEditorView editor;
-        private EquipmentTooltip tooltip;
+        private EquipmentTooltip itemTooltip;
 
         public RunTopBar(VisualElement root, PartyRun party, EncounterData content, Action openEditor = null,
             string editorName = "open-party-editor", Func<int> goldOverride = null, string goldName = "run-gold",
             VisualElement actions = null, Action<bool> settingsChanged = null, Action openEnemyEditor = null,
-            Action resetAdventure = null, IReadOnlyList<GoldExpense> expenseOverride = null)
+            Action resetAdventure = null, IReadOnlyList<GoldExpense> expenseOverride = null, VisualElement modalRoot = null)
         {
             this.root = root;
+            modalRoot ??= root;
             this.party = party;
             this.content = content;
             this.actions = actions;
@@ -122,7 +123,7 @@ namespace RaidPartyManager.Presentation
             {
                 HideTooltip();
                 settingsChanged?.Invoke(true);
-                var underlying = DisableScreen(root);
+                var underlying = DisableScreen(modalRoot);
                 var sheet = ContractPanel.Sheet("金币账单 · 最近三天", out var paper);
                 sheet.name = "expense-ledger";
                 int today = Math.Max(1, party.Day);
@@ -140,14 +141,14 @@ namespace RaidPartyManager.Presentation
                     sheet.RemoveFromHierarchy();
                     EnableScreen(underlying);
                     settingsChanged?.Invoke(false);
-                    this.Q<Button>("run-wallet")?.Focus();
+                    root.Q<Button>("run-wallet")?.Focus();
                 }
                 var close = PrototypeStyle.Button("收起账单", "close-ledger", Close);
                 paper.Add(close);
                 sheet.RegisterCallback<KeyDownEvent>(evt => {
                     if (evt.keyCode == KeyCode.Escape) { evt.StopPropagation(); Close(); }
                 });
-                root.Add(sheet);
+                modalRoot.Add(sheet);
                 close.Focus();
             }
 
@@ -155,37 +156,27 @@ namespace RaidPartyManager.Presentation
             {
                 HideTooltip();
                 settingsChanged?.Invoke(true);
-                var underlying = DisableScreen(root);
-                var overlay = new VisualElement { name = "run-settings" };
-                PrototypeStyle.Fill(overlay);
-                overlay.style.backgroundColor = new Color(0, 0, 0, 0.7f);
-                overlay.style.alignItems = Align.Center;
-                overlay.style.justifyContent = Justify.Center;
-
-                var panel = PrototypeStyle.Panel();
-                panel.style.width = Length.Percent(88);
-                panel.style.maxWidth = 320;
-                panel.style.marginTop = 0;
-                panel.style.paddingTop = panel.style.paddingBottom = 13;
-                panel.style.paddingLeft = panel.style.paddingRight = 16;
-                var title = PrototypeStyle.Text("设置", 21, PrototypeStyle.Accent);
-                title.style.marginBottom = 10;
-                PrototypeStyle.Middle(title);
-                panel.Add(title);
+                var underlying = DisableScreen(modalRoot);
+                var panel = new SettingsPanel(() =>
+                {
+                    EnableScreen(underlying);
+                    settingsChanged?.Invoke(false);
+                    root.Q<Button>("open-settings")?.Focus();
+                });
 
                 if (openEnemyEditor != null && editor == null)
-                    AddOption("敌方编辑", "open-enemy-editor", () => { Close(); openEnemyEditor(); });
+                    panel.AddOption("敌方编辑", "open-enemy-editor", () => { panel.Close(); openEnemyEditor(); });
                 if (resetAdventure != null)
-                    AddOption("重置讨伐", "reset-adventure", () => { Close(); resetAdventure(); });
+                    panel.AddOption("重置讨伐", "reset-adventure", () => { panel.Close(); resetAdventure(); });
                 if (AdventureFlow.CanSave(party))
                 {
                     var feedback = PrototypeStyle.Text("", 13, PrototypeStyle.Accent);
                     feedback.style.display = DisplayStyle.None;
-                    AddOption("保存并退出", "save-and-exit", () => ShowError(AdventureFlow.SaveAndExit(party)));
-                    var abandon = AddOption("放弃", "abandon-run", () => ShowError(AdventureFlow.Abandon(party)));
+                    panel.AddOption("保存并退出", "save-and-exit", () => ShowError(AdventureFlow.SaveAndExit(party)));
+                    var abandon = panel.AddOption("放弃", "abandon-run", () => ShowError(AdventureFlow.Abandon(party)));
                     abandon.style.color = PrototypeStyle.Enemy;
                     abandon.tooltip = "结束当前讨伐并删除续玩进度";
-                    panel.Add(feedback);
+                    panel.AddFeedback(feedback);
 
                     void ShowError(string error)
                     {
@@ -195,33 +186,8 @@ namespace RaidPartyManager.Presentation
                         feedback.style.display = DisplayStyle.Flex;
                     }
                 }
-                AddOption("返回主菜单", "return-main-menu", () => PrototypeSceneMenu.OpenStandalone("MainMenu"));
-                var close = AddOption("关闭", "close-settings", Close);
-                overlay.RegisterCallback<KeyDownEvent>(evt =>
-                {
-                    if (evt.keyCode != KeyCode.Escape) return;
-                    Close();
-                    evt.StopPropagation();
-                });
-                overlay.Add(panel);
-                root.Add(overlay);
-                close.Focus();
-
-                Button AddOption(string text, string id, Action click)
-                {
-                    var button = PrototypeStyle.Button(text, id, click);
-                    button.style.height = 36;
-                    panel.Add(button);
-                    return button;
-                }
-
-                void Close()
-                {
-                    overlay.RemoveFromHierarchy();
-                    EnableScreen(underlying);
-                    settingsChanged?.Invoke(false);
-                    settings.Focus();
-                }
+                panel.AddOption("返回主菜单", "return-main-menu", () => PrototypeSceneMenu.OpenStandalone("MainMenu"));
+                panel.Show(modalRoot);
             }
         }
 
@@ -396,7 +362,7 @@ namespace RaidPartyManager.Presentation
             calendar.text = party.Day > 0 ? $"第 {party.Day} 天　" : "";
             gold.text = $"金币  {Mathf.Max(0, readGold() - flyingGold)}" +
                 (party.PayrollDebt > 0 ? $"　欠薪 {party.PayrollDebt}" : "");
-            calendar.tooltip = $"进入新节点时结算全队日薪 {party.Members.Sum(m => (long)(m.Contract?.DailyWage ?? 0))} 金币";
+            calendar.tooltip = "进入新节点推进 1 天。工资按合同约定的日期扣款，点击金币可查看账单。";
             if (teamButton == null || party.Day == 0) return;
             bool due = party.NeedsRenewal;
             teamButton.style.backgroundColor = due ? new Color(.35f, .065f, .065f) : PrototypeStyle.Inset;
@@ -435,8 +401,8 @@ namespace RaidPartyManager.Presentation
                     if (evt.pointerType != UnityEngine.UIElements.PointerType.mouse)
                         return;
                     HideTooltip();
-                    tooltip = new EquipmentTooltip(item, art);
-                    tooltip.ShowAbove(root, tile);
+                    itemTooltip = new EquipmentTooltip(item, art);
+                    itemTooltip.ShowAbove(root, tile);
                 });
                 tile.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
                 items.Add(tile);
@@ -445,8 +411,12 @@ namespace RaidPartyManager.Presentation
 
         private void HideTooltip()
         {
-            tooltip?.RemoveFromHierarchy();
-            tooltip = null;
+            var current = itemTooltip;
+            itemTooltip = null;
+            // UI Toolkit clears the child list before sending detach and pointer-leave events.
+            // During those callbacks the tooltip may still report its former parent.
+            if (current?.parent is { } parent && parent.hierarchy.IndexOf(current) >= 0)
+                current.RemoveFromHierarchy();
         }
 
         private static void DrawGear(MeshGenerationContext context, Rect rect)

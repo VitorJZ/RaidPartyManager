@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyCabinetMaw
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyCabinetMaw
+  displayName: "卷宗柜兽"
+  portrait: {fileID: 2800000, guid: 553a20fea275508a90eedf5119c40abb, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: a89c7cac220559d2945837afe12f1e6d, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 9b9aefe216795eb9a484d10d99c2fc53, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 6586f59061215e5484025afbd53f253b, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 6f6abef1352e51fdb903094f5cf472ec, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: fabc27c658e450d9a55c30548c360054, type: 3}
+  usePortraitInBattle: 0
+  profession: 4
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "抽屉咬合（66%） / 封卷（34%）"
+  personality: 1
+  attack: 7
+  defense: 5
+  specialDefense: 2
+  health: 37
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "抽屉咬合"
+      weight: 66
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "封卷"
+      weight: 34
+      kind: 1
+      target: 0
+      power: 0
+      damageType: 0
+      status: 13
+      layers: 2
+      requiresCharge: 0
+      delayDecay: 1
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

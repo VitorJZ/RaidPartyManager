@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb2409f7638047119eb89974ed723517, type: 3}
+  m_Name: EnemyBlockadeAdmiral
+  m_EditorClassIdentifier: 
+  roomName: 封锁线总炮台
+  backdrop:
+  - {fileID: 2800000, guid: e520db06e4aa56bcb1b5c31179a554ef, type: 3}
+  - {fileID: 2800000, guid: 855f3584c2c654e9956d9b6a0c70e74f, type: 3}
+  - {fileID: 2800000, guid: e1bf4f898b245f9ba97d7e36cf33d156, type: 3}
+  - {fileID: 2800000, guid: e6cdc1a59a5e5f2d9f1c9b194064b196, type: 3}
+  - {fileID: 2800000, guid: 503620f59bd15ba8a129429d26532ed4, type: 3}
+  - {fileID: 2800000, guid: 7c4f8a1fe36f582d942a38cc6a38cbaf, type: 3}
+  - {fileID: 2800000, guid: 295ae3f3ad625ea0a4e89c0899ebd93b, type: 3}
+  - {fileID: 2800000, guid: 9edc7a002c0e5a2187d8708277cc8232, type: 3}
+  - {fileID: 2800000, guid: 3130304d27c3500897f38d319dfa8fd5, type: 3}
+  - {fileID: 2800000, guid: 4db63358fb9c515f8b5aeebc0d8c87ec, type: 3}
+  - {fileID: 2800000, guid: d23a37b970a85621ac03c7a0bb53095e, type: 3}
+  - {fileID: 2800000, guid: 53fff276f33e59e9b8d867d4257c7ebf, type: 3}
+  - {fileID: 2800000, guid: cba3a186f945511681ec2379415f53ba, type: 3}
+  - {fileID: 2800000, guid: e3855830bfcc5269ba80aed1a2d29050, type: 3}
+  - {fileID: 2800000, guid: 2ae65a214efc5f58aaaafc459a01e10e, type: 3}
+  - {fileID: 2800000, guid: f1b9fdf54cf3595bab16a14814755d47, type: 3}
+  floor: {fileID: 2800000, guid: 95be5a1403ab5e449443ebe53d7c91f9, type: 3}
+  leftWing: {fileID: 2800000, guid: cc179bace43459d2aa747c3c7fa2cf74, type: 3}
+  rightWing: {fileID: 2800000, guid: 35acc05f14245034ad48ca644a0d71cd, type: 3}
+  leftMark: {x: 0.2, y: 0.65, z: 2.0}
+  rightMark: {x: 0.8, y: 0.81, z: 3.15}
+  floorTile: {x: 4.2, y: 1.7}
+  keyLight: {x: 1.17, y: 0.91, z: 0.71, w: -5}
+  rimLight: {x: 0.76, y: 0.83, z: 0.96, w: -0.6}
+  mist: {x: 0.46, y: 0.45, z: 0.41, w: 0.053}
+  mistHeight: 1.1
+  loopSeconds: 3.4

@@ -50,7 +50,7 @@ namespace RaidPartyManager.Run
                 {
                     var subject = candidates[random.Next(candidates.Length)];
                     graveVisit.PrintedMember = subject.Id;
-                    Current.Message = $"墨迹未干，铅字排着「{subject.Character.Name}」。";
+                    Current.Message = $"瞧，明天的讣告上写着「{subject.Character.Name}」！花 3 金币能撤稿。也可以让记者跟访，只要这位队员下场出战并活着回来，队伍就得 12 金币。";
                 }
             }
 
@@ -75,7 +75,7 @@ namespace RaidPartyManager.Run
             }
 
             if (kind == DeadLetters)
-                Current.Message = "〔信中写着：" + LetterClues[graveVisit.Order[0]] + "〕";
+                Current.Message = GraveStories.Intro(kind) + " 第一封写着：「" + LetterClues[graveVisit.Order[0]] + "」";
             if (!GraveEligible(kind))
                 Current.Message = kind switch
                 {
@@ -262,7 +262,7 @@ namespace RaidPartyManager.Run
                     People(present, m => "让" + m.Character.Name + "牵绳", m =>
                     {
                         Select(m);
-                        Current.Message = "走到三块碑前，老狗在" + Headstones[scene.Order[0]] + "旁伏下，把下巴搁在爪上。";
+                        Current.Message = "老狗在" + Headstones[scene.Order[0]] + "旁趴了下来。您要把项圈挂在哪块碑上？";
                     });
                     return;
                 }
@@ -437,7 +437,7 @@ namespace RaidPartyManager.Run
                         {
                             scene.Number = n;
                             scene.Step = 1;
-                            Current.Message = "拟刻「" + Epitaphs[n].words + "」。选择目标栏位。";
+                            Current.Message = "石匠拟好了：「" + Epitaphs[n].words + "」有空位就选「写入空位」。栏位满了，选一个愿意换掉的旧目标。";
                         });
                     }
 
@@ -481,7 +481,14 @@ namespace RaidPartyManager.Run
             void Select(MemberView m)
             {
                 scene.Member = m.Id;
-                Current.Message = m.Character.Name + "走到了台前。";
+                Current.Message = kind switch
+                {
+                    ClaimDesk or Sponsorship => $"{m.Character.Name}来签字了。选「归队」把金币放进公账，选「归本人」提高这位队员的满意度。",
+                    SoulWard => $"{m.Character.Name}躺上了第一张床。再选一位队员，就能预览两人的生命变化。",
+                    WhisperWall => "两位都到齐了。选「下场并肩」让他们一起上阵，或选「下场错班」只派一人。",
+                    Epitaph => $"轮到{m.Character.Name}了。选一件他愿意完成的事，再决定写进哪个目标栏。",
+                    _ => m.Character.Name + "走到了台前。"
+                };
             }
 
             string Gift(string words)
@@ -537,7 +544,7 @@ namespace RaidPartyManager.Run
             EmployeeGoalKind.Kills => "击杀",
             EmployeeGoalKind.Victories => "胜利",
             EmployeeGoalKind.Tenure => "工龄",
-            EmployeeGoalKind.Equipment => "获得装备",
+            EmployeeGoalKind.Equipment => "穿戴装备出战",
             EmployeeGoalKind.Training => "学习技能",
             EmployeeGoalKind.Raise => "加薪",
             EmployeeGoalKind.Renewal => "续约",

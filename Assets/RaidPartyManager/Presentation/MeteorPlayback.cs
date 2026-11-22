@@ -45,12 +45,10 @@ namespace RaidPartyManager.Presentation
             view.Add(rock);
 
             fragments = new Image[FragmentDirections.Length];
-            int width = fragmentSheet.width / 2;
-            int height = fragmentSheet.height / 2;
             for (int i = 0; i < fragments.Length; i++)
             {
                 var piece = Sprite("battle-meteor-fragment", fragmentSheet);
-                piece.sourceRect = new Rect(i % 2 * width, i / 2 * height, width, height);
+                piece.sourceRect = AnimationCels.RectFor(fragmentSheet, i * AnimationCels.Count, 8, 8);
                 fragments[i] = piece;
             }
         }
@@ -81,6 +79,7 @@ namespace RaidPartyManager.Presentation
                 float tailHeight = size * (0.85f + 0.85f * fall);
                 Place(tail, new Vector2(center.x, center.y - tailHeight * 0.45f), size * 1.04f, tailHeight);
                 tail.style.opacity = 0.60f + 0.40f * fall;
+                rock.sourceRect = AnimationCels.RectFor(rock.image, AnimationCels.At(fall));
                 Place(rock, center, size, size);
                 rock.style.rotate = new Rotate(new Angle(-16f + 24f * fall));
                 return;
@@ -93,7 +92,7 @@ namespace RaidPartyManager.Presentation
                 foreach (var fragment in fragments)
                     view.Add(fragment);
             }
-            float scatter = Mathf.Clamp01((float)((now - impactAt) / (disappearsAt - impactAt)));
+            float scatter = AnimationCels.Phase((float)((now - impactAt) / (disappearsAt - impactAt)));
             float spread = 1 - (1 - scatter) * (1 - scatter);
             float fade = 1 - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.37f, 1, scatter));
             for (int i = 0; i < fragments.Length; i++)
@@ -102,6 +101,7 @@ namespace RaidPartyManager.Presentation
                 var offset = direction * (size * (0.24f + spread * 0.96f));
                 offset.y += size * (scatter * scatter * 0.64f + (i >= 2 ? 0.26f : 0f));
                 var piece = fragments[i];
+                piece.sourceRect = AnimationCels.RectFor(piece.image, i * AnimationCels.Count + AnimationCels.At(scatter), 8, 8);
                 float width = size * (i < 2 ? 0.64f : 0.53f);
                 Place(piece, landing + offset, width, width);
                 piece.style.rotate = new Rotate(new Angle(Mathf.Sign(direction.x) * (42 + 16 * i) * scatter));

@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyTurbineKnight
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyTurbineKnight
+  displayName: "涡轮禁卫"
+  portrait: {fileID: 2800000, guid: 601b2b40f27a59f4b7a40b48e97610a7, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: cf2f705e10565d018d5d4de38954b83e, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 99d67c4698fb5e788604840172b40337, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: b378e9bb56c95bc8bfac42899922cf17, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 57e01fa6a60c5b7d816a07dc94d3f213, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 0a421b8c7dc95e31818acf4fd5f52359, type: 3}
+  usePortraitInBattle: 0
+  profession: 0
+  enemyRank: 2
+  positionSlots: 2
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "旋翼破阵（63%） / 超速斩列（37%）"
+  personality: 1
+  attack: 11
+  defense: 6
+  specialDefense: 2
+  health: 70
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "旋翼破阵"
+      weight: 63
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "超速斩列"
+      weight: 37
+      kind: 0
+      target: 9
+      power: 3
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 1
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

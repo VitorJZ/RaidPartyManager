@@ -235,7 +235,7 @@ namespace RaidPartyManager.Presentation
             column.Add(portrait);
 
             var stats = member.EffectiveStats;
-            var baseline = member.Character.BaseStats;
+            var baseline = member.Character.BaseStats + member.Training.Bonus;
             var attributes = PrototypeStyle.Row("details-attributes");
             attributes.style.marginTop = 5;
             attributes.Add(Attribute("攻击", StatText(stats.Attack, baseline.Attack), "details-attack"));
@@ -243,9 +243,17 @@ namespace RaidPartyManager.Presentation
             attributes.Add(Attribute("特防", StatText(stats.SpecialDefense, baseline.SpecialDefense), "details-special-defense"));
             column.Add(attributes);
 
+            if (member.Training.Sessions > 0)
+            {
+                var training = PrototypeStyle.Text(
+                    $"训练 {member.Training.Sessions}/{CampTraining.Limit} 次 · {member.Training.Describe()}", 12, PrototypeStyle.Muted);
+                training.name = "details-training";
+                column.Add(training);
+            }
+
             if (!string.IsNullOrWhiteSpace(member.Character.TraitText))
             {
-                var trait = PrototypeStyle.Text(member.Character.TraitText, 12, PrototypeStyle.Muted);
+                var trait = PrototypeStyle.Text("被动 · " + member.Character.TraitText, 12, PrototypeStyle.Muted);
                 trait.name = "details-fixed-trait";
                 trait.style.marginTop = 8;
                 trait.style.flexGrow = 1;

@@ -76,16 +76,20 @@ namespace RaidPartyManager.Presentation
             float progress = Mathf.Clamp01((float)((now - releaseAt) / (flightEnd - releaseAt)));
             var center = launchTip.Value + new Vector2(direction * (travel * progress - ArrowWidth * 0.5f), 0);
             view.style.opacity = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(impactProgress[^1], 1, progress));
+            int frame = AnimationCels.At(progress);
+            arrow.sourceRect = AnimationCels.RectFor(arrow.image, frame);
             Place(arrow, center, ArrowWidth, 12f);
             arrow.style.scale = new Scale(new Vector3(direction, 1, 1));
 
+            float shimmer = AnimationCels.Phase(progress);
             for (int i = 0; i < particles.Length; i++)
             {
                 float along = i / (particles.Length - 1f);
-                float phase = 2 * Mathf.PI * (3.2f * progress + 1.25f * along);
+                float phase = 2 * Mathf.PI * (3.2f * shimmer + 1.25f * along);
                 float near = 0.5f + 0.5f * Mathf.Cos(phase);
                 var offset = new Vector2(direction * (along - 0.5f) * ArrowWidth * 0.9f, 12f * Mathf.Sin(phase));
                 float size = Mathf.Lerp(7f, 15f, near);
+                particles[i].sourceRect = AnimationCels.RectFor(particles[i].image, (frame + i * 3) % AnimationCels.Count);
                 Place(particles[i], center + offset, size, size);
                 particles[i].style.opacity = Mathf.Lerp(0.25f, 1f, near);
             }

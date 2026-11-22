@@ -17,7 +17,7 @@ namespace RaidPartyManager.Battle
                 int shield = actor.Input.Character.EnemyBehavior?.OpeningShield ?? 0;
                 if (shield == 0) continue;
                 actor.Shield += shield;
-                Report(BattleEventKind.Effect, actor, actor, "墓园护甲", ActionKind.Shield, shield,
+                Report(BattleEventKind.Effect, actor, actor, request.CapitalField ? "铸城护甲" : "墓园护甲", ActionKind.Shield, shield,
                     visual: BattleVisualCue.GraveyardSpecial);
             }
         }
@@ -30,7 +30,7 @@ namespace RaidPartyManager.Battle
             if (profile.PhaseThresholdPercent > 0 &&
                 (long)actor.Health * 100 <= (long)actor.Stats.Health * profile.PhaseThresholdPercent &&
                 phasedEnemies.Add(actor))
-                Report(BattleEventKind.Effect, actor, actor, "墓园第二阶段", ActionKind.Shield,
+                Report(BattleEventKind.Effect, actor, actor, request.CapitalField ? "炉压过载" : "墓园第二阶段", ActionKind.Shield,
                     detail: $"此后伤害招式的攻击修正 +{profile.PhaseAttackBonus}", visual: BattleVisualCue.GraveyardPhase);
 
             if (chargedEnemyActions.Remove(actor, out var charged))

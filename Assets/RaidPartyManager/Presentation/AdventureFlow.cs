@@ -36,7 +36,7 @@ namespace RaidPartyManager.Presentation
             InspectionMode = true;
         }
 
-        private static bool IsBattleScene(string scene) => scene is "BattlePrototype" or "WhisperingGraveyard";
+        private static bool IsBattleScene(string scene) => scene is "BattlePrototype" or "WhisperingGraveyard" or "ClockworkCapital";
 
         internal static void ClearSceneContext()
         {
@@ -112,8 +112,8 @@ namespace RaidPartyManager.Presentation
                 "crew-" + (index + 1), character, index + 1, character.BaseStats.Health));
             var gear = content.StartingEquipment.GroupBy(item => item.Id).Select(group => group.First()).ToArray();
             var bag = inspectionMode
-                ? gear.Where(item => item.Price > 0 && item.Tier == 3).OrderBy(_ => random.Next()).Take(2)
-                    .Concat(gear.Where(item => item.Price > 0 && item.Tier == 2).OrderBy(_ => random.Next()).Take(2))
+                ? gear.Where(item => item.AvailableInRegularPool && item.Price > 0 && item.Tier == 3).OrderBy(_ => random.Next()).Take(2)
+                    .Concat(gear.Where(item => item.AvailableInRegularPool && item.Price > 0 && item.Tier == 2).OrderBy(_ => random.Next()).Take(2))
                 : gear.Where(item => !item.IsPotion && item.Tier is 1 or 2).OrderBy(_ => random.Next()).Take(2);
             var party = new PartyRun(members, bag);
             party.AddGold(inspectionMode ? 100 : 50);
@@ -270,6 +270,8 @@ namespace RaidPartyManager.Presentation
             PrototypeSceneMenu.OpenScene("EventSelect");
         }
 
+        internal static bool FromTownFacility => origin == "Town";
+
         internal static AdventureRun ForScene(string scene) => destination == scene ? Active : null;
 
         internal static AdventureRun TalentMarketRun(AdventureContentAsset assets)
@@ -282,34 +284,35 @@ namespace RaidPartyManager.Presentation
             return run;
         }
 
-        internal static void OpenNodeScene(string scene, bool fromTown = false)
+        internal static void OpenNodeScene(string scene, bool fromTown = false, StageTurn turn = StageTurn.Automatic)
         {
             DockPlayhouse.ChangeSet(() =>
             {
                 origin = fromTown ? "Town" : "EventSelect";
                 destination = scene;
                 PrototypeSceneMenu.OpenScene(scene);
-            }, turn: scene == "TalentMarket" ? StageTurn.Forward : StageTurn.Automatic);
+            }, turn: scene == "TalentMarket" ? StageTurn.Forward : turn,
+                townVisit: fromTown || scene == "Town" || destination == "Town" || origin == "Town");
         }
 
         internal static string SceneFor(NodeKind kind) => kind switch
         {
             NodeKind.Event or NodeKind.TreasureChest => "EventSelect",
             NodeKind.Camp => "Camp", NodeKind.Shop or NodeKind.Town => "Town",
-            _ => Active?.InGraveyard == true ? "WhisperingGraveyard" : "BattlePrototype"
+            _ => Active?.InCapital == true ? "ClockworkCapital" : Active?.InGraveyard == true ? "WhisperingGraveyard" : "BattlePrototype"
         };
 
-        internal static void AddFollowingSigns(VisualElement parent, Texture2D timber, RunTopBar bar)
+        internal static void AddFollowingSigns(VisualElement parent, Texture2D stone, RunTopBar bar)
         {
             var run = Active;
             var visit = run.Current;
             DockRouteSigns signs = null;
-            signs = new DockRouteSigns(run, routeArt, timber, null, Choose, null, following: true);
+            signs = new DockRouteSigns(run, routeArt, stone, Choose, null, following: true);
             parent.Add(new StageSignMask(signs));
 
-            bool Choose(int index)
+            bool Choose(int index, StageTurn turn)
             {
-                if (run.Current != visit || DockPlayhouse.Moving) return false;
+                if (FromTownFacility || run.Current != visit || DockPlayhouse.Moving) return false;
                 var kind = run.FollowingChoice(index).Kind.Value;
                 if (!run.Party.CanAdvanceDay || kind is (NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss) && !run.Party.CanStartBattle)
                 {
@@ -325,31 +328,33 @@ namespace RaidPartyManager.Presentation
                 parent.SetEnabled(false);
                 bar.WhenRewardsArrive(() =>
                 {
-                    if (run.Current != visit || !run.EnterFollowing(index))
+                    if (FromTownFacility || run.Current != visit || !run.EnterFollowing(index))
                     {
                         parent.SetEnabled(true);
                         return;
                     }
                     GameAudio.Play(SoundCue.UiMapMarker);
-                    OpenNodeScene(SceneFor(kind));
+                    OpenNodeScene(SceneFor(kind), turn: turn);
                 });
                 return true;
             }
         }
 
-        internal static void AddServiceNavigation(VisualElement parent, Texture2D timber, RunTopBar bar)
+        internal static void AddTownReturnSign(VisualElement parent, Texture2D stone, string buttonName,
+            Action returnToTown, Func<bool> visible = null)
         {
-            if (OnRoute && Active.CanChooseFollowing)
-            {
-                AddFollowingSigns(parent, timber, bar);
-                if (origin != "Town") return;
-                var back = PrototypeStyle.Button("返回城镇", "return-event-select", () => bar.WhenRewardsArrive(ReturnFromNode));
-                back.style.position = Position.Absolute;
-                back.style.left = 20;
-                back.style.top = RunTopBar.Height + 45;
-                parent.Add(back);
-            }
-            else parent.Add(new StageSignMask(ReturnButton(() => bar.WhenRewardsArrive(ReturnFromNode))));
+            var sign = new DockRouteSigns(stone, routeArt.NodeIcon(NodeKind.Town), buttonName, returnToTown, visible);
+            parent.Add(new StageSignMask(sign));
+        }
+
+        internal static void AddServiceNavigation(VisualElement parent, Texture2D stone, RunTopBar bar, Func<bool> visible = null)
+        {
+            if (FromTownFacility)
+                AddTownReturnSign(parent, stone, "return-event-select", () => bar.WhenRewardsArrive(ReturnFromNode), visible);
+            else if (OnRoute && Active.CanChooseFollowing)
+                AddFollowingSigns(parent, stone, bar);
+            else
+                parent.Add(new StageSignMask(ReturnButton(() => bar.WhenRewardsArrive(ReturnFromNode))));
         }
 
         internal static Button ReturnButton(Action onReturn = null)
@@ -360,9 +365,10 @@ namespace RaidPartyManager.Presentation
         internal static void ReturnFromNode()
         {
             // A district change must turn to the incoming set instead of holding the outgoing battle behind its signs.
-            bool signs = origin != "Town" && Active?.ClearingDock != true &&
+            bool signs = origin != "Town" && Active?.CrossingChapter != true &&
                 (!IsBattleScene(destination) || Active?.Current?.Resolved == true);
-            DockPlayhouse.ChangeSet(FinishReturn, signs, destination == "TalentMarket" ? StageTurn.Reverse : StageTurn.Automatic);
+            DockPlayhouse.ChangeSet(FinishReturn, signs, destination == "TalentMarket" ? StageTurn.Reverse : StageTurn.Automatic,
+                townVisit: origin == "Town" || destination == "Town");
         }
 
         private static void FinishReturn()
@@ -391,7 +397,7 @@ namespace RaidPartyManager.Presentation
             NodeKind.TreasureChest => "宝箱", _ => "Boss 战"
         };
 
-        internal static string EventName(AdventureEventKind kind) => GraveStories.Contains(kind) ? GraveStories.Title(kind) : kind switch
+        internal static string EventName(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Title : GraveStories.Contains(kind) ? GraveStories.Title(kind) : kind switch
         {
             AdventureEventKind.Investor => "引资的创业者", AdventureEventKind.Ambush => "随机敌人",
             AdventureEventKind.LostTraveler => "呼朋引伴", AdventureEventKind.FoundCoins => "捡到钱了",
@@ -405,17 +411,17 @@ namespace RaidPartyManager.Presentation
             Profession.Monster => "怪物", _ => "后勤"
         };
 
-        internal static string Narrative(AdventureEventKind kind) => GraveStories.Contains(kind) ? GraveStories.Intro(kind) : kind switch
+        internal static string Narrative(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Intro + "\n" + string.Join("\n", CapitalStories.For(kind).Choices.Select(c => c.Label + "：" + c.Terms)) : GraveStories.Contains(kind) ? GraveStories.Intro(kind) : kind switch
         {
-            AdventureEventKind.Investor => "诸位瞧，图纸上的船都快出海了，船坞里还欠一根桅杆。船主翻开账本，给您的名字留了个空。",
-            AdventureEventKind.Ambush => "方才还有三盏灯，这会儿一盏也没了。听，那声刀出鞘，可不是我手里的醒铃！",
-            AdventureEventKind.LostTraveler => "这位客官对着海图走了半日。您提醒她一句？她手里那张，拿倒了。",
-            AdventureEventKind.FoundCoins => "啪嗒！钱袋开了口。您瞧那海鸥，鱼虾不理，倒先叼走了一枚金币。",
-            AdventureEventKind.HatTrick => "且看桌上这三顶帽子。那宝贝刚躲进哪一顶，您可记准了？一眨眼，它们就要换座喽。",
-            AdventureEventKind.Forge => "铁匠说，她这炉子专吃旧家伙，少了两件还不开口。至于吐出来个什么，她自己也想瞧瞧。",
-            AdventureEventKind.LockedChest => "这箱子呀，锁比箱板还结实。您听里头那一响！要解开它，得有个人舍得在这儿坐上半晌。",
-            AdventureEventKind.AscensionTrial => "看门人把礼匣搁在门槛外，自己退进门里磨刀去了。收礼的路跟试胆的路，就在这儿分开。",
-            _ => "三瓶药排了一溜，炼药师偏把签儿揭了。她说这回免钱，只求您回来告诉她，哪瓶会打嗝。"
+            AdventureEventKind.Investor => "船主还差钱造船。填好金额，再拉下出资牌。账上凑满 50 金币，她才送两件装备，不足 50 就先记账。",
+            AdventureEventKind.Ambush => "灯一灭，埋伏的人就围上来了！准备好就拉下应战牌，打赢这场能拿 12～18 金币。",
+            AdventureEventKind.LostTraveler => "雾里有人答应来投奔咱们。您喊一声，等人走到跟前，就知道谁应了招。",
+            AdventureEventKind.FoundCoins => "海鸥正啄地上的钱袋呢。拉下拾取牌，把剩下的金币收进队伍钱包吧。",
+            AdventureEventKind.HatTrick => "先记住展示宝物的那顶帽子。拉下「开始交换」，一直盯住它。等帽子停稳，点中它就能带走宝物。",
+            AdventureEventKind.Forge => "铁匠肯用两件旧装备换一件更好的。先挑两件背包里没穿戴的，再确认锻造。确认后，两件旧装备都会用掉。",
+            AdventureEventKind.LockedChest => "这把锁一时半会儿打不开。留一名队员开箱，他会缺席接下来三个节点，再带着收获归队。赶时间也可以直接走。",
+            AdventureEventKind.AscensionTrial => "门外的包裹可以直接拿走。要是想让队员升阶，就放下包裹，挑战门里的精英。两条路只能选一条。",
+            _ => "炼药师请客，三瓶药只能挑一瓶。把鼠标移到瓶上看线索，再点一瓶带走。药瓶装备给队员后，会在开战时用掉。"
         };
     }
 }

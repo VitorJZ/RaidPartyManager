@@ -60,6 +60,11 @@ namespace RaidPartyManager.Battle
                     foreach (var enemy in Opponents(actor))
                         GrantStatus(actor, enemy, Chill, 2, "沉灯霜链", kind: BattleEventKind.Effect);
                 }
+                else if (item.Definition.Effect == PressureGovernor)
+                {
+                    ShieldAlly(actor, actor, 10, "末班调压阀");
+                    GrantStatus(actor, actor, Vigor, 2, "末班调压阀");
+                }
                 else if (item.Definition.Effect == FacelessCrown)
                     ShieldAlly(actor, actor, 5, "无面王冠");
                 else if (item.Definition.Effect == ColdSoulReliquary)
@@ -144,6 +149,7 @@ namespace RaidPartyManager.Battle
             var recruit = new Unit(new Combatant(id, character, Side.Party, slot, character.BaseStats, character.BaseStats.Health));
             units.Add(recruit);
             recruits.Add(recruit);
+            GrantChorusSlots();
             unitsById.Add(id, recruit);
             UpdateFormation();
             Report(BattleEventKind.Effect, actor, recruit, "寻人启事", ActionKind.Heal, detail: $"加入 {slot} 号位", form: character);
@@ -157,6 +163,11 @@ namespace RaidPartyManager.Battle
                     if (item.Effect == InsightTotem)
                         GrantStatus(actor, TargetableOpponents(actor).First(), Exposed, 1,
                             "洞察图腾", BattleVisualCue.RoundStartExposed, BattleEventKind.Effect);
+                    else if (item.Effect == CelestialGyro)
+                    {
+                        GrantStatus(actor, actor, Vigor, 1, "摄政星仪");
+                        ShieldAlly(actor, actor, 3, "摄政星仪");
+                    }
                     else if (item.Effect == StoneArmor)
                         ShieldAlly(actor, actor, 2, "岩石铠甲");
             ApplyMegaphoneBonus();
@@ -173,7 +184,9 @@ namespace RaidPartyManager.Battle
                     {
                         if (unit.Health == 0)
                             break;
-                        if (item.Effect == LifePendant)
+                        if (item.Effect == CrucibleHeart)
+                            Heal(unit, unit, 4, "余热炉心", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndHeal);
+                        else if (item.Effect == LifePendant)
                             Heal(unit, unit, 3, "生命吊坠", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndHeal);
                         else if (item.Effect == FirstFire)
                             GrantStatus(unit, unit, Ember, 1, "初始之火", BattleVisualCue.RoundEndEmber, BattleEventKind.Effect);
@@ -273,9 +286,14 @@ namespace RaidPartyManager.Battle
         }
 
         private static int CurrentAttack(Unit actor) =>
-            EffectiveAttack(actor.Stats.Attack, actor.Layers(Weakened) > 0);
+            EffectiveAttack(actor, actor.Stats.Attack);
 
-        private static int EffectiveAttack(int attack, bool weakened) => Math.Max(0, attack - (weakened ? 2 : 0));
+        private static int EffectiveAttack(Unit unit, int attack)
+        {
+            int value = Math.Max(0, attack - (unit.Health > 0 && unit.Layers(Weakened) > 0 ? 2 : 0));
+            return unit.Trait == CharacterTrait.Rebirth && unit.Revived
+                ? (int)Math.Min(int.MaxValue, 2L * value) : value;
+        }
 
         private static int BaseHealing(Unit actor, ActionDefinition action) =>
             action.HealingScalesWithAttack ? CurrentAttack(actor) : action.Power;
@@ -396,9 +414,9 @@ namespace RaidPartyManager.Battle
             Hit(actor, target, action, BattleEventKind.Action, reason);
             if (actor.Trait == CharacterTrait.ArcherVolley)
             {
-                int shots = units.Count(unit => unit != actor && unit.Health > 0 &&
+                int LivingArchers() => units.Count(unit => unit != actor && unit.Health > 0 &&
                     unit.Input.Side == actor.Input.Side && unit.Input.Character.Profession == Profession.Archer);
-                for (int shot = 0; shot < shots && actor.Health > 0; shot++)
+                for (int shot = 0; actor.Health > 0 && shot < LivingArchers(); shot++)
                 {
                     var visible = TargetableOpponents(actor);
                     var next = visible.Contains(target) ? target : visible.FirstOrDefault();
@@ -435,7 +453,7 @@ namespace RaidPartyManager.Battle
             actor.LastAttackRound = Round;
             if (firstTarget && actor.Input.Side == Side.Party)
             {
-                int gain = Math.Min(actor.Count(MoneyTreeBranch), int.MaxValue - request.PartyGold - equipmentGold);
+                int gain = Math.Min(2 * actor.Count(MoneyTreeBranch), int.MaxValue - request.PartyGold - equipmentGold);
                 if (gain > 0)
                 {
                     equipmentGold += gain;
@@ -549,6 +567,12 @@ namespace RaidPartyManager.Battle
 
         private int Damage(Unit actor, Unit target, int power, DamageType type, bool ignoreDefense)
         {
+            int amount = UnscaledDamage(actor, target, power, type, ignoreDefense);
+            return request.CapitalField && type != DamageType.Magic && amount > 0 ? Math.Max(1, amount / 2) : amount;
+        }
+
+        private int UnscaledDamage(Unit actor, Unit target, int power, DamageType type, bool ignoreDefense)
+        {
             if (type != DamageType.Physical && target.Has(InsulatingOrb))
                 return 0;
             if (type == DamageType.Fixed)
@@ -562,8 +586,6 @@ namespace RaidPartyManager.Battle
             if (actor != null)
             {
                 amount *= 1m + actor.Layers(Vigor) * 0.20m;
-                if (actor.Trait == CharacterTrait.Rebirth && actor.Revived)
-                    amount *= 2;
                 if (actor.Input.Side == Side.Party && (request.PartyGold > 0 || equipmentGold > 0))
                 {
                     int statues = units.Where(ally => ally.Health > 0 && ally.Input.Side == actor.Input.Side &&
@@ -648,13 +670,14 @@ namespace RaidPartyManager.Battle
             target.MirrorShield -= reflected;
             int healthDamage = damage - absorbed;
             var linked = healthDamage > 0 ? LinkedAllies(target) : new List<Unit>();
-            int dealt = LoseHealth(target, LimitDamage(target, healthDamage), out string protection, out var loadout);
+            int dealt = LoseHealth(target, LimitDamage(target, healthDamage), out string protection, out var loadout, out bool charmTriggered);
             var lifeLost = LifeLossByType(resolved, absorbed, dealt);
             int physicalLost = lifeLost.Where(part => part.Type == DamageType.Physical).Sum(part => part.Amount);
             bool poisonDamage = visual == BattleVisualCue.RoundEndPoison;
             string detail = protection ?? DamageDetail(resolved);
             Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack,
-                loadout: loadout, visual: visual, skillBookId: skillBookId, damageTaken: lifeLost, poisonDamage: poisonDamage, shieldAbsorbed: absorbed);
+                loadout: loadout, visual: visual, skillBookId: skillBookId, damageTaken: lifeLost, poisonDamage: poisonDamage, shieldAbsorbed: absorbed,
+                charmTriggered: charmTriggered);
             if (target.Health == 0)
                 Report(BattleEventKind.Defeated, actor, target, name, ActionKind.Attack);
             if (target.Health > 0 && absorbed > 0 && target.Shield == 0)
@@ -684,11 +707,11 @@ namespace RaidPartyManager.Battle
                 int linkedDamage = physicalOnly ? physicalLost : dealt;
                 if (linkedDamage == 0)
                     continue;
-                int mirrored = LoseHealth(ally, LimitDamage(ally, linkedDamage), out string allyProtection, out var allyLoadout);
+                int mirrored = LoseHealth(ally, LimitDamage(ally, linkedDamage), out string allyProtection, out var allyLoadout, out bool allyCharm);
                 var mirroredParts = physicalOnly ? lifeLost.Where(part => part.Type == DamageType.Physical) : lifeLost;
                 Report(BattleEventKind.Effect, target, ally, "红绳", ActionKind.Attack, mirrored,
                     detail: allyProtection, loadout: allyLoadout, damageTaken: LifeLossByType(mirroredParts, 0, mirrored),
-                    poisonDamage: poisonDamage);
+                    poisonDamage: poisonDamage, charmTriggered: allyCharm);
                 if (ally.Health == 0)
                     Report(BattleEventKind.Defeated, target, ally, "红绳", ActionKind.Attack);
                 ReactToEnemyHealthLoss(ally, mirrored, physicalOnly ? mirrored : Math.Min(mirrored, physicalLost));
@@ -775,8 +798,9 @@ namespace RaidPartyManager.Battle
             return linked;
         }
 
-        private int LoseHealth(Unit target, int damage, out string protection, out BattleLoadout loadout)
+        private int LoseHealth(Unit target, int damage, out string protection, out BattleLoadout loadout, out bool charmTriggered)
         {
+            charmTriggered = false;
             protection = null;
             loadout = null;
             if (damage <= 0)
@@ -809,6 +833,7 @@ namespace RaidPartyManager.Battle
                     int restored = target.Health - before;
                     if (restored > 0)
                         Report(BattleEventKind.Effect, owner, target, "精灵护符", ActionKind.Heal, restored);
+                    charmTriggered = true;
                     protection = "精灵护符抵挡致命伤害";
                     return 0;
                 }

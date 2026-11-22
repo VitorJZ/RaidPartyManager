@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyMailSphere
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyMailSphere
+  displayName: "气邮球使"
+  portrait: {fileID: 2800000, guid: faea27003b2a5ff4bb2f793797c22d84, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 6d90e73ca52552cb8079b074f55e3420, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: f08701ac3772547c9b9bbe493482d71d, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: b00a1cf0eeac50c2a717f51b8bf7d64b, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: 155c1ff38d655b5881350c262c5017c7, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: d4a61fc56a7e5282b2f2b2fc29db2c67, type: 3}
+  usePortraitInBattle: 0
+  profession: 2
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 2
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "投递铅丸（66%） / 加急邮包（34%）"
+  personality: 1
+  attack: 6
+  defense: 2
+  specialDefense: 3
+  health: 26
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "投递铅丸"
+      weight: 66
+      kind: 0
+      target: 1
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "加急邮包"
+      weight: 34
+      kind: 0
+      target: 8
+      power: 1
+      damageType: 2
+      status: 6
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

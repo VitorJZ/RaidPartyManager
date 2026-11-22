@@ -36,7 +36,7 @@ namespace RaidPartyManager.Presentation
                 adventure = new AdventureRun(run, content.CharacterCatalog, content.StartingEquipment, true);
                 adventure.Inspect(NodeKind.Camp);
             }
-            stage = new CampStage(transform, root, stageArt, fireArtwork, adventure.InGraveyard);
+            stage = new CampStage(transform, root, stageArt, fireArtwork, adventure.InGraveyard, adventure.InCapital);
             Render();
         }
 
@@ -66,7 +66,7 @@ namespace RaidPartyManager.Presentation
             root.Add(header);
             var bar = new RunTopBar(root, run, content, OpenEditor, "open-camp-editor");
             if (standalone) root.Add(new StageSignMask(HangingSign.Exit("leave-camp", () => PrototypeSceneMenu.OpenStandalone("MainMenu"))));
-            else AdventureFlow.AddServiceNavigation(root, stageArt.timber, bar);
+            else AdventureFlow.AddServiceNavigation(root, stageArt.graveyardStone, bar);
             RunTopBar.PlaceAtTop(root, bar);
             var actions = new VisualElement { name = "camp-actions" };
             actions.style.position = Position.Absolute;
@@ -78,8 +78,11 @@ namespace RaidPartyManager.Presentation
             AddChoice("升阶", "camp-evolve", () => AdventureWidgets.EvolutionChoices(OpenChoice("升阶"), adventure, content,
                 adventure.EvolveAtCamp, CompleteChoice), adventure.EvolutionCandidates.Count > 0);
             AddChoice("休息", "camp-rest", () => { if (adventure.Rest()) { GameAudio.Play(SoundCue.CampRest); Render(); } });
+            AddChoice("训练", "camp-train", OpenTraining, adventure.TrainingCandidates.Count > 0);
             var message = PrototypeStyle.Text(string.IsNullOrEmpty(adventure.Current.Message)
-                ? "任选一项。休息为在场的存活队员恢复 30% 最大生命。" : adventure.Current.Message, 14, PrototypeStyle.Ink);
+                ? "任选一项。休息恢复 30% 最大生命，训练永久提升一名队员的两项随机属性。" : adventure.Current.Message,
+                14, PrototypeStyle.Ink);
+            message.name = "camp-message";
             message.style.backgroundColor = new Color(0, 0, 0, 0.65f);
             PrototypeStyle.Middle(message);
             actions.Add(message);
@@ -94,6 +97,20 @@ namespace RaidPartyManager.Presentation
                 button.style.marginLeft = button.style.marginRight = 4;
                 button.SetEnabled(adventure.CanUseCamp && available);
                 buttons.Add(button);
+            }
+        }
+
+        private void OpenTraining()
+        {
+            var list = OpenChoice("选择训练队员");
+            list.Add(PrototypeStyle.Text("本次随机提升两项不同属性。每人最多训练两次。", 14, PrototypeStyle.Muted));
+            foreach (var member in adventure.TrainingCandidates)
+            {
+                var button = AdventureWidgets.Character(list, member.Character, content, $"train-{member.Id}", () =>
+                {
+                    if (adventure.TrainAtCamp(member.Id)) CompleteChoice();
+                }, member: member);
+                button.text += $"  ·  剩余 {CampTraining.Limit - member.Training.Sessions} 次";
             }
         }
 

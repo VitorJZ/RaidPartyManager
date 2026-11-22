@@ -1,0 +1,1596 @@
+{
+  "region": "机巧遗都",
+  "floor": 3,
+  "enemies": [
+    {
+      "attack": 7,
+      "defense": 4,
+      "specialDefense": 2,
+      "health": 31,
+      "number": 54,
+      "id": "GatePunch",
+      "name": "闸口打孔员",
+      "rank": "Normal",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "验票钳击",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "逾期穿孔",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "Front",
+          "power": 3,
+          "damage": "Physical",
+          "status": "Exposed",
+          "layers": 1
+        }
+      ]
+    },
+    {
+      "attack": 6,
+      "defense": 2,
+      "specialDefense": 3,
+      "health": 26,
+      "number": 55,
+      "id": "MailSphere",
+      "name": "气邮球使",
+      "rank": "Normal",
+      "profession": "Archer",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "投递铅丸",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Rear",
+          "damage": "Physical"
+        },
+        {
+          "name": "加急邮包",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "RearTwo",
+          "power": 1,
+          "damage": "Fire",
+          "status": "Ember",
+          "layers": 1
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 2,
+      "specialDefense": 1,
+      "health": 29,
+      "number": 56,
+      "id": "ShearCentipede",
+      "name": "裁票蜈蚣",
+      "rank": "Normal",
+      "profession": "Monster",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "剪齿爬行",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "连票齐剪",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "FrontTwo",
+          "power": 2,
+          "damage": "Physical",
+          "status": "Injured",
+          "layers": 1
+        }
+      ]
+    },
+    {
+      "attack": 6,
+      "defense": 2,
+      "specialDefense": 5,
+      "health": 30,
+      "number": 57,
+      "id": "PorcelainConductor",
+      "name": "瓷面列车长",
+      "rank": "Normal",
+      "profession": "Support",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "信号杖",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "发车指令",
+          "weight": 34,
+          "kind": "Status",
+          "target": "StrongestAlly",
+          "power": 0,
+          "status": "Vigor",
+          "layers": 2
+        }
+      ]
+    },
+    {
+      "attack": 8,
+      "defense": 2,
+      "specialDefense": 1,
+      "health": 28,
+      "number": 58,
+      "id": "BogieHound",
+      "name": "转向架猎犬",
+      "rank": "Normal",
+      "profession": "Monster",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "车轴扑咬",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "脱轨追猎",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "LowestHealth",
+          "power": 3,
+          "damage": "Physical",
+          "status": "Exposed",
+          "layers": 1
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 2,
+      "specialDefense": 4,
+      "health": 27,
+      "number": 59,
+      "id": "SignalBeacon",
+      "name": "四足信号机",
+      "rank": "Normal",
+      "profession": "Mage",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "绿灯电弧",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "红灯禁行",
+          "weight": 34,
+          "kind": "Status",
+          "target": "Rear",
+          "power": 0,
+          "status": "Stunned",
+          "layers": 1,
+          "delayDecay": true
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 5,
+      "specialDefense": 1,
+      "health": 35,
+      "number": 60,
+      "id": "FareInspector",
+      "name": "铜面稽查",
+      "rank": "Normal",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "罚票猛击",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "稽查铁幕",
+          "weight": 34,
+          "kind": "Shield",
+          "target": "Self",
+          "power": 9
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 1,
+      "specialDefense": 4,
+      "health": 27,
+      "number": 61,
+      "id": "WireDispatch",
+      "name": "电键调度员",
+      "rank": "Normal",
+      "profession": "Mage",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "点划脉冲",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Rear",
+          "damage": "Magic"
+        },
+        {
+          "name": "线路过载",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "RearTwo",
+          "power": 2,
+          "damage": "Lightning"
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 3,
+      "specialDefense": 2,
+      "health": 30,
+      "number": 62,
+      "id": "LuggageCrane",
+      "name": "行李吊鹤",
+      "rank": "Normal",
+      "profession": "Archer",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "吊钩横扫",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "失物抛投",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "HighestAttack",
+          "power": 5,
+          "damage": "Physical",
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 3,
+      "specialDefense": 2,
+      "health": 34,
+      "number": 63,
+      "id": "KilnTender",
+      "name": "炉床司火",
+      "rank": "Normal",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "拨火铁",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "焚膛",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "FrontTwo",
+          "power": 2,
+          "damage": "Fire",
+          "status": "Ember",
+          "layers": 2
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 5,
+      "specialDefense": 1,
+      "health": 39,
+      "number": 64,
+      "id": "WalkingKiln",
+      "name": "行走砖窑",
+      "rank": "Normal",
+      "profession": "Monster",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "窑足践踏",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "烧结外壳",
+          "weight": 34,
+          "kind": "Shield",
+          "target": "Self",
+          "power": 10
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 2,
+      "specialDefense": 2,
+      "health": 28,
+      "number": 65,
+      "id": "RivetMantis",
+      "name": "铆钉螳螂",
+      "rank": "Normal",
+      "profession": "Archer",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "铆枪点射",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Rear",
+          "damage": "Physical"
+        },
+        {
+          "name": "开缝铆弹",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "RearTwo",
+          "power": 1,
+          "damage": "Physical",
+          "status": "Exposed",
+          "layers": 2
+        }
+      ]
+    },
+    {
+      "attack": 6,
+      "defense": 2,
+      "specialDefense": 4,
+      "health": 31,
+      "number": 66,
+      "id": "FlueSweep",
+      "name": "烟囱清扫机",
+      "rank": "Normal",
+      "profession": "Support",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "长刷击",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "扬灰蔽目",
+          "weight": 34,
+          "kind": "Status",
+          "target": "FrontTwo",
+          "power": 0,
+          "status": "Weakened",
+          "layers": 2,
+          "delayDecay": true
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 1,
+      "specialDefense": 4,
+      "health": 25,
+      "number": 67,
+      "id": "WeldFirefly",
+      "name": "焊弧萤",
+      "rank": "Normal",
+      "profession": "Mage",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "焊弧",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "蓝火引燃",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "LowestHealth",
+          "power": 3,
+          "damage": "Fire",
+          "status": "Ember",
+          "layers": 2
+        }
+      ]
+    },
+    {
+      "attack": 8,
+      "defense": 4,
+      "specialDefense": 1,
+      "health": 32,
+      "number": 68,
+      "id": "DieBoxer",
+      "name": "冲床拳师",
+      "rank": "Normal",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "落模拳",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "双模冲压",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "FrontTwo",
+          "power": 4,
+          "damage": "Physical",
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 4,
+      "specialDefense": 1,
+      "health": 35,
+      "number": 69,
+      "id": "CokeBoar",
+      "name": "焦炭铁豕",
+      "rank": "Normal",
+      "profession": "Monster",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "拱炉撞",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "泄压冲锋",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "Front",
+          "power": 5,
+          "damage": "Fire",
+          "status": "Exposed",
+          "layers": 1,
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 6,
+      "defense": 2,
+      "specialDefense": 5,
+      "health": 28,
+      "number": 70,
+      "id": "ValveMedic",
+      "name": "风箱阀医",
+      "rank": "Normal",
+      "profession": "Support",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "压力针",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "换气急救",
+          "weight": 34,
+          "kind": "Heal",
+          "target": "WoundedAlly",
+          "power": 10
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 1,
+      "specialDefense": 4,
+      "health": 26,
+      "number": 71,
+      "id": "LensSurveyor",
+      "name": "玻璃测距师",
+      "rank": "Normal",
+      "profession": "Archer",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "测绘光点",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Rear",
+          "damage": "Magic"
+        },
+        {
+          "name": "三脚聚焦",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "HighestAttack",
+          "power": 4,
+          "damage": "Magic",
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 5,
+      "specialDefense": 2,
+      "health": 37,
+      "number": 72,
+      "id": "CabinetMaw",
+      "name": "卷宗柜兽",
+      "rank": "Normal",
+      "profession": "Monster",
+      "reach": "Melee",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "抽屉咬合",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "封卷",
+          "weight": 34,
+          "kind": "Status",
+          "target": "Front",
+          "power": 0,
+          "status": "Cursed",
+          "layers": 2,
+          "delayDecay": true
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 2,
+      "specialDefense": 4,
+      "health": 29,
+      "number": 73,
+      "id": "InkScribe",
+      "name": "复写吏",
+      "rank": "Normal",
+      "profession": "Mage",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "墨针",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "复写毒墨",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "RearTwo",
+          "power": 0,
+          "damage": "Magic",
+          "status": "Poison",
+          "layers": 2
+        }
+      ]
+    },
+    {
+      "attack": 6,
+      "defense": 3,
+      "specialDefense": 4,
+      "health": 31,
+      "number": 74,
+      "id": "PhonoHerald",
+      "name": "留声宣令官",
+      "rank": "Normal",
+      "profession": "Support",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "音针弹射",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "复播动员令",
+          "weight": 34,
+          "kind": "Status",
+          "target": "AllAllies",
+          "power": 0,
+          "status": "Vigor",
+          "layers": 1
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 3,
+      "specialDefense": 2,
+      "health": 29,
+      "number": 75,
+      "id": "SeismoSpider",
+      "name": "描震蛛",
+      "rank": "Normal",
+      "profession": "Archer",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "探针",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "余震笔迹",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "AllEnemies",
+          "power": -2,
+          "damage": "Physical",
+          "status": "Exposed",
+          "layers": 1,
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 6,
+      "defense": 2,
+      "specialDefense": 4,
+      "health": 31,
+      "number": 76,
+      "id": "GlassGardener",
+      "name": "盲眼温室园丁",
+      "rank": "Normal",
+      "profession": "Support",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "剪枝杖",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "营养雾",
+          "weight": 34,
+          "kind": "Heal",
+          "target": "AllAllies",
+          "power": 5
+        }
+      ]
+    },
+    {
+      "attack": 6,
+      "defense": 3,
+      "specialDefense": 5,
+      "health": 29,
+      "number": 77,
+      "id": "CivicNurse",
+      "name": "白瓷值班护士",
+      "rank": "Normal",
+      "profession": "Support",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "消毒针",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "无菌隔离罩",
+          "weight": 34,
+          "kind": "Shield",
+          "target": "WoundedAlly",
+          "power": 9
+        }
+      ]
+    },
+    {
+      "attack": 7,
+      "defense": 1,
+      "specialDefense": 3,
+      "health": 28,
+      "number": 78,
+      "id": "Postmaster",
+      "name": "铜鸽邮政长",
+      "rank": "Normal",
+      "profession": "Archer",
+      "reach": "Ranged",
+      "slots": 1,
+      "actions": [
+        {
+          "name": "信筒落击",
+          "weight": 66,
+          "kind": "Attack",
+          "target": "Rear",
+          "damage": "Physical"
+        },
+        {
+          "name": "挂号追投",
+          "weight": 34,
+          "kind": "Attack",
+          "target": "LowestHealth",
+          "power": 3,
+          "damage": "Magic"
+        }
+      ]
+    },
+    {
+      "attack": 10,
+      "defense": 5,
+      "specialDefense": 3,
+      "health": 66,
+      "number": 79,
+      "id": "SwitchMarshal",
+      "name": "双首道岔督察",
+      "rank": "Elite",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 2,
+      "actions": [
+        {
+          "name": "闭塞锤",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "双轨封锁",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "FrontTwo",
+          "power": 3,
+          "damage": "Magic",
+          "status": "Exposed",
+          "layers": 2,
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 11,
+      "defense": 6,
+      "specialDefense": 2,
+      "health": 70,
+      "number": 80,
+      "id": "TurbineKnight",
+      "name": "涡轮禁卫",
+      "rank": "Elite",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 2,
+      "actions": [
+        {
+          "name": "旋翼破阵",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "超速斩列",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "AllEnemies",
+          "power": 3,
+          "damage": "Physical",
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 10,
+      "defense": 3,
+      "specialDefense": 6,
+      "health": 62,
+      "number": 81,
+      "id": "PressureBishop",
+      "name": "压力大主教",
+      "rank": "Elite",
+      "profession": "Mage",
+      "reach": "Ranged",
+      "slots": 2,
+      "actions": [
+        {
+          "name": "定压训诫",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "蒸汽赦令",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "AllEnemies",
+          "power": 3,
+          "damage": "Fire",
+          "status": "Ember",
+          "layers": 2,
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 9,
+      "defense": 4,
+      "specialDefense": 6,
+      "health": 64,
+      "number": 82,
+      "id": "FilingJustice",
+      "name": "终审归档官",
+      "rank": "Elite",
+      "profession": "Support",
+      "reach": "Ranged",
+      "slots": 2,
+      "actions": [
+        {
+          "name": "锤印",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "强制归档",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "RearTwo",
+          "power": 3,
+          "damage": "Magic",
+          "status": "Cursed",
+          "layers": 2,
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 10,
+      "defense": 3,
+      "specialDefense": 5,
+      "health": 61,
+      "number": 83,
+      "id": "ArsonExaminer",
+      "name": "蓝焰勘验使",
+      "rank": "Elite",
+      "profession": "Archer",
+      "reach": "Ranged",
+      "slots": 2,
+      "actions": [
+        {
+          "name": "引火取证",
+          "weight": 63,
+          "kind": "Attack",
+          "target": "Rear",
+          "damage": "Fire"
+        },
+        {
+          "name": "回溯燃点",
+          "weight": 37,
+          "kind": "Attack",
+          "target": "HighestAttack",
+          "power": 6,
+          "damage": "Magic",
+          "status": "Exposed",
+          "layers": 2,
+          "charge": true
+        }
+      ]
+    },
+    {
+      "attack": 12,
+      "defense": 6,
+      "specialDefense": 3,
+      "health": 166,
+      "number": 84,
+      "id": "RoyalEngine",
+      "name": "末班皇车",
+      "rank": "Boss",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 3,
+      "actions": [
+        {
+          "name": "王车撞角",
+          "weight": 54,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "终点清场",
+          "weight": 30,
+          "kind": "Attack",
+          "target": "AllEnemies",
+          "power": 5,
+          "damage": "Physical",
+          "status": "Exposed",
+          "layers": 1,
+          "charge": true
+        },
+        {
+          "name": "加挂护车",
+          "kind": "Shield",
+          "target": "Self",
+          "power": 12,
+          "weight": 16
+        }
+      ],
+      "openingShield": 12,
+      "phaseThreshold": 50,
+      "phasePower": 2
+    },
+    {
+      "attack": 11,
+      "defense": 3,
+      "specialDefense": 6,
+      "health": 148,
+      "number": 85,
+      "id": "AstralGovernor",
+      "name": "天球摄政",
+      "rank": "Boss",
+      "profession": "Mage",
+      "reach": "Ranged",
+      "slots": 3,
+      "actions": [
+        {
+          "name": "子午光针",
+          "weight": 54,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Magic"
+        },
+        {
+          "name": "群星合相",
+          "weight": 30,
+          "kind": "Attack",
+          "target": "AllEnemies",
+          "power": 1,
+          "damage": "Magic",
+          "charge": true
+        },
+        {
+          "name": "反向星历",
+          "kind": "Status",
+          "target": "RearTwo",
+          "status": "Weakened",
+          "layers": 2,
+          "delayDecay": true,
+          "weight": 16
+        }
+      ],
+      "openingShield": 8,
+      "phaseThreshold": 50,
+      "phasePower": 2
+    },
+    {
+      "attack": 12,
+      "defense": 5,
+      "specialDefense": 4,
+      "health": 160,
+      "number": 86,
+      "id": "CrucibleRegent",
+      "name": "熔心执政官",
+      "rank": "Boss",
+      "profession": "Warrior",
+      "reach": "Melee",
+      "slots": 3,
+      "actions": [
+        {
+          "name": "坩埚重槌",
+          "weight": 54,
+          "kind": "Attack",
+          "target": "Front",
+          "damage": "Physical"
+        },
+        {
+          "name": "全城开炉",
+          "weight": 30,
+          "kind": "Attack",
+          "target": "FrontTwo",
+          "power": 5,
+          "damage": "Fire",
+          "status": "Ember",
+          "layers": 2,
+          "charge": true
+        },
+        {
+          "name": "熔芯回流",
+          "kind": "Heal",
+          "target": "Self",
+          "power": 12,
+          "weight": 16
+        }
+      ],
+      "openingShield": 14,
+      "phaseThreshold": 50,
+      "phasePower": 2
+    }
+  ],
+  "formations": [
+    {
+      "name": "早班检票",
+      "enemies": [
+        "GatePunch",
+        "MailSphere",
+        "PorcelainConductor",
+        "SignalBeacon"
+      ]
+    },
+    {
+      "name": "分拣大厅",
+      "enemies": [
+        "ShearCentipede",
+        "BogieHound",
+        "FareInspector",
+        "WireDispatch"
+      ]
+    },
+    {
+      "name": "高架吊运",
+      "enemies": [
+        "LuggageCrane",
+        "GatePunch",
+        "WireDispatch",
+        "MailSphere"
+      ]
+    },
+    {
+      "name": "炉前铆接",
+      "enemies": [
+        "KilnTender",
+        "RivetMantis",
+        "FlueSweep",
+        "WeldFirefly"
+      ]
+    },
+    {
+      "name": "砖窑检修",
+      "enemies": [
+        "WalkingKiln",
+        "DieBoxer",
+        "ValveMedic",
+        "LensSurveyor"
+      ]
+    },
+    {
+      "name": "焦仓巡守",
+      "enemies": [
+        "CokeBoar",
+        "WeldFirefly",
+        "LensSurveyor",
+        "ValveMedic"
+      ]
+    },
+    {
+      "name": "档案封存",
+      "enemies": [
+        "CabinetMaw",
+        "InkScribe",
+        "PhonoHerald",
+        "SeismoSpider"
+      ]
+    },
+    {
+      "name": "玻璃温室",
+      "enemies": [
+        "GlassGardener",
+        "CivicNurse",
+        "Postmaster",
+        "InkScribe"
+      ]
+    },
+    {
+      "name": "道岔封锁",
+      "enemies": [
+        "SwitchMarshal",
+        "SignalBeacon",
+        "BogieHound"
+      ]
+    },
+    {
+      "name": "旋翼哨戒",
+      "enemies": [
+        "TurbineKnight",
+        "WeldFirefly",
+        "ValveMedic"
+      ]
+    },
+    {
+      "name": "圣压炉列",
+      "enemies": [
+        "PressureBishop",
+        "WalkingKiln",
+        "FlueSweep"
+      ]
+    },
+    {
+      "name": "审计终端",
+      "enemies": [
+        "FilingJustice",
+        "InkScribe",
+        "PhonoHerald"
+      ]
+    },
+    {
+      "name": "火场复核",
+      "enemies": [
+        "ArsonExaminer",
+        "LensSurveyor",
+        "CivicNurse"
+      ]
+    },
+    {
+      "name": "皇家末班车",
+      "enemies": [
+        "RoyalEngine",
+        "PorcelainConductor"
+      ]
+    },
+    {
+      "name": "天文议会",
+      "enemies": [
+        "AstralGovernor",
+        "SeismoSpider"
+      ]
+    },
+    {
+      "name": "熔心议席",
+      "enemies": [
+        "CrucibleRegent",
+        "ValveMedic"
+      ]
+    }
+  ],
+  "rewards": [
+    {
+      "boss": "RoyalEngine",
+      "gear": {
+        "id": "PressureGovernor",
+        "name": "末班调压阀",
+        "description": "开战时获得10点护盾和2层盛气。",
+        "number": 57
+      },
+      "book": {
+        "id": "ExpressClearance",
+        "name": "清轨通令",
+        "requirement": 5,
+        "cost": 2,
+        "description": "对最前两名敌人各造成（攻击力+4）点物理伤害，存活目标各获2层破绽。",
+        "number": 35
+      }
+    },
+    {
+      "boss": "AstralGovernor",
+      "gear": {
+        "id": "CelestialGyro",
+        "name": "摄政星仪",
+        "description": "每回合开始时获得1层盛气和3点护盾。",
+        "number": 58
+      },
+      "book": {
+        "id": "MeridianTransit",
+        "name": "子午过境",
+        "requirement": 1,
+        "cost": 3,
+        "description": "对所有敌人各造成（攻击力+2）点魔法伤害。",
+        "number": 36
+      }
+    },
+    {
+      "boss": "CrucibleRegent",
+      "gear": {
+        "id": "CrucibleHeart",
+        "name": "余热炉心",
+        "description": "每回合结束时为装备者恢复4点生命。",
+        "number": 59
+      },
+      "book": {
+        "id": "AnnealingOrder",
+        "name": "全员退火",
+        "requirement": 2,
+        "cost": 2,
+        "description": "为所有存活友方各恢复4点生命并给予6点护盾。",
+        "number": 37
+      }
+    }
+  ],
+  "events": [
+    {
+      "id": "FareGate",
+      "name": "永不下班的闸机",
+      "intro": "闸机还在等最后一位乘客。它肯收检修费，也会给持票员工补发车资。",
+      "district": 0,
+      "choices": [
+        {
+          "label": "补办检修票",
+          "cost": 6,
+          "chance": 100,
+          "effect": "Gear",
+          "amount": 2
+        },
+        {
+          "label": "领取误点赔款",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 9
+        }
+      ]
+    },
+    {
+      "id": "DeadMail",
+      "name": "投递于九十年前",
+      "intro": "气邮管里卡着两件东西：寄给车站的零件包，和交给队医的急件。只能给一条管线加压。",
+      "district": 0,
+      "choices": [
+        {
+          "label": "接通货运管",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gear",
+          "amount": 3
+        },
+        {
+          "label": "接通急救管",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Potion",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "TimeOffice",
+      "name": "迟到一生的考勤钟",
+      "intro": "停表那天，全城都算迟到。把时间拨回去，工人名下的工资才会发出来。",
+      "district": 0,
+      "choices": [
+        {
+          "label": "为工人补签",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Morale",
+          "amount": 1
+        },
+        {
+          "label": "申领夜班津贴",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 14
+        }
+      ]
+    },
+    {
+      "id": "WaterCharter",
+      "name": "最后一份供水特许",
+      "intro": "水塔只够开一次阀。送进消毒池能给伤员清创，送进铸币所则能洗出沉底的小钱。",
+      "district": 0,
+      "choices": [
+        {
+          "label": "开放消毒池",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Rest",
+          "amount": 22
+        },
+        {
+          "label": "冲洗铸币槽",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 12
+        }
+      ]
+    },
+    {
+      "id": "LostFreight",
+      "name": "无人认领的行李",
+      "intro": "秤盘亮起黄灯。保管员留下两种结案办法：付仓租开箱，或按废铜重量出售。",
+      "district": 0,
+      "choices": [
+        {
+          "label": "付仓租开箱",
+          "cost": 13,
+          "chance": 100,
+          "effect": "Gear",
+          "amount": 1
+        },
+        {
+          "label": "整箱称重",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 15
+        }
+      ]
+    },
+    {
+      "id": "ClinicQueue",
+      "name": "门诊叫到零号",
+      "intro": "铜护士叫了一个不存在的号。付费可让全队接诊，免费床位只够伤得最重的一人。",
+      "district": 2,
+      "choices": [
+        {
+          "label": "买团体诊票",
+          "cost": 9,
+          "chance": 100,
+          "effect": "Rest",
+          "amount": 35
+        },
+        {
+          "label": "使用免费床位",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Treat",
+          "amount": 8
+        }
+      ]
+    },
+    {
+      "id": "WrongSwitch",
+      "name": "道岔的少数意见",
+      "intro": "一条支线通向废料仓，另一条写着“试车自负”。废料商付现钱，试车成功能拖回军用装备。",
+      "district": 0,
+      "choices": [
+        {
+          "label": "走废料线",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 11
+        },
+        {
+          "label": "试跑军用线",
+          "cost": 0,
+          "chance": 60,
+          "effect": "Gear",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "StreetCurrent",
+      "name": "一盏灯的市政预算",
+      "intro": "街灯还剩一匣能源。把灯点亮，值夜的队员会很高兴；也能卸下电芯换钱。",
+      "district": 1,
+      "choices": [
+        {
+          "label": "点亮街区",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Morale",
+          "amount": 1
+        },
+        {
+          "label": "回收备用电芯",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 16
+        }
+      ]
+    },
+    {
+      "id": "ElectionPress",
+      "name": "只有一张的选票",
+      "intro": "印票机还在选市长。投给图书馆可以换一本技能书；投给公共诊所，伤员能免费就诊。",
+      "district": 2,
+      "choices": [
+        {
+          "label": "投给图书馆",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Book",
+          "amount": 1
+        },
+        {
+          "label": "投给公共诊所",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Rest",
+          "amount": 25
+        }
+      ]
+    },
+    {
+      "id": "BoilerUnion",
+      "name": "锅炉要求加班费",
+      "intro": "锅炉把压力表指向红区。付煤钱可慢慢泄压取货；直接扳阀能省钱，失手会烫伤一名队员。",
+      "district": 1,
+      "choices": [
+        {
+          "label": "买煤缓慢泄压",
+          "cost": 8,
+          "chance": 100,
+          "effect": "Gear",
+          "amount": 2
+        },
+        {
+          "label": "抢开急泄阀",
+          "cost": 0,
+          "chance": 65,
+          "effect": "Gear",
+          "amount": 2
+        }
+      ]
+    },
+    {
+      "id": "SilentOrchestra",
+      "name": "听众席上的灰尘",
+      "intro": "机械乐团等最后一场掌声。留下来当观众可振奋队员，也可以接下乐团的拆台工作领酬。",
+      "district": 2,
+      "choices": [
+        {
+          "label": "听完安可曲",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Morale",
+          "amount": 1
+        },
+        {
+          "label": "拆台领工钱",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 18
+        }
+      ]
+    },
+    {
+      "id": "SeedArchive",
+      "name": "保质期一百年",
+      "intro": "温室的抽屉标着两种用途。药用种荚能换一瓶药；打开培养床能为全队处理伤口。",
+      "district": 2,
+      "choices": [
+        {
+          "label": "交换种荚",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Potion",
+          "amount": 1
+        },
+        {
+          "label": "启动培养床",
+          "cost": 4,
+          "chance": 100,
+          "effect": "Rest",
+          "amount": 28
+        }
+      ]
+    },
+    {
+      "id": "SpareHands",
+      "name": "借来的一双手",
+      "intro": "维修台的双手还能工作。装上精密模具可加工一件装备，改装书写头则可抄录一本技能书。",
+      "district": 1,
+      "choices": [
+        {
+          "label": "购买精密模具",
+          "cost": 11,
+          "chance": 100,
+          "effect": "Gear",
+          "amount": 1
+        },
+        {
+          "label": "装上书写头",
+          "cost": 5,
+          "chance": 100,
+          "effect": "Book",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "GoldStandard",
+      "name": "黄金标准差半克",
+      "intro": "银行的天平差半克才肯结账。按旧币面值可稳拿赔付，申请重新称重则可能一枚也拿不到，还会被夹伤手指。",
+      "district": 1,
+      "choices": [
+        {
+          "label": "按面值结算",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 15
+        },
+        {
+          "label": "要求重新称重",
+          "cost": 0,
+          "chance": 55,
+          "effect": "Gold",
+          "amount": 32
+        }
+      ]
+    },
+    {
+      "id": "LastMeridian",
+      "name": "最后一次正午",
+      "intro": "圆顶开了一条缝。归零仪器可读出星图手册；放弃校准，拆下镜片也值一笔钱。",
+      "district": 2,
+      "choices": [
+        {
+          "label": "支付校准费",
+          "cost": 8,
+          "chance": 100,
+          "effect": "Book",
+          "amount": 1
+        },
+        {
+          "label": "出售备用镜片",
+          "cost": 0,
+          "chance": 100,
+          "effect": "Gold",
+          "amount": 19
+        }
+      ]
+    }
+  ]
+}

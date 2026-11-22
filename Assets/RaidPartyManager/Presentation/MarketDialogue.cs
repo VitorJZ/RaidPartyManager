@@ -26,6 +26,7 @@ namespace RaidPartyManager.Presentation
             atlas = Resources.Load<Texture2D>("StoryEvents/Cast/BrokerPortraits");
             portrait = new Image { name = "broker-portrait", image = atlas, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
             Add(portrait);
+            portrait.schedule.Execute(Pose).Every(40);
             var options = new VisualElement { name = "broker-options" };
             account = PrototypeStyle.Text("", 14, PrototypeStyle.Accent);
             options.Add(account);
@@ -42,11 +43,16 @@ namespace RaidPartyManager.Presentation
             if (run.Current.BrokerMember is string id && run.Party.CanSellMember(id)) Quote(id, true);
         }
 
+        private void Pose()
+        {
+            int mood = Mathf.Clamp(run.Current.BrokerRefusals, 0, 3);
+            int frame = AnimationCels.Loop(Time.unscaledTimeAsDouble, 1.2);
+            portrait.sourceRect = AnimationCels.RectFor(atlas, mood * AnimationCels.Count + frame, 8, 8);
+        }
+
         private void Speak(string words)
         {
-            var cell = new Vector2(atlas.width * .5f, atlas.height * .5f);
-            int pose = Mathf.Clamp(run.Current.BrokerRefusals, 0, 3);
-            portrait.sourceRect = new Rect(pose % 2 * cell.x, pose / 2 * cell.y, cell.x, cell.y);
+            Pose();
             line.text = words;
             account.text = $"队伍资金　{run.Party.Gold} 金币";
             choices.Clear();
@@ -82,17 +88,28 @@ namespace RaidPartyManager.Presentation
         {
             Speak(words);
             var member = run.Party.Members.Single(m => m.Id == id);
-            int fee = member.Contract.ReleaseFee;
+            int fee = member.Contract.CurrentReleaseFee;
             var field = new IntegerField { name = "broker-asking", value = suggested, isDelayed = false };
             choices.Add(PrototypeStyle.Text("我的报价（金币）", 14, PrototypeStyle.Ink));
             choices.Add(field);
+            int counter = run.Current.BrokerCounter;
+            var presets = PrototypeStyle.Row();
+            void Suggest(string label, int percent, int minimum)
+            {
+                int ask = (int)Math.Min(int.MaxValue, counter + Math.Max(minimum, (long)counter * percent / 100));
+                var button = PrototypeStyle.Button($"{label} {ask}", "broker-raise-" + percent, () => field.value = ask);
+                button.style.flexGrow = 1;
+                presets.Add(button);
+            }
+            Suggest("试探", 15, 4);
+            Suggest("大胆开价", 45, 12);
+            choices.Add(presets);
             var net = PrototypeStyle.Text("", 14, PrototypeStyle.Muted);
             choices.Add(net);
             void Preview(int price) => net.text = $"违约金 {fee}　·　待付工资 {member.Contract.Outstanding}　·　成交净收入 {price - member.Contract.ExitCost} 金币";
             field.RegisterValueChangedCallback(e => Preview(e.newValue));
             Preview(field.value);
             Option("按我的报价成交", "broker-offer", () => Submit(id, field.value), true);
-            int counter = run.Current.BrokerCounter;
             Option($"接受她的 {counter} 金币", "broker-accept", () => Submit(id, counter));
             Option("换一位队员谈。", "broker-back", () => Pick("名单给我，我重新翻一页。"));
             Option("暂时离席", "broker-leave", close);
@@ -103,6 +120,8 @@ namespace RaidPartyManager.Presentation
             var member = run.Party.Members.FirstOrDefault(m => m.Id == id);
             if (member == null) { Pick("这位的手续已经办好了。"); return; }
             long net = asking - member.Contract.ExitCost;
+            int previous = run.Current.BrokerCounter;
+            bool conceded = run.Current.BrokerLastAsk > asking;
             switch (run.OfferSale(id, asking))
             {
                 case MarketReply.Sold:
@@ -114,8 +133,11 @@ namespace RaidPartyManager.Presentation
                     break;
                 case MarketReply.Counteroffer:
                     int counter = run.Current.BrokerCounter;
-                    string reply = run.Current.BrokerRefusals == 1 ? "慢着，这枚金币可掰不成两枚。" : "等、等一下，眼镜滑了！这次可真是我能挪出的预算了。";
-                    Bargain(id, $"{reply} 我还到 {counter} 金币，你再想想？", counter);
+                    string reply = conceded ? "你肯让一步，我也松松钱袋。" :
+                        asking - (long)previous > 3L * (counter - previous) ? "好大的胃口！我的帽子可印不出金币。" :
+                        "这队员我确实想签。你听，钱袋又响了一声。";
+                    string lastCall = run.Current.BrokerRefusals == AdventureRun.BrokerPatience - 1 ? "这回谈不拢，我可要收账本了。" : "你怎么说？";
+                    Bargain(id, $"{reply}我添 {counter - previous} 金币，出到 {counter}。{lastCall}", counter);
                     break;
                 case MarketReply.Closed:
                     Speak("……哼，今天的董事会到此结束！再讲下去，我的胡子就要掉下来啦。下座城镇见。");

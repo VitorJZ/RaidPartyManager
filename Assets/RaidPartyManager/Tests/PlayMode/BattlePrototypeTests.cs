@@ -71,6 +71,73 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator ChantsFallenGearStaysInItsSlotAndTurnsGrayDuringPlayback()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+            var content = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
+            var singer = content.CharacterCatalog.Single(c => c.Id == "Chant");
+            var ally = party.Members.First(m => m.Position == 2);
+            party.ResetRoster(new[] {
+                new PartyMemberStart("singer", singer, 1, 1, new Dictionary<StatusKind, int> { [StatusKind.Poison] = 8 }),
+                new PartyMemberStart(ally.Id, ally.Character, 2, ally.Character.BaseStats.Health)
+            });
+            var cup = party.AddEquipment(content.StartingEquipment.First(item => item.Effect == EquipmentEffect.EchoChalice));
+            var singersCup = party.AddEquipment(cup.Definition);
+            Assert.That(party.TryEquip("singer", 3, singersCup.Id), Is.True);
+            Assert.That(party.TryEquip(ally.Id, 3, cup.Id), Is.True);
+            Press(root, "start");
+            VisualElement GrayIcon() => root.Q("equipment-position-2")?.Q("equipment-slot-4")?.Q("equipment-icon");
+            float deadline = Time.realtimeSinceStartup + 20;
+            while (GrayIcon()?.style.filter.value?.Count != 1 && Time.realtimeSinceStartup < deadline) yield return null;
+            var icon = GrayIcon();
+            Assert.That(icon.style.filter.value?.Single().type, Is.EqualTo(FilterFunctionType.Grayscale));
+            Assert.That(icon.Q<Image>().image, Is.SameAs(content.IconFor(cup.Definition.Id)));
+            var own = root.Q("equipment-position-1").Q("equipment-slot-4").Q("equipment-icon");
+            Assert.That(own.Q<Image>().image, Is.SameAs(content.IconFor(cup.Definition.Id)));
+            Assert.That(own.style.filter.value == null || own.style.filter.value.Count == 0, Is.True);
+            var details = HoverCharacter(root, root.Q("equipment-portrait-2"));
+            Assert.That(details.Q<Label>("battle-detail-slot-4").text, Does.Contain("本场失效"));
+        }
+
+        [UnityTest]
+        public IEnumerator AConsumedElvenCharmPlaysOnTheProtectedCombatant()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+            var front = party.Members.First(m => m.Position == 1);
+            party.ResetRoster(new[] { new PartyMemberStart(front.Id, front.Character, 1, 1,
+                new Dictionary<StatusKind, int> { [StatusKind.Poison] = 8 }) });
+            var charm = party.AddEquipment(new EquipmentDefinition("test-charm", "精灵护符", default,
+                effect: EquipmentEffect.ElvenCharm));
+            Assert.That(party.TryEquip(front.Id, 0, charm.Id), Is.True);
+            Press(root, "start");
+            var frames = new HashSet<Rect>();
+            float limit = Time.realtimeSinceStartup + 18;
+            while (Time.realtimeSinceStartup < limit)
+            {
+                var fx = root.Q<Image>("battle-elven-charm-effect");
+                if (fx == null && frames.Count > 0) break;
+                if (fx != null && fx.worldBound.width > 0)
+                {
+                    var protectedBody = root.Q("party-position-1").Q<Image>("battle-sprite");
+                    Assert.That(fx.image.name, Is.EqualTo("ElvenCharm"));
+                    Assert.That(fx.worldBound.center.x, Is.EqualTo(protectedBody.worldBound.center.x).Within(2f));
+                    frames.Add(fx.sourceRect);
+                }
+                yield return null;
+            }
+            Assert.That(frames.Count, Is.GreaterThan(2));
+            Assert.That(party.Inventory.Any(e => e.Id == charm.Id), Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator DefaultDraftsAndManualSelectionsReachTheAnimatedBattle()
         {
             useAuthoredFixture = false;
@@ -104,7 +171,7 @@ namespace RaidPartyManager.Tests
                 float entranceDeadline = Time.realtimeSinceStartup + 1f;
                 while (!bossEntered && Time.realtimeSinceStartup < entranceDeadline)
                 {
-                    bossEntered = BossWalkIsVisible(root);
+                    bossEntered = BossEntranceIsVisible(root);
                     yield return null;
                 }
             }
@@ -126,7 +193,8 @@ namespace RaidPartyManager.Tests
             Assert.That(RosterNames(root, "enemy-positions", "combatant-name").Distinct().Count(), Is.EqualTo(2));
             Assert.That(root.Q("enemy-position-2"), Is.Null);
             Assert.That(root.Q("enemy-position-3"), Is.Null);
-            Assert.That(root.Q("enemy-position-1").Q<Label>("position-tag").text, Is.EqualTo("01"));
+            Assert.That(root.Q("enemy-positions").Q("position-tag"), Is.Null);
+            Assert.That(root.Q("party-positions").Q("position-tag"), Is.Null);
             var enemySprites = root.Q("enemy-positions").Query<Image>("battle-sprite").ToList();
             Assert.That(enemySprites.Count, Is.EqualTo(2));
             Assert.That(root.Q("enemy-position-1").Q<Image>("battle-sprite").image.name,
@@ -138,7 +206,7 @@ namespace RaidPartyManager.Tests
             float deadline = Time.realtimeSinceStartup + 7f;
             while ((!bossPlayed || !bossEffectPlayed) && Time.realtimeSinceStartup < deadline)
             {
-                bossEntered |= BossWalkIsVisible(root);
+                bossEntered |= BossEntranceIsVisible(root);
                 bossPlayed |= root.Q("battle-action-layer").Query<Image>().ToList().Any(overlay =>
                     overlay.image != null && overlay.image.name.StartsWith("DrownedLanternRay-"));
                 bossEffectPlayed |= root.Q("battle-action-layer").Query<VisualElement>("dock-enemy-effect").ToList()
@@ -154,8 +222,8 @@ namespace RaidPartyManager.Tests
                 Is.GreaterThan(root.Q("enemy-position-4").Q<Image>("battle-sprite").resolvedStyle.height * 1.2f));
         }
 
-        private static bool BossWalkIsVisible(VisualElement root) =>
-            root.Q<Image>("entrance-enemy-1")?.image?.name == "DrownedLanternRay-Walk";
+        private static bool BossEntranceIsVisible(VisualElement root) =>
+            root.Q<Image>("entrance-enemy-1")?.image?.name == "EnemyDrownedLanternRay";
 
         private static string[] RosterNames(VisualElement root, string row, string label) =>
             root.Q(row).Query<Label>(label).ToList().Select(entry => entry.text).ToArray();
@@ -322,7 +390,8 @@ namespace RaidPartyManager.Tests
             Assert.That(drape.bounds.center.z, Is.LessThan(0));
             Assert.That(Vector3.Dot(stage.Find("Stage floor").up, Vector3.forward), Is.GreaterThan(.99f));
             var footer = root.Q("battle-footer");
-            Assert.That(footer.parent, Is.SameAs(root));
+            Assert.That(footer.parent, Is.SameAs(root.Q("battle-screen")));
+            Assert.That(footer.parent.worldBound, Is.EqualTo(root.worldBound));
             var rosterBounds = footer.Q("roster-equipment").worldBound;
             var logBounds = footer.Q("battle-log-paper").worldBound;
             var clearance = root.Q("audience-clearance").worldBound;
@@ -414,7 +483,7 @@ namespace RaidPartyManager.Tests
             Assert.That(guard.Q("status-badges").childCount, Is.Zero);
 
             Press(root, "start");
-            Press(root, "battle-pause");
+
             Assert.That(root.Q<Button>("start"), Is.Null);
             Assert.That(root.Q("enemy-positions").Children().Select(card => card.name),
                 Is.EqualTo(new[] { "enemy-position-1", "enemy-position-2", "enemy-position-3", "enemy-position-4" }));
@@ -426,13 +495,15 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("enemy-position-4").childCount, Is.Zero);
             yield return null;
             AssertBattleEquipmentIsReadOnly(root);
-            yield return WaitForRoundBreak(root);
+            yield return WaitForRound(root, 1);
+            var round = (IReadOnlyList<BattleEvent>)typeof(BattlePrototype).GetField("roundEvents", PrivateInstance).GetValue(scene);
+            yield return WaitForRound(root, 2);
+            yield return null; // Let the rebuilt round UI complete layout before pointer hit-testing.
             Assert.That(scene.transform.Find("Paper Theatre/Cyclorama").GetComponent<MeshRenderer>(), Is.SameAs(backcloth));
             AssertBattleEquipmentIsReadOnly(root);
             var initialLog = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 普攻")), Is.True);
             Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 举盾")), Is.False);
-            var round = (IReadOnlyList<BattleEvent>)typeof(BattlePrototype).GetField("roundEvents", PrivateInstance).GetValue(scene);
             var archer = ((PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene)).Members.Single(m => m.Position == 4);
             int healthAfterRound = round.Where(e => e.TargetId == archer.Id && e.Kind is BattleEventKind.Action or BattleEventKind.Effect)
                 .Select(e => e.TargetHealth).DefaultIfEmpty(archer.Health).Last();
@@ -557,7 +628,7 @@ namespace RaidPartyManager.Tests
             Press(root, "back-party-editor");
 
             Press(root, "start");
-            Press(root, "battle-pause");
+
             yield return null;
             Assert.That(root.Q<Label>("battle-phase").text, Is.EqualTo("入场"));
             Assert.That(root.Q("enemy-positions"), Is.Not.Null);
@@ -568,10 +639,10 @@ namespace RaidPartyManager.Tests
                 yield return null;
             var entrance = root.Q("battle-entrance-layer");
             Assert.That(entrance.Q("entrance-brute"), Is.Not.Null);
-            Assert.That(entrance.Q<Image>("entrance-brute"), Is.Null, "A ranged enemy should use the animated walk pose.");
+            Assert.That(entrance.Q<Image>("entrance-brute").image.name, Is.EqualTo("AshLanternAdept-Walk"));
             Assert.That(entrance.Q<Image>("entrance-flanker").image.name, Is.EqualTo("RearHunter-Walk"));
             Assert.That(root.Q("battle-action"), Is.Null);
-            yield return WaitForRoundBreak(root);
+            yield return WaitForRound(root, 2);
             Assert.That(root.Q("battle-entrance-layer").childCount, Is.Zero);
         }
 
@@ -597,9 +668,10 @@ namespace RaidPartyManager.Tests
             type.GetMethod("ResetDemo", PrivateInstance).Invoke(scene, new object[] { false });
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "start");
-            Press(root, "battle-pause");
-            yield return WaitForRoundBreak(root);
+
+            yield return WaitForRound(root, 1);
             var round = (IReadOnlyList<BattleEvent>)type.GetField("roundEvents", PrivateInstance).GetValue(scene);
+            yield return WaitForRound(root, 2);
             Assert.That(round.Count(e => e.ActionName == "沉灯翻涌"), Is.EqualTo(1));
             foreach (var slot in new[] { ("party-position-1", "archer"), ("enemy-position-1", "ray"), ("enemy-position-4", "crab") })
             {
@@ -613,7 +685,7 @@ namespace RaidPartyManager.Tests
             Press(root, "run-wallet");
             Assert.That(root.Q("expense-ledger"), Is.Not.Null);
             Press(root, "close-ledger");
-            Assert.That(PausedControl(root), Is.Not.Null);
+            Assert.That(root.Q("battle-pause"), Is.Null);
         }
 
         [UnityTest]
@@ -663,6 +735,9 @@ namespace RaidPartyManager.Tests
             var particles = root.Query<Image>("battle-arrow-particle").ToList();
             Assert.That(particles.Count, Is.GreaterThan(2));
             Assert.That(particles.Select(particle => particle.image.name), Is.All.EqualTo("TianGong-ArrowParticle"));
+            var launchCel = arrow.sourceRect;
+            Assert.That(launchCel.width, Is.EqualTo(arrow.image.width / 4f));
+            Assert.That(particles[0].sourceRect.height, Is.EqualTo(particles[0].image.height / 4f));
             float startX = arrow.style.left.value.value;
             float particleY = particles[0].style.top.value.value;
             Assert.That(HealthAt(1), Is.EqualTo("50 / 50"));
@@ -674,6 +749,7 @@ namespace RaidPartyManager.Tests
             Assert.That(HealthAt(4), Is.EqualTo("50 / 50"));
             Assert.That(root.Q<Image>("battle-piercing-arrow"), Is.SameAs(arrow));
             Assert.That(arrow.style.left.value.value, Is.GreaterThan(startX));
+            Assert.That(arrow.sourceRect, Is.Not.EqualTo(launchCel));
             Assert.That(particles[0].style.top.value.value, Is.Not.EqualTo(particleY).Within(0.01f));
 
             while (HealthAt(4) == "50 / 50" && Time.realtimeSinceStartup < deadline)
@@ -702,14 +778,14 @@ namespace RaidPartyManager.Tests
             var (archer, book) = PrepareGroupSkillBattle(scene, "archer", "skill-book-07");
             UseFastAttacks(scene);
             Press(root, "start");
-            Press(root, "battle-pause");
-            yield return WaitForRoundBreak(root);
+
+            yield return WaitForRound(root, 2);
             Assert.That(root.Q<ScrollView>("battle-log").Query<Label>().ToList()
                 .Any(line => line.text.Contains("万箭齐发") && line.text.Contains("消耗")), Is.True);
 
             SetAttackAnimationTimeScale(scene, 0.55f);
-            Press(root, "battle-pause");
-            Press(root, "battle-pause");
+
+
             float deadline = Time.realtimeSinceStartup + 6f;
             while (root.Query<Image>("battle-projectile", "skill-volley-projectile").ToList().Count != 3 &&
                 Time.realtimeSinceStartup < deadline)
@@ -738,12 +814,12 @@ namespace RaidPartyManager.Tests
             var (caster, book) = PrepareGroupSkillBattle(scene, "mage", "skill-book-08");
             UseFastAttacks(scene);
             Press(root, "start");
-            Press(root, "battle-pause");
-            yield return WaitForRoundBreak(root);
+
+            yield return WaitForRound(root, 2);
 
             SetAttackAnimationTimeScale(scene, 0.9f);
-            Press(root, "battle-pause");
-            Press(root, "battle-pause");
+
+
             float deadline = Time.realtimeSinceStartup + 6f;
             while (root.Q<Image>("battle-meteor") == null && Time.realtimeSinceStartup < deadline)
                 yield return null;
@@ -752,6 +828,8 @@ namespace RaidPartyManager.Tests
             Assert.That(meteor, Is.Not.Null);
             Assert.That(meteor.image.name, Is.EqualTo("08-MeteorBoulder"));
             Assert.That(root.Query<Image>("battle-meteor").ToList(), Has.Count.EqualTo(1));
+            var fallingCel = meteor.sourceRect;
+            Assert.That(fallingCel.width, Is.EqualTo(meteor.image.width / 4f));
             float top = meteor.style.top.value.value;
             float left = meteor.style.left.value.value;
             float center = left + meteor.style.width.value.value * 0.5f;
@@ -764,6 +842,7 @@ namespace RaidPartyManager.Tests
             Assert.That(meteor.panel, Is.Not.Null);
             Assert.That(meteor.style.left.value.value, Is.EqualTo(left).Within(1f));
             Assert.That(meteor.style.top.value.value, Is.GreaterThan(top));
+            Assert.That(meteor.sourceRect, Is.Not.EqualTo(fallingCel));
             Assert.That(root.Query<Image>("battle-meteor-fragment").ToList(), Is.Empty);
             for (int position = 1; position <= 3; position++)
                 Assert.That(root.Q("enemy-position-" + position).Q<Label>("health-value").text, Is.EqualTo("50 / 50"));
@@ -780,10 +859,13 @@ namespace RaidPartyManager.Tests
             for (int position = 1; position <= 3; position++)
                 Assert.That(root.Q("enemy-position-" + position).Q<Label>("health-value").text,
                     Is.EqualTo($"{50 - caster.BaseStats.Attack} / 50"));
+            var brokenCel = fragments[0].sourceRect;
+            Assert.That(brokenCel.width, Is.EqualTo(fragments[0].image.width / 8f));
             float fragmentX = fragments[0].style.left.value.value;
             yield return new WaitForSecondsRealtime(0.1f);
             Assert.That(fragments[0].style.left.value.value, Is.LessThan(fragmentX));
-            yield return WaitForRoundBreak(root);
+            Assert.That(fragments[0].sourceRect, Is.Not.EqualTo(brokenCel));
+            yield return WaitForRound(root, 3);
             Assert.That(root.Q("battle-meteor-effect"), Is.Null);
         }
 
@@ -837,7 +919,7 @@ namespace RaidPartyManager.Tests
 
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "start");
-            Press(root, "battle-pause");
+
             var activeAction = type.GetField("actionPlayback", PrivateInstance);
             float deadline = Time.realtimeSinceStartup + 6;
             while (root.Q("round-start-effect") == null && Time.realtimeSinceStartup < deadline)
@@ -849,18 +931,10 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("enemy-position-1").Q<Label>("health-value").text, Is.EqualTo("150 / 150"));
             Assert.That(ChantBadge().Q<Label>("status-stack-count").text, Is.EqualTo("3"));
 
-            foreach (int remaining in new[] { 2, 1, 3 })
+            for (int round = 2; round <= 4; round++)
             {
-                deadline = Time.realtimeSinceStartup + 6;
-                while (PausedControl(root) == null && Time.realtimeSinceStartup < deadline)
-                    yield return null;
-                Assert.That(PausedControl(root), Is.Not.Null);
-                Assert.That(ChantBadge().Q<Label>("status-stack-count").text, Is.EqualTo(remaining.ToString()));
-                if (remaining == 3)
-                    break;
-                Press(root, "battle-pause");
-                Press(root, "battle-pause");
-                yield return null;
+                yield return WaitForRound(root, round);
+                Assert.That(ChantBadge().Q<Label>("status-stack-count").text, Is.EqualTo((3 - (round - 1) % 3).ToString()));
             }
 
             var badge = ChantBadge();
@@ -905,7 +979,7 @@ namespace RaidPartyManager.Tests
 
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "start");
-            Press(root, "battle-pause");
+
             string PoisonLayers() => root.Q("status-badge-Poison")?.Q<Label>("status-stack-count").text;
             Assert.That(PoisonLayers(), Is.EqualTo("2"));
             var seen = new HashSet<Label>();
@@ -919,7 +993,7 @@ namespace RaidPartyManager.Tests
             float firstGone = 0;
             bool rose = false;
             float deadline = Time.realtimeSinceStartup + 7f;
-            while (PausedControl(root) == null && Time.realtimeSinceStartup < deadline)
+            while (root.Q<Label>("battle-phase")?.text != "第 2 回合" && Time.realtimeSinceStartup < deadline)
             {
                 foreach (var caption in root.Query<Label>("round-end-effect-label").ToList())
                     if (seen.Add(caption))
@@ -955,7 +1029,7 @@ namespace RaidPartyManager.Tests
                 "初始之火  余烬 ×1", "生命吊坠  +3 生命", "中毒  −2 生命",
                 "初始之火  余烬 ×2", "生命吊坠  +3 生命", "中毒  −2 生命"
             }));
-            Assert.That(PausedControl(root), Is.Not.Null);
+            Assert.That(root.Q("battle-pause"), Is.Null);
             Assert.That(root.Q("round-end-effect"), Is.Null);
             Assert.That(root.Q("party-position-1").Q<Label>("health-value").text, Is.EqualTo("11 / 24"));
         }
@@ -983,7 +1057,7 @@ namespace RaidPartyManager.Tests
             Assert.That(bar.Q("energy-cell-2").resolvedStyle.backgroundColor, Is.EqualTo(full));
             SetAttackAnimationTimeScale(scene, 0.30f);
             Press(root, "start");
-            Press(root, "battle-pause");
+
             Image warCry = null;
             float effectDeadline = Time.realtimeSinceStartup + 12f;
             while (warCry == null && Time.realtimeSinceStartup < effectDeadline)
@@ -999,7 +1073,7 @@ namespace RaidPartyManager.Tests
                 yield return null;
             Assert.That(warCry.sourceRect.x, Is.GreaterThan(firstFrame));
             UseFastAttacks(scene);
-            yield return WaitForRoundBreak(root);
+            yield return WaitForRound(root, 2);
             yield return null;
             Assert.That(root.Q("battle-skill-effect"), Is.Null);
 
@@ -1008,7 +1082,8 @@ namespace RaidPartyManager.Tests
             Assert.That(bar.Q("energy-cell-2").resolvedStyle.backgroundColor, Is.EqualTo(Color.white));
             var lines = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
             Assert.That(lines.Any(line => line.text.Contains("战争咆哮") && line.text.Contains("消耗 1 点能量")), Is.True);
-            Assert.That(lines.Any(line => line.text.Contains("篝火守夜人 · 普攻")), Is.False);
+            var firstRound = lines.TakeWhile(line => line.text != "第 2 回合");
+            Assert.That(firstRound.Any(line => line.text.Contains("篝火守夜人 · 普攻")), Is.False);
             var details = HoverCharacter(root, root.Q("equipment-portrait-1"));
             Assert.That(details.Q<Label>("battle-detail-skill-1").text, Is.EqualTo("战争咆哮 · 1 能量"));
             Assert.That(details.Q<Label>("battle-detail-skill-effect-1").text, Does.Contain("翻倍"));
@@ -1045,6 +1120,17 @@ namespace RaidPartyManager.Tests
             var guardCard = root.Q("edit-position-1");
             Assert.That(guardCard.Q("profession-frame-warrior"), Is.Not.Null);
             Assert.That(guardCard.Q("profession-portrait-art"), Is.Not.Null);
+            foreach (var portrait in root.Query<VisualElement>("character-portrait").ToList())
+            {
+                var artwork = portrait.Q<Image>("profession-portrait-art");
+                float ratio = artwork == null ? 2f / 3f : (float)artwork.image.width / artwork.image.height;
+                Assert.That(portrait.worldBound.width, Is.EqualTo(portrait.worldBound.height * ratio).Within(2f));
+                if (artwork != null)
+                {
+                    Assert.That(artwork.scaleMode, Is.EqualTo(ScaleMode.ScaleToFit));
+                    Assert.That(artwork.worldBound.width, Is.EqualTo(artwork.worldBound.height * ratio).Within(2f));
+                }
+            }
             Assert.That(guardCard.Q<Label>("character-name").text, Is.EqualTo("篝火守夜人"));
             Assert.That(guardCard.Q("character-health").Q<Label>().text, Does.Contain("10/10"));
 
@@ -1176,7 +1262,7 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator BattleAdvancesAutomaticallyAndPausesOnlyAtTheRequestedRoundBoundary()
+        public IEnumerator BattleAdvancesAtTheSelectedSpeedEvenWhileSettingsAreOpen()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
@@ -1184,99 +1270,34 @@ namespace RaidPartyManager.Tests
             UseFastAttacks(scene);
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "start");
-            yield return null;
-
-            var pause = root.Q<Button>("battle-pause");
-            Assert.That(pause.text, Is.EqualTo("暂停"));
-            Assert.That(pause.worldBound.center.x, Is.EqualTo(root.worldBound.center.x).Within(2f));
-            Assert.That(pause.worldBound.yMin, Is.GreaterThan(root.Q("run-top-bar").worldBound.yMax));
-            Press(root, "battle-pause");
-            Assert.That(pause.text, Is.EqualTo("取消暂停"));
-            Press(root, "battle-pause");
-            Assert.That(pause.text, Is.EqualTo("暂停"));
-
-            float deadline = Time.realtimeSinceStartup + 8f;
-            while (PhaseText() != "第 2 回合" && Time.realtimeSinceStartup < deadline)
-                yield return null;
-            Assert.That(PhaseText(), Is.EqualTo("第 2 回合"));
-            Assert.That(root.Q<Button>("battle-pause").text, Is.EqualTo("暂停"));
-
-            Press(root, "battle-pause");
-            Assert.That(PhaseText(), Is.EqualTo("第 2 回合"));
-            yield return WaitForRoundBreak(root);
-            Assert.That(PhaseText(), Is.EqualTo("第 2 回合结束"));
-            yield return new WaitForSecondsRealtime(0.3f);
-            Assert.That(PhaseText(), Is.EqualTo("第 2 回合结束"));
-
-            Press(root, "battle-pause");
-            Assert.That(PhaseText(), Is.EqualTo("第 3 回合"));
-            Assert.That(root.Q<Button>("battle-pause").text, Is.EqualTo("暂停"));
-            deadline = Time.realtimeSinceStartup + 20f;
-            while (PhaseText() != "战斗结算" && Time.realtimeSinceStartup < deadline)
-                yield return null;
-            Assert.That(PhaseText(), Is.EqualTo("战斗结算"));
             Assert.That(root.Q("battle-pause"), Is.Null);
-
-            string PhaseText() => root.Q<Label>("battle-phase").text;
-        }
-
-        [UnityTest]
-        public IEnumerator LongPressSwapIsAvailableOnlyBetweenRoundsAndStartsTheNextRound()
-        {
-            yield return SceneManager.LoadSceneAsync("BattlePrototype");
-            yield return null;
-            var scene = Object.FindAnyObjectByType<BattlePrototype>();
-            UseFastAttacks(scene);
-            var root = scene.GetComponent<UIDocument>().rootVisualElement;
-            AssertNoFormationButtons(root);
+            Assert.That(root.Q<Button>("battle-speed").text, Is.EqualTo("倍速 1×"));
+            yield return WaitForRound(root, 1);
+            var clock = typeof(BattlePrototype).GetProperty("PlaybackNow", PrivateInstance);
+            double Now() => (double)clock.GetValue(scene);
+            double before = Now();
+            Press(root, "battle-speed");
+            Assert.That(Now(), Is.EqualTo(before).Within(.01), "Switching speed must not skip ahead.");
             var guard = root.Q("party-position-1");
-            Down(guard);
-            yield return new WaitForSecondsRealtime(0.35f);
-            Assert.That(root.Q("formation-drag-preview"), Is.Null);
-            Up(root.Q("party-positions"), root.Q("party-position-4").worldBound.center);
-            Assert.That(root.Q("party-position-1").Q("status-row-guard"), Is.Not.Null);
-
-            Press(root, "start");
-            Press(root, "battle-pause");
-            yield return null;
-            Assert.That(PausedControl(root), Is.Null);
-            AssertNoFormationButtons(root);
-            guard = root.Q("party-position-1");
-            Down(guard);
-            yield return new WaitForSecondsRealtime(0.35f);
-            Assert.That(root.Q("formation-drag-preview"), Is.Null);
-            Up(guard, guard.worldBound.center);
-
-            yield return WaitForRoundBreak(root);
-            AssertNoFormationButtons(root);
             var party = root.Q("party-positions");
-            guard = root.Q("party-position-1");
-            var archer = root.Q("party-position-4");
-
             Down(guard);
-            Up(party, archer.worldBound.center);
-            Assert.That(PausedControl(root), Is.Not.Null, "A short press should not swap.");
-
-            Down(guard);
-            yield return WaitForFormationDrag(root);
-            Up(party, root.Q("enemy-position-1").worldBound.center);
-            Assert.That(PausedControl(root), Is.Not.Null, "Dropping on an enemy should not advance.");
+            double start = Now(), real = Time.unscaledTimeAsDouble;
+            yield return new WaitForSecondsRealtime(.36f);
+            Assert.That((Now() - start) / (Time.unscaledTimeAsDouble - real), Is.EqualTo(2).Within(.05));
+            Assert.That(root.Q("formation-drag-preview"), Is.Null);
+            Up(party, root.Q("party-position-4").worldBound.center);
+            Press(root, "open-settings");
+            yield return WaitForRound(root, 2);
+            Assert.That(root.Q("run-settings"), Is.Not.Null);
             Assert.That(root.Q("party-position-1").Q("status-row-guard"), Is.Not.Null);
-
-            Down(guard);
-            yield return WaitForFormationDrag(root);
-            Up(party, archer.worldBound.center);
-            Assert.That(PausedControl(root), Is.Null, "A successful swap should start the next round.");
-            Assert.That(root.Q<Label>("battle-phase").text, Is.EqualTo("第 2 回合"));
-            Assert.That(root.Q("party-position-4").Q("status-row-guard"), Is.Not.Null);
-            Assert.That(root.Q("party-position-1").Q("status-row-archer"), Is.Not.Null);
-
-            Press(root, "battle-pause");
-            yield return WaitForRoundBreak(root);
-            var log = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
-            Assert.That(log.Any(line => line.text.Contains("绕后猎手 · 普攻 → 篝火守夜人")), Is.True);
-            Press(root, "battle-pause");
-            Assert.That(root.Q<Label>("battle-phase").text, Is.EqualTo("第 3 回合"));
+            Press(root, "close-settings");
+            Assert.That(root.Q<Button>("battle-speed").text, Is.EqualTo("倍速 2×"));
+            Press(root, "battle-speed");
+            start = Now(); real = Time.unscaledTimeAsDouble;
+            yield return new WaitForSecondsRealtime(.15f);
+            Assert.That((Now() - start) / (Time.unscaledTimeAsDouble - real), Is.EqualTo(1).Within(.05));
+            yield return ResolveBattle(root);
+            Assert.That(root.Q("battle-speed"), Is.Null);
         }
 
         [UnityTest]
@@ -1307,16 +1328,15 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Is.EqualTo("TianGong-Combat"));
             Assert.That(root.Q("party-position-2").Q<Image>("battle-sprite").image.name, Is.EqualTo("IntelligenceOfficer-Combat"));
             Press(root, "start");
-            Press(root, "battle-pause");
-            yield return WaitForRoundBreak(root);
-            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Is.EqualTo("DiSha-Combat"));
+
+            yield return WaitForRound(root, 2);
+            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Does.StartWith("DiSha-"));
             Assert.That(root.Q("party-position-1").Query<Label>().ToList().Any(label => label.text == "地煞"), Is.True);
 
-            Press(root, "battle-pause");
-            Press(root, "battle-pause");
+
             var meleeSheets = new HashSet<string>();
             float deadline = Time.realtimeSinceStartup + 5f;
-            while (PausedControl(root) == null && Time.realtimeSinceStartup < deadline)
+            while (root.Q<Label>("battle-phase")?.text != "第 3 回合" && Time.realtimeSinceStartup < deadline)
             {
                 var moving = root.Q<Image>("battle-moving-character");
                 if (moving?.image != null)
@@ -1325,8 +1345,8 @@ namespace RaidPartyManager.Tests
             }
             Assert.That(meleeSheets, Does.Contain("DiSha-Walk"));
             Assert.That(meleeSheets, Does.Contain("DiSha-Attack"));
-            yield return WaitForRoundBreak(root);
-            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Is.EqualTo("TianGong-Combat"));
+            yield return WaitForRound(root, 3);
+            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Does.StartWith("TianGong-"));
             Assert.That(root.Q("party-position-1").Query<Label>().ToList().Any(label => label.text == "天弓"), Is.True);
             Object.Destroy(encounter);
         }
@@ -1357,16 +1377,16 @@ namespace RaidPartyManager.Tests
             while (root.Q("curtain-input-shield") != null && Time.realtimeSinceStartup < openBy) yield return null;
             var idleFrames = sprites.Select(_ => new HashSet<int>()).ToArray();
             float deadline = Time.realtimeSinceStartup + 2.2f;
-            while (idleFrames.Any(frames => frames.Count < 8) && Time.realtimeSinceStartup < deadline)
+            while (idleFrames.Any(frames => frames.Count < 16) && Time.realtimeSinceStartup < deadline)
             {
                 for (int slot = 0; slot < sprites.Length; slot++)
                     idleFrames[slot].Add(FrameColumn(sprites[slot]));
                 yield return null;
             }
-            Assert.That(idleFrames.Select(frames => frames.Count), Is.All.EqualTo(8));
+            Assert.That(idleFrames.Select(frames => frames.Count), Is.All.EqualTo(16));
 
             Press(root, "start");
-            Press(root, "battle-pause");
+
             Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite"), Is.SameAs(sprites[0]));
             Assert.That(root.Q("enemy-position-1").Q<Image>("battle-sprite"), Is.Null);
             var actionFrames = new bool[4];
@@ -1391,8 +1411,10 @@ namespace RaidPartyManager.Tests
             }
             Assert.That(actionFrames, Is.All.True, "All four roles should use their action poses.");
             Assert.That(archerRecoiled, Is.True, "The enemy's rear attack should animate the archer's hit reaction.");
-            yield return WaitForRoundBreak(root);
-            yield return new WaitForSecondsRealtime(0.45f);
+            yield return WaitForRound(root, 2);
+            deadline = Time.realtimeSinceStartup + 2f;
+            while (sprites.Any(sprite => FrameRow(sprite) != 0) && Time.realtimeSinceStartup < deadline)
+                yield return null;
             Assert.That(sprites.Select(FrameRow), Is.All.EqualTo(0), "Survivors resume idle after action and hit.");
         }
 
@@ -1464,17 +1486,17 @@ namespace RaidPartyManager.Tests
             Press(root, "start");
             var deathFrames = new HashSet<int>();
             float deadline = Time.realtimeSinceStartup + 6f;
-            while (deathFrames.Count < 8 && Time.realtimeSinceStartup < deadline)
+            while (deathFrames.Count < 16 && Time.realtimeSinceStartup < deadline)
             {
                 if (FrameRow(replacement) == 3)
                     deathFrames.Add(FrameColumn(replacement));
                 yield return null;
             }
-            Assert.That(deathFrames, Is.EquivalentTo(Enumerable.Range(0, 8)));
+            Assert.That(deathFrames, Is.EquivalentTo(Enumerable.Range(0, 16)));
             Assert.That(root.Q("party-position-4").Q<Label>("health-value").text, Does.StartWith("倒下"));
             yield return new WaitForSecondsRealtime(0.3f);
             Assert.That(FrameRow(replacement), Is.EqualTo(3));
-            Assert.That(FrameColumn(replacement), Is.EqualTo(7));
+            Assert.That(FrameColumn(replacement), Is.EqualTo(15));
             yield return ResolveBattle(root);
             yield return null;
             var revived = root.Q("party-positions").Children().Single(card =>
@@ -1513,7 +1535,10 @@ namespace RaidPartyManager.Tests
             using (var enter = PointerEnterEvent.GetPooled(Mouse(EventType.MouseMove, first.worldBound.center)))
                 Send(first, enter);
             Assert.That(root.Q<Label>("equipment-tooltip-name").text, Is.EqualTo("战争咆哮"));
-            var tooltipArtwork = root.Q("equipment-tooltip-art").Q<Image>();
+            var bookTooltip = root.Q("equipment-tooltip");
+            Assert.That(bookTooltip.Q<Label>("skill-book-requirements").text, Does.Contain("消耗"));
+            Assert.That(bookTooltip.Query<Label>().ToList().Any(label => label.text.Contains("拆卸")), Is.False);
+            var tooltipArtwork = bookTooltip.Q("equipment-tooltip-art").Q<Image>();
             Assert.That(tooltipArtwork.image, Is.SameAs(scroll.image));
             Assert.That(tooltipArtwork.Q<Image>("skill-scroll-symbol").image, Is.SameAs(symbol.image));
             yield return Drag(root, first, root.Q("edit-slot-0"));
@@ -1810,6 +1835,19 @@ namespace RaidPartyManager.Tests
                 int shadedPixels = bareBoards.Zip(withShadow, (a, b) => a.r - b.r).Count(drop => drop > 4);
                 Assert.That(shadedPixels, Is.GreaterThan(25), "Cargo must cast a visible shadow on the dock.");
                 cargoShadow.layer = shadowLayer;
+                camera.Render();
+                var boards = floor.GetComponent<Renderer>().bounds;
+                var apron = new Vector3(0, boards.center.y, boards.min.z + .3f);
+                var upstage = new Vector3(0, boards.center.y, boards.max.z - 1.0f);
+                float clearApron = BrightnessAround(apron), mistyDistance = BrightnessAround(upstage);
+                var mist = material.GetVector("_StageMist");
+                var clearAir = mist;
+                clearAir.w = 0;
+                material.SetVector("_StageMist", clearAir);
+                camera.Render();
+                Assert.That(BrightnessAround(apron), Is.EqualTo(clearApron).Within(1));
+                Assert.That(Mathf.Abs(BrightnessAround(upstage) - mistyDistance), Is.GreaterThan(2));
+                material.SetVector("_StageMist", mist);
                 material.DisableKeyword("RPM_DOCK_MOON");
                 lens.layer = lensLayer;
                 camera.Render();
@@ -2022,7 +2060,7 @@ namespace RaidPartyManager.Tests
                     healthBeforeMelee ??= enemyHealth;
                     if (moving.image.name == "CampGuardWalk")
                     {
-                        int frame = FrameRow(moving) * 3 + FrameColumn(moving);
+                        int frame = FrameRow(moving) * 4 + FrameColumn(moving);
                         if (moving.style.scale.value.value.x > 0)
                         {
                             walkOut.Add(frame);
@@ -2050,8 +2088,8 @@ namespace RaidPartyManager.Tests
             }
             Assert.That(seenProjectiles, Is.EquivalentTo(new[] { "Arrow", "MagicOrb" }));
             Assert.That(visibleWindups, Is.EquivalentTo(new[] { "StarMage-Attack", "SilverArcher-Attack" }));
-            Assert.That(walkOut, Is.EquivalentTo(Enumerable.Range(0, 6)));
-            Assert.That(walkBack, Is.EquivalentTo(Enumerable.Range(0, 6)));
+            Assert.That(walkOut, Is.EquivalentTo(Enumerable.Range(0, 16)));
+            Assert.That(walkBack, Is.EquivalentTo(Enumerable.Range(0, 16)));
             Assert.That(attackPosition, Is.GreaterThan(home + 28f));
             Assert.That(returned, Is.True);
             Object.Destroy(guard);
@@ -2115,9 +2153,22 @@ namespace RaidPartyManager.Tests
             yield return null;
             Down(root.Q(from));
             yield return WaitForFormationDrag(root);
-            yield return null;
-            var center = root.Q(to).worldBound.center;
             var roster = root.Q("editor-roster");
+            var target = root.Q(to);
+            // The editor can still be scrolling the previously focused portrait into view.
+            target.GetFirstAncestorOfType<ScrollView>()?.ScrollTo(target);
+            float deadline = Time.realtimeSinceStartup + 3f;
+            Vector2 center;
+            VisualElement picked;
+            do
+            {
+                yield return null;
+                center = target.worldBound.center;
+                picked = target.panel?.Pick(center);
+            } while ((picked == null || picked != target && !target.Contains(picked)) &&
+                Time.realtimeSinceStartup < deadline);
+            Assert.That(picked == target || picked != null && target.Contains(picked), Is.True,
+                $"The centre of {to} should pick that slot before pointer release (picked {picked?.name}).");
             using (var move = PointerMoveEvent.GetPooled(Mouse(EventType.MouseDrag, center)))
                 Send(roster, move);
             yield return null;
@@ -2171,16 +2222,13 @@ namespace RaidPartyManager.Tests
             }
         }
 
-        private static Button PausedControl(VisualElement root) =>
-            root.Q<Button>("battle-pause") is { text: "继续" } button ? button : null;
-
-        private static IEnumerator WaitForRoundBreak(VisualElement root)
+        private static IEnumerator WaitForRound(VisualElement root, int round)
         {
-            float deadline = Time.realtimeSinceStartup + 5f;
-            while (PausedControl(root) == null && Time.realtimeSinceStartup < deadline)
+            string expected = $"第 {round} 回合";
+            float deadline = Time.realtimeSinceStartup + 12f;
+            while (root.Q<Label>("battle-phase")?.text != expected && Time.realtimeSinceStartup < deadline)
                 yield return null;
-            Assert.That(PausedControl(root), Is.Not.Null, "Playback should stop at the round break.");
-            yield return null;
+            Assert.That(root.Q<Label>("battle-phase")?.text, Is.EqualTo(expected));
         }
 
         private static IEnumerator WaitForFormationDrag(VisualElement root)
@@ -2203,8 +2251,6 @@ namespace RaidPartyManager.Tests
             float deadline = Time.realtimeSinceStartup + 25f;
             while (root.Q<Label>("battle-phase").text != "战斗结算" && Time.realtimeSinceStartup < deadline)
             {
-                if (PausedControl(root) != null)
-                    Press(root, "battle-pause");
                 yield return null;
             }
             Assert.That(root.Q<Label>("battle-phase").text, Is.EqualTo("战斗结算"));

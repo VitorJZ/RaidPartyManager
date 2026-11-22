@@ -1,0 +1,72 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: EnemyShearCentipede
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: EnemyShearCentipede
+  displayName: "裁票蜈蚣"
+  portrait: {fileID: 2800000, guid: 417e85b1728a5fa38c4328bd5ae42eaa, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 33e14d7c69355ff98731036e0d3e242e, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 96258131f37450e4869c196e58b3a3ad, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 90699c5970bc53379e24019f970bfca1, type: 3}
+  battleSpecialSheet: {fileID: 2800000, guid: c629bca4b3f25560a5c492dc4fd8868d, type: 3}
+  battleSpecialEffect: {fileID: 2800000, guid: 9e85be435680576283900adb90ae986c, type: 3}
+  usePortraitInBattle: 0
+  profession: 4
+  enemyRank: 1
+  positionSlots: 1
+  rosterNumber: 0
+  stage: 1
+  reach: 1
+  fixedTrait: 0
+  traitPower: 0
+  traitText: "剪齿爬行（66%） / 连票齐剪（34%）"
+  personality: 1
+  attack: 7
+  defense: 2
+  specialDefense: 1
+  health: 29
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 0
+  hasSkill: 0
+  enemyBehavior:
+    actions:
+    - name: "剪齿爬行"
+      weight: 66
+      kind: 0
+      target: 0
+      power: 0
+      damageType: 0
+      status: -1
+      layers: 0
+      requiresCharge: 0
+      delayDecay: 0
+    - name: "连票齐剪"
+      weight: 34
+      kind: 0
+      target: 7
+      power: 2
+      damageType: 0
+      status: 12
+      layers: 1
+      requiresCharge: 0
+      delayDecay: 0
+    openingShield: 0
+    phaseThresholdPercent: 0
+    phaseAttackBonus: 0

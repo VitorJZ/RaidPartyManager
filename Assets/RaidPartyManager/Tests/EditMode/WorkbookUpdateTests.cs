@@ -16,12 +16,12 @@ namespace RaidPartyManager.Tests
             var catalog = AssetDatabase.LoadAssetAtPath<SkillCatalogAsset>(
                 "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset");
             Assert.That(catalog, Is.Not.Null);
-            Assert.That(catalog.Skills.Select(skill => skill.Number), Is.EqualTo(Enumerable.Range(1, 34)));
-            Assert.That(catalog.Skills.Select(skill => skill.DisplayName).Distinct().Count(), Is.EqualTo(34));
+            Assert.That(catalog.Skills.Select(skill => skill.Number), Is.EqualTo(Enumerable.Range(1, 37)));
+            Assert.That(catalog.Skills.Select(skill => skill.DisplayName).Distinct().Count(), Is.EqualTo(37));
             Assert.That(catalog.Skills.All(skill => skill.Cost is >= 1 and <= 8 && skill.Description.Length > 0 &&
                 skill.ToBook().SkillEffect != SkillEffect.None && skill.Icon != null && skill.Icon.width == skill.Icon.height), Is.True);
-            Assert.That(catalog.Skills.Select(s => s.Icon).Distinct().Count(), Is.EqualTo(34));
-            Assert.That(catalog.Skills.Skip(20).Select(s => s.Cost), Is.EqualTo(new[] { 3, 3, 3, 4, 4, 4, 6, 6, 7, 8, 1, 1, 2, 2 }));
+            Assert.That(catalog.Skills.Select(s => s.Icon).Distinct().Count(), Is.EqualTo(37));
+            Assert.That(catalog.Skills.Skip(20).Select(s => s.Cost), Is.EqualTo(new[] { 3, 3, 3, 4, 4, 4, 6, 6, 7, 8, 1, 1, 2, 2, 2, 3, 2 }));
             Assert.That(catalog.Skills.Single(skill => skill.DisplayName == "熊熊烈火")
                 .CanLearn(Fighter("guard", Side.Party, 1, Personality.Stoic).Character), Is.False);
         }
@@ -30,8 +30,8 @@ namespace RaidPartyManager.Tests
         public void EveryLearnedSkillHasAUniqueImportedEffectStrip()
         {
             var effects = LoadSkills().Skills.Select(skill => skill.BattleEffect).ToArray();
-            Assert.That(effects, Has.Length.EqualTo(34));
-            Assert.That(effects.Distinct().Count(), Is.EqualTo(34));
+            Assert.That(effects, Has.Length.EqualTo(37));
+            Assert.That(effects.Distinct().Count(), Is.EqualTo(37));
             foreach (var sheet in effects)
             {
                 Assert.That(sheet, Is.Not.Null);
@@ -41,6 +41,26 @@ namespace RaidPartyManager.Tests
                 Assert.That(importer.DoesSourceTextureHaveAlpha(), Is.True);
                 Assert.That(importer.mipmapEnabled, Is.False);
             }
+        }
+
+        [TestCase(5, true)]
+        [TestCase(12, false)]
+        public void MageRotatesComparableBooksButKeepsAClearlyBetterSpell(int attack, bool shouldRotate)
+        {
+            var books = LoadSkills().Skills.Select(s => s.ToBook()).ToArray();
+            var fire = books.Single(s => s.SkillEffect == SkillEffect.BlazingFire);
+            var whip = books.Single(s => s.SkillEffect == SkillEffect.LightningWhip);
+            var basic = new ActionDefinition("basic", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0);
+            var stats = new Stats(attack, 0, 0, 30);
+            var mage = new CharacterDefinition("mage", "mage", Profession.Mage, Personality.Stoic, stats, 1, basic);
+            var cup = new EquipmentDefinition("cup", "余响圣杯", default, effect: EquipmentEffect.EchoChalice);
+            var actor = new Combatant("mage", mage, Side.Party, 1, stats, 30, new[] { cup }, learnedSkills: new[] { fire, whip });
+            var foe = Fighter("foe", Side.Enemy, 1, Personality.Frank);
+            var battle = new BattleSimulator().Start(new BattleRequest("book-choice", new[] { actor, foe }, 3));
+            var events = battle.AdvanceRound().ToList();
+            events.AddRange(battle.AdvanceRound());
+            Assert.That(events.Where(e => e.ActorId == actor.Id && e.SkillBookId != null && e.ActorEnergy.HasValue)
+                .Select(e => e.SkillBookId), Is.EqualTo(new[] { fire.Id, shouldRotate ? whip.Id : fire.Id }));
         }
 
         [TestCase(30, 6)]
@@ -226,7 +246,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void EmployeesKeepTheirPositionsAndCanSwapAfterBeingWounded()
+        public void EmployeesKeepTheirPositionsAfterBeingWounded()
         {
             var first = Fighter("first", Side.Party, 1, Personality.Worrier, 10);
             var last = Fighter("last", Side.Party, 4, Personality.Stoic);
@@ -235,8 +255,7 @@ namespace RaidPartyManager.Tests
 
             session.AdvanceRound();
             Assert.That(session.Formation.Single(unit => unit.Id == first.Id).Position, Is.EqualTo(1));
-            Assert.That(session.IsPositionLocked(4), Is.False);
-            Assert.That(session.TrySwapPartyPositions(1, 4), Is.True);
+            Assert.That(session.Formation.Single(unit => unit.Id == last.Id).Position, Is.EqualTo(4));
         }
 
         private static SkillCatalogAsset LoadSkills() => AssetDatabase.LoadAssetAtPath<SkillCatalogAsset>(

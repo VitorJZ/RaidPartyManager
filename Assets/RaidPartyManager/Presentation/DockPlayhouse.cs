@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.Rendering;
 
 namespace RaidPartyManager.Presentation
 {
@@ -23,6 +24,10 @@ namespace RaidPartyManager.Presentation
         private float framedAspect;
         private MeshRenderer left, right, deckFrame;
         private Vector3 deckJoint;
+        private float impactTime = float.NegativeInfinity;
+        private Camera shakenCamera;
+        private Matrix4x4 restingProjection;
+        private Material[] stageTimber;
         internal Mesh FloorPattern { get; private set; }
         internal Mesh PanoramaPattern { get; private set; }
         private VisualElement panel, inputShield;
@@ -33,10 +38,13 @@ namespace RaidPartyManager.Presentation
         internal DockSet Set { get; private set; }
         internal static bool HoldingSet => current != null && current.performance.HoldsScenery;
         private Action afterClose;
+        private const float TownTransitionSpeed = 1.5f;
+        private float cueSpeed = 1f;
         private float travel, hold;
         private bool closedFrame;
 
         internal static bool Moving => current != null && current.owner != null && (current.cue != Cue.Playing || current.performance.Busy);
+        internal static DockPlayhouse Current => current;
 
         internal static DockPlayhouse Bind(Transform owner, VisualElement document)
         {
@@ -63,6 +71,10 @@ namespace RaidPartyManager.Presentation
                 current.lineRest = current.liftLine.localPosition;
                 current.lineSize = current.liftLine.localScale;
                 current.deckFrame = current.shell.Find("Deck and joists").GetComponent<MeshRenderer>();
+                current.stageTimber = new[] { current.deckFrame.material,
+                    current.shell.Find("Port gallery").GetComponent<Renderer>().material,
+                    current.shell.Find("Starboard gallery").GetComponent<Renderer>().material,
+                    current.shell.Find("Fly loft").GetComponent<Renderer>().material };
                 current.FloorPattern = current.deckFrame.transform.Find("Floorcloth pattern").GetComponent<MeshFilter>().sharedMesh;
                 current.deckJoint = root.transform.InverseTransformPoint(current.deckFrame.transform.position);
             }
@@ -83,6 +95,9 @@ namespace RaidPartyManager.Presentation
             current.inputShield.RegisterCallback<KeyDownEvent>(e => e.StopPropagation());
             current.gameObject.SetActive(true);
             bool continuous = current.performance.Crossing;
+            if (!continuous)
+                current.cueSpeed = owner.gameObject.scene.name is "Town" or "TalentMarket" or "DockShop" ||
+                    AdventureFlow.FromTownFacility ? TownTransitionSpeed : 1f;
             current.cue = continuous ? Cue.Playing : Cue.Opening;
             current.travel = continuous ? 1 : 0;
             current.hold = .13f;
@@ -92,7 +107,6 @@ namespace RaidPartyManager.Presentation
         }
 
         internal static readonly Vector2 PlankTile = new(3f, 1.12f);
-        internal Vector3 FlyBarEye(float x) => moonShackle.parent.TransformPoint(new Vector3(x, 2.033f, 12));
         internal float DownstageLimit => transform.TransformPoint(new Vector3(0, 0, 8.55f)).z;
         internal MeshRenderer DeckFrame => deckFrame;
         internal Bounds DeckBounds => deckFrame.bounds;
@@ -142,6 +156,66 @@ namespace RaidPartyManager.Presentation
             Vector3 r = camera.WorldToViewportPoint(house.right.transform.TransformPoint(seam));
             if (l.z < camera.nearClipPlane || r.z < camera.nearClipPlane) return new Vector2(frame.xMin,frame.xMax);
             return new Vector2(Mathf.Lerp(frame.xMin,frame.xMax,l.x),Mathf.Lerp(frame.xMin,frame.xMax,r.x));
+        }
+
+        internal void SetLighting(StageLighting lighting)
+        {
+            Set.Lighting = lighting;
+            if (!performance.HoldsScenery) LightTimber(lighting);
+        }
+
+        internal void LightTimber(StageLighting lighting)
+        {
+            foreach (var material in stageTimber) lighting.Apply(material);
+        }
+
+        internal void LandRoadstone() => impactTime = Time.unscaledTime;
+
+        private void OnEnable()
+        {
+            RenderPipelineManager.beginCameraRendering += BeginCameraRendering;
+            RenderPipelineManager.endCameraRendering += EndCameraRendering;
+            Camera.onPreCull += ShakeFrame;
+            Camera.onPostRender += RestoreFrame;
+        }
+
+        private void OnDisable()
+        {
+            if (shakenCamera != null) RestoreFrame(shakenCamera);
+            impactTime = float.NegativeInfinity;
+            RenderPipelineManager.beginCameraRendering -= BeginCameraRendering;
+            RenderPipelineManager.endCameraRendering -= EndCameraRendering;
+            Camera.onPreCull -= ShakeFrame;
+            Camera.onPostRender -= RestoreFrame;
+        }
+
+        private void BeginCameraRendering(ScriptableRenderContext context, Camera camera) => ShakeFrame(camera);
+        private void EndCameraRendering(ScriptableRenderContext context, Camera camera) => RestoreFrame(camera);
+
+        private void ShakeFrame(Camera camera)
+        {
+            float t = (Time.unscaledTime - impactTime) / .28f;
+            if (camera != framedCamera || t >= 1 || shakenCamera != null) return;
+            restingProjection = camera.projectionMatrix;
+            var shake = restingProjection;
+            float amplitude = .022f * (1-t) * (1-t);
+            shake.m12 += amplitude * Mathf.Cos(23 * t);
+            shake.m02 += amplitude * .36f * Mathf.Sin(32 * t);
+            shakenCamera = camera;
+            camera.projectionMatrix = shake;
+        }
+
+        private void RestoreFrame(Camera camera)
+        {
+            if (camera != shakenCamera) return;
+            camera.projectionMatrix = restingProjection;
+            shakenCamera = null;
+        }
+
+        private void OnDestroy()
+        {
+            if (stageTimber != null)
+                foreach (var material in stageTimber) Destroy(material);
         }
 
         internal void SetMoonVisible(bool on) => moon.gameObject.SetActive(on);
@@ -207,9 +281,10 @@ namespace RaidPartyManager.Presentation
             if (!performance.Crossing) gameObject.SetActive(false);
         }
 
-        internal static void ChangeSet(Action next, bool toSigns = false, StageTurn turn = StageTurn.Automatic)
+        internal static void ChangeSet(Action next, bool toSigns = false, StageTurn turn = StageTurn.Automatic, bool townVisit = false)
         {
             if (current == null || current.panel == null) { next(); return; }
+            current.cueSpeed = townVisit ? TownTransitionSpeed : 1f;
             current.performance.EndFirstEntrance();
             if (AdventureFlow.OnRoute || turn != StageTurn.Automatic)
             {
@@ -231,15 +306,15 @@ namespace RaidPartyManager.Presentation
         private void LateUpdate()
         {
             if (panel == null) return;
+            float dt = Mathf.Min(Time.unscaledDeltaTime, .08f) * cueSpeed;
             if (cue == Cue.Playing)
             {
                 bool arriving = performance.FirstEntrance;
-                performance.Tick(panel);
+                performance.Tick(panel, dt);
                 if (arriving && !performance.FirstEntrance) ApplyCue();
                 return;
             }
             if (cue == Cue.Opening) performance.PrepareFirstEntrance();
-            float dt = Mathf.Min(Time.unscaledDeltaTime, .08f);
             if (cue == Cue.Closed)
             {
                 if (!closedFrame) { closedFrame = true; return; }

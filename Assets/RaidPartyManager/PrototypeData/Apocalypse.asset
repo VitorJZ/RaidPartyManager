@@ -17,6 +17,7 @@ MonoBehaviour:
   portrait: {fileID: 2800000, guid: 20d5b20c29ab497da0548fa5a8a410f2, type: 3}
   campSeatedSprite: {fileID: 2800000, guid: 79a9c313fd254cc090672b882b61ffbf, type: 3}
   battleSpriteSheet: {fileID: 2800000, guid: a0cdd7f642b045e98f0de08207dcafb9, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 8ca38df9e721597bbfd4bb0af88cf5e0, type: 3}
   battleAttackSheet: {fileID: 2800000, guid: f92d946bccf548fcbb13bbbd60b69fad, type: 3}
   profession: 3
   rosterNumber: 31
@@ -24,7 +25,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 15
   traitPower: 0
-  traitText: "战斗开始时，将此特性随机变成1名2阶角色的特性"
+  traitText: "开战时随机复制一名二阶角色的被动，持续至本场战斗结束。"
   personality: 9
   attack: 5
   defense: 1

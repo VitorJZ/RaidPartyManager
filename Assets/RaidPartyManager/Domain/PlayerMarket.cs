@@ -13,7 +13,7 @@ namespace RaidPartyManager.Domain
         Watchful, Successor, ShieldPiercer, Unshaken, RearGuard,
         Therapy, Contractor, FrostAffinity, AgileSwap, BackWeighted,
         Finisher, Compensation, CurseWard, Selfless, Warmup,
-        LeakyShield, ExposedStart, Disobedient, ColdSensitive, Tuition
+        LeakyShield, ExposedStart, Disobedient, ColdSensitive, Tuition, Bargaining
     }
 
     public static class PlayerMarket
@@ -49,7 +49,7 @@ namespace RaidPartyManager.Domain
             ("公费理疗", "营地休息时，自身额外恢复2点生命值。", 8),
             ("委托熟客", "交付城镇委托时，队伍每有1名持有此特性的存活成员，额外获得2金币。", 10),
             ("冰霜亲和", "对冰冻的敌人额外造成50%的伤害。", 45),
-            ("临场调位", "每场首次因玩家换位而改变站位后，自身在下一回合开始时获得1层迅捷。", 12),
+            ("临场调位", "若本场首发站位与上一次出战不同，开战时获得1层迅捷。", 12),
             ("重心靠后", "位于1、2号位时，防御力−1（最低为0）。位于3、4号位时，特防+1。", 0),
             ("挑软柿子", "普攻对半血或以下的敌人伤害+1，对其他敌人伤害−1（最低为1）。", 0),
             ("工伤赔偿", "每场首次倒下时，其他存活队友各获得2点护盾。若队伍获胜，从本场金币奖励中支付最多2金币赔偿。", 0),
@@ -58,9 +58,10 @@ namespace RaidPartyManager.Domain
             ("还在热身", "第1回合无法施放技能。第2回合开始时，若自身存活，获得1层迅捷。", -5),
             ("护盾漏风", "每场战斗首次获得护盾时，护盾值少获得2点（最低为0）。", -8),
             ("开场露怯", "开战时，自身获得1层破绽。", -15),
-            ("不服调度", "每场首次因玩家换位而改变站位后，自身在下一回合开始时获得1层萎靡。", -5),
+            ("不服调度", "若本场首发站位与上一次出战不同，开战时获得1层萎靡。", -5),
             ("怕冷", "每场战斗首次被施加寒冷时，额外获得1层寒冷。", -8),
             ("技能外包", "学习技能时，队伍额外支付2金币培训费。金币不足时，无法学习该技能。", -10),
+            ("讨价还价", "队伍每有1名成员持有此特性，普通装备和技能书的回收率就提高20个百分点。基础回收率为50%，可超过100%。", 20),
         };
 
         private static readonly int[] prices = { 0, 19, 40, 37, 23, 34, 42, 32, 90, 28, 20, 35, 36, 19, 37, 43, 17, 37, 27, 27, 34, 45, 18, 41, 26, 17, 34, 39, 16, 24, 20, 19, 12, 16, 15, 15 };
@@ -78,22 +79,27 @@ namespace RaidPartyManager.Domain
         public static string Describe(PlayerTrait trait)
         {
             var entry = traits[(int)trait];
-            return $"{entry.Name} · {entry.Effect}";
+            return $"随机特性 · {entry.Name} · {entry.Effect}";
         }
         public static int BaseValue(CharacterDefinition character) =>
             character.RosterNumber > 0 && character.RosterNumber < prices.Length ? prices[character.RosterNumber] : 18;
         public static double SkillPremium(SkillBookDefinition skill)
         {
+            if (skill?.BossExclusive == true) return 100;
             if (skill == null || !skill.Id.StartsWith("skill-book-", StringComparison.Ordinal) ||
                 !int.TryParse(skill.Id.Substring(11), out int id) || id < 1 || id >= skillRates.Length) return 0;
             return skillRates[id] * (skill.Cost <= Rules.DefaultEnergy ? 1d : .25d);
         }
 
-        public static int Value(CharacterDefinition character, PlayerTrait trait, IEnumerable<SkillBookDefinition> learned = null)
+        public static int Value(CharacterDefinition character, PlayerTrait trait, IEnumerable<SkillBookDefinition> learned = null,
+            int trainingSessions = 0)
         {
-            var rates = (learned ?? Enumerable.Empty<SkillBookDefinition>()).Select(SkillPremium).Where(rate => rate > 0).ToList();
+            var skills = (learned ?? Enumerable.Empty<SkillBookDefinition>()).Where(skill => skill != null).ToArray();
+            var rates = skills.Where(skill => !skill.BossExclusive).Select(SkillPremium).Where(rate => rate > 0).ToList();
             double total = rates.Count == 0 ? 0 : .6 * rates.Sum() + .4 * rates.Max();
-            return (int)Math.Round(BaseValue(character) * (1 + traits[(int)trait].Percent / 100d) * (1 + total / 100), MidpointRounding.AwayFromZero);
+            int ordinary = (int)Math.Round(BaseValue(character) * (1 + traits[(int)trait].Percent / 100d) * (1 + total / 100), MidpointRounding.AwayFromZero);
+            int trainingPremium = Math.Max(trainingSessions, (int)Math.Round(ordinary * trainingSessions / 10d, MidpointRounding.AwayFromZero));
+            return (ordinary + trainingPremium) * (1 + skills.Count(skill => skill.BossExclusive));
         }
     }
 }

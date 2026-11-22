@@ -41,6 +41,7 @@ namespace RaidPartyManager.Battle
             public string Id;
             public EquipmentDefinition Definition;
             public int Transfers;
+            public bool Disabled;
         }
 
         private sealed class Unit
@@ -59,6 +60,7 @@ namespace RaidPartyManager.Battle
             public int LastAttackRound;
             public bool CrownTriggered, ReliquaryWard;
             public int LastSkillRound;
+            public readonly Dictionary<string, int> LastBookCast = new Dictionary<string, int>();
             public int ProtectedRound;
             public int BonusMaximumHealth;
             public bool DoubleNextAttack;
@@ -67,25 +69,34 @@ namespace RaidPartyManager.Battle
             public bool CorpseConsumed;
             public BattleEnergy Energy;
             private int spentEnergy;
-            private int chargedCapacity;
+            private int chargeGained;
             public PlayerTrait Talent => Original.Talent;
             public bool TalentUsed;
-            public int WatchRound, SwapRound, MirrorShield, Intercepts, InterceptUntil, ThunderRound;
+            public int WatchRound, MirrorShield, Intercepts, InterceptUntil, ThunderRound;
             public bool FirstTrigger(PlayerTrait trait)
             {
                 if (Talent != trait || TalentUsed) return false;
                 return TalentUsed = true;
             }
 
+            public int ChargeTarget
+            {
+                get
+                {
+                    int skillLimit = Math.Max(Rules.DefaultEnergy, Original.LearnedSkills.Select(b => b.Cost).DefaultIfEmpty(0).Max());
+                    int bonus = BattleEnergy.Full(Equipped.Select(slot => slot.Definition)).Capacity - Rules.DefaultEnergy;
+                    return Math.Min(Rules.MaximumEnergy, skillLimit + bonus);
+                }
+            }
+
             public bool Charge()
             {
-                int target = Original.LearnedSkills.Select(b => b.Cost).DefaultIfEmpty(0).Max();
-                if (Energy.Capacity >= target) return false;
-                chargedCapacity = Energy.Capacity + 1;
-                Energy = new BattleEnergy(chargedCapacity, Energy.Remaining + 1);
+                if (Energy.Capacity >= ChargeTarget) return false;
+                chargeGained++;
+                Energy = new BattleEnergy(Energy.Capacity + 1, Energy.Remaining + 1);
                 return true;
             }
-            public readonly EquippedItem[] Slots;
+            public EquippedItem[] Slots;
             public string LastHitTarget;
             public readonly HashSet<string> DamagedTargets = new HashSet<string>();
             public bool Revived;
@@ -111,7 +122,7 @@ namespace RaidPartyManager.Battle
                 Stats = input.Stats;
                 Gear = input.Equipment.ToArray();
                 Energy = BattleEnergy.Full(Gear);
-                Slots = new EquippedItem[Math.Max(Math.Max(Rules.EquipmentSlots, input.EquipmentSlots.Count), Gear.Length)];
+                Slots = new EquippedItem[Math.Max(Math.Max(Rules.PersonalEquipmentSlots(input.Talent), input.EquipmentSlots.Count), Gear.Length)];
                 if (input.EquipmentSlots.Count == 0)
                 {
                     for (int index = 0; index < Gear.Length; index++)
@@ -130,9 +141,6 @@ namespace RaidPartyManager.Battle
                 Statuses = input.StartingStatuses.ToDictionary(status => status.Key, status => status.Value);
             }
 
-            public void MoveTo(int position) =>
-                Input = new Combatant(Input.Id, Input.Character, Input.Side, position, Input.Stats, Input.Health, Input.Equipment);
-
             public void ChangeForm(CharacterDefinition form)
             {
                 var before = Input.Character.BaseStats;
@@ -145,7 +153,7 @@ namespace RaidPartyManager.Battle
                 SkillReadyAt = 0;
             }
 
-            public IEnumerable<EquippedItem> Equipped => Slots.Where(item => item != null);
+            public IEnumerable<EquippedItem> Equipped => Slots.Where(item => item != null && !item.Disabled);
 
             public void ApplySlotChanges()
             {
@@ -159,7 +167,7 @@ namespace RaidPartyManager.Battle
                     previous.Health - oldBonus.Health + newBonus.Health);
                 Health = Math.Min(Health, stats.Health + BonusMaximumHealth);
                 Input = new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), equipment);
-                int capacity = Math.Max(chargedCapacity, BattleEnergy.Full(equipment).Capacity);
+                int capacity = Math.Min(Rules.MaximumEnergy, chargeGained + BattleEnergy.Full(equipment).Capacity);
                 Energy = new BattleEnergy(capacity, capacity - spentEnergy);
             }
 
@@ -171,7 +179,7 @@ namespace RaidPartyManager.Battle
 
             public Combatant EquipmentInput() =>
                 new Combatant(Input.Id, Input.Character, Input.Side, Input.Position,
-                    PlayerMarket.GearAndPosition(Talent, Equipped.Count(), Input.Position, Input.Stats) + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack,
+                    PlayerMarket.GearAndPosition(Talent, Slots.Count(item => item != null), Input.Position, Input.Stats) + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack,
                         Trait == CharacterTrait.EnemyAnchorHermit && EnemyTriggered ? -2 : 0, 0, BonusMaximumHealth), Health, Input.Equipment);
 
             public Combatant RecruitmentResult() =>
@@ -195,7 +203,6 @@ namespace RaidPartyManager.Battle
         private readonly List<Unit> recruits = new List<Unit>();
         private readonly List<Unit> units;
         private readonly Dictionary<string, Stats> reportedPartyStats = new Dictionary<string, Stats>();
-        private bool canSwap;
         private int equipmentGold;
         private readonly HashSet<string> consumedEquipment = new HashSet<string>();
         private BattleLoadout currentLoadout;
@@ -214,6 +221,7 @@ namespace RaidPartyManager.Battle
             this.random = random;
             units = request.Combatants.Select(input => new Unit(input)).ToList();
             unitsById = units.ToDictionary(unit => unit.Input.Id);
+            GrantChorusSlots();
             UpdateFormation();
             foreach (var entry in ReadPartyStats())
                 reportedPartyStats.Add(entry.Key, entry.Value);
@@ -235,7 +243,7 @@ namespace RaidPartyManager.Battle
             {
                 string id = unit.Input.Id;
                 var stats = formationStats.TryGetValue(id, out var current) ? current : unit.Stats;
-                int attack = EffectiveAttack(stats.Attack, unit.Health > 0 && unit.Layers(StatusKind.Weakened) > 0);
+                int attack = EffectiveAttack(unit, stats.Attack);
                 yield return new KeyValuePair<string, Stats>(id, new Stats(attack, stats.Defense, stats.SpecialDefense, stats.Health));
             }
         }
@@ -253,45 +261,11 @@ namespace RaidPartyManager.Battle
             return changes?.AsReadOnly();
         }
 
-        public bool TrySwapPartyPositions(int first, int second)
-        {
-            if (!canSwap || first == second)
-                return false;
-
-            var from = LivingPartyUnitAt(first);
-            var to = LivingPartyUnitAt(second);
-            if (from == null || to == null || IsLockedInBattle(from) || IsLockedInBattle(to))
-                return false;
-
-            foreach (var moved in new[] { from, to })
-                if ((moved.Talent is PlayerTrait.AgileSwap or PlayerTrait.Disobedient) && moved.FirstTrigger(moved.Talent))
-                    moved.SwapRound = Round + 1;
-            from.MoveTo(second);
-            to.MoveTo(first);
-            canSwap = false;
-            UpdateFormation();
-            return true;
-        }
-
-        public bool IsPositionLocked(int position) => PositionLockReason(position) != null;
-
-        public string PositionLockReason(int position)
-        {
-            var unit = LivingPartyUnitAt(position);
-            return unit == null ? null : PositionLockReason(unit);
-        }
-
-        private static bool IsLockedInBattle(Unit unit) => PositionLockReason(unit) != null;
-
-        private static string PositionLockReason(Unit unit) =>
-            unit.Gear.FirstOrDefault(item => item.Effect == EquipmentEffect.TreeRoot)?.Name;
-
         public IReadOnlyList<BattleEvent> AdvanceRound()
         {
             if (Result != null)
                 throw new InvalidOperationException("The battle has already ended.");
 
-            canSwap = false;
             int firstEvent = events.Count;
             if (Round++ == 0)
                 StartBattle();
@@ -325,13 +299,8 @@ namespace RaidPartyManager.Battle
                 foreach (var (scavenger, stash) in scavengedItems)
                     ReportCountdown(scavenger, BattleCountdownKind.ScavengerEscape, stash.EscapeRound - Round);
 
-                if (!FinishIfDecided())
-                {
-                    if ((long)Tick + RoundInterval() > request.TickLimit)
-                        Finish(BattleOutcome.Timeout, request.TickLimit);
-                    else
-                        canSwap = true;
-                }
+                if (!FinishIfDecided() && (long)Tick + RoundInterval() > request.TickLimit)
+                    Finish(BattleOutcome.Timeout, request.TickLimit);
             }
 
             return events.GetRange(firstEvent, events.Count - firstEvent);
@@ -376,9 +345,6 @@ namespace RaidPartyManager.Battle
             }
         }
 
-        private Unit LivingPartyUnitAt(int position) =>
-            units.FirstOrDefault(unit => unit.Input.Side == Side.Party && unit.Input.Position == position && unit.Health > 0);
-
         private IEnumerable<Unit> Opponents(Unit actor) =>
             units.Where(unit => unit.Input.Side != actor.Input.Side && unit.Health > 0);
 
@@ -403,13 +369,28 @@ namespace RaidPartyManager.Battle
             return targets.Take(1);
         }
 
+        // Keep granted slots until settlement so equipped copies survive the singer falling.
+        private void GrantChorusSlots()
+        {
+            foreach (var side in units.GroupBy(unit => unit.Input.Side))
+            {
+                if (!side.Any(unit => unit.Health > 0 && unit.Trait == CharacterTrait.ChorusArmory)) continue;
+                foreach (var ally in side)
+                {
+                    int count = Rules.PersonalEquipmentSlots(ally.Talent) + 1;
+                    if (ally.Slots.Length < count) Array.Resize(ref ally.Slots, count);
+                }
+            }
+        }
+
         private BattleLoadout CaptureLoadout()
         {
             var tracked = units.Where(unit => unit.Input.Side == Side.Party &&
                 (unit.Original.EquipmentSlots.Count > 0 || recruits.Contains(unit)));
             return new BattleLoadout(tracked.Select(unit => new KeyValuePair<string, IReadOnlyList<string>>(
                 unit.Input.Id, unit.Slots.Select(item => item?.Id).ToArray())), consumedEquipment,
-                escapedWithEquipment.Concat(scavengedItems.Values.Select(stash => stash.Item.Id).Where(id => id != null)));
+                escapedWithEquipment.Concat(scavengedItems.Values.Select(stash => stash.Item.Id).Where(id => id != null)),
+                tracked.SelectMany(unit => unit.Slots).Where(item => item?.Disabled == true && item.Id != null).Select(item => item.Id));
         }
 
         private void UpdateFormation()
@@ -604,7 +585,8 @@ namespace RaidPartyManager.Battle
             CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false,
             BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
             BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
-            bool poisonDamage = false, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null)
+            bool poisonDamage = false, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null,
+            bool charmTriggered = false)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
@@ -613,7 +595,7 @@ namespace RaidPartyManager.Battle
                 ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
                 target.Health, target.Shield, StatusText(target), detail, form, target.Stats.Health, statuses,
-                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage, shieldAbsorbed: shieldAbsorbed, copiedTraitSource: copiedTraitSource));
+                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage, shieldAbsorbed: shieldAbsorbed, copiedTraitSource: copiedTraitSource, charmTriggered: charmTriggered));
             if (kind == BattleEventKind.Defeated) FallenTraits(target);
         }
     }

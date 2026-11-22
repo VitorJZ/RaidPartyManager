@@ -49,9 +49,9 @@ namespace RaidPartyManager.Battle
                         break;
                     case PlayerTrait.ExposedStart: GrantStatus(unit, unit, Exposed, 1, "开场露怯"); break;
                     case PlayerTrait.RecklessStart:
-                        int lost = LoseHealth(unit, 2, out _, out var loadout);
+                        int lost = LoseHealth(unit, 2, out _, out var loadout, out bool charmTriggered);
                         Report(BattleEventKind.Effect, unit, unit, "豁命开场", ActionKind.Attack, lost, loadout: loadout,
-                            damageTaken: new[] { (DamageType.Fixed, lost) });
+                            damageTaken: new[] { (DamageType.Fixed, lost) }, charmTriggered: charmTriggered);
                         if (unit.Health == 0) Report(BattleEventKind.Defeated, unit, unit, "豁命开场", ActionKind.Attack);
                         else { TriggerCrown(unit); GrantStatus(unit, unit, Vigor, 1, "豁命开场"); }
                         break;
@@ -70,9 +70,8 @@ namespace RaidPartyManager.Battle
                     Report(BattleEventKind.Effect, unit, unit, "蓄能", ActionKind.Shield, targetEnergy: unit.Energy);
                 if (Round == 2 && unit.Talent == PlayerTrait.HelpingHand && Behind(unit) is {} rear)
                     Heal(unit, rear, 2, "搭把手", BattleEventKind.Effect);
-                if (Round == 2 && unit.Talent == PlayerTrait.Warmup || unit.SwapRound == Round && unit.Talent == PlayerTrait.AgileSwap)
+                if (Round == 2 && unit.Talent == PlayerTrait.Warmup)
                     GrantStatus(unit, unit, Swift, 1);
-                if (unit.SwapRound == Round && unit.Talent == PlayerTrait.Disobedient) GrantStatus(unit, unit, Weakened, 1);
                 if (unit.ThunderRound == Round && unit.Layers(Stunned) == 0)
                     foreach (var enemy in Opponents(unit).ToArray())
                         Strike(unit, enemy, 2 * CurrentAttack(unit) + 6, DamageType.Lightning, "雷暴裁决", BattleEventKind.Effect, skillBookId: "skill-book-30");
@@ -85,6 +84,21 @@ namespace RaidPartyManager.Battle
 
         private void FallenTraits(Unit fallen)
         {
+            if (fallen.Trait == CharacterTrait.ChorusArmory)
+            {
+                foreach (var ally in Teammates(fallen).Where(unit => unit != fallen).ToArray())
+                {
+                    var candidates = ally.Equipped.ToArray();
+                    if (candidates.Length == 0) continue;
+                    var item = candidates[random.Next(candidates.Length)];
+                    item.Disabled = true;
+                    ally.ApplySlotChanges();
+                    RefreshFormationEquipment();
+                    var loadout = ally.Input.Side == Side.Party && item.Id != null ? currentLoadout = CaptureLoadout() : null;
+                    Report(BattleEventKind.Effect, fallen, ally, "颂歌落幕", ActionKind.Shield,
+                        detail: $"{item.Definition.Name}本场失效", loadout: loadout, targetEnergy: ally.Energy);
+                }
+            }
             fallen.ThunderRound = 0;
             fallen.Intercepts = 0;
             bool compensation = fallen.FirstTrigger(PlayerTrait.Compensation);

@@ -9,7 +9,7 @@ namespace RaidPartyManager.Presentation
     {
         public const float Width = 208f;
 
-        public EquipmentTooltip(EquipmentDefinition item, Texture2D texture, bool showScroll = true)
+        public EquipmentTooltip(EquipmentDefinition item, Texture2D texture, bool showScroll = true, bool disabled = false)
         {
             name = "equipment-tooltip";
             style.position = Position.Absolute;
@@ -20,14 +20,14 @@ namespace RaidPartyManager.Presentation
             pickingMode = PickingMode.Ignore;
             PrototypeStyle.Outline(this, PrototypeStyle.Accent, 7);
 
-            var art = new EquipmentIcon(item, texture, showScroll) { name = "equipment-tooltip-art" };
+            var art = new EquipmentIcon(item, texture, showScroll, disabled) { name = "equipment-tooltip-art" };
             art.style.height = 87;
             art.style.flexGrow = 0;
             art.style.backgroundColor = PrototypeStyle.Inset;
             PrototypeStyle.Outline(art, PrototypeStyle.Edge, 4);
             Add(art);
 
-            var title = PrototypeStyle.Text(item.Name, 16, PrototypeStyle.Accent);
+            var title = PrototypeStyle.Text(disabled ? item.Name + " · 本场失效" : item.Name, 16, PrototypeStyle.Accent);
             title.name = "equipment-tooltip-name";
             title.pickingMode = PickingMode.Ignore;
             title.style.marginTop = 5;
@@ -54,9 +54,7 @@ namespace RaidPartyManager.Presentation
                 rules.name = "skill-book-requirements";
                 rules.style.marginTop = 6;
                 Add(rules);
-                if (book.Cost > Rules.DefaultEnergy) Add(PrototypeStyle.Text("从第 2 回合起，每回合能量和上限各增加 1 点，直到上限达到所学最高费用。", 12, PrototypeStyle.Accent));
-                var permanence = PrototypeStyle.Text("学会后无法拆卸，覆盖会失去旧技能。", 12, PrototypeStyle.Muted);
-                Add(permanence);
+                if (book.Cost > Rules.DefaultEnergy) Add(PrototypeStyle.Text("从第 2 回合起，每回合能量和上限各增加 1 点，直到达到所学最高费用与装备加成之和，最多 8 点。", 12, PrototypeStyle.Accent));
             }
         }
 

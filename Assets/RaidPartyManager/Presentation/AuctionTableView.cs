@@ -32,7 +32,7 @@ namespace RaidPartyManager.Presentation
                 pullingBack = true;
                 stage.FocusCases(false);
                 speech.text = visit.Resolved ? visit.Message + " 点空白处离场。"
-                    : "还想看看就点桌上的匣子。要是拿不定主意，点空白处就可以离场。";
+                    : "还想看货就点匣子回到桌前。要离开，现在再点一次空白处。";
             }) { name = "auction-floor" };
             StyleTarget(blank);
             PrototypeStyle.Fill(blank);
@@ -61,7 +61,7 @@ namespace RaidPartyManager.Presentation
         }
 
         private string Instructions() => run.AuctionInspected >= 0
-            ? visit.Message : "三只匣子只许验一只。先点想查验的匣子，这次免费。点空白处可以退后。";
+            ? visit.Message : "先点一只匣子，免费验货。只能验一次，下一次点哪只，就按标价买哪只。点空白处退回远景。";
 
         private void Select(int slot)
         {

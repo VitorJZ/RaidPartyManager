@@ -16,7 +16,7 @@ namespace RaidPartyManager.Presentation
         public Texture2D marketHall, registryDesk, contractBoard, guildParquet;
         public Shader shader;
         public Texture2D campSky, soil, bark, endGrain, townSky, timber, cobbles, counterFront;
-        // Recruit, shop, camp, quest; each resident strip has four equally sized cels.
+        // Recruitment, shop, camp and quest residents use 4 × 4 animation atlases.
         public Texture2D[] facilities, residents;
     }
 }

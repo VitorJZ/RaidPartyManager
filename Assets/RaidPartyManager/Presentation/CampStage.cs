@@ -13,17 +13,19 @@ namespace RaidPartyManager.Presentation
         private readonly MeshRenderer flames;
         private readonly Texture2D fireCels;
         private int lastCel = -1;
-        private static readonly int[] Flicker = { 0, 1, 2, 1, 0, 3 };
+        private int lastSeatedCel = -1;
+        private readonly Texture2D[] seatedArt = new Texture2D[4];
         private readonly MeshRenderer[] seats = new MeshRenderer[4];
         private static readonly Vector3[] Feet = {
             new(3.60f,0,-1.05f), new(2.08f,0,1.72f),
             new(-2.08f,0,1.72f), new(-3.60f,0,-1.05f)
         };
 
-        public CampStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D fire, bool graveyard) :
-            base(owner, panel, art)
+        public CampStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D fire, bool graveyard, bool capital = false) :
+            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Firelight) : StageLighting.For(graveyard, StageVenue.Firelight))
         {
-            if (graveyard)
+            if (capital) DressCapital(1);
+            else if (graveyard)
             {
                 HangBackdrop("Cemetery vigil", art.watchCloister);
                 GraveyardFloor();
@@ -43,14 +45,14 @@ namespace RaidPartyManager.Presentation
             {
                 int first = stage.childCount;
                 var leaves = Flat("Fern groundrow", new Vector3(side * 4.7f, .64f, 3.0f + side * .18f),
-                    side * 4.25f, 1.32f, art.ferns, Surface.ScenicFlat);
+                    side * 4.25f, 1.32f, capital ? CapitalArt("SpareHands") : art.ferns, Surface.ScenicFlat);
                 leaves.transform.rotation = Quaternion.Euler(0, -side * 12, 0);
                 var a = new Vector3(side * 4.32f, .37f, -2.00f);
                 var b = new Vector3(side * 1.42f, .37f, 3.25f);
                 var direction = (b - a).normalized;
                 var axis = Quaternion.FromToRotation(Vector3.up, direction);
                 var log = Shape("Pine bench", PrimitiveType.Cylinder, (a + b) * .5f, new Vector3(.79f, (b - a).magnitude * .5f, .79f),
-                    art.bark, new Color(.80f, .79f, .78f), Surface.Solid, new Vector2(2, 1));
+                    capital ? CapitalArt("IronDeck") : art.bark, new Color(.80f, .79f, .78f), Surface.Solid, new Vector2(2, 1));
                 log.transform.rotation = axis;
                 foreach (var end in new[] { a - direction * .014f, b + direction * .014f })
                 {
@@ -101,6 +103,7 @@ namespace RaidPartyManager.Presentation
 
         public void SeatParty(PartyRun party, EncounterData content)
         {
+            lastSeatedCel = -1;
             foreach (var seat in seats) seat.enabled = false;
             foreach (var entry in party.CaptureFormation(Side.Party))
             {
@@ -109,18 +112,27 @@ namespace RaidPartyManager.Presentation
                 if (image == null) continue;
                 Dressing.Cast[seat] = new DockSet.Player(false, content.BattleWalkFor(entry.Character.Id),
                     content.BattleSpriteFor(entry.Character.Id), true);
-                SetFrame(seat, image, 1, 0);
+                seatedArt[entry.Position - 1] = image;
+                SetFrame(seat, image, AnimationCels.Count, 0);
                 seat.enabled = true;
             }
         }
 
         public void Animate(float time)
         {
-            int cel = Flicker[Mathf.FloorToInt(time * 7) % Flicker.Length];
+            int cel = AnimationCels.Loop(time, 6f / 7f);
             if (cel != lastCel)
             {
-                SetFrame(flames, fireCels, 4, cel);
+                SetFrame(flames, fireCels, AnimationCels.Count, cel);
                 lastCel = cel;
+            }
+            int seated = AnimationCels.Loop(time, 2.4);
+            if (seated != lastSeatedCel)
+            {
+                for (int i = 0; i < seats.Length; i++)
+                    if (seats[i].enabled && seatedArt[i] != null)
+                        SetFrame(seats[i], seatedArt[i], AnimationCels.Count, (seated + i) % AnimationCels.Count);
+                lastSeatedCel = seated;
             }
             firelight.intensity = 1.38f + .17f * Mathf.Sin(time * 7.1f) + .10f * Mathf.Sin(time * 11.2f + .8f);
             FireUniforms(firelight, time);

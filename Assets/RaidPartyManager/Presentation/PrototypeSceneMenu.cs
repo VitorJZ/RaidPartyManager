@@ -85,27 +85,27 @@ namespace RaidPartyManager.Presentation
             battleButton.style.marginTop = 10;
             panel.Add(battleButton);
 
-            var graveyardButton = PrototypeStyle.Button("低语墓园", "open-graveyard", () => OpenStandalone("WhisperingGraveyard"));
-            graveyardButton.style.minHeight = 46;
-            graveyardButton.style.marginTop = 10;
-            panel.Add(graveyardButton);
-
-            var shopButton = PrototypeStyle.Button("商店", "open-shop", () => OpenStandalone("DockShop"));
-            shopButton.style.minHeight = 46;
-            shopButton.style.marginTop = 10;
-            panel.Add(shopButton);
-
-            var campButton = PrototypeStyle.Button("营地", "open-camp", () => OpenStandalone("Camp"));
-            campButton.style.minHeight = 46;
-            campButton.style.marginTop = 10;
-            panel.Add(campButton);
-
             var eventsButton = PrototypeStyle.Button("事件选择", "open-events", AdventureFlow.OpenHub);
             eventsButton.style.minHeight = 46;
             eventsButton.style.marginTop = 10;
             panel.Add(eventsButton);
 
+            var settingsButton = PrototypeStyle.Button("设置", "open-settings", null);
+            settingsButton.clicked += OpenSettings;
+            settingsButton.style.minHeight = 36;
+            settingsButton.style.marginTop = 10;
+            panel.Add(settingsButton);
             root.Add(panel);
+
+            void OpenSettings()
+            {
+                panel.SetEnabled(false);
+                new SettingsPanel(() =>
+                {
+                    panel.SetEnabled(true);
+                    settingsButton.Focus();
+                }).Show(root);
+            }
         }
 
         private void ShowReturnButton()
