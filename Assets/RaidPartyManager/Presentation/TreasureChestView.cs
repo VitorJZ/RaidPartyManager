@@ -35,6 +35,7 @@ namespace RaidPartyManager.Presentation
             {
                 if (DockPlayhouse.Moving || !run.OpenTreasureChest()) return;
                 latch.style.display = DisplayStyle.None;
+                GameAudio.Play(SoundCue.ChestLatchRelease);
                 stage.UnlockChest();
             };
             schedule.Execute(Pose).Every(16);

@@ -12,7 +12,8 @@ namespace RaidPartyManager.Domain
         EternalFire, FirstFire, RitualMask, MurkyWater, PurityPotion, RedCord, InsightTotem,
         ScarletRose, Bludgeon, LoneWolf, ImperialSeal, PoisonRecipe, StealthCloak, CounterHorn,
         Bagua, Megaphone, TreeRoot, Shortbow, ExecutionMask, ThunderEye, ElementalQuartz, StaticPrism, PanaceaBottle,
-        LionGoldStatue, ArcaneCrystal, InsulatingOrb, CoinDevourer, MoneyTreeBranch, EchoChalice, WindChime
+        LionGoldStatue, ArcaneCrystal, InsulatingOrb, CoinDevourer, MoneyTreeBranch, EchoChalice, WindChime,
+        HarborWhistle, SunkenFrostChain, FacelessCrown, ColdSoulReliquary, StoneArmor
     }
 
     public enum StatusKind

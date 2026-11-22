@@ -16,20 +16,22 @@ namespace RaidPartyManager.Tests
             var catalog = AssetDatabase.LoadAssetAtPath<SkillCatalogAsset>(
                 "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset");
             Assert.That(catalog, Is.Not.Null);
-            Assert.That(catalog.Skills.Select(skill => skill.Number), Is.EqualTo(Enumerable.Range(1, 20)));
-            Assert.That(catalog.Skills.Select(skill => skill.DisplayName).Distinct().Count(), Is.EqualTo(20));
-            Assert.That(catalog.Skills.All(skill => skill.Cost is 1 or 2 && skill.Description.Length > 0 &&
+            Assert.That(catalog.Skills.Select(skill => skill.Number), Is.EqualTo(Enumerable.Range(1, 34)));
+            Assert.That(catalog.Skills.Select(skill => skill.DisplayName).Distinct().Count(), Is.EqualTo(34));
+            Assert.That(catalog.Skills.All(skill => skill.Cost is >= 1 and <= 8 && skill.Description.Length > 0 &&
                 skill.ToBook().SkillEffect != SkillEffect.None && skill.Icon != null && skill.Icon.width == skill.Icon.height), Is.True);
+            Assert.That(catalog.Skills.Select(s => s.Icon).Distinct().Count(), Is.EqualTo(34));
+            Assert.That(catalog.Skills.Skip(20).Select(s => s.Cost), Is.EqualTo(new[] { 3, 3, 3, 4, 4, 4, 6, 6, 7, 8, 1, 1, 2, 2 }));
             Assert.That(catalog.Skills.Single(skill => skill.DisplayName == "熊熊烈火")
-                .CanLearn(Fighter("guard", Side.Party, 1, Personality.Stubborn).Character), Is.False);
+                .CanLearn(Fighter("guard", Side.Party, 1, Personality.Stoic).Character), Is.False);
         }
 
         [Test]
         public void EveryLearnedSkillHasAUniqueImportedEffectStrip()
         {
             var effects = LoadSkills().Skills.Select(skill => skill.BattleEffect).ToArray();
-            Assert.That(effects, Has.Length.EqualTo(20));
-            Assert.That(effects.Distinct().Count(), Is.EqualTo(20));
+            Assert.That(effects, Has.Length.EqualTo(34));
+            Assert.That(effects.Distinct().Count(), Is.EqualTo(34));
             foreach (var sheet in effects)
             {
                 Assert.That(sheet, Is.Not.Null);
@@ -41,14 +43,116 @@ namespace RaidPartyManager.Tests
             }
         }
 
+        [TestCase(30, 6)]
+        [TestCase(19, 3)]
+        [TestCase(4, 1)]
+        public void CloudPiercerSpendsTwoEnergyAndDealsTrueDamageFromCurrentHealth(int health, int damage)
+        {
+            var book = LoadSkills().Skills.Select(skill => skill.ToBook()).Single(skill => skill.SkillEffect == SkillEffect.CloudPiercer);
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stoic, book: book);
+            var enemy = Fighter("target", Side.Enemy, 1, Personality.Frank, health);
+            var round = new BattleSimulator(new PreferBooks()).Start(new BattleRequest("cloud-piercer",
+                new[] { caster, enemy }, 1)).AdvanceRound();
+
+            var cast = round.Single(e => e.SkillBookId == book.Id && e.ActorEnergy.HasValue);
+            Assert.That(cast.ActorEnergy.Value.Remaining, Is.EqualTo(cast.ActorEnergy.Value.Capacity - 2));
+            var hit = round.Single(e => e.SkillBookId == book.Id && e.DamageTaken.Count > 0);
+            Assert.That(hit.DamageTaken, Is.EqualTo(new[] { (DamageType.True, damage) }));
+            Assert.That(hit.TargetHealth, Is.EqualTo(health - damage));
+        }
+
+        [TestCase(30, 1)] [TestCase(27, 3)]
+        public void FeastGrowsOncePerCorpseAndOnlyCreditsEffectiveHealing(int initial, int healing)
+        {
+            var book = LoadSkills().Skills.Single(s => s.Number == 12).ToBook();
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stoic, initial, book);
+            var corpse = Fighter("fallen", Side.Enemy, 1, Personality.Stoic, 0);
+            var other = Fighter("foe", Side.Enemy, 2, Personality.Stoic);
+            var session = new BattleSimulator(new PreferBooks(), new System.Random(1)).Start(
+                new BattleRequest("feast", new[] { caster, corpse, other }, 3));
+            while (session.Result == null) session.AdvanceRound();
+            var result = session.Result;
+            Assert.That(result.PermanentHealthGains[caster.Id], Is.EqualTo(1));
+            var heal = result.Events.Single(ev => ev.SkillBookId == book.Id && ev.ActionKind == ActionKind.Heal && !ev.ActorEnergy.HasValue);
+            Assert.That(heal.Amount, Is.EqualTo(healing));
+        }
+
+        [TestCase(21)] [TestCase(22)] [TestCase(23)] [TestCase(24)] [TestCase(25)]
+        [TestCase(26)] [TestCase(27)] [TestCase(28)] [TestCase(29)] [TestCase(30)]
+        public void HighCostSkillsChargeAndActuallyCastInBattle(int number)
+        {
+            var book = LoadSkills().Skills.Single(s => s.Number == number).ToBook();
+            var caster = Fighter("caster", Side.Party, 2, Personality.Stoic, 22, book);
+            var ally = Fighter("ally", Side.Party, 1, Personality.Stoic, number == 29 ? 1 : 20);
+            var enemy = Fighter("enemy", Side.Enemy, 1, Personality.Frank);
+            var boss = new Combatant(enemy.Id, enemy.Character, enemy.Side, 1, new Stats(2, 0, 0, 200), 200);
+            var session = new BattleSimulator(new PreferBooks(), new System.Random(8)).Start(
+                new BattleRequest("charge", new[] { caster, ally, boss }, 30));
+            var events = new List<BattleEvent>();
+            for (int i = 0; i < book.Cost && session.Result == null; i++) events.AddRange(session.AdvanceRound());
+            var cast = events.First(e => e.ActorId == caster.Id && e.ActionName == book.Name && e.ActorEnergy.HasValue);
+            Assert.That(cast.ActorEnergy.Value.Remaining, Is.Zero);
+            Assert.That(cast.ActorEnergy.Value.Capacity, Is.EqualTo(book.Cost));
+            if (number == 29) Assert.That(events.Any(e => e.TargetId == ally.Id && e.SkillBookId == book.Id && e.ActionKind == ActionKind.Heal && e.Amount == 12), Is.True);
+            if (number == 30) Assert.That(events.Any(e => e.TargetId == boss.Id && e.SkillBookId == book.Id && e.DamageTaken.Any(p => p.Type == DamageType.Lightning)), Is.True);
+        }
+
+        [TestCase(31)] [TestCase(32)] [TestCase(33)] [TestCase(34)]
+        public void BossBooksApplyTheirDocumentedEffectsToTheIntendedTargets(int number)
+        {
+            var book = LoadSkills().Skills.Single(skill => skill.Number == number).ToBook();
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stoic, 20, book);
+            var ally = Fighter("ally", Side.Party, 2, Personality.Stoic, 15);
+            ally = new Combatant(ally.Id, ally.Character, ally.Side, ally.Position, ally.Stats, ally.Health,
+                startingStatuses: new Dictionary<StatusKind, int> { [StatusKind.Cursed] = 4 });
+            var front = Fighter("front", Side.Enemy, 1, Personality.Frank);
+            var middle = Fighter("middle", Side.Enemy, 2, Personality.Frank);
+            var rear = Fighter("rear", Side.Enemy, 3, Personality.Frank);
+            var battle = new BattleSimulator(new PreferBooks(), new System.Random(19)).Start(
+                new BattleRequest("boss-book", new[] { caster, ally, front, middle, rear }, 6));
+            var log = new List<BattleEvent>();
+            for (int i = 0; i < book.Cost; i++) log.AddRange(battle.AdvanceRound());
+            var events = log.Where(e => e.SkillBookId == book.Id).ToArray();
+            Assert.That(events.Count(e => e.ActorEnergy.HasValue), Is.EqualTo(1));
+            var hits = events.Where(e => e.ActionKind == ActionKind.Attack && e.DamageTaken.Count > 0).ToArray();
+            if (number == 31)
+            {
+                Assert.That(hits.Select(e => e.TargetId), Is.EquivalentTo(new[] { "middle", "rear" }));
+                Assert.That(hits.All(e => e.DamageTaken.Single() == (DamageType.Physical, 5)), Is.True);
+                Assert.That(events.Where(e => e.TargetStatuses?.Contains("破绽 1") == true).Select(e => e.TargetId),
+                    Is.EquivalentTo(new[] { "middle", "rear" }));
+            }
+            else if (number == 32)
+            {
+                Assert.That(hits.Single().DamageTaken.Single(), Is.EqualTo((DamageType.Magic, 5)));
+                Assert.That(events.Any(e => e.TargetId == hits[0].TargetId && e.TargetStatuses?.Contains("冰冻") == true), Is.True);
+                Assert.That(events.Count(e => e.TargetStatuses?.Contains("寒冷 1") == true), Is.EqualTo(2));
+            }
+            else if (number == 33)
+            {
+                Assert.That(hits.Single().TargetId, Is.EqualTo("front"));
+                Assert.That(hits[0].DamageTaken.Single(), Is.EqualTo((DamageType.Physical, 6)));
+                Assert.That(events.Where(e => e.TargetStatuses?.Contains("诅咒 2") == true).Select(e => e.TargetId),
+                    Is.EquivalentTo(new[] { "front", "middle", "rear" }));
+            }
+            else
+            {
+                Assert.That(events.Where(e => e.ActionKind == ActionKind.Heal && e.Amount == 5).Select(e => e.TargetId),
+                    Is.EquivalentTo(new[] { "caster", "ally" }));
+                Assert.That(events.Where(e => e.ActionKind == ActionKind.Shield && e.Amount == 5).Select(e => e.TargetId),
+                    Is.EquivalentTo(new[] { "caster", "ally" }));
+                Assert.That(events.Any(e => e.ActionKind == ActionKind.Heal && e.TargetStatuses?.Contains("诅咒") == true), Is.False);
+            }
+        }
+
         [Test]
         public void GroupDamageMarksOnlyResolvedEnemyTargetsWithItsSkillId()
         {
             var book = LoadSkills().Skills.Single(skill => skill.Number == 2).ToBook();
-            var caster = Fighter("caster", Side.Party, 1, Personality.Stubborn, book: book);
-            var ally = Fighter("ally", Side.Party, 2, Personality.Stubborn);
-            var front = Fighter("front", Side.Enemy, 1, Personality.Reckless);
-            var rear = Fighter("rear", Side.Enemy, 4, Personality.Reckless);
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stoic, book: book);
+            var ally = Fighter("ally", Side.Party, 2, Personality.Stoic);
+            var front = Fighter("front", Side.Enemy, 1, Personality.Frank);
+            var rear = Fighter("rear", Side.Enemy, 4, Personality.Frank);
             var session = new BattleSimulator(new PreferBooks()).Start(new BattleRequest(
                 "group-skill", new[] { caster, ally, front, rear }, 200));
 
@@ -71,12 +175,12 @@ namespace RaidPartyManager.Tests
             var quartz = content.StartingEquipment.First(item => item.Id == "elemental-quartz");
             var thunderEye = content.StartingEquipment.First(item => item.Effect == EquipmentEffect.ThunderEye);
             var stats = new Stats(6, 0, 0, 40);
-            var mage = new CharacterDefinition("mage", "mage", Profession.Mage, Personality.Impatient, stats, 1,
+            var mage = new CharacterDefinition("mage", "mage", Profession.Mage, Personality.Theatrical, stats, 1,
                 new ActionDefinition("basic", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0));
             var caster = new Combatant("caster", mage, Side.Party, 1, stats, stats.Health,
                 Enumerable.Repeat(quartz, quartzCount).Append(thunderEye), learnedSkills: new[] { fire });
-            var enemies = new[] { Fighter("front", Side.Enemy, 1, Personality.Reckless),
-                Fighter("rear", Side.Enemy, 4, Personality.Reckless) }.Select(unit =>
+            var enemies = new[] { Fighter("front", Side.Enemy, 1, Personality.Frank),
+                Fighter("rear", Side.Enemy, 4, Personality.Frank) }.Select(unit =>
                 new Combatant(unit.Id, unit.Character, unit.Side, unit.Position, new Stats(2, 0, 4, 30), 30)).ToArray();
             var round = new BattleSimulator(new PreferBooks()).Start(
                 new BattleRequest("quartz", enemies.Prepend(caster), 1)).AdvanceRound();
@@ -97,12 +201,12 @@ namespace RaidPartyManager.Tests
         public void SweepVariantsRetainTheBookIdentityUntilTheNextAttack(int number)
         {
             var book = LoadSkills().Skills.Single(skill => skill.Number == number).ToBook();
-            var caster = Fighter("caster", Side.Party, 1, Personality.Stubborn, book: book);
-            var front = Fighter("front", Side.Enemy, 1, Personality.Reckless, gear: new[]
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stoic, book: book);
+            var front = Fighter("front", Side.Enemy, 1, Personality.Frank, gear: new[]
             {
                 new EquipmentDefinition("horn", "反击的号角", default, effect: EquipmentEffect.CounterHorn)
             });
-            var rear = Fighter("rear", Side.Enemy, 4, Personality.Reckless);
+            var rear = Fighter("rear", Side.Enemy, 4, Personality.Frank);
             var session = new BattleSimulator(new PreferBooks()).Start(new BattleRequest(
                 "sweep-skill", new[] { caster, front, rear }, 200));
 
@@ -122,41 +226,17 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void TimidRetreatFindsTheOpenPositionBeforeAStubbornAlly()
+        public void EmployeesKeepTheirPositionsAndCanSwapAfterBeingWounded()
         {
-            var timid = Fighter("timid", Side.Party, 1, Personality.Timid, 10);
-            var stubborn = Fighter("stubborn", Side.Party, 4, Personality.Stubborn);
-            var enemy = Fighter("enemy", Side.Enemy, 1, Personality.Reckless);
-            var session = new BattleSimulator().Start(new BattleRequest("retreat", new[] { timid, stubborn, enemy }, 2));
+            var first = Fighter("first", Side.Party, 1, Personality.Worrier, 10);
+            var last = Fighter("last", Side.Party, 4, Personality.Stoic);
+            var enemy = Fighter("enemy", Side.Enemy, 1, Personality.Frank);
+            var session = new BattleSimulator().Start(new BattleRequest("formation", new[] { first, last, enemy }, 2));
 
             session.AdvanceRound();
-
-            Assert.That(session.Formation.Single(unit => unit.Id == timid.Id).Position, Is.EqualTo(3));
-            Assert.That(session.IsPositionLocked(4), Is.True);
-            Assert.That(session.PositionLockReason(4), Is.EqualTo("固执"));
-            Assert.That(session.TrySwapPartyPositions(3, 4), Is.False);
-        }
-
-        [Test]
-        public void NewTargetPreferencesRespectLegalOptionsAndDistinguishDamageFromOverkill()
-        {
-            var first = Fighter("first", Side.Enemy, 1, Personality.Reckless, 2);
-            var second = Fighter("second", Side.Enemy, 2, Personality.Reckless, 8);
-            var options = new[]
-            {
-                new ActionOption(first.Character.BasicAttack, first, first.Health, 15),
-                new ActionOption(second.Character.BasicAttack, second, second.Health, 7)
-            };
-            foreach (var (personality, expected) in new[]
-            {
-                (Personality.Greedy, 1), (Personality.Careful, 0),
-                (Personality.Vengeful, 1), (Personality.Focused, 0)
-            })
-            {
-                var actor = Fighter("actor", Side.Party, 1, personality);
-                var context = new DecisionContext(actor, 1, actor.Health, 0, null, second.Id, first.Id);
-                Assert.That(new PersonalityPolicy().Choose(context, options).OptionIndex, Is.EqualTo(expected), personality.ToString());
-            }
+            Assert.That(session.Formation.Single(unit => unit.Id == first.Id).Position, Is.EqualTo(1));
+            Assert.That(session.IsPositionLocked(4), Is.False);
+            Assert.That(session.TrySwapPartyPositions(1, 4), Is.True);
         }
 
         private static SkillCatalogAsset LoadSkills() => AssetDatabase.LoadAssetAtPath<SkillCatalogAsset>(

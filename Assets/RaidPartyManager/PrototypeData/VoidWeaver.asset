@@ -26,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 0
   traitPower: 0
   traitText: "攻击时，造成2次伤害，1次为物理伤害，1次为法术伤害"
-  personality: 13
+  personality: 8
   attack: 6
   defense: 3
   specialDefense: 3

@@ -1,0 +1,249 @@
+{
+  "actors": [
+    {
+      "sideSpan": 0.82143,
+      "sideInset": 0.0625,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.925781
+    },
+    {
+      "sideSpan": 0.8267,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.82386,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.82386,
+      "sideInset": 0.06818,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.82955,
+      "sideInset": 0.07386,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.898438
+    },
+    {
+      "sideSpan": 0.75,
+      "sideInset": 0.06818,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.07102,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84943,
+      "sideInset": 0.07386,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.925781
+    },
+    {
+      "sideSpan": 0.84375,
+      "sideInset": 0.07386,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.925781
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.06818,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.85795,
+      "sideInset": 0.06818,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84091,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.82589,
+      "sideInset": 0.05804,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84091,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.85227,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.82143,
+      "sideInset": 0.0625,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.86364,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.8267,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.85227,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.83523,
+      "sideInset": 0.07102,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.83036,
+      "sideInset": 0.05804,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.925781
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.07386,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.871094
+    },
+    {
+      "sideSpan": 0.82102,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.67045,
+      "sideInset": 0.07102,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84091,
+      "sideInset": 0.06818,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.85511,
+      "sideInset": 0.07102,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.85227,
+      "sideInset": 0.06818,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.85227,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.07386,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.85227,
+      "sideInset": 0.06818,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.84659,
+      "sideInset": 0.07386,
+      "frontSpan": 0.9375,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    },
+    {
+      "sideSpan": 0.82386,
+      "sideInset": 0.07386,
+      "frontSpan": 0.93945,
+      "frontInset": 0.01953,
+      "frontBodySpan": 0.929688
+    }
+  ]
+}

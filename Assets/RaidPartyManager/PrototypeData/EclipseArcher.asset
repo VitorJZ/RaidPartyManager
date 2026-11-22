@@ -25,11 +25,11 @@ MonoBehaviour:
   fixedTrait: 5
   traitPower: 2
   traitText: "攻击造成伤害时，对目标施加2层中毒"
-  personality: 13
+  personality: 9
   attack: 6
   defense: 3
   specialDefense: 2
-  health: 8
+  health: 10
   actionInterval: 10
   basicAttack:
     id: basic

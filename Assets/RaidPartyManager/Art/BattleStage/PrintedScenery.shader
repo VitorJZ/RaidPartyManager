@@ -45,14 +45,7 @@ Shader "Raid Party Manager/Printed Scenery"
             {
                 // Six-step paper deformation for units with no authored walk sheet.
                 if (_Walk.z != 0)
-                {
-                    float lane = _Walk.z > 0 ? v.uv.x : 1 - v.uv.x;
-                    float leg = smoothstep(.35,.62,lane) * 2 - 1;
-                    float knees = 1 - smoothstep(.09,.47,v.uv.y);
-                    v.position.x += _Walk.z * (leg * _Walk.x * _Walk.w * knees
-                        + (.045 - .025 * _Walk.x) * v.uv.y);
-                    v.position.y += max(0,leg * _Walk.y) * .06 * knees + .025 * abs(_Walk.y) * (1-knees);
-                }
+                    v.position.xy += GaitOffset(v.uv, _Walk);
                 Varyings o;
                 o.position = UnityObjectToClipPos(v.position);
                 #ifdef RPM_DOCK_MOON

@@ -17,6 +17,8 @@ namespace RaidPartyManager.Presentation
         private readonly Action select;
         private readonly Texture2D grain;
         private readonly bool arrow;
+        internal bool MountedInScenery { get; private set; }
+        internal float ScenicPull => lift;
         private const string FlightLayer = "selected-sign-flight";
 
         internal HangingSign(string id, string caption, Action select, Texture2D grain = null, bool arrow = false)
@@ -122,6 +124,12 @@ namespace RaidPartyManager.Presentation
 
         private void FlyToBeam()
         {
+            if (MountedInScenery)
+            {
+                Move(0);
+                select();
+                return;
+            }
             var root = panel.visualTree;
             if (root.Q(FlightLayer) != null) { Release(); return; }
             spring.Pause();
@@ -200,12 +208,23 @@ namespace RaidPartyManager.Presentation
 
         private void FitRope()
         {
-            if (panel == null || !float.IsFinite(rope.layout.height)) return;
+            if (MountedInScenery || panel == null || !float.IsFinite(rope.layout.height)) return;
             float beam = DockPlayhouse.StageOpeningTop(panel);
             // The bottom of the rope stays attached to the sign while its top stays at the beam.
             float length = Mathf.Max(0, rope.layout.height - rope.WorldToLocal(new Vector2(rope.worldBound.center.x, beam)).y);
             if (Mathf.Abs(length - rope.style.height.value.value) > .05f)
                 rope.style.height = length;
+        }
+
+        internal void MountInScenery()
+        {
+            MountedInScenery = true;
+            rope.style.display = DisplayStyle.None;
+            if (arrow) generateVisualContent -= DrawArrow;
+            style.backgroundColor = Color.clear;
+            style.backgroundImage = StyleKeyword.None;
+            PrototypeStyle.Outline(this, Color.clear, 0);
+            foreach (var child in Children()) child.style.opacity = 0;
         }
 
         private void DrawRope(MeshGenerationContext context)

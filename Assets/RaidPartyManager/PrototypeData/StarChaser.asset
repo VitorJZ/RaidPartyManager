@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 4
   traitPower: 0
   traitText: "场上每有1个其他友方射手，额外攻击1次"
-  personality: 13
+  personality: 4
   attack: 6
   defense: 1
   specialDefense: 1

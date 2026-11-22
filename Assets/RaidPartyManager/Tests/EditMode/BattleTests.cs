@@ -13,10 +13,10 @@ namespace RaidPartyManager.Tests
         private static readonly ActionDefinition Guard = new ActionDefinition("guard", "guard", ActionKind.Shield, TargetRule.Self, 5, 3);
 
         [Test]
-        public void AggressiveChoosesHighestDamageAcrossAttackTypesAndTargets()
+        public void DefaultPolicyChoosesHighestDamageAcrossAttackTypesAndTargets()
         {
             var magic = Attack("magic", TargetRule.AnyEnemy, 2, 3, DamageType.Magic);
-            var result = Fight(Unit("actor", Side.Party, 1, Personality.Aggressive, skill: magic),
+            var result = Fight(Unit("actor", Side.Party, 1, Personality.Competitive, skill: magic),
                 Unit("front", Side.Enemy, 1, defense: 1, specialDefense: 8),
                 Unit("back", Side.Enemy, 4, defense: 8, specialDefense: 0));
 
@@ -28,9 +28,9 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void CautiousShieldsInPreferenceToAttacking()
+        public void ReadyShieldPrecedesBasicAttack()
         {
-            var action = FirstAction(Fight(Unit("actor", Side.Party, 1, Personality.Cautious, skill: Guard),
+            var action = FirstAction(Fight(Unit("actor", Side.Party, 1, Personality.Worrier, skill: Guard),
                 Unit("enemy", Side.Enemy, 1)), "actor");
             Assert.That(action.ActionKind, Is.EqualTo(ActionKind.Shield));
             Assert.That(action.TargetId, Is.EqualTo("actor"));
@@ -38,18 +38,9 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void RecklessAttacksEvenWhenSelfHealingIsLegal()
+        public void HealingTargetsLowestHealthRatioAndSkipsDefeatedAllies()
         {
-            var action = FirstAction(Fight(Unit("actor", Side.Party, 1, Personality.Reckless, skill: Heal, hp: 3),
-                Unit("enemy", Side.Enemy, 1)), "actor");
-            Assert.That(action.ActionKind, Is.EqualTo(ActionKind.Attack));
-            Assert.That(action.Reason, Is.EqualTo(DecisionReason.FavorAttack));
-        }
-
-        [Test]
-        public void GentleHealsLowestHealthRatioAndSkipsDefeatedAllies()
-        {
-            var action = FirstAction(Fight(Unit("actor", Side.Party, 1, Personality.Gentle, skill: Heal, hp: 7),
+            var action = FirstAction(Fight(Unit("actor", Side.Party, 1, Personality.Caring, skill: Heal, hp: 7),
                 Unit("hurt", Side.Party, 2, hp: 6, maxHealth: 30),
                 Unit("down", Side.Party, 3, hp: 0),
                 Unit("enemy", Side.Enemy, 1)), "actor");
@@ -59,34 +50,20 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void CooperativeUsesLivingTargetPreviouslyAttackedByTeammate()
+        public void AllEmployeePersonalitiesMakeTheSameBattleDecision()
         {
-            var result = new BattleSimulator(random: new System.Random(1)).Simulate(new BattleRequest("follow-ally", new[]
+            foreach (Personality personality in System.Enum.GetValues(typeof(Personality)))
             {
-                Unit("leader", Side.Party, 1, basic: Attack("rear", TargetRule.RearEnemy)),
-                Unit("support", Side.Party, 2, Personality.Cooperative),
-                Unit("front", Side.Enemy, 1), Unit("back", Side.Enemy, 4)
-            }, 1));
-            var action = FirstAction(result, "support");
-            Assert.That(action.TargetId, Is.EqualTo("back"));
-            Assert.That(action.Reason, Is.EqualTo(DecisionReason.FollowAlly));
-        }
-
-        [Test]
-        public void CalmPicksLowestHealthRatioEvenWhenInFrontOfWeakerRawHealth()
-        {
-            var result = Fight(Unit("actor", Side.Party, 1, Personality.Calm),
-                Unit("front", Side.Enemy, 1, hp: 5, maxHealth: 8),
-                Unit("back", Side.Enemy, 4, hp: 7, maxHealth: 20));
-            var action = FirstAction(result, "actor");
-            Assert.That(action.TargetId, Is.EqualTo("back"));
-            Assert.That(action.Reason, Is.EqualTo(DecisionReason.LowestHealth));
+                var action = FirstAction(Fight(Unit("actor", Side.Party, 1, personality, skill: Heal, hp: 3),
+                    Unit("enemy", Side.Enemy, 1)), "actor");
+                Assert.That(action.ActionKind, Is.EqualTo(ActionKind.Heal), personality.ToString());
+            }
         }
 
         [Test]
         public void FixedRearTargetSkipsEmptyAndDefeatedSlotsAndChangesAfterSwap()
         {
-            var enemy = Unit("enemy", Side.Enemy, 1, Personality.Calm,
+            var enemy = Unit("enemy", Side.Enemy, 1, Personality.Stoic,
                 basic: Attack("rear", TargetRule.RearEnemy), interval: 1);
             var first = FirstAction(Fight(new[] { enemy, Unit("guard", Side.Party, 1, interval: 2),
                 Unit("archer", Side.Party, 3, interval: 2), Unit("down", Side.Party, 4, hp: 0) }, 2), "enemy");
@@ -125,7 +102,7 @@ namespace RaidPartyManager.Tests
         [Test]
         public void SkillWaitsForLegalTargetAndCooldownWhileBasicAttacksContinue()
         {
-            var healer = Unit("healer", Side.Party, 1, Personality.Gentle, basic: Front, skill: Heal, attack: 1);
+            var healer = Unit("healer", Side.Party, 1, Personality.Caring, basic: Front, skill: Heal, attack: 1);
             var enemy = Unit("enemy", Side.Enemy, 1, attack: 3, maxHealth: 30, interval: 2);
             var actions = Fight(new[] { enemy, healer }, 8).Events
                 .Where(entry => entry.Kind == BattleEventKind.Action && entry.ActorId == healer.Id)
@@ -235,7 +212,7 @@ namespace RaidPartyManager.Tests
         {
             var actor = Unit("caster", Side.Party, 1, maxHealth: 50);
             var book = new SkillBookDefinition("fire", "熊熊烈火", "", SkillRequirement.Mage, 2, 1, SkillEffect.BlazingFire);
-            var mage = new CharacterDefinition("caster", "caster", Profession.Mage, Personality.Impatient,
+            var mage = new CharacterDefinition("caster", "caster", Profession.Mage, Personality.Theatrical,
                 actor.Stats, 1, actor.Character.BasicAttack);
             var caster = new Combatant(actor.Id, mage, actor.Side, 1, actor.Stats, actor.Health, learnedSkills: new[] { book });
             var front = Unit("front", Side.Enemy, 1, specialDefense: 2);
@@ -253,7 +230,7 @@ namespace RaidPartyManager.Tests
         [Test]
         public void OrdinaryEnemyTargetingIgnoresTheAuthoredPersonality()
         {
-            var enemy = Unit("enemy", Side.Enemy, 1, Personality.Aggressive);
+            var enemy = Unit("enemy", Side.Enemy, 1, Personality.Competitive);
             var action = FirstAction(Fight(enemy, Unit("front", Side.Party, 1, defense: 20),
                 Unit("back", Side.Party, 4)), enemy.Id);
             Assert.That(action.TargetId, Is.EqualTo("front"));
@@ -276,7 +253,7 @@ namespace RaidPartyManager.Tests
         private static BattleResult Fight(Combatant[] units, int ticks) =>
             new BattleSimulator(random: new System.Random(0)).Simulate(new BattleRequest("test", units, ticks));
 
-        private static Combatant Unit(string id, Side side, int position, Personality personality = Personality.Reckless,
+        private static Combatant Unit(string id, Side side, int position, Personality personality = Personality.Frank,
             ActionDefinition basic = null, ActionDefinition skill = null, int? hp = null, int maxHealth = 20,
             int defense = 0, int specialDefense = 0, int interval = 1, int attack = 5)
         {

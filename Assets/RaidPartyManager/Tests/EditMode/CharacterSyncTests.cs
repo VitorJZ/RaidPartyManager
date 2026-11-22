@@ -263,6 +263,27 @@ namespace RaidPartyManager.Tests
                 .Select(entry => (entry.Tick, entry.Countdown.Value.Remaining)), Is.EqualTo(new[] { (10, 1), (20, 0) }));
         }
 
+        [TestCase(Side.Party, 5, 2)]
+        [TestCase(Side.Enemy, 5, 2)]
+        [TestCase(Side.Party, 6, 1)]
+        [TestCase(Side.Enemy, 6, 1)]
+        public void MeleeCanBypassSlotOneAtHalfHealthOnEitherTeam(Side side, int frontHealth, int expected)
+        {
+            var basic = new ActionDefinition("melee", "测试近战", ActionKind.Attack, TargetRule.FrontEnemy, 0);
+            var stats = new Stats(1, 0, 0, 10);
+            var fighter = new CharacterDefinition("melee", "近战", Profession.Warrior, Personality.Frank,
+                stats, 1, basic, reach: AttackReach.Melee);
+            var opposite = side == Side.Party ? Side.Enemy : Side.Party;
+            var units = new[] {
+                new Combatant("actor", fighter, side, 1, stats, 10),
+                new Combatant("target1", fighter, opposite, 1, stats, frontHealth),
+                new Combatant("target2", fighter, opposite, 2, stats, 10)
+            };
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(new BattleRequest("front", units, 10));
+            Assert.That(result.Events.First(e => e.ActorId == "actor" && e.Kind == BattleEventKind.Action).TargetId,
+                Is.EqualTo("target" + expected));
+        }
+
         [Test]
         public void RayFreezesHeroesWhenCrossingHalfHealthAndUpgradesItsFog()
         {
@@ -330,7 +351,7 @@ namespace RaidPartyManager.Tests
             var result = new BattleSimulator(random: new FixedOrder()).Simulate(run.BeginBattle(new[] { enemy }, 10, null));
 
             Assert.That(run.TrySettle(result, out _), Is.True);
-            Assert.That(run.Gold, Is.EqualTo(5));
+            Assert.That(run.Gold, Is.EqualTo(8));
             Assert.That(run.Inventory.Select(item => item.Definition.Id), Is.EqualTo(new[] { accessory.Id, accessory.Id }));
         }
 
@@ -425,7 +446,7 @@ namespace RaidPartyManager.Tests
         {
             var stats = new Stats(attack, 0, 0, health);
             var basic = new ActionDefinition("basic", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0);
-            var character = new CharacterDefinition(id, id, Profession.Warrior, Personality.Reckless, stats, 1, basic);
+            var character = new CharacterDefinition(id, id, Profession.Warrior, Personality.Frank, stats, 1, basic);
             return new Combatant(id, character, side, position, stats, health);
         }
 

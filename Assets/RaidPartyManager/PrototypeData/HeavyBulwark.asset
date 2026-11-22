@@ -26,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 23
   traitPower: 0
   traitText: "在场时，敌方只能以自己为目标"
-  personality: 9
+  personality: 7
   attack: 4
   defense: 5
   specialDefense: 1

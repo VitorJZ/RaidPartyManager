@@ -21,15 +21,14 @@ namespace RaidPartyManager.Domain
     }
     public enum Personality
     {
-        Aggressive, Cautious, Reckless, Gentle, Cooperative, Calm,
-        Timid, Vengeful, Careful, Stubborn, Impatient, Focused, Patient, Greedy
+        Frank, Deadpan, Optimist, Worrier, Competitive, Caring, Frugal, Stoic, Curious, Theatrical
     }
     public enum Side { Party, Enemy }
     public enum ActionKind { Attack, Heal, Shield }
     public enum DamageType { Physical, Magic, Fire, Lightning, True, Default, Fixed }
     public enum TargetRule { AnyEnemy, FrontEnemy, RearEnemy, WoundedAlly, Self }
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
-    public enum DecisionReason { Default, HighestDamage, SelfProtection, FavorAttack, WoundedAlly, FollowAlly, LowestHealth, Retaliate, FinishWounded, StayOnTarget, UseSkill, SaveSkill, AvoidOverkill, EmergencyHeal }
+    public enum DecisionReason { Default, HighestDamage = 1, SelfProtection = 2, WoundedAlly = 4, UseSkill = 10 }
     public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual, Retreated, EnemyVisual, RoundStarted, Countdown }
     public enum BattleCountdownKind { CalamityChant, ScavengerEscape, AdmiralBroadside, GoldenBell, EnemyCharge }
 
@@ -183,6 +182,9 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<string> EvolutionIds { get; }
         public EnemyBehaviorDefinition EnemyBehavior { get; }
 
+        public CharacterDefinition WithName(string name) => new(Id, name, Profession, Personality, BaseStats, ActionInterval, BasicAttack, Skill, RosterNumber, Stage, Reach, Trait, TraitPower, TraitText, BattleFormId, EvolutionIds, Rank, PositionSlots, EnemyBehavior);
+        public CharacterDefinition WithPersonality(Personality personality) => personality == Personality ? this : new(Id, Name, Profession, personality, BaseStats, ActionInterval, BasicAttack, Skill, RosterNumber, Stage, Reach, Trait, TraitPower, TraitText, BattleFormId, EvolutionIds, Rank, PositionSlots, EnemyBehavior);
+
         public CharacterDefinition(string id, string name, Profession profession, Personality personality,
             Stats baseStats, int actionInterval, ActionDefinition basicAttack, ActionDefinition skill = null,
             int rosterNumber = 0, int stage = 1, AttackReach reach = AttackReach.Unspecified,
@@ -228,12 +230,14 @@ namespace RaidPartyManager.Domain
         public int Tier { get; }
         public int Price { get; }
         public bool CanDropInBattle { get; }
+        public string RewardBossId { get; }
+        public bool BossExclusive => !string.IsNullOrEmpty(RewardBossId);
         public bool IsPotion => Effect is EquipmentEffect.VigorPotion or EquipmentEffect.SwiftPotion or
             EquipmentEffect.ResolvePotion or EquipmentEffect.GreedPotion or EquipmentEffect.ThornsPotion or
             EquipmentEffect.PurityPotion;
 
         public EquipmentDefinition(string id, string name, Stats bonus, string description = null,
-            EquipmentEffect effect = EquipmentEffect.None, int tier = 2, int price = 20, bool canDropInBattle = true)
+            EquipmentEffect effect = EquipmentEffect.None, int tier = 2, int price = 20, bool canDropInBattle = true, string rewardBossId = null)
         {
             if (string.IsNullOrWhiteSpace(id) || bonus.Attack < 0 || bonus.Defense < 0 ||
                 bonus.SpecialDefense < 0 || bonus.Health < 0)
@@ -245,7 +249,8 @@ namespace RaidPartyManager.Domain
             Effect = effect;
             Tier = tier;
             Price = price;
-            CanDropInBattle = canDropInBattle && tier is >= 1 and <= 3;
+            RewardBossId = rewardBossId;
+            CanDropInBattle = !BossExclusive && canDropInBattle && tier is >= 1 and <= 3;
         }
     }
 
@@ -254,7 +259,9 @@ namespace RaidPartyManager.Domain
     {
         None, WarCry, BlazingFire, AbsoluteZero, Sunshine, StoneGuard, HealingHands, SweepNextAttack,
         LightningWhip, ToxicMist, FleshFeast, Sidestep, GoldenBell, FieryEyes, CrimsonReap,
-        HeroicAnthem, Intimidate, Earthquake, CloudPiercer
+        HeroicAnthem, Intimidate, Earthquake, CloudPiercer,
+        HookArrow, TwinCover, FieldMedic, ColdTide, BronzeMirror, NightWatch, SiegeBolt, Intercept, BackPay, ThunderVerdict,
+        BlockadeSalvo, DeepwaterSurge, BurialEdict, LongNightPrayer
     }
 
     public sealed class SkillBookDefinition : EquipmentDefinition
@@ -264,8 +271,8 @@ namespace RaidPartyManager.Domain
         public SkillEffect SkillEffect { get; }
 
         public SkillBookDefinition(string id, string name, string description, SkillRequirement requirement, int cost, int tier,
-            SkillEffect skillEffect = SkillEffect.None)
-            : base(id, name, default, description, tier: tier, price: 0)
+            SkillEffect skillEffect = SkillEffect.None, string rewardBossId = null)
+            : base(id, name, default, description, tier: tier, price: 0, rewardBossId: rewardBossId)
         {
             if (cost < 1 || cost > Rules.MaximumEnergy)
                 throw new ArgumentOutOfRangeException(nameof(cost));
@@ -288,6 +295,7 @@ namespace RaidPartyManager.Domain
 
     public sealed class Combatant
     {
+        public PlayerTrait Talent { get; }
         public string Id { get; }
         public CharacterDefinition Character { get; }
         public Side Side { get; }
@@ -303,8 +311,9 @@ namespace RaidPartyManager.Domain
         public Combatant(string id, CharacterDefinition character, Side side, int position, Stats stats, int health,
             IEnumerable<EquipmentDefinition> equipment = null,
             IReadOnlyDictionary<StatusKind, int> startingStatuses = null, IEnumerable<string> equipmentSlots = null,
-            IEnumerable<SkillBookDefinition> learnedSkills = null)
+            IEnumerable<SkillBookDefinition> learnedSkills = null, PlayerTrait talent = PlayerTrait.None)
         {
+            Talent = talent;
             Character = character ?? throw new ArgumentNullException(nameof(character));
             if (string.IsNullOrWhiteSpace(id) || !Rules.Fits(position, Character.PositionSlots) ||
                 stats.Health <= 0 || health < 0 || health > stats.Health)
@@ -317,7 +326,7 @@ namespace RaidPartyManager.Domain
             Equipment = Array.AsReadOnly(equipment?.ToArray() ?? Array.Empty<EquipmentDefinition>());
             EquipmentSlots = Array.AsReadOnly(equipmentSlots?.ToArray() ?? Array.Empty<string>());
             LearnedSkills = Array.AsReadOnly(learnedSkills?.Where(skill => skill != null).ToArray() ?? Array.Empty<SkillBookDefinition>());
-            if (EquipmentSlots.Count != 0 && (EquipmentSlots.Count != Rules.EquipmentSlots ||
+            if (EquipmentSlots.Count != 0 && (EquipmentSlots.Count != Rules.EquipmentSlots + (talent == PlayerTrait.Warehouse ? 1 : 0) ||
                 EquipmentSlots.Count(slot => slot != null) != Equipment.Count))
                 throw new ArgumentException("Combat equipment slots must match the supplied equipped instances.", nameof(equipmentSlots));
             StartingStatuses = new System.Collections.ObjectModel.ReadOnlyDictionary<StatusKind, int>(
@@ -334,10 +343,15 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<CharacterDefinition> RecruitmentPool { get; }
         public IReadOnlyDictionary<string, CharacterDefinition> CharacterCatalog { get; }
         public int PartyGold { get; }
+        public int RecruitLimit { get; }
+        public bool HardFight { get; }
+
+        public string PallbearerId { get; }
+        public int GraveBell { get; }
 
         public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit,
             IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null,
-            int partyGold = 0)
+            int partyGold = 0, int recruitLimit = Rules.Positions, bool hardFight = false, string pallbearerId = null, int graveBell = 0)
         {
             if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0 || partyGold < 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
@@ -353,6 +367,10 @@ namespace RaidPartyManager.Domain
             Combatants = Array.AsReadOnly(units);
             TickLimit = tickLimit;
             PartyGold = partyGold;
+            RecruitLimit = recruitLimit;
+            PallbearerId = pallbearerId;
+            GraveBell = graveBell;
+            HardFight = hardFight || units.Any(u => u.Side == Side.Enemy && u.Character.Rank is EnemyRank.Elite or EnemyRank.Boss);
             RecruitmentPool = Array.AsReadOnly(recruitmentPool?.ToArray() ?? Array.Empty<CharacterDefinition>());
             CharacterCatalog = new System.Collections.ObjectModel.ReadOnlyDictionary<string, CharacterDefinition>(
                 (characterCatalog ?? Enumerable.Empty<CharacterDefinition>()).Concat(RecruitmentPool)
@@ -402,9 +420,11 @@ namespace RaidPartyManager.Domain
         public BattleEnergy? ActorEnergy { get; }
         public BattleEnergy? TargetEnergy { get; }
         public string SkillBookId { get; }
+        public CharacterDefinition CopiedTraitSource { get; }
         private readonly DamageBreakdown damageTaken;
         public IReadOnlyList<(DamageType Type, int Amount)> DamageTaken => damageTaken.Parts;
         public bool PoisonDamage { get; }
+        public int ShieldAbsorbed { get; }
         public BattleCountdown? Countdown { get; }
 
         public BattleEvent(int tick, BattleEventKind kind, string actorId = null, string targetId = null,
@@ -415,7 +435,7 @@ namespace RaidPartyManager.Domain
             IReadOnlyList<KeyValuePair<string, Stats>> partyStatChanges = null, AttackReach attackReach = AttackReach.Unspecified,
             BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
             BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
-            bool poisonDamage = false, BattleCountdown? countdown = null)
+            bool poisonDamage = false, BattleCountdown? countdown = null, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null)
         {
             Tick = tick;
             Kind = kind;
@@ -441,7 +461,9 @@ namespace RaidPartyManager.Domain
             TargetEnergy = targetEnergy;
             this.damageTaken = new DamageBreakdown(damageTaken);
             PoisonDamage = poisonDamage;
+            ShieldAbsorbed = shieldAbsorbed;
             Countdown = countdown;
+            CopiedTraitSource = copiedTraitSource;
         }
 
         private readonly struct DamageBreakdown : IEquatable<DamageBreakdown>
@@ -474,6 +496,7 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<BattleEvent> Events { get; }
         public IReadOnlyList<Combatant> Recruits { get; }
         public IReadOnlyDictionary<string, int> PermanentAttackGains { get; }
+        public IReadOnlyDictionary<string, int> PermanentHealthGains { get; }
         public int PotionsEarned { get; }
         public int GoldEarned { get; }
         public int AccessoriesEarned { get; }
@@ -482,7 +505,8 @@ namespace RaidPartyManager.Domain
         public BattleResult(string id, BattleOutcome outcome, IEnumerable<KeyValuePair<string, int>> health,
             IEnumerable<BattleEvent> events, IEnumerable<KeyValuePair<string, int>> partyPositions = null,
             IEnumerable<Combatant> recruits = null, IEnumerable<KeyValuePair<string, int>> permanentAttackGains = null,
-            int potionsEarned = 0, BattleLoadout loadout = null, int goldEarned = 0, int accessoriesEarned = 0)
+            int potionsEarned = 0, BattleLoadout loadout = null, int goldEarned = 0, int accessoriesEarned = 0,
+            IEnumerable<KeyValuePair<string, int>> permanentHealthGains = null)
         {
             Id = id;
             Outcome = outcome;
@@ -496,6 +520,8 @@ namespace RaidPartyManager.Domain
             PermanentAttackGains = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
                 (permanentAttackGains ?? Enumerable.Empty<KeyValuePair<string, int>>())
                     .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal));
+            PermanentHealthGains = (permanentHealthGains ?? Enumerable.Empty<KeyValuePair<string, int>>())
+                .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
             PotionsEarned = potionsEarned;
             GoldEarned = goldEarned;
             AccessoriesEarned = accessoriesEarned;

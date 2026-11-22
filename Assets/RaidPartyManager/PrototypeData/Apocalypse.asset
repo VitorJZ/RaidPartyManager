@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 15
   traitPower: 0
   traitText: "战斗开始时，将此特性随机变成1名2阶角色的特性"
-  personality: 13
+  personality: 9
   attack: 5
   defense: 1
   specialDefense: 1

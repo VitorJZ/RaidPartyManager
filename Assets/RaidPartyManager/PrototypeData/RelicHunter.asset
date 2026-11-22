@@ -26,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 26
   traitPower: 1
   traitText: "战斗结束时，若仍然存活，获得1件饰品"
-  personality: 13
+  personality: 8
   attack: 4
   defense: 1
   specialDefense: 1

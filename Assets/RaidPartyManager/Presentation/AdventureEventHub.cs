@@ -22,6 +22,7 @@ namespace RaidPartyManager.Presentation
         private VisualElement screen;
         private RunTopBar topBar;
         private AdventureEventWindow eventWindow;
+        private IVisualElementScheduledItem sceneryPlayback;
         private AdventureRun run;
         private Font localFont;
         private FontAsset localFontAsset;
@@ -37,15 +38,23 @@ namespace RaidPartyManager.Presentation
         private void ShowRun()
         {
             if (run?.HasBattleRewardScreen == true && run.Current.Event == null)
-                root.schedule.Execute(() => AdventureFlow.OpenNodeScene("BattlePrototype"));
+                root.schedule.Execute(() => AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(run.Current.Kind)));
             else
                 Render();
         }
 
         private void Update() => stage?.Tick();
 
+        private void HideBackdrop()
+        {
+            sceneryPlayback?.Pause();
+            sceneryPlayback = null;
+            root.style.backgroundImage = StyleKeyword.None;
+        }
+
         private void OnDisable()
         {
+            HideBackdrop();
             stage?.Dispose();
             stage = null;
             PrototypeStyle.ClearDocument(root, localFont, localFontAsset);
@@ -53,6 +62,7 @@ namespace RaidPartyManager.Presentation
 
         private void Render()
         {
+            GameAudio.SetScene(gameObject.scene.name, run);
             if (run == null || run.IsInspection && run.Current == null)
             {
                 stage?.Dispose();
@@ -61,7 +71,9 @@ namespace RaidPartyManager.Presentation
             root.Clear();
             eventWindow = null;
             root.style.backgroundColor = PrototypeStyle.Background;
-            root.style.backgroundImage = new StyleBackground(assets.Backdrop);
+            HideBackdrop();
+            if (run == null || run.IsInspection && run.Current == null)
+                sceneryPlayback = SceneryFlipbook.Animate(root, assets.Backdrop);
             root.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
             root.style.unityBackgroundImageTintColor = new Color(0.25f, 0.28f, 0.32f, 1);
             root.style.paddingLeft = root.style.paddingRight = 22;
@@ -112,7 +124,7 @@ namespace RaidPartyManager.Presentation
             var header = PrototypeStyle.Row();
             header.style.alignItems = Align.Center;
             header.style.marginTop = 8;
-            var title = PrototypeStyle.Text("弥雾码头", 27, PrototypeStyle.Accent);
+            var title = PrototypeStyle.Text(run.RegionName, 27, PrototypeStyle.Accent);
             title.style.marginLeft = 14;
             title.style.flexGrow = 1;
             header.Add(title);
@@ -126,27 +138,27 @@ namespace RaidPartyManager.Presentation
             toolbar.Add(PrototypeStyle.Button("讨伐路线", "event-tab-route", () => Switch(false)));
             toolbar.Add(PrototypeStyle.Button("重置当前试游", "reset-adventure", ResetAdventure));
             toolbar.Add(PrototypeStyle.Button("推进 1 个关卡", "inspection-advance", () => { run.AdvanceInspection(); Render(); }));
-            toolbar.Add(PrototypeStyle.Button("下一层", "inspection-next-floor", () => { run.NextFloor(); Render(); }));
+            toolbar.Add(PrototypeStyle.Button("下一层", "inspection-next-floor", NextFloor));
             screen.Add(toolbar);
             if (!string.IsNullOrEmpty(run.ReturnMessage))
                 screen.Add(PrototypeStyle.Text(run.ReturnMessage, 17, PrototypeStyle.Accent));
 
-            var hint = PrototypeStyle.Text("任选一幕试演。问号事件结束后自动返回列表，下次试演从头开始。", 13, PrototypeStyle.Muted);
+            var hint = PrototypeStyle.Text("任选一幕试演。墓园事件结算后可阅读结果，拉动出口牌返回。", 13, PrototypeStyle.Muted);
             hint.style.marginTop = hint.style.marginBottom = 10; screen.Add(hint);
             var scroll = new ScrollView { name = "event-catalog" }; scroll.style.flexGrow = 1; scroll.style.minHeight = 0;
             var grid = PrototypeStyle.Row(); grid.style.flexWrap = Wrap.Wrap; scroll.Add(grid); screen.Add(scroll);
             foreach (AdventureEventKind kind in Enum.GetValues(typeof(AdventureEventKind)))
             {
                 var captured = kind;
-                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, DockEventStage.EventProp(kind), () =>
+                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, GraveStories.Contains(kind) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
                 { if (run.Inspect(NodeKind.Event, captured)) PresentVisit(); }, kind == AdventureEventKind.FoundCoins);
             }
-            foreach (var kind in new[] { NodeKind.Town, NodeKind.Camp, NodeKind.Shop, NodeKind.NormalBattle, NodeKind.EliteBattle, NodeKind.Boss, NodeKind.TreasureChest })
+            foreach (var kind in new[] { NodeKind.Town, NodeKind.Camp, NodeKind.NormalBattle, NodeKind.EliteBattle, NodeKind.Boss, NodeKind.TreasureChest })
             {
                 var captured = kind;
-                Card(grid, AdventureFlow.NodeName(kind), kind == NodeKind.Town ? "四项服务，选择两项" :
+                Card(grid, AdventureFlow.NodeName(kind), kind == NodeKind.Town ? "人才市场、商店、委托可反复往返，营地可用一次" :
                     kind == NodeKind.TreasureChest ? "开箱并挑选一件物品" :
-                    kind == NodeKind.Camp ? "招募、升阶或休息，三选一" : kind == NodeKind.Shop ? "拖拽购买，共用金币与背包" : "进入真实自动战斗",
+                    kind == NodeKind.Camp ? "升阶或休息，二选一" : "进入真实自动战斗",
                     "inspect-node-" + kind, assets.NodeIcon(kind), () => { if (run.Inspect(captured)) PresentVisit(); });
             }
         }
@@ -154,29 +166,56 @@ namespace RaidPartyManager.Presentation
         private void RenderRoute()
         {
             if (run.Current != null) return;
-            stage ??= new DockEventStage(transform, root, stageArt, false);
-            if (!DockPlayhouse.HoldingSet && run.CompletedNodes == 0)
-                stage.ShowCompany(run.Party, assets.Encounter);
-            root.style.backgroundImage = StyleKeyword.None;
-            root.style.backgroundColor = Color.clear;
-            screen.Add(new StageSignMask(new DockRouteSigns(run, assets, stageArt.timber, stage.Anchor, EnterRoute, () =>
+            if (stage != null && stage.Cemetery != run.InGraveyard)
             {
-                if (run.NextFloor()) Render();
-            })));
+                stage.Dispose();
+                stage = null;
+            }
+            stage ??= new DockEventStage(transform, root, stageArt, false, graveyard: run.InGraveyard);
+            if (run.Stage == 1 && (run.InGraveyard || !DockPlayhouse.HoldingSet))
+                stage.ShowCompany(run.Party, assets.Encounter);
+            HideBackdrop();
+            root.style.backgroundColor = Color.clear;
+            screen.Add(new StageSignMask(new DockRouteSigns(run, assets, stageArt.timber, stage.Anchor, EnterRoute, NextFloor)));
+        }
+
+        private void NextFloor()
+        {
+            if (!run.Party.HasBorrowedName) { if (run.NextFloor()) Render(); return; }
+            if (body.Q("grave-name-register") != null) return;
+            var page = new VisualElement { name = "grave-name-register" };
+            PrototypeStyle.Fill(page);
+            page.style.backgroundColor = new Color(.08f, .07f, .09f, .95f);
+            page.style.alignItems = Align.Center;
+            page.style.justifyContent = Justify.Center;
+            var prompt = PrototypeStyle.Text("出园簿上有三个姓名。哪一个属于你的队员？", 20, PrototypeStyle.Accent);
+            page.Add(prompt);
+            string real = run.Party.BorrowedRealName;
+            var names = assets.Encounter.CharacterCatalog.Where(c => c.RosterNumber > 0).Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n) && n != real)
+                .Distinct().Take(2).Append(real).OrderBy(n => n, StringComparer.Ordinal);
+            foreach (string candidate in names)
+                page.Add(PrototypeStyle.Button(candidate, "reclaim-" + candidate, () =>
+                {
+                    if (!run.Party.ReclaimName(candidate)) { prompt.text = "笔迹对不上。再仔细看一次。"; return; }
+                    if (run.NextFloor()) Render();
+                }));
+            body.Add(page);
         }
 
         private bool EnterRoute(int index)
         {
             if (!run.EnterRoute(index))
             {
-                if (!run.Party.CanStartBattle && screen.Q("route-entry-message") == null)
+                GameAudio.Play(SoundCue.UiRestricted);
+                if ((!run.Party.CanStartBattle || !run.Party.CanAdvanceDay) && screen.Q("route-entry-message") == null)
                 {
-                    var warning = PrototypeStyle.Text("请先在队伍编辑中为在场队员安排站位。", 16, PrototypeStyle.Accent);
+                    var warning = PrototypeStyle.Text(!run.Party.CanAdvanceDay ? "没有队员能履约到明天。请在编队中右击队员续约。" : "请先在队伍编辑中为在场队员安排站位。", 16, PrototypeStyle.Accent);
                     warning.name = "route-entry-message";
                     screen.Add(warning);
                 }
                 return false;
             }
+            GameAudio.Play(SoundCue.UiMapMarker);
             var kind = run.Current.Kind;
             AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(kind));
             return true;
@@ -210,15 +249,16 @@ namespace RaidPartyManager.Presentation
         private void PresentVisit()
         {
             if (run.Current == null) return;
+            GameAudio.SetScene(gameObject.scene.name, run);
             var current = run.Current;
             if (current.Kind is NodeKind.Event or NodeKind.TreasureChest || current.Battle?.Settled == true)
             {
-                stage ??= new DockEventStage(transform, root, stageArt, current.Kind == NodeKind.TreasureChest, current.Event);
-                root.style.backgroundImage = StyleKeyword.None;
+                stage ??= new DockEventStage(transform, root, stageArt, current.Kind == NodeKind.TreasureChest, current.Event, run.InGraveyard && !current.Event.HasValue);
+                HideBackdrop();
                 root.style.backgroundColor = Color.clear;
                 screen.style.display = DisplayStyle.None;
                 screen.SetEnabled(false);
-                stage.EventResident(current, assets);
+                stage.EventResident(run, assets);
                 if (run.HasBattleRewardScreen && current.Event.HasValue)
                 {
                     BeginEventBattle();
@@ -228,15 +268,14 @@ namespace RaidPartyManager.Presentation
                 {
                     if (run.IsInspection)
                     {
-                        if (current.Event.HasValue) run = AdventureFlow.Select(assets, true, true);
+                        if (current.Event.HasValue && !GraveStories.Contains(current.Event)) run = AdventureFlow.Select(assets, true, true);
                         Render();
                     }
                     else PrototypeSceneMenu.OpenScene("EventSelect");
                 }, topBar, () => stage.ShowCompany(run.Party, assets.Encounter), () => StartCoroutine(ExitTeller()));
                 body.Add(eventWindow);
             }
-            else AdventureFlow.OpenNodeScene(current.Kind switch
-            { NodeKind.Town => "Town", NodeKind.Camp => "Camp", NodeKind.Shop => "DockShop", _ => "BattlePrototype" });
+            else AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(current.Kind));
         }
 
         private System.Collections.IEnumerator ExitTeller()
@@ -257,7 +296,7 @@ namespace RaidPartyManager.Presentation
             stage.TellerExit(1);
             stage.HideCompany();
             root.Clear();
-            root.style.backgroundImage = StyleKeyword.None;
+            HideBackdrop();
             eventBattle = gameObject.AddComponent<BattlePrototype>();
             eventBattle.UseEventStage(stage,assets.EncounterAsset,encounterStageArt,assets.EventParchment,encounterArrow,FinishEventBattle);
         }
@@ -302,7 +341,7 @@ namespace RaidPartyManager.Presentation
             parent.Add(button); return button;
         }
 
-        private static string Gate(AdventureEventKind kind) => kind switch
+        private static string Gate(AdventureEventKind kind) => GraveStories.Contains(kind) ? "低语墓园 · 随机事件" : kind switch
         {
             AdventureEventKind.Investor => "首层第 3 关之后 · 每层一次",
             AdventureEventKind.Ambush => "全局事件",

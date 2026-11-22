@@ -95,7 +95,7 @@ namespace RaidPartyManager.Presentation
                 stage.MoveHat(visit.HatPositions[swap.Second], Mathf.Lerp(swap.Second,swap.First,eased), -arc, 0);
                 if (t >= 1)
                 {
-                    run.StepHat(visit.HatStep);
+                    if (run.StepHat(visit.HatStep)) GameAudio.Play(SoundCue.HatSwap, .45f);
                     Settle();
                     began = Time.unscaledTimeAsDouble;
                     if (visit.HatStep == visit.HatSwaps.Count) { moving = false; Ready(); }

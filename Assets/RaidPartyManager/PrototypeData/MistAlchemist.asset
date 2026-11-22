@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 13
   traitPower: 1
   traitText: "回合开始时，对所有敌人施加1层中毒"
-  personality: 10
+  personality: 3
   attack: 2
   defense: 1
   specialDefense: 2

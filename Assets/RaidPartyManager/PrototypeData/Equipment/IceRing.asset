@@ -16,10 +16,10 @@ MonoBehaviour:
   displayName: "寒冰戒指"
   effect: 8
   icon: {fileID: 2800000, guid: 5c25c34db8e04ecf8c491b95bf1df95d, type: 3}
-  description: "攻击后，对目标施加1层寒冷"
+  description: "攻击命中后，对目标及其队列中前后相邻的单位各施加1层寒冷。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0
   healthBonus: 0
   shopTier: 1
-  shopPrice: 35
+  shopPrice: 30

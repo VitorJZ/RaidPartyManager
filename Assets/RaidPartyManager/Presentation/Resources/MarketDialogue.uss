@@ -1,0 +1,7 @@
+#market-dialogue { background-color: rgba(22, 16, 29, .76); }
+#broker-portrait { position: absolute; right: 1%; top: 2%; width: 58%; height: 82%; }
+#broker-options { position: absolute; left: 5%; width: 38%; top: 8%; max-height: 61%; background-color: rgb(48, 33, 42); border-width: 1px; border-color: rgb(182, 137, 84); padding: 12px; }
+#broker-options .unity-scroll-view { flex-shrink: 1; min-height: 0; margin-top: 6px; }
+.broker-choice { margin-top: 3px; margin-bottom: 3px; min-height: 30px; }
+#broker-speech { position: absolute; left: 4%; right: 4%; bottom: 3%; min-height: 20%; background-color: rgba(45, 27, 40, .97); border-top-width: 2px; border-top-color: rgb(222, 175, 106); padding: 10px 22px; }
+#broker-line { margin-top: 6px; }

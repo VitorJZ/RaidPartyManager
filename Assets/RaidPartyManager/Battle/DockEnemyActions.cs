@@ -20,7 +20,7 @@ namespace RaidPartyManager.Battle
                     GrantStatus(actor, TargetableOpponents(actor).First(), Exposed, 1, "逐潮标记", BattleVisualCue.TideMark);
                     return true;
                 case EnemyWreckScavenger:
-                    var victim = TargetableOpponents(actor).First();
+                    var victim = FrontAttackTargets(actor).First();
                     if (EnemyHit(actor, victim, "普攻", BattleVisualCue.None) && actor.Health > 0 && !actor.EnemyTriggered)
                         Scavenge(actor, victim);
                     return true;
@@ -93,7 +93,7 @@ namespace RaidPartyManager.Battle
                 detail: "下次行动将炮击最后两名存活的对手", visual: BattleVisualCue.AdmiralWhistle);
             ReportCountdown(actor, BattleCountdownKind.AdmiralBroadside, 1);
             foreach (var target in Opponents(actor).Reverse().Take(2))
-                Report(BattleEventKind.EnemyVisual, actor, target, null, ActionKind.Shield, visual: BattleVisualCue.AdmiralWarning);
+                ShowEnemyVisual(actor, target, BattleVisualCue.AdmiralWarning);
             return true;
         }
 
@@ -102,10 +102,14 @@ namespace RaidPartyManager.Battle
             Report(kind, actor, actor, name, ActionKind.Shield, detail: $"所有对手受到 {layers} 层寒冷", visual: visual);
             foreach (var target in Opponents(actor).ToArray())
             {
-                Report(BattleEventKind.EnemyVisual, actor, target, null, ActionKind.Shield, visual: visual);
+                ShowEnemyVisual(actor, target, visual);
                 GrantStatus(actor, target, Chill, layers);
             }
         }
+
+        private void ShowEnemyVisual(Unit actor, Unit target, BattleVisualCue cue) =>
+            events.Add(new BattleEvent(Tick, BattleEventKind.EnemyVisual, actor.Input.Id, target.Input.Id,
+                actionKind: ActionKind.Shield, targetHealth: target.Health, targetShield: target.Shield, maximumHealth: target.Stats.Health, visualCue: cue));
 
         private Unit NextLivingAllyBehind(Unit actor) => units.FirstOrDefault(unit =>
             unit.Input.Side == actor.Input.Side && unit.Input.Position > actor.Input.Position && unit.Health > 0);

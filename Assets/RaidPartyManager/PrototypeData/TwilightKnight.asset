@@ -26,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 22
   traitPower: 0
   traitText: "造成伤害时，恢复等同于伤害一半的生命值"
-  personality: 7
+  personality: 1
   attack: 8
   defense: 1
   specialDefense: 3

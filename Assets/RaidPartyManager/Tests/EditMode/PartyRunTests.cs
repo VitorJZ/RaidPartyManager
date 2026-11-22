@@ -34,6 +34,75 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void EveryPersonalityHasItsOwnFirstPersonLineForEveryThought()
+        {
+            var personalities = (Personality[])Enum.GetValues(typeof(Personality));
+            Assert.That(personalities.Length, Is.EqualTo(10));
+            foreach (EmployeeThought topic in Enum.GetValues(typeof(EmployeeThought)))
+            {
+                if (topic == EmployeeThought.None) continue;
+                var lines = personalities.Select(p => EmployeeVoice.For(p).Say(topic, "甲", "乙")).ToArray();
+                Assert.That(lines.All(line => line.Contains("我")), Is.True, topic.ToString());
+                Assert.That(lines.Distinct().Count(), Is.EqualTo(personalities.Length), topic.ToString());
+            }
+        }
+
+        [Test]
+        public void EmployeeDossierAccumulatesActualContributionsAndCompletesGoalsOnce()
+        {
+            var run = MakeRun();
+            var initial = run.EmployeeProfileFor("a");
+            Assert.That(initial.Goals.Select(goal => goal.Kind),
+                Is.EquivalentTo(new[] { EmployeeGoalKind.Appearances, EmployeeGoalKind.Equipment }));
+            var armor = run.Inventory.Single();
+            Assert.That(run.TryEquip("a", 0, armor.Id), Is.True);
+            Assert.That(run.Members[0].EmployeeAttributes.Satisfaction, Is.EqualTo(4));
+            Assert.That(run.EmployeeProfileFor("a").Career.LastCompleted.Kind, Is.EqualTo(EmployeeGoalKind.Equipment));
+            Assert.That(run.TryEquip("a", 0, armor.Id), Is.True);
+            Assert.That(run.EmployeeProfileFor("a").Career.GoalsCompleted, Is.EqualTo(1));
+
+            for (int i = 0; i < 2; i++)
+            {
+                var request = run.BeginBattle(Enemies(), 20, null);
+                var events = new[]
+                {
+                    new BattleEvent(1, BattleEventKind.Action, "enemy", "a", shieldAbsorbed: 4),
+                    new BattleEvent(2, BattleEventKind.Action, "a", "enemy", amount: 7, targetHealth: 3),
+                    new BattleEvent(3, BattleEventKind.Action, "a", "b", actionKind: ActionKind.Heal, amount: 2),
+                    new BattleEvent(4, BattleEventKind.Action, "b", "enemy", amount: 3, targetHealth: 0),
+                    new BattleEvent(4, BattleEventKind.Defeated, "b", "enemy")
+                };
+                var result = new BattleResult(request.Id, BattleOutcome.Victory,
+                    new Dictionary<string, int> { ["a"] = 10, ["b"] = 10, ["enemy"] = 0 }, events);
+                Assert.That(run.TryFinishBattle(result, out _), Is.True);
+                Assert.That(run.TryFinishBattle(result, out _), Is.False);
+            }
+
+            var profile = run.EmployeeProfileFor("a");
+            Assert.That(profile.Career.Damage, Is.EqualTo(14));
+            Assert.That(profile.Career.Blocked, Is.EqualTo(8));
+            Assert.That(profile.Career.Healed, Is.EqualTo(4));
+            Assert.That(profile.Career.Appearances, Is.EqualTo(2));
+            Assert.That(run.EmployeeProfileFor("b").Career.Kills, Is.EqualTo(2));
+            Assert.That(profile.Career.LastCompleted.Kind, Is.EqualTo(EmployeeGoalKind.Appearances));
+            Assert.That(profile.Career.GoalsCompleted, Is.EqualTo(2));
+            Assert.That(profile.Goals.Any(goal => goal.Kind == EmployeeGoalKind.SeparateLineups && goal.SubjectId == "b"), Is.True);
+            Assert.That(profile.Thoughts.Any(thought => thought.Contains("分开上阵")), Is.True);
+
+            Assert.That(run.TrySendAway("b"), Is.True);
+            for (int i = 0; i < 2; i++)
+            {
+                var request = run.BeginBattle(Enemies(), 20, null);
+                var result = new BattleResult(request.Id, BattleOutcome.Victory,
+                    new Dictionary<string, int> { ["a"] = 10, ["enemy"] = 0 }, Array.Empty<BattleEvent>());
+                Assert.That(run.TryFinishBattle(result, out _), Is.True);
+            }
+            profile = run.EmployeeProfileFor("a");
+            Assert.That(profile.Career.LastCompleted.Kind, Is.EqualTo(EmployeeGoalKind.SeparateLineups));
+            Assert.That(profile.Thoughts.Any(thought => thought.Contains("分开上阵")), Is.False);
+        }
+
+        [Test]
         public void EditorSuppliesRefillTheBackpackAndKeepEquippedGearAndLearnedSkills()
         {
             var run = MakeRun();
@@ -168,9 +237,12 @@ namespace RaidPartyManager.Tests
             Assert.That(run.SkillBooks.Select(book => book.Id), Is.EquivalentTo(new[] { duplicate.Id, restricted.Id }));
 
             var basic = run.Members[0].Character.BasicAttack;
-            var evolved = new CharacterDefinition("evolved", "evolved", Profession.Warrior, Personality.Reckless,
+            var evolved = new CharacterDefinition("evolved", "evolved", Profession.Warrior, Personality.Curious,
                 new Stats(8, 1, 1, 12), 1, basic, stage: 2);
+            var voice = EmployeeVoice.For(run.Members[0].Personality);
             Assert.That(run.TryChangeForm("a", evolved), Is.True);
+            Assert.That(EmployeeVoice.For(run.Members[0].Personality), Is.SameAs(voice));
+            Assert.That(run.EmployeeProfileFor("a").Thoughts, Does.Contain(voice.Say(EmployeeThought.Promotion, evolved.Name)));
             Assert.That(run.Members[0].SkillSlotCount, Is.EqualTo(2));
             var extraGuard = run.AddEquipment(guard);
             Assert.That(run.TryLearnSkill("a", 1, extraGuard.Id), Is.False);
@@ -232,7 +304,7 @@ namespace RaidPartyManager.Tests
         }
 
         private static CharacterDefinition Character(string id, Stats stats) => new CharacterDefinition(
-            id, id, Profession.Warrior, Personality.Reckless, stats, 1,
+            id, id, Profession.Warrior, Personality.Frank, stats, 1,
             new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0));
 
         private static BattleResult Result(string id, BattleOutcome outcome, int a, int b, int enemy) =>

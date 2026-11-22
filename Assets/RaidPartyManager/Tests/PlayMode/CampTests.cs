@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using RaidPartyManager.Presentation;
+using RaidPartyManager.Run;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -17,7 +18,7 @@ namespace RaidPartyManager.Tests
             .GetMethod("ResetPlaySession", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
 
         [UnityTest]
-        public IEnumerator CampMirrorsTheCurrentPartyAndKeepsReplacementsWhenReturningToBattle()
+        public IEnumerator CampMirrorsTheCurrentPartyAndKeepsRenewalsWhenReturningToBattle()
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");
             yield return null;
@@ -73,16 +74,20 @@ namespace RaidPartyManager.Tests
             using (var right = PointerUpEvent.GetPooled(new Event
                 { type = EventType.MouseUp, button = 1, mousePosition = outgoing.worldBound.center }))
                 Send(outgoing, right);
-            var candidates = root.Q("replacement-candidates").Query<Button>().ToList();
-            Assert.That(candidates.Count, Is.EqualTo(35));
-            var selected = candidates.First(button => button.enabledInHierarchy);
-            string characterId = selected.name.Substring("replace-with-".Length);
-            Press(root, selected.name);
+            Assert.That(root.Q<Button>("sign-crew-contract").text, Is.EqualTo("签订新合同"));
+            var party = (PartyRun)typeof(CampPrototype).GetField("run", BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(Object.FindAnyObjectByType<CampPrototype>());
+            int salary = 18 * root.Q<IntegerField>("contract-daily-wage").value;
+            party.AddGold(salary);
+            int initialBalance = party.Gold;
+            root.Q<IntegerField>("contract-duration").value = 18;
+            root.Q<Toggle>("bonus-shield").value = true;
+            root.Q<IntegerField>("bonus-shield-amount").value = 6;
+            Press(root, "sign-crew-contract");
+            Assert.That(party.Gold, Is.EqualTo(initialBalance - salary));
             Press(root, "back-party-editor");
             yield return null;
-            var replacement = Artwork(1);
-            Assert.That(replacement, Is.Not.SameAs(before));
-            Assert.That(replacement.name, Does.Contain(characterId));
+            Assert.That(Artwork(1), Is.SameAs(before));
             Press(root, "open-settings");
             Press(root, "return-main-menu");
             yield return WaitForScene("MainMenu");
@@ -96,8 +101,14 @@ namespace RaidPartyManager.Tests
             using (var right = PointerUpEvent.GetPooled(new Event
                 { type = EventType.MouseUp, button = 1, mousePosition = preserved.worldBound.center }))
                 Send(preserved, right);
-            Assert.That(battleRoot.Q<Button>($"replace-with-{characterId}").enabledInHierarchy, Is.False,
-                "The seated party and the battle party must share the same run.");
+            var contract = battleRoot.Q("crew-contract");
+            var terms = contract.Query<Label>().ToList();
+            Assert.That(terms.Any(label => label.text.Contains("剩余 18 天")), Is.True);
+            Assert.That(terms.Any(label => label.text.Contains("每挡下 5 点敌方伤害 6 金币")), Is.True);
+            Assert.That(battleRoot.Q<Button>("sign-crew-contract").text, Is.EqualTo("签订新合同"));
+            Assert.That(contract.Q<Toggle>("bonus-shield").value, Is.True);
+            Assert.That(contract.Q<IntegerField>("bonus-shield-amount").value, Is.EqualTo(6));
+
         }
 
         private static IEnumerator WaitForScene(string name)

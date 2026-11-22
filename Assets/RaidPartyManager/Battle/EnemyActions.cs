@@ -18,7 +18,7 @@ namespace RaidPartyManager.Battle
                     GrantStatus(actor, actor, StatusKind.Resolve, 1, "扎盾坚毅", BattleVisualCue.ResolveGuard);
                     return true;
                 case CharacterTrait.EnemyCeramicPierce:
-                    var target = TargetableOpponents(actor).First();
+                    var target = FrontAttackTargets(actor).First();
                     int defense = target.Stats.Defense;
                     var behind = Opponents(actor).FirstOrDefault(unit => unit.Input.Position > target.Input.Position);
                     if (EnemyHit(actor, target, "裂陶穿击", BattleVisualCue.CeramicPierce) && defense > 0 && behind?.Health > 0)
@@ -63,7 +63,7 @@ namespace RaidPartyManager.Battle
                 return;
             }
             bool critical = random.NextDouble() < 0.2;
-            EnemyHit(actor, TargetableOpponents(actor).First(), critical ? "重弩暴击" : "普攻",
+            EnemyHit(actor, FrontAttackTargets(actor).First(), critical ? "重弩暴击" : "普攻",
                 critical ? BattleVisualCue.CrossbowCritical : BattleVisualCue.None, critical ? 2 : 1);
         }
 
@@ -80,7 +80,7 @@ namespace RaidPartyManager.Battle
                     return;
                 }
             }
-            EnemyHit(actor, TargetableOpponents(actor).First(), "真伤刺击", BattleVisualCue.QuackStrike);
+            EnemyHit(actor, FrontAttackTargets(actor).First(), "真伤刺击", BattleVisualCue.QuackStrike);
         }
 
         private bool EnemyHit(Unit actor, Unit target, string name, BattleVisualCue cue, int multiplier = 1) =>

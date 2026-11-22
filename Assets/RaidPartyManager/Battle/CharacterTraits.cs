@@ -21,7 +21,7 @@ namespace RaidPartyManager.Battle
                 var source = available[random.Next(available.Length)];
                 unit.CopiedTrait = source.Trait;
                 unit.CopiedTraitPower = source.TraitPower;
-                Report(BattleEventKind.Effect, unit, unit, "复制特性", ActionKind.Shield, detail: source.Name);
+                Report(BattleEventKind.Effect, unit, unit, "复制特性", ActionKind.Shield, detail: source.Name, copiedTraitSource: source);
             }
 
             foreach (var unit in units.Where(unit => unit.Health > 0 && unit.Trait == EvolveAlly).ToArray())
@@ -111,6 +111,7 @@ namespace RaidPartyManager.Battle
         private void ChangeForm(Unit source, Unit target, CharacterDefinition form, string reason,
             BattleVisualCue visual = BattleVisualCue.None)
         {
+            form = form.WithPersonality(target.Input.Character.Personality);
             target.ChangeForm(form);
             UpdateFormation();
             Report(BattleEventKind.FormChanged, source, target, reason, ActionKind.Shield, detail: form.Name, form: form,
@@ -119,6 +120,9 @@ namespace RaidPartyManager.Battle
 
         private void OnLifeLost(Unit source, Unit target, int amount)
         {
+            if (amount > 0) TriggerCrown(target);
+            if (amount > 0 && target.Health > 0 && target.Health * 2 <= target.Stats.Health && target.FirstTrigger(PlayerTrait.Grit))
+                GrantStatus(target, target, StatusKind.Resolve, 1, "硬撑");
             if (amount == 0)
                 return;
 
@@ -126,9 +130,6 @@ namespace RaidPartyManager.Battle
                 GrantStatus(target, target, Ember, target.TraitPower);
             if (source == null || source.Input.Side == target.Input.Side)
                 return;
-            target.LastAttacker = source.Input.Id;
-            if (amount >= 7)
-                target.WantsRetreat = true;
             if (source.Trait == FirstDamageToTarget)
                 source.DamagedTargets.Add(target.Input.Id);
             if (target.Health == 0 && source.Trait == PermanentAttackOnKill)

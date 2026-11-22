@@ -19,7 +19,7 @@ namespace RaidPartyManager.Tests
             var encounter = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
                 "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
             var stacks = encounter.StartingEquipment.GroupBy(item => item.Id).ToArray();
-            Assert.That(stacks, Has.Length.EqualTo(50));
+            Assert.That(stacks, Has.Length.EqualTo(55));
             Assert.That(stacks.All(stack => stack.Count() == 4 && encounter.IconFor(stack.Key) != null), Is.True);
             Assert.That(stacks.Select(stack => stack.First().Effect).Where(effect => effect != None),
                 Is.EquivalentTo(Enum.GetValues(typeof(EquipmentEffect)).Cast<EquipmentEffect>().Where(effect => effect is not (None or CoinDevourer))));
@@ -103,6 +103,26 @@ namespace RaidPartyManager.Tests
                     statuses: new Dictionary<StatusKind, int> { { StatusKind.Poison, 3 } }));
             Assert.That(result.Events.Any(entry => entry.ActionName == "破绽" || entry.ActionName == "中毒"), Is.False);
             Assert.That(result.Events.First(entry => entry.TargetId == "enemy").TargetStatuses, Is.EqualTo("纯净 2"));
+        }
+
+        [TestCase(1, 3, 30)]
+        [TestCase(2, 4, 30)]
+        [TestCase(1, 4, 1)]
+        public void IceRingChillsTheTargetAndUnitsTouchingItsSlots(int targetSlots, int rearPosition, int targetHealth)
+        {
+            var attacker = Unit("attacker", Side.Party, gear: Gear(IceRing));
+            var front = Unit("front", Side.Enemy, 1, gear: Gear(StealthCloak));
+            var target = Unit("target", Side.Enemy, 2, health: targetHealth, positionSlots: targetSlots);
+            var rear = Unit("rear", Side.Enemy, rearPosition);
+            var result = Fight(attacker, front, target, rear);
+
+            Assert.That(Action(result, attacker.Id).TargetId, Is.EqualTo(target.Id));
+            var chilled = result.Events.Where(e => e.ActorId == attacker.Id && e.ActionName == "寒冷").ToArray();
+            var expected = new List<string> { front.Id };
+            if (result.HealthById[target.Id] > 0) expected.Add(target.Id);
+            if (rearPosition == 2 + targetSlots) expected.Add(rear.Id);
+            Assert.That(chilled.Select(e => e.TargetId), Is.EquivalentTo(expected));
+            Assert.That(chilled.Select(e => e.TargetStatuses), Is.All.EqualTo("寒冷 1"));
         }
 
         [Test]
@@ -279,7 +299,7 @@ namespace RaidPartyManager.Tests
         private sealed class EnemyTargetPolicy : IDecisionPolicy
         {
             private readonly string actorId;
-            private readonly PersonalityPolicy policy = new PersonalityPolicy();
+            private readonly DefaultBattlePolicy policy = new DefaultBattlePolicy();
 
             public EnemyTargetPolicy(string actorId) => this.actorId = actorId;
 
@@ -305,6 +325,44 @@ namespace RaidPartyManager.Tests
             Assert.That(hits[1].TargetHealth, Is.Zero);
             Assert.That(result.Events.Count(entry => entry.ActionName == "荆棘" && entry.ActionKind == ActionKind.Attack),
                 Is.EqualTo(1));
+        }
+
+        [Test]
+        public void LethalHitsConsumeOnlyTheCharmThatProtectedTheTarget()
+        {
+            var front = Unit("front", Side.Party);
+            var rear = Unit("rear", Side.Party, 2);
+            var run = new PartyRun(new[]
+            {
+                new PartyMemberStart(front.Id, front.Character, 1, front.Health),
+                new PartyMemberStart(rear.Id, rear.Character, 2, rear.Health)
+            }, Gear(ElvenCharm, ElvenCharm, RedCord));
+            var charms = run.Inventory.Where(item => item.Definition.Effect == ElvenCharm).ToArray();
+            var cord = run.Inventory.Single(item => item.Definition.Effect == RedCord);
+            Assert.That(run.TryEquip(front.Id, 2, charms[0].Id), Is.True);
+            Assert.That(run.TryEquip(rear.Id, 1, charms[1].Id), Is.True);
+            Assert.That(run.TryEquip(rear.Id, 0, cord.Id), Is.True);
+            var enemy = Unit("enemy", Side.Enemy, stats: new Stats(20, 0, 0, 60));
+            var request = run.BeginBattle(new[] { enemy }, 3, null);
+            var battle = new BattleSimulator(random: new FixedRoll(0.9)).Start(request);
+
+            Assert.That(battle.AdvanceRound().All(entry => entry.Loadout == null), Is.True);
+            var personal = battle.AdvanceRound().Single(entry => entry.Loadout != null);
+            Assert.That(personal.TargetHealth, Is.EqualTo(15));
+            Assert.That(personal.Loadout.Consumed, Is.EqualTo(new[] { charms[0].Id }));
+            Assert.That(run.TryApplyBattleLoadout(request.Id, personal.Loadout), Is.True);
+            Assert.That(run.Members.Single(member => member.Id == front.Id).EquipmentIds[2], Is.Null);
+            Assert.That(run.Members.Single(member => member.Id == rear.Id).EquipmentIds[1], Is.EqualTo(charms[1].Id));
+
+            var shared = battle.AdvanceRound().Single(entry => entry.Loadout != null);
+            Assert.That(shared.TargetId, Is.EqualTo(front.Id));
+            Assert.That(shared.TargetHealth, Is.EqualTo(15));
+            Assert.That(shared.Loadout.Consumed, Is.EquivalentTo(charms.Select(item => item.Id)));
+            Assert.That(run.TryApplyBattleLoadout(request.Id, shared.Loadout), Is.True);
+            Assert.That(run.TrySettle(battle.Result, out _), Is.True);
+            Assert.That(run.Members.Single(member => member.Id == rear.Id).EquipmentIds,
+                Is.EqualTo(new[] { cord.Id, null, null }));
+            Assert.That(run.Inventory.Single().Id, Is.EqualTo(cord.Id));
         }
 
         [Test]
@@ -404,6 +462,22 @@ namespace RaidPartyManager.Tests
             Assert.That(result.Recruits.Single().Position, Is.EqualTo(2));
             Assert.That(run.TrySettle(result, out _), Is.True);
             Assert.That(run.Members.Single(member => member.Id != fighter.Id).Character, Is.SameAs(recruit));
+            Assert.That(run.Inventory.Any(i => i.Definition.Effect == RecruitmentNotice), Is.False);
+        }
+
+        [Test]
+        public void UnusedNoticeSurvivesWhenNoRecruitIsAvailable()
+        {
+            var fighter = Unit("fighter", Side.Party);
+            var run = new PartyRun(new[] { new PartyMemberStart(fighter.Id, fighter.Character, 1, fighter.Health) },
+                Gear(RecruitmentNotice));
+            var notice = run.Inventory.Single().Id;
+            Assert.That(run.TryEquip(fighter.Id, 0, notice), Is.True);
+            var request = run.BeginBattle(new[] { Unit("enemy", Side.Enemy, health: 8) }, 3, null);
+            var result = new BattleSimulator(random: new FixedRoll(.9)).Simulate(request);
+            Assert.That(result.Recruits, Is.Empty);
+            Assert.That(run.TrySettle(result, out _), Is.True);
+            Assert.That(run.Inventory.Any(i => i.Id == notice), Is.True);
         }
 
         [Test]
@@ -422,10 +496,10 @@ namespace RaidPartyManager.Tests
             var request = run.BeginBattle(new[] { Unit("enemy", Side.Enemy, health: 7) }, 3, null, new[] { character });
             var result = new BattleSimulator(random: new FixedRoll(0.9)).Simulate(request);
             Assert.That(run.TrySettle(result, out _), Is.True);
-            Assert.That(run.Members.Count, Is.EqualTo(4));
+            Assert.That(run.Members.Count, Is.EqualTo(5));
             Assert.That(run.Members.Single(member => member.Position == 4).Id, Is.EqualTo(result.Recruits.Single().Id));
             Assert.That(run.Inventory, Does.Contain(inventory[1]));
-            Assert.That(run.Members.SelectMany(member => member.EquipmentIds), Does.Not.Contain(inventory[1].Id));
+            Assert.That(run.Members.Single(m => m.Id == "fighter-4").EquipmentIds, Does.Contain(inventory[1].Id));
 
             var recruitId = result.Recruits.Single().Id;
             Assert.That(run.TryEquip(recruitId, 0, inventory[1].Id), Is.True);
@@ -613,12 +687,58 @@ namespace RaidPartyManager.Tests
 
             var ordinary = Fight(caster, defender);
             Assert.That(Action(ordinary, caster.Id).Amount, Is.EqualTo(7));
-            Assert.That(ordinary.Events.Single(entry => entry.ActionName == "魔导水晶").Amount, Is.EqualTo(3));
+            Assert.That(ordinary.Events.Single(entry => entry.ActionName == "魔导水晶").Amount, Is.EqualTo(1));
 
             var insulated = Unit("enemy", Side.Enemy, gear: Gear(InsulatingOrb), stats: defender.Stats);
             var mixed = Fight(caster, insulated);
             Assert.That(Action(mixed, caster.Id).Amount, Is.EqualTo(4));
             Assert.That(mixed.Events.Any(entry => entry.ActionName == "魔导水晶"), Is.False);
+        }
+
+        [Test]
+        public void StoneArmorAddsTwoShieldAtTheStartOfEveryRound()
+        {
+            var result = Fight(3, Unit("wearer", Side.Party, gear: Gear(StoneArmor)), Unit("foe", Side.Enemy));
+            Assert.That(result.Events.Where(e => e.ActionName == "岩石铠甲").Select(e => e.Amount),
+                Is.EqualTo(new[] { 2, 2, 2 }));
+        }
+
+        [Test]
+        public void AdmiralWhistleStrikesTheLastEnemyOncePerRoundAndFrostChainChillsAllAtOpening()
+        {
+            var result = Fight(2, Unit("wearer", Side.Party, gear: Gear(HarborWhistle, SunkenFrostChain)),
+                Unit("front", Side.Enemy), Unit("rear", Side.Enemy, 4));
+            var whistle = result.Events.Where(e => e.ActionName == "封港信笛").ToArray();
+            Assert.That(whistle.Select(e => e.TargetId), Is.EqualTo(new[] { "rear", "rear" }));
+            Assert.That(whistle.All(e => e.DamageTaken.SequenceEqual(new[] { (DamageType.Lightning, 4) })), Is.True);
+            var chain = result.Events.Where(e => e.ActionName == "沉灯霜链").ToArray();
+            Assert.That(chain.Select(e => e.TargetId), Is.EquivalentTo(new[] { "front", "rear" }));
+            Assert.That(chain.All(e => e.TargetStatuses?.Contains("寒冷 2") == true), Is.True);
+        }
+
+        [TestCase(15, 1)]
+        [TestCase(14, 2)]
+        public void CrownTriggersOnceAndOnlyStrictlyBelowHalf(int health, int shields)
+        {
+            var result = Fight(2, Unit("king", Side.Party, health: health, gear: Gear(FacelessCrown)),
+                Unit("foe", Side.Enemy, stats: new Stats(1, 0, 0, 30)));
+            var events = result.Events.Where(e => e.ActionName == "无面王冠").ToArray();
+            Assert.That(events.Count(e => e.Amount == 5), Is.EqualTo(shields));
+            Assert.That(events.Any(e => e.TargetStatuses?.Contains("盛气 2") == true), Is.EqualTo(shields == 2));
+        }
+
+        [Test]
+        public void ReliquaryProtectsTheWearerAndAdjacentAllyAndItsChillEndsWhenShieldBreaks()
+        {
+            var result = Fight(2, Unit("wearer", Side.Party, gear: Gear(ColdSoulReliquary)),
+                Unit("near", Side.Party, 2), Unit("far", Side.Party, 4),
+                Unit("foe", Side.Enemy, stats: new Stats(8, 0, 0, 100)));
+            var events = result.Events.Where(e => e.ActionName == "冷魂圣匣").ToArray();
+            Assert.That(events.Where(e => e.Amount > 0).Select(e => (e.TargetId, e.Amount)),
+                Is.EquivalentTo(new[] { ("wearer", 5), ("near", 3) }));
+            Assert.That(events.Count(e => e.ActorId == "wearer" && e.TargetId == "foe"), Is.EqualTo(1));
+            Assert.That(events.Any(e => e.ActorId == "near" && e.TargetId == "foe"), Is.True);
+            Assert.That(events.Any(e => e.ActorId == "far"), Is.False);
         }
 
         private static BattleEvent Action(BattleResult result, string actor) =>
@@ -635,11 +755,12 @@ namespace RaidPartyManager.Tests
         private static Combatant Unit(string id, Side side, int position = 1, int? health = null, Stats? stats = null,
             EquipmentDefinition[] gear = null, IReadOnlyDictionary<StatusKind, int> statuses = null,
             ActionDefinition skill = null, ActionDefinition basic = null, Profession profession = Profession.Warrior,
-            AttackReach reach = AttackReach.Unspecified)
+            AttackReach reach = AttackReach.Unspecified, int positionSlots = 1)
         {
             var attributes = stats ?? new Stats(side == Side.Party ? 5 : 2, 0, 0, 30);
-            var definition = new CharacterDefinition(id, id, profession, Personality.Gentle, attributes, 1,
-                basic ?? new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0), skill, reach: reach);
+            var definition = new CharacterDefinition(id, id, profession, Personality.Caring, attributes, 1,
+                basic ?? new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0), skill,
+                reach: reach, positionSlots: positionSlots);
             return new Combatant(id, definition, side, position, attributes, health ?? attributes.Health, gear, statuses);
         }
 

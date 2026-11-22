@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "魔导水晶"
   effect: 44
   icon: {fileID: 2800000, guid: 8d8f81935c4d44d789bab20eb9ea6dc5, type: 3}
-  description: "造成魔法伤害时，恢复等同于伤害的生命值"
+  description: "造成魔法伤害时，恢复实际伤害一半的生命值（向下取整）"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

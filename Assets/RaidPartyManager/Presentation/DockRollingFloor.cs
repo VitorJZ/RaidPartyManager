@@ -42,7 +42,7 @@ namespace RaidPartyManager.Presentation
         {
             shaft.localRotation = Quaternion.AngleAxis(degrees, Vector3.forward);
             // Both printing shaders render double-sided. The front row sees one face at a time.
-            bool reverse = degrees >= 90;
+            bool reverse = Mathf.Abs(degrees) >= 90;
             outgoing.ShowFace(!reverse);
             incoming.ShowFace(reverse);
         }

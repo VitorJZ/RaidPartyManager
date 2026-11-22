@@ -27,7 +27,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "额外获取后方队友的攻击力，并使其在本回合无法行动；回合结束时，切换为天弓。"
   battleForm: {fileID: 11400000, guid: dac678d7eeb14344a6e1c949c2424d14, type: 2}
-  personality: 7
+  personality: 0
   attack: 5
   defense: 2
   specialDefense: 1

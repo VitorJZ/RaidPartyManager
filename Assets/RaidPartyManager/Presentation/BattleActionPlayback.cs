@@ -31,6 +31,16 @@ namespace RaidPartyManager.Presentation
         private readonly MeteorPlayback meteor;
         private readonly PiercingArrowPlayback piercingArrow;
 
+        private SoundCue releaseSound;
+
+        internal void SoundAt(double now)
+        {
+            if (releaseSound == SoundCue.None || now < releaseAt) return;
+            GameAudio.Play(releaseSound);
+            if (releaseSound == SoundCue.BowRelease) GameAudio.Play(SoundCue.ArrowFlight, .32f);
+            releaseSound = SoundCue.None;
+        }
+
         public double ImpactAt { get; }
         public double FinishAt { get; }
         public bool IsPiercing => piercingArrow != null;
@@ -42,8 +52,9 @@ namespace RaidPartyManager.Presentation
         public BattleActionPlayback(BattleSpriteView sprite, ActionKind kind, Texture2D walkSheet,
             Texture2D projectile, Texture2D fragments, bool isArrow, BattleEvent action, IReadOnlyList<BattleEvent> projectileHits,
             double now, float scale, Texture2D special, bool hasImpactEffect, bool critical, bool cannon = false,
-            Texture2D piercingParticle = null)
+            Texture2D piercingParticle = null, SoundCue releaseSound = SoundCue.None)
         {
+            this.releaseSound = releaseSound;
             this.sprite = sprite;
             this.walkSheet = walkSheet;
             this.projectile = projectile;
@@ -89,12 +100,7 @@ namespace RaidPartyManager.Presentation
             if (walkSheet != null)
                 movingImage = MakeActor("battle-moving-character");
             if (walkSheet == null && sprite?.HasWideAttack == true && (kind != ActionKind.Shield || special != null))
-            {
                 standingPose = MakeActor("battle-attack-pose");
-                sprite.SetBodyVisible(false, keepLocalEffects: true);
-            }
-            if (walkSheet != null)
-                sprite.SetBodyVisible(false);
         }
 
         public void HandleImpact()
@@ -124,8 +130,11 @@ namespace RaidPartyManager.Presentation
             if (actor == null)
                 return;
             var source = layer.WorldToLocal(actor.BodyBounds);
-            if (source.width <= 0f)
+            if (!(source.width > 0 && source.height > 0))
+            {
+                if (movingImage != null || standingPose != null) sprite.SetBodyVisible(true);
                 return;
+            }
 
             if (standingPose != null)
             {
@@ -156,10 +165,14 @@ namespace RaidPartyManager.Presentation
                 return;
             }
             var meleeTarget = layer.WorldToLocal(defender.BodyBounds);
-            if (meleeTarget.width <= 0f)
+            if (!(meleeTarget.width > 0 && meleeTarget.height > 0))
+            {
+                sprite.SetBodyVisible(true);
                 return;
+            }
             DrawMelee(now, source, meleeTarget);
             Attach(layer, movingImage);
+            sprite.SetBodyVisible(false);
         }
 
         private void DrawStandingPose(double now, VisualElement layer, Rect source)
@@ -175,6 +188,7 @@ namespace RaidPartyManager.Presentation
             var size = sprite.PoseSize(source.size);
             SetBounds(standingPose, new Rect(source.center.x - size.x * 0.5f, source.yMax - size.y, size.x, size.y));
             Attach(layer, standingPose);
+            sprite.SetBodyVisible(false, keepLocalEffects: true);
         }
 
         private void DrawProjectile(Image view, bool missed, Rect source, Rect destination, float progress)

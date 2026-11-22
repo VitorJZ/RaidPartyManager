@@ -56,8 +56,9 @@ namespace RaidPartyManager.Presentation
         private float castDistance;
         internal bool HasDockHouse => house != null;
         private readonly Texture2D printedSurf;
-        private readonly MeshRenderer surf, derrickFooting, mooring, creel;
+        private readonly MeshRenderer surf, derrickFooting, mooring, creel, leftDressing, rightDressing;
         private readonly BattleStageArt stageArt;
+        private readonly SceneryFlipbook scenery;
 
         private sealed class Actor
         {
@@ -98,18 +99,18 @@ namespace RaidPartyManager.Presentation
             camera.fieldOfView = FieldOfView;
             camera.clearFlags = CameraClearFlags.SolidColor;
             camera.backgroundColor = new Color32(25, 37, 48, 255);
-            if (moonlit)
-            {
-                paper.EnableKeyword("RPM_DOCK_MOON");
-                paper.SetInt("_PortalTest", (int)CompareFunction.NotEqual);
-            }
-            sky = Flat("Cyclorama", set.backcloth != null ? set.backcloth : set.region, -100, Surface.Sky);
+            if (moonlit) paper.EnableKeyword("RPM_DOCK_MOON");
+            if (moonlit || set.turntable) paper.SetInt("_PortalTest", (int)CompareFunction.NotEqual);
+            scenery = new SceneryFlipbook(set.backcloth != null ? set.backcloth : set.region);
+            sky = Flat("Cyclorama", scenery.Current, -100, Surface.Sky);
             deck = Flat("Stage floor", set.floor != null ? set.floor : set.region, -60, Surface.Boards);
             upstage = Flat("Upstage", set.upstage, set.moored ? -72 : -48);
             if (set.moored && upstage != null)
                 Shape(upstage, set.upstage, new Vector4(1, .88f, 0, .12f), new Color(.88f, .92f, .95f), surface: Surface.Paper, scenic: true);
             left = Flat("Left wing", set.leftWing, -40);
             right = Flat("Right wing", set.rightWing, -38);
+            leftDressing = Flat("Stage left dressing", set.leftDressing, -42);
+            rightDressing = Flat("Stage right dressing", set.rightDressing, -43);
             printedSurf = art.breakers;
             if (set.moored)
                 surf = Flat("Breaker groundrow", printedSurf, -69);
@@ -117,8 +118,12 @@ namespace RaidPartyManager.Presentation
             {
                 mooring = Flat("Downstage mooring", art.mooring, -31);
                 creel = Flat("Derrick catch basket", art.creel, -36);
+            }
+            if (moonlit || set.turntable)
+            {
                 house = DockPlayhouse.Bind(stage.transform, panel);
                 house.Set.Sky = sky;
+                house.Set.Scenery = scenery;
                 house.Set.Floor = deck;
                 house.Set.NativeEntrance = true;
                 sky.GetComponent<MeshFilter>().sharedMesh = house.PanoramaPattern;
@@ -207,10 +212,11 @@ namespace RaidPartyManager.Presentation
             if (house != null)
             {
                 var uv = house.DressPanorama(sky.transform, backdrop);
-                Shape(sky, backdrop, uv, Color.white, surface: Surface.Sky);
+                Shape(sky, scenery.Current, uv, Color.white, surface: Surface.Sky);
             }
             else
             {
+                Shape(sky, scenery.Current, new Vector4(1,1,0,0), Color.white, surface: Surface.Sky);
                 float skyHeight = Mathf.Max(halfHeight * 2.05f, halfWidth * 2.12f * backdrop.height / backdrop.width);
                 Place(sky, .5f, .06f, farZ, skyHeight * farScale, backdrop);
                 float skyWidth = Mathf.Max(sky.transform.localScale.x, halfWidth * 2.22f * farScale);
@@ -230,7 +236,7 @@ namespace RaidPartyManager.Presentation
             float deckDepth = deckBack - front.z;
             deck.transform.SetPositionAndRotation(front, Quaternion.Euler(90, 0, 0));
             deck.transform.localScale = new Vector3(deckWidth, deckDepth, 1);
-            var tile = house != null ? DockPlayhouse.PlankTile : new Vector2(9f, 4.2f);
+            var tile = set.turntable ? new Vector2(5.4f, 1.8f) : house != null ? DockPlayhouse.PlankTile : new Vector2(9f, 4.2f);
             var deckUv = set.floor != null
                 ? new Vector4(deckWidth / tile.x, deckDepth / tile.y, 0, 0)
                 : new Vector4(1, .19f, 0, 0);
@@ -263,7 +269,7 @@ namespace RaidPartyManager.Presentation
                 }
                 else
                 {
-                    float z = deckBack - .2f;
+                    float z = set.turntable ? front.z + .86f * deckDepth : deckBack - .2f;
                     upstage.transform.position = new Vector3(-.17f * halfWidth * DepthScale(z), 0, z);
                     upstage.transform.localScale = new Vector3(2.75f * set.upstage.width / set.upstage.height, 2.75f, 1);
                 }
@@ -272,6 +278,8 @@ namespace RaidPartyManager.Presentation
             SetWing(right, set.rightWing, house != null ? .828f : .88f, house != null ? front.z + deckDepth * .72f : 4.6f, house != null ? 2.62f : 3.55f, t - 0.12f);
             if (house != null)
             {
+                SetWing(leftDressing, set.leftDressing, .261f, front.z + .79f * deckDepth, 1.47f, t);
+                SetWing(rightDressing, set.rightDressing, .755f, front.z + .68f * deckDepth, 1.12f, t);
                 SetWing(mooring, stageArt.mooring, .125f, front.z + .56f * deckDepth, .48f, t);
                 SetWing(creel, stageArt.creel, .787f, front.z + .62f * deckDepth, .64f, t);
             }
@@ -515,7 +523,7 @@ namespace RaidPartyManager.Presentation
             return new Vector3((2 * x - 1) * halfWidth, cameraHeight + (2 * y - 1) * halfHeight, 0);
         }
 
-        private static Mesh MakeSheet(int cols, int rows)
+        internal static Mesh MakeSheet(int cols, int rows)
         {
             int stride = cols + 1;
             var points = new Vector3[stride * (rows + 1)];

@@ -80,7 +80,7 @@ namespace RaidPartyManager.Presentation
         {
             RecruitReplacement(parent, run.Current.PendingRecruit, run.Party, content, id =>
             {
-                run.CompleteRecruit(id);
+                if (run.CompleteRecruit(id)) GameAudio.Play(SoundCue.CompanionJoin);
                 refresh();
             });
         }
@@ -164,7 +164,11 @@ namespace RaidPartyManager.Presentation
                 foreach (var form in run.EvolutionForms(memberId))
                     Character(choices, form, content, $"evolve-{memberId}-{form.Id}", () =>
                     {
-                        if (evolve(memberId, form.Id)) completed();
+                        if (evolve(memberId, form.Id))
+                        {
+                            GameAudio.Play(SoundCue.CharacterEvolve);
+                            completed();
+                        }
                     });
                 Action(choices, "返回队员选择", "back-to-evolution-members", () =>
                 {

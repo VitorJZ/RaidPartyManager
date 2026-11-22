@@ -26,7 +26,7 @@ MonoBehaviour:
   fixedTrait: 21
   traitPower: 5
   traitText: "第1次对1个目标造成伤害时，造成的伤害+5"
-  personality: 10
+  personality: 0
   attack: 8
   defense: 3
   specialDefense: 3

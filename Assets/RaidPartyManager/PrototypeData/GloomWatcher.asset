@@ -25,7 +25,7 @@ MonoBehaviour:
   fixedTrait: 6
   traitPower: 0
   traitText: "攻击时，额外造成等同于自己损失生命的值"
-  personality: 7
+  personality: 3
   attack: 7
   defense: 2
   specialDefense: 2

@@ -27,7 +27,7 @@ MonoBehaviour:
   traitText: "战斗结束时，若仍然存活，获得1瓶药水"
   evolutions:
   - {fileID: 11400000, guid: adc918ef39c64bce8771a4ebfbef0ddd, type: 2}
-  personality: 11
+  personality: 8
   attack: 5
   defense: 1
   specialDefense: 2

@@ -27,7 +27,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "攻击会对前方的所有单位造成伤害，每命中一个单位，此伤害-1；回合结束时，切换为地煞。"
   battleForm: {fileID: 11400000, guid: 513fe91324cb45b18e69a8805184c8e5, type: 2}
-  personality: 11
+  personality: 4
   attack: 7
   defense: 1
   specialDefense: 1

@@ -7,6 +7,9 @@ Shader "Raid Party Manager/Service Scenery"
         _Surface ("Surface", Float) = 0
         _PlayingZ ("Playing area depth", Float) = 0
         _DepthWrite ("Depth write", Float) = 1
+        _Desaturation ("Desaturation", Range(0,1)) = 0
+        _CutoutThreshold ("Cutout threshold", Range(0,1)) = .025
+        _Walk ("Walk pose", Vector) = (0,0,0,0)
     }
     SubShader
     {
@@ -20,8 +23,8 @@ Shader "Raid Party Manager/Service Scenery"
             #include "UnityCG.cginc"
             #include "../Stagecraft/ScenicPaint.cginc"
             sampler2D _MainTex;
-            float4 _MainTex_ST, _Color, _FireLight;
-            float _Surface, _FlameTime, _FireRange, _BackEdge, _PlayingZ;
+            float4 _MainTex_ST, _Color, _FireLight, _Walk;
+            float _Surface, _FlameTime, _FireRange, _BackEdge, _PlayingZ, _Desaturation, _CutoutThreshold;
             struct vertex { float4 pos:POSITION; float3 normal:NORMAL; float2 uv:TEXCOORD0; };
             struct fragment { float4 pos:SV_POSITION; float2 uv:TEXCOORD0; float3 world:TEXCOORD1; float3 normal:TEXCOORD2; };
             fragment vert(vertex v)
@@ -29,6 +32,8 @@ Shader "Raid Party Manager/Service Scenery"
                 fragment o;
                 if (_Surface == 4) // Only the top of the flame moves; the logs stay planted.
                     v.pos.x += pow(saturate(v.uv.y),2) * (.019*sin(_FlameTime*6+v.uv.y*8)+.012*sin(_FlameTime*9-v.uv.y*5));
+                if (_Walk.z != 0)
+                    v.pos.xy += GaitOffset(v.uv, _Walk);
                 o.pos = UnityObjectToClipPos(v.pos);
                 o.uv = TRANSFORM_TEX(v.uv,_MainTex);
                 o.world = mul(unity_ObjectToWorld,v.pos).xyz;
@@ -54,9 +59,11 @@ Shader "Raid Party Manager/Service Scenery"
                     return half4(1,.26+.34*saturate(sparks),.055,saturate(.20*bloom*_FireLight.w+sparks));
                 }
                 half4 ink=tex2D(_MainTex,i.uv)*_Color;
+                half luminance = dot(ink.rgb, half3(.299,.587,.114));
+                ink.rgb = lerp(ink.rgb, half3(luminance,luminance,luminance), _Desaturation);
                 if (_Surface == 8) ink = SawnFlat(ink, _MainTex, i.uv);
                 else if (_Surface == 1) ink.rgb = ScenicPigment(ink.rgb, i.uv);
-                clip(ink.a-.025);
+                clip(ink.a-_CutoutThreshold);
                 if (_Surface == 0) return half4(ink.rgb * half3(.86,.91,.97), ink.a);
                 if (_Surface == 4) return ink;
                 float3 n=normalize(i.normal);

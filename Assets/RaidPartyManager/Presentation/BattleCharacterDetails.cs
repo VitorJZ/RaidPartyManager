@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using RaidPartyManager.Domain;
+using RaidPartyManager.Run;
 using UnityEngine;
 using UnityEngine.UIElements;
 using static RaidPartyManager.Presentation.PrototypeText;
@@ -17,7 +18,7 @@ namespace RaidPartyManager.Presentation
         private readonly Label conditions;
 
         public BattleCharacterDetails(int position, CharacterDefinition character, IReadOnlyList<EquipmentDefinition> equipment,
-            IReadOnlyList<SkillBookDefinition> skills, Func<string, Texture2D> iconFor)
+            IReadOnlyList<SkillBookDefinition> skills, Func<string, Texture2D> iconFor, PlayerTrait talent, Personality personality)
         {
             name = "battle-character-details";
             style.position = Position.Absolute;
@@ -27,10 +28,11 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(this, PrototypeStyle.Accent, 6);
 
             Add(Field("name", $"{character.Name} · {position} 号位", 16, PrototypeStyle.Accent));
-            Add(Field("personality", $"性格  {PersonalityText(character.Personality)}", 12, PrototypeStyle.Muted));
+            Add(Field("personality", $"性格  {EmployeeVoice.For(personality).Name}", 12, PrototypeStyle.Muted));
             if (!string.IsNullOrWhiteSpace(character.TraitText))
                 Add(Field("trait", $"固定特性  {character.TraitText}", 12, PrototypeStyle.Muted));
 
+            if (talent != PlayerTrait.None) Add(Field("random-trait", PlayerMarket.Describe(talent), 12, PrototypeStyle.Accent));
             health = Field("health", "", 15, PrototypeStyle.Ally);
             health.style.marginTop = 7;
             Add(health);
@@ -75,7 +77,7 @@ namespace RaidPartyManager.Presentation
             var gearHeading = Field("equipment", "装备", 13, PrototypeStyle.Accent);
             gearHeading.style.marginTop = 6;
             Add(gearHeading);
-            for (int slot = 0; slot < Rules.EquipmentSlots; slot++)
+            for (int slot = 0; slot < equipment.Count; slot++)
             {
                 var item = equipment[slot];
                 Add(Field($"slot-{slot + 1}", $"{slot + 1} · {item?.Name ?? "空槽"}", 13,
@@ -89,6 +91,12 @@ namespace RaidPartyManager.Presentation
             }
 
             IgnorePicking(this);
+        }
+
+        internal void ShowCopiedTrait(CharacterDefinition source)
+        {
+            var label = this.Q<Label>("battle-detail-trait");
+            if (label != null) label.text = $"本场特性 · {source.Name}　{source.TraitText}";
         }
 
         public void Refresh(Stats stats, int currentHealth, int shield, IReadOnlyList<StatusStack> statuses,

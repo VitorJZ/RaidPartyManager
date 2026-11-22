@@ -47,27 +47,37 @@ namespace RaidPartyManager.Run
         public Stats EffectiveStats { get; }
         public IReadOnlyList<string> EquipmentIds { get; }
         public IReadOnlyList<SkillBookDefinition> LearnedSkills { get; }
-        public int SkillSlotCount => SkillSlotsFor(Character);
+        public PlayerTrait Trait { get; }
+        public Personality Personality { get; }
+        public EmployeeAttributes EmployeeAttributes { get; }
+        public CrewContract Contract { get; }
+        public int MarketValue => PlayerMarket.Value(Character, Trait, LearnedSkills);
+        public int SkillSlotCount => SkillSlotsFor(Character) + (Trait == PlayerTrait.Scholar ? 1 : 0);
 
         public bool IsAway { get; }
 
         internal static int SkillSlotsFor(CharacterDefinition character) => character.Stage >= 2 ? 2 : 1;
 
         internal MemberView(string id, CharacterDefinition character, int? position, int health, Stats stats, string[] slots,
-            SkillBookDefinition[] learnedSkills, bool isAway)
+            SkillBookDefinition[] learnedSkills, bool isAway, PlayerTrait trait, CrewContract contract,
+            EmployeeAttributes employeeAttributes, Personality personality)
         {
+            Trait = trait;
+            EmployeeAttributes = employeeAttributes;
+            Personality = personality;
+            Contract = contract;
             Id = id;
             Character = character;
             Position = position;
             Health = health;
             EffectiveStats = stats;
             EquipmentIds = Array.AsReadOnly((string[])slots.Clone());
-            LearnedSkills = Array.AsReadOnly((SkillBookDefinition[])learnedSkills.Clone());
+            LearnedSkills = Array.AsReadOnly(learnedSkills.Take(trait == PlayerTrait.Scholar ? 3 : 2).ToArray());
             IsAway = isAway;
         }
     }
 
-    public sealed class PartyRun
+    public sealed partial class PartyRun
     {
         private sealed class Member
         {
@@ -76,11 +86,15 @@ namespace RaidPartyManager.Run
             public CharacterDefinition Character;
             public int? Position;
             public int Health;
-            public int PermanentAttack;
+            public int PermanentAttack, PermanentHealth;
             public bool IsAway;
             public IReadOnlyDictionary<StatusKind, int> StartingStatuses;
-            public readonly string[] Slots = new string[Rules.EquipmentSlots];
-            public readonly SkillBookDefinition[] LearnedSkills = new SkillBookDefinition[2];
+            public PlayerTrait Trait;
+            public EmployeeAttributes Attributes;
+            public EmployeeCareer Career;
+            public CrewContract Contract;
+            public string[] Slots = new string[Rules.EquipmentSlots];
+            public readonly SkillBookDefinition[] LearnedSkills = new SkillBookDefinition[3];
 
             public Member(PartyMemberStart start)
             {
@@ -106,12 +120,15 @@ namespace RaidPartyManager.Run
         private int nextEditorItemId;
         private int nextBattleId;
         private readonly Random rewardRandom = new Random();
+        private readonly Random employeeRandom = new Random();
 
         public PartyRun(IEnumerable<PartyMemberStart> startingMembers, IEnumerable<EquipmentDefinition> startingEquipment)
         {
             members.AddRange(ValidateRoster(startingMembers));
             foreach (var equipment in startingEquipment)
                 AddEquipment(equipment);
+            foreach (var member in members)
+                RefreshEmployeeGoals(member);
         }
 
         private PartyRun() { }
@@ -121,17 +138,20 @@ namespace RaidPartyManager.Run
             var assigned = AssignedEquipmentIds();
             return new PartyCheckpoint
             {
-                Gold = Gold, NextItemId = nextItemId, NextBookId = nextBookId,
+                GravePromises = grave.Copy(), Day = Day, PayrollDebt = PayrollDebt, TalentSeed = talentSeed,
+                Expenses = expenses.ToArray(), Gold = Gold, NextItemId = nextItemId, NextBookId = nextBookId,
                 NextEditorItemId = nextEditorItemId, NextBattleId = nextBattleId,
                 Inventory = inventory.Values.Where(item => !editorSupplies.Contains(item.Id) || assigned.Contains(item.Id))
                     .OrderBy(item => item.AcquisitionOrder)
                     .Select(item => new CheckpointItem { Id = item.Id, Definition = item.Definition.Id }).ToArray(),
                 Members = members.Select(member => new CheckpointMember
                 {
+                    Trait = member.Trait, Contract = member.Contract?.Copy(), EmployeeAttributes = member.Attributes,
+                    EmployeeCareer = member.Career,
                     Id = member.Id, StartingCharacter = member.Start.Character.Id, StartingPosition = member.Start.Position,
                     StartingHealth = member.Start.Health, InitialStatuses = CaptureStatuses(member.Start.StartingStatuses),
                     Character = member.Character.Id, Position = member.Position ?? 0, Health = member.Health,
-                    PermanentAttack = member.PermanentAttack, IsAway = member.IsAway, Statuses = CaptureStatuses(member.StartingStatuses),
+                    PermanentAttack = member.PermanentAttack, PermanentHealth = member.PermanentHealth, IsAway = member.IsAway, Statuses = CaptureStatuses(member.StartingStatuses),
                     Slots = (string[])member.Slots.Clone(), Skills = member.LearnedSkills.Select(skill => skill?.Id).ToArray()
                 }).ToArray()
             };
@@ -140,14 +160,18 @@ namespace RaidPartyManager.Run
         internal static PartyRun RestoreCheckpoint(PartyCheckpoint saved, IReadOnlyDictionary<string, CharacterDefinition> characters,
             IReadOnlyDictionary<string, EquipmentDefinition> items)
         {
-            if (saved?.Members == null || saved.Inventory == null || saved.Members.Length is < 1 or > Rules.Positions)
+            // Squads saved under the previous ten-member limit keep their signed employees.
+            const int legacyRosterLimit = 10;
+            if (saved?.Members == null || saved.Inventory == null || saved.Day < 0 || saved.PayrollDebt < 0 || saved.Members.Length is < 1 or > legacyRosterLimit)
                 throw new ArgumentException("Invalid saved party.");
 
             var party = new PartyRun
             {
+                grave = saved.GravePromises?.Copy() ?? new GravePromises(), Day = saved.Day, PayrollDebt = saved.PayrollDebt, talentSeed = saved.TalentSeed,
                 Gold = saved.Gold, nextItemId = saved.NextItemId, nextBookId = saved.NextBookId,
                 nextEditorItemId = saved.NextEditorItemId, nextBattleId = saved.NextBattleId
             };
+            if (saved.Expenses != null) party.expenses.AddRange(saved.Expenses.Where(e => e.Amount > 0 && e.Day >= Math.Max(1, saved.Day - 2) && e.Day <= Math.Max(1, saved.Day)));
             foreach (var item in saved.Inventory)
             {
                 var definition = items[item.Definition];
@@ -156,22 +180,31 @@ namespace RaidPartyManager.Run
             }
             foreach (var entry in saved.Members)
             {
-                if (entry == null || string.IsNullOrWhiteSpace(entry.Id) || entry.Slots?.Length != Rules.EquipmentSlots ||
-                    entry.Skills?.Length != 2 || !Rules.IsPosition(entry.StartingPosition) ||
-                    entry.Position != 0 && !Rules.IsPosition(entry.Position) || entry.Health < 0)
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Id) || entry.Slots?.Length != Rules.EquipmentSlots + (entry.Trait == PlayerTrait.Warehouse ? 1 : 0) ||
+                    (int)entry.Trait < 0 || (int)entry.Trait > PlayerMarket.TraitCount ||
+                    saved.Day > 0 && (entry.Contract == null || entry.Contract.EndDay <= saved.Day || entry.Contract.DailyWage < 1 || !entry.Contract.Rates.Valid || !entry.Contract.AgreedRates.Valid ||
+                        !entry.Contract.Plan.Fits(entry.Contract.EndDay - entry.Contract.StartDay) || entry.Contract.Plan.Enabled &&
+                        (entry.Contract.InstallmentsPaid < 1 || entry.Contract.InstallmentsPaid > entry.Contract.Plan.Count || entry.Contract.NextDueDay <= saved.Day)) ||
+                    entry.Skills?.Length is not (2 or 3) || !Rules.IsPosition(entry.StartingPosition) ||
+                    entry.Position != 0 && !Rules.IsPosition(entry.Position) || entry.Health < 0 || entry.PermanentHealth < 0)
                     throw new ArgumentException("Invalid saved party member.");
                 var member = new Member(new PartyMemberStart(entry.Id, characters[entry.StartingCharacter], entry.StartingPosition,
                     entry.StartingHealth, RestoreStatuses(entry.InitialStatuses)))
                 {
-                    Character = characters[entry.Character],
+                    Trait = entry.Trait, Contract = saved.Day == 0 ? null : entry.Contract.Copy(), Slots = new string[entry.Slots.Length],
+                    Character = characters[entry.Character].WithPersonality(characters[entry.StartingCharacter].Personality),
                     Position = entry.Position == 0 ? (int?)null : entry.Position,
-                    Health = entry.Health, PermanentAttack = entry.PermanentAttack, IsAway = entry.IsAway,
-                    StartingStatuses = RestoreStatuses(entry.Statuses)
+                    Health = entry.Health, PermanentAttack = entry.PermanentAttack, PermanentHealth = entry.PermanentHealth, IsAway = entry.IsAway,
+                    StartingStatuses = RestoreStatuses(entry.Statuses),
+                    Attributes = entry.EmployeeAttributes.IsValid ? entry.EmployeeAttributes :
+                        EmployeeAttributes.ForLegacySave(entry.StartingCharacter),
+                    Career = entry.EmployeeCareer.Initialized ? entry.EmployeeCareer :
+                        new EmployeeCareer { ServiceDays = Math.Max(0, saved.Day - (entry.Contract?.StartDay ?? saved.Day)) }
                 };
                 for (int i = 0; i < member.Slots.Length; i++)
                     if (!string.IsNullOrEmpty(entry.Slots[i]))
                         member.Slots[i] = party.inventory[entry.Slots[i]].Id;
-                for (int i = 0; i < member.LearnedSkills.Length; i++)
+                for (int i = 0; i < entry.Skills.Length; i++)
                 {
                     if (string.IsNullOrEmpty(entry.Skills[i]))
                         continue;
@@ -181,6 +214,8 @@ namespace RaidPartyManager.Run
                 }
                 party.members.Add(member);
             }
+            foreach (var member in party.members)
+                party.RefreshEmployeeGoals(member);
             return party;
         }
 
@@ -190,7 +225,7 @@ namespace RaidPartyManager.Run
         private static IReadOnlyDictionary<StatusKind, int> RestoreStatuses(CheckpointStatus[] statuses) =>
             statuses == null || statuses.Length == 0 ? null : statuses.ToDictionary(status => status.Kind, status => status.Layers);
 
-        private static List<Member> ValidateRoster(IEnumerable<PartyMemberStart> startingMembers)
+        private List<Member> ValidateRoster(IEnumerable<PartyMemberStart> startingMembers)
         {
             var roster = new List<Member>();
             foreach (var entry in startingMembers)
@@ -201,7 +236,7 @@ namespace RaidPartyManager.Run
                         Rules.Overlaps(entry.Position, entry.Character.PositionSlots, member.Start.Position, member.Character.PositionSlots)))
                     throw new ArgumentException("Invalid or duplicate starting member.", nameof(startingMembers));
 
-                roster.Add(new Member(entry));
+                roster.Add(new Member(entry) { Attributes = EmployeeAttributes.Roll(employeeRandom, minimum: 3) });
             }
 
             if (roster.Count < 1 || roster.Count > Rules.Positions)
@@ -215,6 +250,7 @@ namespace RaidPartyManager.Run
             ResetEncounter();
             members.Clear();
             members.AddRange(roster);
+            foreach (var member in members) PrepareHire(member);
         }
 
         public void ResetEncounter()
@@ -225,7 +261,7 @@ namespace RaidPartyManager.Run
             {
                 if (member.IsAway)
                     continue;
-                member.Health = Math.Min(member.Start.Health, PersonalStats(member).Health);
+                member.Health = Math.Min(member.Start.Health + (member.Trait == PlayerTrait.Sturdy ? 2 : 0), PersonalStats(member).Health);
                 member.StartingStatuses = member.Start.StartingStatuses;
                 if (!IsRooted(member) || member.Health == 0 || !member.Position.HasValue)
                     member.Position = null;
@@ -261,9 +297,10 @@ namespace RaidPartyManager.Run
             get
             {
                 var formationStats = EquipmentFormation.Resolve(CaptureFormation(Side.Party));
-                return members.Select(member => new MemberView(member.Id, member.Character, member.Position, member.Health,
-                    formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member), member.Slots,
-                    member.LearnedSkills, member.IsAway)).ToArray();
+                return members.Select(member => new MemberView(member.Id, DisplayCharacter(member), member.Position, member.Health,
+                    PlayerMarket.GearAndPosition(member.Trait, member.Slots.Count(s => s != null), member.Position,
+                        formationStats.TryGetValue(member.Id, out var stats) ? stats : PersonalStats(member)), member.Slots,
+                    member.LearnedSkills, member.IsAway, member.Trait, member.Contract, member.Attributes, member.Start.Character.Personality)).ToArray();
             }
         }
 
@@ -284,11 +321,11 @@ namespace RaidPartyManager.Run
         public IReadOnlyList<Combatant> CaptureFormation(Side side) =>
             members.Where(IsDeployed).Select(member => ToCombatant(member, side)).ToArray();
 
-        public bool HasRecruitmentVacancy => members.Count(IsDeployed) + members.Count(member => member.IsAway) < Rules.Positions &&
+        public bool HasRecruitmentVacancy => members.Count < RosterLimit && members.Count(IsDeployed) + members.Count(member => member.IsAway) < Rules.Positions &&
             members.Where(IsDeployed).Any(member => EquipmentOf(member).Any(item => item.Effect == EquipmentEffect.RecruitmentNotice));
 
         public bool CanStartBattle => activeBattle == null && members.Any(IsDeployed) &&
-            (members.All(member => member.IsAway || member.Health == 0 || member.Position.HasValue) || HasRecruitmentVacancy);
+            (Day > 0 || members.Count > Rules.Positions || members.All(member => member.IsAway || member.Health == 0 || member.Position.HasValue) || HasRecruitmentVacancy);
 
         // Moving onto an occupied position swaps its occupant into the mover's old position.
         public bool TryPlace(string memberId, int? position)
@@ -328,7 +365,7 @@ namespace RaidPartyManager.Run
         public bool TryEquip(string memberId, int slot, string equipmentId)
         {
             var receiver = FindMember(memberId);
-            if (activeBattle != null || receiver == null || receiver.IsAway || slot < 0 || slot >= Rules.EquipmentSlots ||
+            if (activeBattle != null || receiver == null || receiver.IsAway || slot < 0 || slot >= receiver.Slots.Length ||
                 (equipmentId != null && (!inventory.TryGetValue(equipmentId, out var item) || item.Definition is SkillBookDefinition)))
                 return false;
 
@@ -348,6 +385,7 @@ namespace RaidPartyManager.Run
             receiver.Slots[slot] = equipmentId;
             foreach (var member in members)
                 member.Health = Math.Min(member.Health, PersonalStats(member).Health);
+            RefreshEmployeeGoals(receiver);
             return true;
         }
 
@@ -355,7 +393,8 @@ namespace RaidPartyManager.Run
         {
             var member = FindMember(memberId);
             return activeBattle == null && member != null && !member.IsAway && member.Health > 0 &&
-                slot >= 0 && slot < MemberView.SkillSlotsFor(member.Character) &&
+                slot >= 0 && slot < MemberView.SkillSlotsFor(member.Character) + (member.Trait == PlayerTrait.Scholar ? 1 : 0) &&
+                (member.Trait != PlayerTrait.Tuition || Gold >= 2) &&
                 bookId != null && inventory.TryGetValue(bookId, out var item) && item.Definition is SkillBookDefinition book &&
                 book.CanLearn(member.Character) && !member.LearnedSkills.Any(known => known?.Id == book.Id);
         }
@@ -365,9 +404,11 @@ namespace RaidPartyManager.Run
             if (!CanLearnSkill(memberId, slot, bookId))
                 return false;
 
-            // Learned skills are not inventory items; overwriting forgets the previous skill.
-            FindMember(memberId).LearnedSkills[slot] = (SkillBookDefinition)inventory[bookId].Definition;
+            var member = FindMember(memberId);
+            if (member.Trait == PlayerTrait.Tuition) TrySpendGold(2, member.Character.Name + " · 学习技能");
+            member.LearnedSkills[slot] = (SkillBookDefinition)inventory[bookId].Definition;
             inventory.Remove(bookId);
+            RefreshEmployeeGoals(member);
             return true;
         }
 
@@ -380,8 +421,10 @@ namespace RaidPartyManager.Run
                     members.Any(other => other != member && Overlaps(other, position, newForm.PositionSlots))))
                 return false;
 
-            member.Character = newForm;
+            if (member.Character.Id != newForm.Id) Remember(member, EmployeeThought.Promotion, newForm.Name);
+            member.Character = newForm.WithPersonality(member.Start.Character.Personality);
             member.Health = Math.Min(member.Health, PersonalStats(member).Health);
+            RefreshEmployeeGoals(member);
             return true;
         }
 
@@ -403,15 +446,19 @@ namespace RaidPartyManager.Run
             var displaced = position.HasValue ? members.Where(other => other != member &&
                 Overlaps(other, position.Value, replacement.PositionSlots)).OrderBy(other => other.Position).ToArray()
                 : Array.Empty<Member>();
-            if (displaced.Any(IsRooted))
-                return false;
+            long exitCost = member.Contract?.ExitCost ?? 0;
+            if (displaced.Any(IsRooted) || exitCost > Gold) return false;
+            Gold -= (int)exitCost;
+            RecordExitExpenses(member);
 
             // Equipment instances remain in inventory. Replacing the member releases their assigned slots.
-            members[members.IndexOf(member)] = new Member(new PartyMemberStart(
+            var incoming = new Member(new PartyMemberStart(
                 member.Id, replacement, position ?? Math.Min(lastStart, member.Start.Position), replacement.BaseStats.Health))
             {
                 Position = position
             };
+            PrepareHire(incoming);
+            members[members.IndexOf(member)] = incoming;
             foreach (var other in displaced)
                 other.Position = null;
             foreach (var other in displaced)
@@ -425,7 +472,7 @@ namespace RaidPartyManager.Run
         }
 
         public BattleRequest BeginBattle(IEnumerable<Combatant> enemies, int tickLimit, EquipmentDefinition victoryReward,
-            IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null)
+            IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null, bool hardFight = false)
         {
             if (!CanStartBattle)
                 throw new InvalidOperationException("Place all living members before starting a new battle.");
@@ -435,9 +482,9 @@ namespace RaidPartyManager.Run
             if (enemyUnits.Any(unit => unit.Side != Side.Enemy))
                 throw new ArgumentException("Encounter units must be enemies.", nameof(enemies));
             // An absent companion retains a party slot, including against recruitment-notice summons.
-            if (members.Any(member => member.IsAway) && members.Count(member => member.Health > 0) >= Rules.Positions)
+            if (members.Count >= RosterLimit || members.Any(member => member.IsAway) && members.Count(member => member.Health > 0) >= Rules.Positions)
                 recruitmentPool = null;
-            var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit, recruitmentPool, characterCatalog, Gold);
+            var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit, recruitmentPool, characterCatalog, Gold, Math.Max(0, RosterLimit - members.Count), hardFight, grave.Porter, grave.Bell);
             nextBattleId++;
             activeBattle = request;
             activeReward = victoryReward;
@@ -454,10 +501,11 @@ namespace RaidPartyManager.Run
             var original = deployed.SelectMany(unit => unit.EquipmentSlots.Where(id => id != null).Zip(unit.Equipment,
                 (id, item) => (id, item))).ToDictionary(entry => entry.id, entry => entry.item);
             var equipped = loadout.Slots.Values.SelectMany(slots => slots).Where(id => id != null).ToArray();
-            if (loadout.Slots.Count > Rules.Positions || loadout.Slots.Values.Any(slots => slots.Count != Rules.EquipmentSlots) ||
+            if (loadout.Slots.Count > Rules.Positions || loadout.Slots.Any(pair => pair.Value.Count != (FindMember(pair.Key)?.Slots.Length ?? Rules.EquipmentSlots)) ||
                 deployed.Any(unit => !loadout.Slots.ContainsKey(unit.Id)) ||
                 equipped.Any(id => !inventory.ContainsKey(id)) ||
-                loadout.Consumed.Any(id => !original.TryGetValue(id, out var definition) || !definition.IsPotion))
+                loadout.Consumed.Any(id => !original.TryGetValue(id, out var definition) ||
+                    !(definition.IsPotion || definition.Effect is EquipmentEffect.ElvenCharm or EquipmentEffect.RecruitmentNotice)))
                 return false;
             var instances = equipped.Concat(loadout.Consumed).Concat(loadout.Stolen).ToArray();
             if (instances.Length != original.Count || instances.Distinct().Count() != original.Count ||
@@ -475,7 +523,7 @@ namespace RaidPartyManager.Run
         private static void CopySlots(IReadOnlyList<string> slots, Member member)
         {
             for (int slot = 0; slot < member.Slots.Length; slot++)
-                member.Slots[slot] = slots[slot];
+                member.Slots[slot] = slot < slots.Count ? slots[slot] : null;
         }
 
         public bool TrySettle(BattleResult result, out EquipmentInstance reward)
@@ -484,7 +532,7 @@ namespace RaidPartyManager.Run
             var guaranteed = result?.Outcome == BattleOutcome.Victory ? activeReward : null;
             if (!TryFinishBattle(result, out var loot))
                 return false;
-            Gold += result.GoldEarned;
+            AddGold(result.GoldEarned);
             for (int i = 0; i < loot.Count; i++)
             {
                 var item = AddEquipment(loot[i]);
@@ -511,7 +559,7 @@ namespace RaidPartyManager.Run
                 return false;
 
             foreach (var unit in allUnits)
-                if (!result.HealthById.TryGetValue(unit.Id, out int health) || health < 0 || health > unit.Stats.Health)
+                if (!result.HealthById.TryGetValue(unit.Id, out int health) || health < 0 || health > (long)unit.Stats.Health + (recruits.Contains(unit) ? 0 : result.PermanentHealthGains.GetValueOrDefault(unit.Id)))
                     return false;
 
             var positions = result.PartyPositionsById;
@@ -526,7 +574,7 @@ namespace RaidPartyManager.Run
 
             if ((recruits.Count > 0 && positions.Count == 0) || result.PotionsEarned < 0 ||
                 result.PotionsEarned > Rules.Positions || result.GoldEarned < 0 || result.GoldEarned > int.MaxValue - Gold ||
-                result.AccessoriesEarned < 0 || result.AccessoriesEarned > Rules.Positions || result.PermanentAttackGains.Any(gain =>
+                result.AccessoriesEarned < 0 || result.AccessoriesEarned > Rules.Positions || result.PermanentAttackGains.Concat(result.PermanentHealthGains).Any(gain =>
                     gain.Value < 0 || !allUnits.Any(unit => unit.Side == Side.Party && unit.Id == gain.Key)))
                 return false;
 
@@ -536,9 +584,13 @@ namespace RaidPartyManager.Run
 
             var deployedIds = new HashSet<string>(activeBattle.Combatants.Where(unit => unit.Side == Side.Party)
                 .Select(unit => unit.Id));
+            SettlePerformance(result, deployedIds);
             foreach (var member in members.Where(member => deployedIds.Contains(member.Id)))
             {
+                member.PermanentHealth += result.PermanentHealthGains.GetValueOrDefault(member.Id);
                 member.Health = Math.Max(1, Math.Min(result.HealthById[member.Id], PersonalStats(member).Health));
+                if (result.Outcome == BattleOutcome.Victory && member.Trait == PlayerTrait.Bandages && result.HealthById[member.Id] > 0)
+                    member.Health = Math.Min(PersonalStats(member).Health, member.Health + 2);
                 member.PermanentAttack += result.PermanentAttackGains.GetValueOrDefault(member.Id);
                 member.StartingStatuses = null;
                 if (positions.TryGetValue(member.Id, out int position))
@@ -547,25 +599,25 @@ namespace RaidPartyManager.Run
 
             foreach (var recruit in recruits.Where(unit => unit.Health > 0))
             {
-                if (members.Count == Rules.Positions)
-                {
-                    var reserve = members.Find(member => member.Position == null && member.Health == 0)
-                        ?? members.Find(member => member.Position == null);
-                    members.Remove(reserve);
-                }
-
+                if (members.Count >= RosterLimit) break;
                 string id = recruit.Id;
                 while (FindMember(id) != null)
                     id += "-ally";
                 var start = new PartyMemberStart(id, recruit.Character, positions[recruit.Id], recruit.Character.BaseStats.Health);
                 var member = new Member(start)
                 {
-                    Health = recruit.Health, PermanentAttack = result.PermanentAttackGains.GetValueOrDefault(recruit.Id)
+                    Health = recruit.Health, PermanentHealth = result.PermanentHealthGains.GetValueOrDefault(recruit.Id),
+                    PermanentAttack = result.PermanentAttackGains.GetValueOrDefault(recruit.Id)
                 };
+                PrepareHire(member);
                 if (result.Loadout != null && result.Loadout.Slots.TryGetValue(recruit.Id, out var slots))
                     CopySlots(slots, member);
                 members.Add(member);
             }
+
+            deployedIds.UnionWith(recruits.Where(unit => unit.Health > 0).Select(unit => unit.Id));
+            SettleEmployeeBattle(result, deployedIds);
+            SettleGravePromises(result, deployedIds);
 
             var rewards = new List<EquipmentDefinition>();
             if (result.Outcome == BattleOutcome.Victory && activeReward != null)
@@ -590,14 +642,27 @@ namespace RaidPartyManager.Run
         {
             if (amount < 0 || Gold > int.MaxValue - amount)
                 throw new ArgumentOutOfRangeException(nameof(amount));
-            Gold += amount;
+            int repaid = (int)Math.Min(amount, PayrollDebt);
+            PayrollDebt -= repaid;
+            RecordExpense("补付拖欠薪资", repaid);
+            Gold += amount - repaid;
         }
 
-        public bool TrySpendGold(int amount)
+        private readonly List<GoldExpense> expenses = new();
+        public IReadOnlyList<GoldExpense> Expenses => expenses.AsReadOnly();
+        private void RecordExpense(string reason, long amount)
+        {
+            if (amount > 0) expenses.Add(new GoldExpense { Day = Math.Max(1, Day), Reason = reason, Amount = amount });
+        }
+
+        public bool TrySpendGold(int amount) => TrySpendGold(amount, "其他支出");
+
+        public bool TrySpendGold(int amount, string reason)
         {
             if (activeBattle != null || amount < 0 || Gold < amount)
                 return false;
             Gold -= amount;
+            RecordExpense(reason, amount);
             return true;
         }
 
@@ -630,7 +695,8 @@ namespace RaidPartyManager.Run
             {
                 int before = member.Health;
                 int maximum = PersonalStats(member).Health;
-                member.Health = Math.Min(maximum, member.Health + (int)Math.Ceiling(maximum * fraction));
+                member.Health = Math.Min(maximum, member.Health + (int)Math.Ceiling(maximum * fraction) + (member.Trait == PlayerTrait.Therapy ? 2 : 0));
+                if (member.Health > before) Remember(member, EmployeeThought.CampRest);
                 healed += member.Health - before;
             }
             return healed;
@@ -651,17 +717,15 @@ namespace RaidPartyManager.Run
         {
             if (activeBattle != null || character == null || members.Any(member => member.Character.Id == character.Id))
                 return false;
-            var dead = members.FirstOrDefault(member => member.Health == 0);
-            if (members.Count >= Rules.Positions && dead == null)
-                return false;
-            if (dead != null)
-                return TryReplaceMember(dead.Id, character, Enumerable.Range(1, Rules.Positions)
-                    .First(slot => members.All(member => member.Position != slot)));
-            int position = Enumerable.Range(1, Rules.Positions).First(slot => members.All(member => member.Position != slot));
+            if (members.Count >= RosterLimit) return false;
+            int position = Enumerable.Range(1, Rules.Positions).FirstOrDefault(slot => !members.Any(m => Overlaps(m, slot, character.PositionSlots)) && Rules.Fits(slot, character.PositionSlots));
             string id = "recruit-" + character.Id;
             while (FindMember(id) != null)
                 id += "-ally";
-            members.Add(new Member(new PartyMemberStart(id, character, position, character.BaseStats.Health)));
+            var recruit = new Member(new PartyMemberStart(id, character, Math.Max(1, position), character.BaseStats.Health));
+            if (position == 0) recruit.Position = null;
+            PrepareHire(recruit);
+            members.Add(recruit);
             return true;
         }
 
@@ -687,10 +751,8 @@ namespace RaidPartyManager.Run
                 return false;
             int position = Rules.IsPosition(preferredPosition) && members.All(other => other.Position != preferredPosition)
                 ? preferredPosition : Enumerable.Range(1, Rules.Positions).FirstOrDefault(slot => members.All(other => other.Position != slot));
-            if (!Rules.IsPosition(position))
-                return false;
             member.IsAway = false;
-            member.Position = position;
+            member.Position = position == 0 ? (int?)null : position;
             return true;
         }
 
@@ -703,7 +765,7 @@ namespace RaidPartyManager.Run
             var available = inventory.Values.GroupBy(item => item.Definition.Id)
                 .ToDictionary(group => group.Key, group => group.Count());
             var supplied = new List<string>();
-            foreach (var definition in catalog.Where(item => item != null).GroupBy(item => item.Id).Select(group => group.First()))
+            foreach (var definition in catalog.Where(item => item != null && !item.BossExclusive).GroupBy(item => item.Id).Select(group => group.First()))
             {
                 int missing = copies - available.GetValueOrDefault(definition.Id);
                 for (int i = 0; i < missing; i++)
@@ -750,7 +812,7 @@ namespace RaidPartyManager.Run
 
         private void RegisterReward(EquipmentDefinition definition)
         {
-            if (definition.Tier < 0 || definition.Price <= 0)
+            if (definition.BossExclusive || definition.Tier < 0 || definition.Price <= 0)
                 return;
 
             if (definition.IsPotion)
@@ -776,11 +838,11 @@ namespace RaidPartyManager.Run
             member.Slots.Where(id => id != null).Select(id => inventory[id].Definition);
 
         private Stats PersonalStats(Member member) =>
-            EquipmentOf(member).Aggregate(member.Character.BaseStats + new Stats(member.PermanentAttack, 0, 0, 0),
+            EquipmentOf(member).Aggregate(member.Character.BaseStats + TraitBonus(member) + new Stats(member.PermanentAttack, 0, 0, member.PermanentHealth),
                 (stats, item) => stats + item.Bonus);
 
-        private Combatant ToCombatant(Member member, Side side) => new Combatant(member.Id, member.Character, side,
+        private Combatant ToCombatant(Member member, Side side) => new Combatant(member.Id, DisplayCharacter(member), side,
             member.Position.Value, PersonalStats(member), member.Health, EquipmentOf(member), member.StartingStatuses, member.Slots,
-            member.LearnedSkills.Take(MemberView.SkillSlotsFor(member.Character)));
+            member.LearnedSkills, member.Trait);
     }
 }
