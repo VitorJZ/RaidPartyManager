@@ -15,6 +15,8 @@ namespace RaidPartyManager.Presentation
         public static readonly Color Enemy = new Color32(227, 133, 112, 255);
         public static readonly Color PanelColor = new Color32(27, 29, 34, 255);
         public static readonly Color Inset = new Color32(20, 22, 27, 255);
+        public static readonly Color EquipmentSilver = new Color32(190, 201, 212, 255);
+        public static readonly Color SkillGold = new Color32(231, 182, 77, 255);
         public static readonly Color Edge = new Color32(65, 62, 61, 255);
         private static readonly Color ButtonColor = new Color32(48, 45, 43, 255);
 

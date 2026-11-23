@@ -18,7 +18,7 @@ namespace RaidPartyManager.Presentation
         protected readonly Transform stage;
         protected readonly ServiceStageArt art;
         protected readonly Material paint;
-        private readonly Material backdropPaint, softPaint;
+        private readonly Material backdropPaint, softPaint, paperPaint;
         protected readonly DockPlayhouse house;
         protected readonly MaterialPropertyBlock properties = new MaterialPropertyBlock();
         private readonly Vector3 previousEye;
@@ -108,6 +108,8 @@ namespace RaidPartyManager.Presentation
             house = DockPlayhouse.Bind(stage, panel);
             house.SetLighting(lighting);
             lighting.Apply(paint);
+            // Leave one queue between solid scenery and the cast for the travelling wave.
+            paperPaint = new Material(paint) { renderQueue = paint.renderQueue + 2 };
             lighting.Apply(backdropPaint);
             lighting.Apply(softPaint);
             FrameCamera();
@@ -161,6 +163,7 @@ namespace RaidPartyManager.Presentation
             renderer.sharedMaterial = surface switch
             {
                 Surface.Backdrop => backdropPaint,
+                Surface.Paper => paperPaint,
                 Surface.Shadow or Surface.Embers => softPaint,
                 _ => paint
             };
@@ -287,6 +290,9 @@ namespace RaidPartyManager.Presentation
             paint.SetVector("_FireLight", source);
             paint.SetFloat("_FireRange", light.range);
             paint.SetFloat("_FlameTime", time);
+            paperPaint.SetVector("_FireLight", source);
+            paperPaint.SetFloat("_FireRange", light.range);
+            paperPaint.SetFloat("_FlameTime", time);
             softPaint.SetVector("_FireLight", source);
             softPaint.SetFloat("_FlameTime", time);
         }
@@ -297,6 +303,7 @@ namespace RaidPartyManager.Presentation
             stage.gameObject.SetActive(false);
             UnityEngine.Object.Destroy(stage.gameObject);
             UnityEngine.Object.Destroy(paint);
+            UnityEngine.Object.Destroy(paperPaint);
             UnityEngine.Object.Destroy(softPaint);
             UnityEngine.Object.Destroy(backdropPaint);
             if (camera == null) return;

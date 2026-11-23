@@ -106,7 +106,7 @@ namespace RaidPartyManager.Presentation
                 {
                     StatusKind.Chill or StatusKind.Frozen => FreezeForm,
                     StatusKind.Exposed or StatusKind.Weakened or StatusKind.Poison or StatusKind.Cursed or
-                        StatusKind.Stunned or StatusKind.Injured => DebuffApply,
+                        StatusKind.Stunned or StatusKind.Injured or StatusKind.Wet or StatusKind.Evaporation => DebuffApply,
                     _ => BuffApply
                 };
                 GameAudio.Play(cue, .31f);

@@ -80,17 +80,21 @@ namespace RaidPartyManager.Presentation
             AddChoice("休息", "camp-rest", () => { if (adventure.Rest()) { GameAudio.Play(SoundCue.CampRest); Render(); } });
             AddChoice("训练", "camp-train", OpenTraining, adventure.TrainingCandidates.Count > 0);
             var message = PrototypeStyle.Text(string.IsNullOrEmpty(adventure.Current.Message)
-                ? "任选一项。休息恢复 30% 最大生命，训练永久提升一名队员的两项随机属性。" : adventure.Current.Message,
+                ? "任选一项。休息恢复 30% 最大生命，训练永久提升一名队员的一项随机属性。" : adventure.Current.Message,
                 14, PrototypeStyle.Ink);
             message.name = "camp-message";
             message.style.backgroundColor = new Color(0, 0, 0, 0.65f);
             PrototypeStyle.Middle(message);
             actions.Add(message);
             root.Add(actions);
+            FirstRunGuide.ShowFacility(root, adventure, GuideStep.Camp);
 
             void AddChoice(string title, string id, System.Action action, bool available = true)
             {
-                var button = PrototypeStyle.Button(title, id, action);
+                var button = PrototypeStyle.Button(title, id, () => {
+                    root.Q("camp-guide")?.RemoveFromHierarchy();
+                    action();
+                });
                 button.style.minHeight = 42;
                 button.style.flexGrow = 1;
                 button.style.flexBasis = 0;
@@ -103,7 +107,7 @@ namespace RaidPartyManager.Presentation
         private void OpenTraining()
         {
             var list = OpenChoice("选择训练队员");
-            list.Add(PrototypeStyle.Text("本次随机提升两项不同属性。每人最多训练两次。", 14, PrototypeStyle.Muted));
+            list.Add(PrototypeStyle.Text("本次随机提升一项属性（攻击、物防、特防、最大生命或能量上限）。每人最多训练两次。", 14, PrototypeStyle.Muted));
             foreach (var member in adventure.TrainingCandidates)
             {
                 var button = AdventureWidgets.Character(list, member.Character, content, $"train-{member.Id}", () =>

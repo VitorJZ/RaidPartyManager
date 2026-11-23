@@ -64,7 +64,7 @@ namespace RaidPartyManager.Domain
             ("讨价还价", "队伍每有1名成员持有此特性，普通装备和技能书的回收率就提高20个百分点。基础回收率为50%，可超过100%。", 20),
         };
 
-        private static readonly int[] prices = { 0, 19, 40, 37, 23, 34, 42, 32, 90, 28, 20, 35, 36, 19, 37, 43, 17, 37, 27, 27, 34, 45, 18, 41, 26, 17, 34, 39, 16, 24, 20, 19, 12, 16, 15, 15 };
+        private static readonly int[] prices = { 0, 19, 40, 37, 23, 34, 42, 32, 90, 28, 20, 35, 36, 19, 37, 43, 17, 37, 27, 27, 34, 45, 18, 41, 26, 17, 34, 39, 16, 24, 20, 19, 12, 16, 15, 15, 40 };
         private static readonly int[] skillRates = { 0, 15, 23, 20, 35, 15, 30, 13, 15, 18, 25, 18, 23, 10, 28, 8, 28, 10, 30, 20, 13, 20, 23, 30, 38, 40, 38, 43, 43, 50, 55, 30, 30, 35, 35 };
         public static Stats GearAndPosition(PlayerTrait trait, int gear, int? position, Stats stats)
         {

@@ -54,7 +54,7 @@ namespace RaidPartyManager.Presentation
                 rules.name = "skill-book-requirements";
                 rules.style.marginTop = 6;
                 Add(rules);
-                if (book.Cost > Rules.DefaultEnergy) Add(PrototypeStyle.Text("从第 2 回合起，每回合能量和上限各增加 1 点，直到达到所学最高费用与装备加成之和，最多 8 点。", 12, PrototypeStyle.Accent));
+                if (book.Cost > Rules.DefaultEnergy) Add(PrototypeStyle.Text("从第 2 回合起，每回合能量和上限各增加 1 点，直到达到所学技能的最高费用，最多 8 点。", 12, PrototypeStyle.Accent));
             }
         }
 

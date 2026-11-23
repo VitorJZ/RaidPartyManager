@@ -109,6 +109,7 @@ namespace RaidPartyManager.Presentation
                     layer.Add(arrival.Figure);
 
                 float t = Mathf.Clamp01((float)(elapsed / arrival.Duration));
+                if (arrival.Figure is StageActorImage rider) rider.RideHeight = RidingWave.Envelope(t);
                 var cue = arrival.Cue;
                 if (cue == null)
                 {

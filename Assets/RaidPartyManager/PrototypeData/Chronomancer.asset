@@ -24,8 +24,8 @@ MonoBehaviour:
   stage: 2
   reach: 2
   fixedTrait: 8
-  traitPower: 2
-  traitText: "每击杀1名敌方角色，攻击力永久+2"
+  traitPower: 1
+  traitText: "每击杀1名敌方角色，攻击力永久+1"
   personality: 6
   attack: 5
   defense: 0

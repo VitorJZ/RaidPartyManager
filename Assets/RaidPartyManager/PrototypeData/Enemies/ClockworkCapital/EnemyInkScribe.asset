@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 0
   traitPower: 0
-  traitText: "墨针（66%） / 复写毒墨（34%）"
+  traitText: "34% 概率向最后两名对手泼墨，各施加 1 层中毒。潮湿的目标会多得 1 层。"
   personality: 1
   attack: 7
   defense: 2
@@ -64,7 +64,7 @@ MonoBehaviour:
       power: 0
       damageType: 1
       status: 7
-      layers: 2
+      layers: 1
       requiresCharge: 0
       delayDecay: 0
     openingShield: 0

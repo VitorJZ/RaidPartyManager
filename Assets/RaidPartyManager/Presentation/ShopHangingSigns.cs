@@ -16,6 +16,7 @@ namespace RaidPartyManager.Presentation
             public Transform Board;
             public Transform[] Ropes;
             public Vector3 Rest;
+            public bool ReturnsToTown;
         }
 
         internal void MountShopSigns(VisualElement root)
@@ -38,7 +39,8 @@ namespace RaidPartyManager.Presentation
                         null, WheelBrass, Surface.Solid);
                     Part(rivet, board, new Vector3(x, 0, -.086f));
                 }
-                if (target.Q<Image>("route-node-icon")?.image is Texture2D artwork)
+                var artwork = target.Q<Image>("route-node-icon")?.image as Texture2D;
+                if (artwork != null)
                     Part(Flat("Route emblem", Vector3.zero, .33f, .33f, artwork), board, new Vector3(0, 0, -.086f));
                 else
                 {
@@ -48,6 +50,7 @@ namespace RaidPartyManager.Presentation
                     Part(arrow, board, new Vector3(0, 0, -.088f));
                     SetTint(arrow, WheelBrass);
                 }
+                if (artwork != null) board.localScale = Vector3.one * 1.23f;
                 var ropes = new Transform[2];
                 for (int i = 0; i < ropes.Length; i++)
                 {
@@ -57,7 +60,7 @@ namespace RaidPartyManager.Presentation
                     ropes[i] = rope.transform;
                 }
                 target.MountInScenery();
-                shopSigns.Add(new ShopSign { Target = target, Board = board, Ropes = ropes, Rest = rest });
+                shopSigns.Add(new ShopSign { Target = target, Board = board, Ropes = ropes, Rest = rest, ReturnsToTown = artwork != null });
             }
             PoseShopSigns(root);
         }
@@ -72,27 +75,31 @@ namespace RaidPartyManager.Presentation
                 bool visible = RecruitmentFocus < .44f && counterFocus < .44f;
                 sign.Board.gameObject.SetActive(visible);
                 foreach (var rope in sign.Ropes) rope.gameObject.SetActive(visible);
-                float depth = sign.Rest.z - camera.transform.position.z;
-                float metresPerPixel = depth * 2 * Mathf.Tan(camera.fieldOfView * .5f * Mathf.Deg2Rad) / frame.height;
-                float pull = sign.Target.ScenicPull;
-                sign.Board.SetPositionAndRotation(sign.Rest - Vector3.up * (pull * metresPerPixel),
-                    Quaternion.Euler(0, 13, pull * -.075f));
+                var rest = sign.Rest;
+                float depth = camera.WorldToViewportPoint(rest).z;
+                if (sign.ReturnsToTown)
+                {
+                    float centreY = RunTopBar.Height + HangingSign.ExitTopGap + HangingSign.TownSignHeight * .5f;
+                    rest = camera.ViewportToWorldPoint(new Vector3(.5f, 1 - centreY / frame.height, depth));
+                }
+                float scale = sign.Board.localScale.x;
+                sign.Board.SetPositionAndRotation(rest, Quaternion.Euler(0, sign.ReturnsToTown ? 0 : 13, 0));
                 // The rigging descends from above the shot, leaving the overhead scenery clear.
-                var aboveFrame = camera.WorldToViewportPoint(sign.Rest);
+                var aboveFrame = camera.WorldToViewportPoint(rest);
                 aboveFrame.y = 1.03f;
-                float hangerY = Mathf.Max(sign.Rest.y + .5f, camera.ViewportToWorldPoint(aboveFrame).y);
+                float hangerY = Mathf.Max(rest.y + .5f, camera.ViewportToWorldPoint(aboveFrame).y);
                 for (int i = 0; i < sign.Ropes.Length; i++)
                 {
                     float x = i == 0 ? -.23f : .23f;
-                    Vector3 start = new(sign.Rest.x + x, hangerY, sign.Rest.z);
+                    Vector3 start = new(rest.x + x * scale, hangerY, rest.z);
                     Vector3 tip = sign.Board.TransformPoint(new Vector3(x, SignHeight * .47f, 0));
                     Vector3 span = start - tip;
                     var rope = sign.Ropes[i];
                     rope.SetPositionAndRotation((tip + start) * .5f, Quaternion.FromToRotation(Vector3.up, span));
                     rope.localScale = new Vector3(.023f, span.magnitude * .5f, .023f);
                 }
-                Vector2 a = Project(sign.Rest + new Vector3(-SignWidth * .54f, SignHeight * .55f, -.07f));
-                Vector2 b = Project(sign.Rest + new Vector3(SignWidth * .54f, -SignHeight * .55f, -.07f));
+                Vector2 a = Project(rest + scale * new Vector3(-SignWidth * .54f, SignHeight * .55f, -.07f));
+                Vector2 b = Project(rest + scale * new Vector3(SignWidth * .54f, -SignHeight * .55f, -.07f));
                 Vector2 local = sign.Target.parent.WorldToLocal(a);
                 sign.Target.style.left = local.x;
                 sign.Target.style.right = StyleKeyword.Auto;

@@ -15,7 +15,7 @@ namespace RaidPartyManager.Presentation
 
         public static Label Text(string words, int size) => PrototypeStyle.Text(words, size, Ink);
 
-        public static VisualElement Sheet(string title, out ScrollView paper, Button back = null)
+        public static VisualElement Sheet(string title, out ScrollView paper, Action close = null)
         {
             var shade = new VisualElement { name = "crew-contract" };
             PrototypeStyle.Fill(shade);
@@ -36,15 +36,21 @@ namespace RaidPartyManager.Presentation
             heading.style.borderBottomWidth = 1;
             heading.style.borderBottomColor = Seal;
             heading.style.paddingBottom = heading.style.marginBottom = 8;
-            if (back == null) paper.Add(heading);
+            if (close == null) paper.Add(heading);
             else
             {
                 var header = PrototypeStyle.Row();
                 header.style.alignItems = Align.Center;
                 heading.style.flexGrow = 1;
-                header.Add(back);
+                header.style.flexShrink = 0;
                 header.Add(heading);
-                paper.Add(header);
+                var dismiss = PrototypeStyle.Button("×", "dismiss-paper", close);
+                dismiss.tooltip = "关闭并返回上一级";
+                dismiss.style.width = dismiss.style.height = 32;
+                dismiss.style.flexShrink = 0;
+                dismiss.style.fontSize = 20;
+                header.Add(dismiss);
+                paper.hierarchy.Insert(0, header);
             }
             shade.Add(paper);
             return shade;
@@ -66,7 +72,7 @@ namespace RaidPartyManager.Presentation
             CrewContract current, int expectedWage, EmployeeAttributes ratings, Func<int, PerformanceBonuses, long, bool> sign, Action close, IReadOnlyList<CrewContract> renewals = null)
         {
             int startDay = (renewals?.LastOrDefault() ?? current)?.EndDay ?? day;
-            var view = Sheet(c.Name + (current == null ? " · 讨伐队合约" : " · 续约合同"), out var paper);
+            var view = Sheet(c.Name + (current == null ? " · 讨伐队合约" : " · 续约合同"), out var paper, close);
             paper.Add(Text(PlayerMarket.Describe(talent), 15));
             if (current != null)
             {

@@ -26,7 +26,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 35
   traitPower: 0
-  traitText: "直接攻击（70%） / 施加1层破绽（30%）"
+  traitText: "30% 概率向最前方对手泼水，施加 1 层潮湿。潮湿与寒冷相遇会使目标冰冻。"
   personality: 1
   attack: 4
   defense: 1

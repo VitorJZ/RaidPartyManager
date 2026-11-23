@@ -54,6 +54,7 @@ namespace RaidPartyManager.Run
         public IReadOnlyList<CrewContract> Renewals { get; }
         public int ContractEndDay => (Renewals.LastOrDefault() ?? Contract)?.EndDay ?? 0;
         public CampTraining Training { get; }
+        public int BonusEnergy => Training.Energy + EmployeeAttributes.BonusEnergy;
         public int MarketValue => PlayerMarket.Value(Character, Trait, LearnedSkills, Training.Sessions);
         public int SkillSlotCount => SkillSlotsFor(Character) + (Trait == PlayerTrait.Scholar ? 1 : 0);
 
@@ -190,7 +191,8 @@ namespace RaidPartyManager.Run
             }
             foreach (var entry in saved.Members)
             {
-                if (entry == null || string.IsNullOrWhiteSpace(entry.Id) || entry.Slots == null || !Rules.ValidEquipmentSlots(entry.Slots.Length, entry.Trait) ||
+                if (entry == null || string.IsNullOrWhiteSpace(entry.Id) || entry.Slots == null || !(Rules.ValidEquipmentSlots(entry.Slots.Length, entry.Trait, entry.EmployeeAttributes.ExtraEquipmentSlot) ||
+                    entry.EmployeeAttributes.ExtraEquipmentSlot && entry.Slots.Length == Rules.PersonalEquipmentSlots(entry.Trait)) ||
                     (int)entry.Trait < 0 || (int)entry.Trait > PlayerMarket.TraitCount ||
                     saved.Day > 0 && (entry.Contract == null || !entry.Contract.ValidAt(saved.Day)) ||
                     entry.Skills?.Length is not (2 or 3) || !Rules.IsPosition(entry.StartingPosition) ||
@@ -278,7 +280,7 @@ namespace RaidPartyManager.Run
             {
                 if (member.IsAway)
                     continue;
-                member.Health = Math.Min(member.Start.Health + member.Training.Bonus.Health +
+                member.Health = Math.Min(member.Start.Health + member.Training.Bonus.Health + member.Attributes.Bonus.Health +
                     (member.Trait == PlayerTrait.Sturdy ? 2 : 0), PersonalStats(member).Health);
                 member.StartingStatuses = member.Start.StartingStatuses;
                 if (!IsRooted(member) || member.Health == 0 || !member.Position.HasValue)
@@ -533,7 +535,7 @@ namespace RaidPartyManager.Run
             {
                 var unit = deployed.FirstOrDefault(originalUnit => originalUnit.Id == id);
                 int expected = unit?.EquipmentSlots.Count ?? Rules.EquipmentSlots;
-                return count == expected || count == Rules.PersonalEquipmentSlots(unit?.Talent ?? PlayerTrait.None) + 1 &&
+                return count == expected || count == Rules.PersonalEquipmentSlots(unit?.Talent ?? PlayerTrait.None, unit?.ExtraEquipmentSlot ?? false) + 1 &&
                     (summonedSingerPossible || unit == null && deployedSinger);
             }
             if (loadout.Slots.Count > Rules.Positions || loadout.Slots.Any(pair => !SlotCountMatches(pair.Key, pair.Value.Count)) ||
@@ -672,7 +674,7 @@ namespace RaidPartyManager.Run
             bool chorusActive = members.Any(m => IsDeployed(m) && m.Character.Trait == CharacterTrait.ChorusArmory);
             foreach (var member in members)
             {
-                int count = Rules.PersonalEquipmentSlots(member.Trait) + (chorusActive ? 1 : 0);
+                int count = Rules.PersonalEquipmentSlots(member.Trait, member.Attributes.ExtraEquipmentSlot) + (chorusActive ? 1 : 0);
                 if (count == member.Slots.Length) continue;
                 // Items live in inventory; releasing a surplus slot puts its item back in the backpack.
                 bool losingSlot = count < member.Slots.Length;
@@ -839,6 +841,20 @@ namespace RaidPartyManager.Run
             return true;
         }
 
+        internal bool TrySignTidePact(CharacterDefinition singer, string equipmentId, string bookId)
+        {
+            var gear = SaleableItems.FirstOrDefault(item => item.Id == equipmentId)?.Definition;
+            if (Day < 1 || Day > int.MaxValue - 99 || gear == null || gear is SkillBookDefinition ||
+                gear.IsPotion || gear.Effect == EquipmentEffect.RecruitmentNotice ||
+                !SaleableItems.Any(item => item.Id == bookId && item.Definition is SkillBookDefinition) ||
+                !TryRecruit(singer)) return false;
+
+            inventory.Remove(equipmentId);
+            inventory.Remove(bookId);
+            SignNewHire(singer.Id, new CrewContract { StartDay = Day, EndDay = Day + 99, TidePact = true });
+            return true;
+        }
+
         internal bool TryTrain(string id, Random inspectionRandom, out CampTraining gains, out int remaining)
         {
             gains = default;
@@ -969,7 +985,7 @@ namespace RaidPartyManager.Run
             member.Slots.Where(id => id != null).Select(id => inventory[id].Definition);
 
         private Stats PersonalStats(Member member) =>
-            EquipmentOf(member).Aggregate(member.Character.BaseStats + member.Training.Bonus + TraitBonus(member) +
+            EquipmentOf(member).Aggregate(member.Character.BaseStats + member.Training.Bonus + member.Attributes.Bonus + TraitBonus(member) +
                 new Stats(member.PermanentAttack, 0, 0, member.PermanentHealth),
                 (stats, item) => stats + item.Bonus);
 
@@ -986,6 +1002,6 @@ namespace RaidPartyManager.Run
 
         private Combatant ToCombatant(Member member, Side side) => new Combatant(member.Id, DisplayCharacter(member), side,
             member.Position.Value, PersonalStats(member), member.Health, EquipmentOf(member), OpeningStatuses(member), member.Slots,
-            member.LearnedSkills, member.Trait);
+            member.LearnedSkills, member.Trait, member.Training.Energy + member.Attributes.BonusEnergy, member.Attributes.ExtraEquipmentSlot);
     }
 }

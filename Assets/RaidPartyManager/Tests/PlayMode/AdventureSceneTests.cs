@@ -42,6 +42,7 @@ namespace RaidPartyManager.Tests
             RecruitmentWheelVisibility.SetValue(null, false);
             Flow.GetMethod("ClearSceneContext", PrivateStatic).Invoke(null, null);
             Flow.GetField("checkpointPathOverride", PrivateStatic).SetValue(null, null);
+            PlayerPrefs.DeleteKey("RaidPartyManager.Guide.v1:" + savePath);
             File.Delete(savePath);
             File.Delete(savePath + ".tmp");
         }
@@ -57,7 +58,7 @@ namespace RaidPartyManager.Tests
             Press(root.Q("run-settings"), "save-and-exit");
         }
 
-        private static void ConfirmFirstPair(VisualElement root)
+        private static void ConfirmFirstPair(VisualElement root, bool skipGuide = true)
         {
             var candidates = root.Q("starter-candidates").Query<Button>().ToList();
             Press(root, candidates[0].name);
@@ -65,6 +66,7 @@ namespace RaidPartyManager.Tests
             Press(root, "confirm-starters");
             Assert.That(root.Q("crew-contract"), Is.Not.Null);
             Press(root, "sign-starters");
+            if (skipGuide && root.Q("skip-departure-guide") != null) Press(root, "skip-departure-guide");
         }
 
         private IEnumerator OpenMenu()
@@ -213,6 +215,18 @@ namespace RaidPartyManager.Tests
             using (var leave = PointerLeaveEvent.GetPooled(new Event { type = EventType.MouseMove }))
                 Send(entries[0], leave);
             Assert.That(profile.style.display.value, Is.EqualTo(DisplayStyle.None));
+            Press(root, entries[0].name);
+            yield return null;
+            var paperView = root.Q<ScrollView>("contract-paper");
+            var close = paperView.Q<Button>("dismiss-paper");
+            var corner = close.worldBound.center;
+            paperView.scrollOffset = new Vector2(0, 300);
+            yield return null;
+            Assert.That(close.worldBound.center, Is.EqualTo(corner));
+            Assert.That(close.panel.Pick(corner), Is.SameAs(close));
+            Press(root, "dismiss-paper");
+            Assert.That(root.Q("crew-contract"), Is.Null);
+            Assert.That(run.Party.Gold, Is.EqualTo(balance));
             Press(root, entries[0].name);
             Assert.That(root.Q("contract-paper").Query<Label>().ToList().Any(l => l.text.Contains($"人才市场转会费　{firstPrice} 金币")), Is.True);
             root.Q<IntegerField>().value = 0;
@@ -475,6 +489,30 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator TidePactWindowTradesTheTwoSelectedItems()
+        {
+            yield return OpenMenu();
+            var hub = Object.FindAnyObjectByType<AdventureEventHub>();
+            var art = (AdventureContentAsset)typeof(AdventureEventHub).GetField("assets", Private).GetValue(hub);
+            var content = art.Encounter;
+            var gear = run.Party.AddEquipment(content.StartingEquipment.First(i => i.Effect == EquipmentEffect.LifePendant));
+            var book = run.Party.AddEquipment(content.SkillBooks.First());
+            var root = Root<AdventureEventHub>();
+            Press(root, "inspect-event-TidePact");
+            yield return null;
+            Assert.That(root.Q<Button>("sign-tide-pact").enabledInHierarchy, Is.False);
+            root.Q<DropdownField>("tide-gear").value = gear.Definition.Name;
+            root.Q<DropdownField>("tide-book").value = book.Definition.Name;
+            int books = run.Party.SkillBooks.Count;
+            Press(root, "sign-tide-pact");
+            var singer = run.Party.Members.Single(m => m.Character.Id == AdventureRun.TideSingerId);
+            Assert.That(singer.Contract.Days, Is.EqualTo(99));
+            Assert.That(singer.Contract.BaseTotal, Is.Zero);
+            Assert.That(run.Party.SkillBooks.Count, Is.EqualTo(books - 1));
+            Assert.That(root.Q("sign-tide-pact"), Is.Null);
+        }
+
+        [UnityTest]
         public IEnumerator AllEventWindowsAndIndependentTownCampShopScenesWorkFromTheMenu()
         {
             yield return OpenMenu();
@@ -495,7 +533,7 @@ namespace RaidPartyManager.Tests
                 var costume = new MaterialPropertyBlock();
                 storyteller.GetPropertyBlock(costume);
                 string voice = CapitalStories.Contains(kind) ? CapitalStories.For(kind).District switch
-                    { 0 => "LostTraveler", 1 => "Forge", _ => "Investor" } : GraveStories.Contains(kind) ? "GraveChronicler" : kind.ToString();
+                    { 0 => "LostTraveler", 1 => "Forge", _ => "Investor" } : GraveStories.Contains(kind) ? "GraveChronicler" : kind == AdventureEventKind.TidePact ? "LostTraveler" : kind.ToString();
                 Assert.That(costume.GetTexture("_MainTex"), Is.SameAs(Resources.Load<Texture2D>("StoryEvents/Cast/" + voice)));
                 if (kind == AdventureEventKind.Auction)
                 {
@@ -550,6 +588,8 @@ namespace RaidPartyManager.Tests
                 }
                 if (kind == AdventureEventKind.SoulWard)
                     Assert.That(theatre.Find("Ward cot frame"), Is.Not.Null);
+                else if (kind == AdventureEventKind.TidePact)
+                    Assert.That(theatre.Find("Deep sea visitor").GetComponent<MeshRenderer>(), Is.Not.Null);
                 else
                 {
                     var prop = theatre.Find("Event prop " + kind).GetComponent<MeshRenderer>();
@@ -674,10 +714,13 @@ namespace RaidPartyManager.Tests
             var parchment = facilities.Q<ScrollView>("contract-paper");
             var back = facilities.Q<Button>("close-town-quest");
             Assert.That(parchment.resolvedStyle.backgroundImage.texture, Is.Not.Null);
-            Assert.That(back.worldBound.center.x, Is.LessThan(parchment.worldBound.center.x));
-            Assert.That(back.worldBound.center.y, Is.LessThan(parchment.worldBound.center.y));
+            Assert.That(back.worldBound.center.x, Is.EqualTo(parchment.worldBound.center.x).Within(2));
+            Assert.That(back.worldBound.yMax, Is.LessThan(parchment.worldBound.yMin));
             Assert.That(back.panel.Pick(back.worldBound.center), Is.SameAs(back));
-            Press(facilities, "close-town-quest");
+            var dismiss = parchment.Q<Button>("dismiss-paper");
+            Assert.That(dismiss.worldBound.center.x, Is.GreaterThan(parchment.worldBound.center.x));
+            Assert.That(dismiss.panel.Pick(dismiss.worldBound.center), Is.SameAs(dismiss));
+            Press(facilities, "dismiss-paper");
             Assert.That(run.QuestActive, Is.False);
             Press(facilities, "town-service-Quest");
             Assert.That(facilities.Q("town-quest-board").Query<Button>().ToList().Count(button => button.name?.StartsWith("town-quest-offer-") == true), Is.EqualTo(3));
@@ -881,24 +924,24 @@ namespace RaidPartyManager.Tests
             for (int i = 0; i < 14; i++) run.Party.AddEquipment(input);
             Press(root, "inspect-event-Forge");
             yield return WaitForShow();
-            IEnumerator PullBoard(Button board)
+            IEnumerator ClickBoard(Button board)
             {
                 var at = board.worldBound.center;
-                Down(board); Up(board, at + Vector2.up * 80);
+                Down(board); Up(board, at);
                 yield return new WaitForSecondsRealtime(.8f);
             }
-            yield return PullBoard(root.Q<Button>("later-event-options"));
+            yield return ClickBoard(root.Q<Button>("later-event-options"));
             yield return null;
             var choices = root.Q("event-options").Query<Button>().ToList()
                 .Where(b => b.name.StartsWith("forge-item-") && b.resolvedStyle.display == DisplayStyle.Flex).Take(2).ToArray();
             Assert.That(choices.Length, Is.EqualTo(2));
             string second = choices[1].name;
-            yield return PullBoard(choices[0]);
+            yield return ClickBoard(choices[0]);
             yield return null;
             Assert.That(root.Q<Button>(second).resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
-            yield return PullBoard(root.Q<Button>(second));
+            yield return ClickBoard(root.Q<Button>(second));
             yield return null;
-            yield return PullBoard(root.Q<Button>("earlier-event-options"));
+            yield return ClickBoard(root.Q<Button>("earlier-event-options"));
             yield return null;
             var confirm = root.Q<Button>("event-forge-confirm");
             Assert.That(confirm.enabledInHierarchy, Is.True);
@@ -906,7 +949,7 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator EventSignsRequireADownwardPullForChoicesAndExit()
+        public IEnumerator EventSignClickSelectsOnceAndReleasingOutsideCancels()
         {
             yield return OpenMenu();
             var root = Root<AdventureEventHub>();
@@ -915,25 +958,14 @@ namespace RaidPartyManager.Tests
             var choice = root.Q<Button>("event-collect-coins");
             int gold = run.Party.Gold;
             var origin = choice.worldBound.center;
-            Down(choice); Up(choice, origin);
+            Down(choice); Up(choice, origin + Vector2.down * (choice.worldBound.height + 10));
+            Assert.That(root.panel.visualTree.Q("retracting-sign"), Is.Null);
             Assert.That(run.Party.Gold, Is.EqualTo(gold));
             var frame = root.panel.visualTree.worldBound;
             var beam = GameObject.Find("Mist Dock Playhouse/Portal and traveller rail/Header lower edge").transform;
             float beamY = frame.yMin + frame.height * (1 - Camera.main.WorldToViewportPoint(beam.position).y);
-            var rope = choice.Q("sign-rope");
-            Assert.That(rope.worldBound.yMin, Is.EqualTo(beamY).Within(1));
-            float originalLength = rope.worldBound.height;
-            float originalBottom = rope.worldBound.yMax;
-            Down(choice);
-            using (var drag = PointerMoveEvent.GetPooled(new Event { type = EventType.MouseDrag, button = 0, mousePosition = origin + Vector2.up * 18 }))
-                Send(choice, drag);
-            yield return new WaitForSecondsRealtime(.12f);
-            Assert.That(rope.worldBound.yMin, Is.EqualTo(beamY).Within(1));
-            Assert.That(rope.worldBound.yMax - originalBottom, Is.EqualTo(18).Within(2));
-            Assert.That(rope.worldBound.height - originalLength, Is.EqualTo(rope.worldBound.yMax - originalBottom).Within(2));
-            Up(choice, origin + Vector2.up * 18);
-            Assert.That(run.Current.Resolved, Is.False);
-            Down(choice); Up(choice, origin + Vector2.up * 78);
+            Assert.That(choice.Q("sign-rope").worldBound.yMin, Is.EqualTo(beamY).Within(1));
+            Down(choice); Up(choice, origin);
             Assert.That(run.Current.Resolved, Is.False);
             Assert.That(root.panel.visualTree.Q("retracting-sign"), Is.Not.Null);
             yield return new WaitForSecondsRealtime(.8f);
@@ -985,7 +1017,7 @@ namespace RaidPartyManager.Tests
                 yield return null;
             Assert.That(Camera.main.transform.position.z, Is.GreaterThan(wide.z + 4));
             var arrow = root.Q<Button>("close-event");
-            Down(arrow); Up(arrow, arrow.worldBound.center + Vector2.up * 80);
+            Down(arrow); Up(arrow, arrow.worldBound.center);
             Assert.That(root.Q("hat-game"), Is.Not.Null);
             yield return WaitForEventExit(root);
             Press(root, "inspect-event-FoundCoins");
@@ -1161,11 +1193,91 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator NewRouteDraftsTwoOfFourAndUsesOnlyTheRolledGear()
+        public IEnumerator FirstDepartureTeachesRealLoadoutAndContractActionsBeforeShowingTheRoad()
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");
             yield return null;
             Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            var root = Root<AdventureEventHub>();
+            ConfirmFirstPair(root, skipGuide: false);
+            Assert.That(root.Q("departure-guide"), Is.Not.Null);
+            Assert.That(root.Q("dock-route-signs"), Is.Null);
+            var party = CurrentRoute().Party;
+            var member = party.Members.First();
+            Press(root, "event-party-editor");
+            Press(root, "edit-member-" + member.Id);
+            Assert.That(root.Q("edit-slot-0").style.borderTopColor.value, Is.EqualTo((Color)new Color32(190, 201, 212, 255)));
+            Assert.That(root.Q("skill-slot-0").style.borderTopColor.value, Is.EqualTo((Color)new Color32(231, 182, 77, 255)));
+            void Submit(string name)
+            {
+                using var evt = NavigationSubmitEvent.GetPooled();
+                Send(root.Q(name), evt);
+            }
+            Submit("edit-slot-0");
+            Submit("bag-cell-0");
+            Assert.That(party.Members.First().EquipmentIds[0], Is.Not.Null);
+            Press(root, "backpack-skill-tab");
+            var book = (SkillBookDefinition)party.SkillBooks.Single().Definition;
+            Assert.That(party.Members.All(m => book.CanLearn(m.Character)), Is.True);
+            Press(root, "backpack-equipment-tab");
+            Press(root, "backpack-skill-tab");
+            Assert.That(party.SkillBooks.Count, Is.EqualTo(1));
+            Submit("skill-slot-0");
+            Submit("book-cell-0");
+            Assert.That(party.Members.First().LearnedSkills[0], Is.SameAs(book));
+            Press(root, "close-character-details");
+            Press(root, "back-party-editor");
+            Assert.That(root.Q("dock-route-signs"), Is.Null);
+            SaveAndExit(root);
+            yield return WaitScene("MainMenu");
+            ResetAdventureFlow();
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            root = Root<AdventureEventHub>();
+            Assert.That(root.Q("dock-route-signs"), Is.Null);
+            Press(root, "event-party-editor");
+            Press(root, "edit-member-" + member.Id);
+            Press(root, "open-employee-dossier");
+            Press(root, "employee-open-contract");
+            Assert.That(root.Q("crew-contract"), Is.Not.Null);
+            Press(root, "dismiss-paper");
+            Press(root, "close-character-details");
+            Press(root, "back-party-editor");
+            Assert.That(root.Q("departure-guide").Q<Label>().text, Does.Contain("石路牌"));
+            yield return WaitForRoadstone(root);
+            Press(root, "route-choice-0");
+            yield return WaitScene("BattlePrototype");
+            var battle = Root<BattlePrototype>();
+            Press(battle, "open-settings");
+            Press(battle.Q("run-settings"), "abandon-run");
+            yield return WaitScene("MainMenu");
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            root = Root<AdventureEventHub>();
+            ConfirmFirstPair(root, skipGuide: false);
+            Assert.That(root.Q("departure-guide"), Is.Null);
+            Assert.That(root.Q("dock-route-signs"), Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator NewRouteDraftsTwoOfFourAndUsesOnlyTheRolledGear()
+        {
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
+            var menu = Root<PrototypeSceneMenu>();
+            var march = menu.Q("menu-march");
+            var defaultWalkers = march.Children().Where(child => child.name?.StartsWith("menu-walker-") == true).ToArray();
+            Assert.That(defaultWalkers, Has.Length.EqualTo(2));
+            var sprite = defaultWalkers[0].Q<Image>();
+            var strip = march.Q("menu-promenade-strip");
+            Assert.That(strip.Q<Image>().image.name, Is.EqualTo("MistboundPromenade"));
+            float scrollBefore = strip.style.translate.value.x.value;
+            var firstCel = sprite.sourceRect;
+            yield return new WaitForSecondsRealtime(.23f);
+            Assert.That(strip.style.translate.value.x.value, Is.LessThan(scrollBefore));
+            Assert.That(sprite.sourceRect, Is.Not.EqualTo(firstCel));
+            Press(menu, "open-route");
             yield return WaitScene("EventSelect");
 
             var root = Root<AdventureEventHub>();
@@ -1197,6 +1309,9 @@ namespace RaidPartyManager.Tests
             Press(root, candidates[2].name);
             Press(root, "confirm-starters");
             Assert.That(root.Q("crew-contract"), Is.Not.Null);
+            Press(root, "dismiss-paper");
+            Assert.That(root.Q("crew-contract"), Is.Null);
+            Press(root, "confirm-starters");
             Press(root, "sign-starters");
 
             var party = CurrentRoute().Party;
@@ -1243,6 +1358,10 @@ namespace RaidPartyManager.Tests
             Press(root, "back-party-editor");
             SaveAndExit(root);
             yield return WaitScene("MainMenu");
+            menu = Root<PrototypeSceneMenu>();
+            var savedWalkers = menu.Q("menu-march").Children().Where(child => child.name?.StartsWith("menu-walker-") == true);
+            Assert.That(savedWalkers.Select(walker => walker.name), Is.EqualTo(members.Select(member => "menu-walker-" + member.Character.Id)));
+            Assert.That(menu.Q<Label>("menu-run-progress").text, Does.Contain("第 1 天"));
 
             ResetAdventureFlow();
             Press(Root<PrototypeSceneMenu>(), "open-route");
@@ -1421,6 +1540,7 @@ namespace RaidPartyManager.Tests
                     beforeEvent = seeded.CheckpointForExit();
             }
             Assert.That(beforeEvent, Is.Not.Null);
+            beforeEvent.Party.Day = beforeEvent.Party.Members[0].Contract.EndDay - 4;
             File.WriteAllText(savePath, JsonUtility.ToJson(beforeEvent));
             yield return SceneManager.LoadSceneAsync("MainMenu");
             yield return null;
@@ -1442,6 +1562,19 @@ namespace RaidPartyManager.Tests
             int rewardGold = run.Party.Gold;
             Assert.That(rewardGold - beforeCoins, Is.InRange(10, 20));
             Assert.That(root.Q("reward-flight").Q("reward-gold-icon"), Is.Not.Null);
+            var teamIcon = root.Q("team-icon");
+            Assert.That(run.Party.NeedsRenewal, Is.True);
+            yield return WaitForPulse(teamIcon);
+            yield return new WaitForSecondsRealtime(3.2f);
+            yield return WaitForPulse(teamIcon);
+            var audio = GameObject.Find("Game audio").GetComponent(
+                typeof(AdventureEventHub).Assembly.GetType("RaidPartyManager.Presentation.GameAudio"));
+            var cues = (System.Collections.IDictionary)audio.GetType().GetField("lastPlayed", Private).GetValue(audio);
+            var cue = System.Enum.Parse(typeof(AdventureEventHub).Assembly.GetType("RaidPartyManager.Presentation.SoundCue"), "UiTurnAdvance");
+            Assert.That(cues.Contains(cue), Is.True);
+            var played = cues[cue];
+            root.Q("run-top-bar").GetType().GetMethod("Refresh").Invoke(root.Q("run-top-bar"), null);
+            Assert.That(cues[cue], Is.EqualTo(played));
             SaveAndExit(root);
             yield return WaitScene("MainMenu");
 
@@ -1466,6 +1599,39 @@ namespace RaidPartyManager.Tests
             yield return WaitScene("EventSelect");
             Assert.That(CurrentRoute().CompletedNodes, Is.EqualTo(node.Number));
             Assert.That(CurrentRoute().Party.Gold, Is.EqualTo(rewardGold));
+
+            root = Root<AdventureEventHub>();
+            run = CurrentRoute();
+            teamIcon = root.Q("team-icon");
+            yield return WaitForPulse(teamIcon);
+            Assert.That(cues[cue], Is.EqualTo(played), "Resuming a save should restore the visual reminder without replaying the event sound.");
+
+            var expiring = run.Party.Members.Where(member => member.ContractEndDay - run.Party.Day <= 3).ToArray();
+            Assert.That(expiring.Length, Is.GreaterThan(1));
+            run.Party.AddGold(1000);
+            Press(root, "event-party-editor");
+            for (int index = 0; index < expiring.Length; index++)
+            {
+                string memberId = expiring[index].Id;
+                using (var rightClick = PointerUpEvent.GetPooled(new Event { type = EventType.MouseUp, button = 1 }))
+                    Send(root.Q("edit-member-" + memberId), rightClick);
+                root.Q<LongField>("contract-signing-fee").value = 12 * (run.Party.ExpectedDailyWage(memberId) + 1);
+                Press(root, "sign-crew-contract");
+                Assert.That(run.Party.Members.Single(member => member.Id == memberId).ContractEndDay - run.Party.Day, Is.GreaterThan(3));
+                if (index < expiring.Length - 1) yield return WaitForPulse(teamIcon);
+            }
+            Press(root, "back-party-editor");
+            yield return new WaitForSecondsRealtime(1.1f);
+            Assert.That(run.Party.NeedsRenewal, Is.False);
+            Assert.That(teamIcon.resolvedStyle.opacity, Is.EqualTo(1f));
+            Assert.That(root.Q<Button>("event-party-editor").tooltip, Is.EqualTo("编队 · 右击队员查看合约"));
+
+            static IEnumerator WaitForPulse(VisualElement icon)
+            {
+                float deadline = Time.realtimeSinceStartup + 2;
+                while (icon.resolvedStyle.opacity >= .8f && Time.realtimeSinceStartup < deadline) yield return null;
+                Assert.That(icon.resolvedStyle.opacity, Is.LessThan(.8f));
+            }
         }
 
         [UnityTest]
@@ -1541,6 +1707,108 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator CapitalBossRewardsLeadToFiveSecondsBehindTheClosedCurtain()
+        {
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            ConfirmFirstPair(Root<AdventureEventHub>());
+            SaveAndExit(Root<AdventureEventHub>());
+            yield return WaitScene("MainMenu");
+            var saved = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            saved.Floor = 3;
+            saved.Stage = DockRoute.Stages;
+            saved.Choice = 0;
+            saved.Options = new[] { NodeKind.Boss };
+            saved.HasBattleReward = true;
+            saved.BattleReward = new BattleRewardCheckpoint
+            {
+                Kind = NodeKind.Boss, Resolved = true, Gold = 5,
+                Items = System.Array.Empty<string>(), Choices = System.Array.Empty<string>()
+            };
+            File.WriteAllText(savePath, JsonUtility.ToJson(saved));
+            ResetAdventureFlow();
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("ClockworkCapital");
+            var root = Root<BattlePrototype>();
+            yield return WaitForShow();
+            Assert.That(root.panel.visualTree.Q("campaign-finale"), Is.Null);
+            Press(root, "claim-gold");
+            float deadline = Time.realtimeSinceStartup + 6;
+            while (root.panel.visualTree.Q("campaign-finale") == null && Time.realtimeSinceStartup < deadline) yield return null;
+            Assert.That(root.panel.visualTree.Q<Label>("campaign-finale")?.text, Is.EqualTo("恭喜通关，感谢游玩"));
+            var folds = new MaterialPropertyBlock();
+            GameObject.Find("Mist Dock Playhouse/Curtain R").GetComponent<MeshRenderer>().GetPropertyBlock(folds);
+            Assert.That(folds.GetFloat("_Travel"), Is.Zero);
+            yield return new WaitForSecondsRealtime(4.8f);
+            Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("ClockworkCapital"));
+            yield return WaitScene("MainMenu");
+            Assert.That(File.Exists(savePath), Is.False);
+            Assert.That(Root<PrototypeSceneMenu>().Q<Button>("open-route").text, Is.EqualTo("开始讨伐"));
+        }
+
+        [UnityTest]
+        public IEnumerator ContinuingAfterMarketExitRestoresTheMarketAndSupportsOlderTownSaves()
+        {
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            ConfirmFirstPair(Root<AdventureEventHub>());
+            SaveAndExit(Root<AdventureEventHub>());
+            yield return WaitScene("MainMenu");
+
+            var checkpoint = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            checkpoint.Floor = 2;
+            checkpoint.Stage = 3;
+            checkpoint.CompletedNodes = 12;
+            checkpoint.Options = null;
+            checkpoint.Nodes[2] = new RouteCheckpointNode { Kind = NodeKind.Town, Replaces = -1 };
+            File.WriteAllText(savePath, JsonUtility.ToJson(checkpoint));
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            yield return WaitForRoadstone(Root<AdventureEventHub>());
+            Press(Root<AdventureEventHub>(), "route-choice-0");
+            yield return WaitScene("Town");
+            Press(Root<DockTown>(), "town-service-Recruit");
+            yield return WaitScene("TalentMarket");
+            var root = Root<TalentMarket>();
+            string[] Offers() => Root<TalentMarket>().Query<Label>().ToList()
+                .Where(label => label.name?.StartsWith("town-price-") == true)
+                .Select(label => label.name + "=" + label.text).ToArray();
+            var offers = Offers();
+            Assert.That(offers.Length, Is.GreaterThan(0));
+            SaveAndExit(root);
+            yield return WaitScene("MainMenu");
+            string marketSave = File.ReadAllText(savePath);
+            var original = JsonUtility.FromJson<AdventureCheckpoint>(marketSave);
+
+            // Older saves recorded the town visit but omitted the facility.
+            File.WriteAllText(savePath, marketSave.Replace("\"InTalentMarket\":true,", ""));
+            ResetAdventureFlow();
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("Town");
+            Press(Root<DockTown>(), "town-service-Recruit");
+            yield return WaitScene("TalentMarket");
+            Assert.That(Offers(), Is.EqualTo(offers));
+            SaveAndExit(Root<TalentMarket>());
+            yield return WaitScene("MainMenu");
+
+            ResetAdventureFlow();
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("TalentMarket");
+            Assert.That(Offers(), Is.EqualTo(offers));
+            Assert.That(Root<TalentMarket>().resolvedStyle.opacity, Is.GreaterThan(.95f));
+            var active = (AdventureRun)Flow.GetProperty("Active", PrivateStatic).GetValue(null);
+            Assert.That((active.Party.Day, active.Party.Gold), Is.EqualTo((original.Party.Day, original.Party.Gold)));
+            Assert.That(active.IsInspection, Is.False);
+            Press(Root<TalentMarket>(), "close-town-recruit");
+            yield return WaitScene("Town");
+            Assert.That(Root<DockTown>().Q<Button>("town-service-Recruit").enabledInHierarchy, Is.True);
+        }
+
+        [UnityTest]
         public IEnumerator GraveyardTownServicesAndTreasureUseTheSameDistrict()
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");
@@ -1582,33 +1850,40 @@ namespace RaidPartyManager.Tests
             for (int i = 0; i < facades.Length; i++) AssertTexture("Facility " + i, facades[i]);
 
             var route = (AdventureRun)Flow.GetProperty("Active", PrivateStatic).GetValue(null);
+            Assert.That(Root<DockTown>().Q("town-guide"), Is.Not.Null);
+            Press(Root<DockTown>(), "dismiss-facility-guide");
             var visit = route.Current;
             int townDay = route.Party.Day;
             var art = (AdventureContentAsset)Flow.GetField("routeArt", PrivateStatic).GetValue(null);
             Press(Root<DockTown>(), "town-service-Shop");
             yield return WaitScene("DockShop");
             AssertTexture("Cemetery chandlery", "WakeShop");
-            ClickTownSign(Root<DockShop>());
+            AssertTexture("Shop route sign return-event-select/Route emblem", art.NodeIcon(NodeKind.Town).name);
+            ClickFacilityExit(Root<DockShop>());
             yield return WaitScene("Town");
 
             Press(Root<DockTown>(), "town-service-Recruit");
             yield return WaitScene("TalentMarket");
             AssertTexture("Cemetery vestry", "VestryHall");
-            ClickTownSign(Root<TalentMarket>());
+            ClickFacilityExit(Root<TalentMarket>());
             yield return WaitScene("Town");
 
             Press(Root<DockTown>(), "town-service-Camp");
             yield return WaitScene("Camp");
             AssertTexture("Cemetery vigil", "WatchCloister");
-            ClickTownSign(Root<CampPrototype>());
+            Assert.That(Root<CampPrototype>().Q("camp-guide"), Is.Not.Null);
+            Press(Root<CampPrototype>(), "dismiss-facility-guide");
+            ClickFacilityExit(Root<CampPrototype>());
             yield return WaitScene("Town");
             var townRoot = Root<DockTown>();
+            Assert.That(townRoot.Q("town-guide"), Is.Null);
             Press(townRoot, "town-service-Quest");
             yield return null;
-            Press(townRoot, "close-town-quest");
+            var boardExit = townRoot.Q<Button>("close-town-quest");
+            ClickTownSign(townRoot, boardExit);
+            yield return WaitForRoadstone(townRoot);
             Assert.That(route.Current, Is.SameAs(visit));
             Assert.That(route.Party.Day, Is.EqualTo(townDay));
-            yield return WaitForRoadstone(townRoot);
             var onward = townRoot.Q<Button>("route-choice-0");
             Assert.That(townRoot.panel.Pick(onward.worldBound.center), Is.SameAs(onward));
             Down(onward);
@@ -1619,16 +1894,23 @@ namespace RaidPartyManager.Tests
             Assert.That(route.Current.Kind, Is.EqualTo(NodeKind.TreasureChest));
             Assert.That(route.Party.Day, Is.EqualTo(townDay + 1));
 
-            void ClickTownSign(VisualElement root)
+            void ClickFacilityExit(VisualElement root)
             {
                 Assert.That(root.Q("dock-route-signs"), Is.Null);
                 var buttons = root.Q("town-return-sign").Query<Button>().ToList();
                 Assert.That(buttons, Has.Count.EqualTo(1));
-                var button = buttons[0];
-                Assert.That(button.tooltip, Is.EqualTo("下拉返回城镇"));
+                ClickTownSign(root, buttons[0]);
+            }
+
+            void ClickTownSign(VisualElement root, Button button)
+            {
+                Assert.That(button.Q<Image>("route-node-icon").image, Is.SameAs(art.NodeIcon(NodeKind.Town)));
+                Assert.That(button.tooltip, Is.EqualTo("点击返回城镇"));
+                Assert.That(button.worldBound.center.x, Is.EqualTo(root.worldBound.center.x).Within(2), button.name);
+                Assert.That(button.worldBound.center.y, Is.LessThan(root.worldBound.yMin + root.worldBound.height * .35f), button.name);
                 Assert.That(root.panel.Pick(button.worldBound.center), Is.SameAs(button), button.name);
                 Down(button);
-                Up(button, button.worldBound.center + new Vector2(0,75));
+                Up(button, button.worldBound.center);
             }
 
             void AssertTexture(string mesh, string expected)
@@ -1754,10 +2036,11 @@ namespace RaidPartyManager.Tests
             Assert.That(run.IsInspection, Is.False);
             AddTestWeapons();
             bool tookRightBranch = false, checkedLeftTurn = false;
-            for (int stage = 1; stage <= 10; stage++)
+            bool sawPact = false;
+            for (int visit = 1; visit <= DockRoute.Stages + 1; visit++)
             {
                 var previousVisit = run.Current;
-                Assert.That(run.Stage + (previousVisit != null ? 1 : 0), Is.EqualTo(stage));
+                int stage = run.Stage + (previousVisit == null || previousVisit.Kind == NodeKind.Town ? 0 : 1);
                 var root = Object.FindAnyObjectByType<UIDocument>().rootVisualElement;
                 var map = root.Q("dock-route-signs");
                 Assert.That(root.Q("dock-route"), Is.Null);
@@ -1808,6 +2091,12 @@ namespace RaidPartyManager.Tests
                 while (run.Current == previousVisit && Time.realtimeSinceStartup < selectionDeadline) yield return null;
                 var kind = run.Current.Kind;
                 Assert.That(kind, Is.EqualTo(selected.Kind));
+                if (previousVisit?.Kind == NodeKind.Town)
+                {
+                    Assert.That(sawPact, Is.False);
+                    Assert.That(run.Current.Event, Is.EqualTo(AdventureEventKind.TidePact));
+                    sawPact = true;
+                }
                 bool left = choices.Count == 2 && choiceIndex == 0;
                 if (stage == 1 || left && !checkedLeftTurn)
                 {
@@ -1995,8 +2284,9 @@ namespace RaidPartyManager.Tests
                 if (stage < DockRoute.Stages)
                     Assert.That((run.RouteDestination ?? run.RouteCurrent).Lane, Is.EqualTo(selected.Lane));
             }
+            Assert.That(sawPact, Is.True);
             Assert.That(tookRightBranch && checkedLeftTurn, Is.True, "Both choices should be exercised on the route.");
-            Assert.That(run.CompletedNodes, Is.EqualTo(10));
+            Assert.That(run.CompletedNodes, Is.EqualTo(DockRoute.Stages + 1));
             Assert.That(run.InGraveyard && run.Floor == 2, Is.True);
             Assert.That(run.Stage, Is.EqualTo(1));
             int dayAtGate = run.Party.Day;
@@ -2009,7 +2299,7 @@ namespace RaidPartyManager.Tests
             Press(Root<PrototypeSceneMenu>(), "open-route");
             yield return WaitScene("EventSelect");
             run = CurrentRoute();
-            Assert.That(run.CompletedNodes, Is.EqualTo(10));
+            Assert.That(run.CompletedNodes, Is.EqualTo(DockRoute.Stages + 1));
             Assert.That(run.Floor, Is.EqualTo(2));
             Assert.That(run.Party.Day, Is.EqualTo(dayAtGate));
             Assert.That(run.Party.Gold, Is.EqualTo(finalGold));
@@ -2019,6 +2309,9 @@ namespace RaidPartyManager.Tests
             Assert.That(newFloor.Q<Label>("route-region").text, Does.Contain("低语墓园"));
             Assert.That(GameObject.Find("Cemetery gate"), Is.Not.Null);
             Assert.That(run.RouteCurrent.Number, Is.Zero);
+            // The detour at the wharf uses the last travel day of the founding agreements.
+            foreach (var member in run.Party.Members)
+                Assert.That(run.Party.SetContract(member.Id, 3, default), Is.True);
             AddTestWeapons();
             yield return WaitForRoadstone(newFloor);
             Press(newFloor, "route-choice-0");

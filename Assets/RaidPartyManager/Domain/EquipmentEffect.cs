@@ -19,7 +19,7 @@ namespace RaidPartyManager.Domain
     public enum StatusKind
     {
         Vigor, Swift, Resolve, Undying, Greed, Purity, Ember, Poison, Exposed, Weakened,
-        Thorns, Stunned, Injured, Cursed, Chill, Frozen
+        Thorns, Stunned, Injured, Cursed, Chill, Frozen, Wet, Evaporation
     }
 
     public static class EquipmentFormation

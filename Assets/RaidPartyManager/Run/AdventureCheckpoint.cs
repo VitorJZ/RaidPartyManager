@@ -60,6 +60,7 @@ namespace RaidPartyManager.Run
     [Serializable]
     public sealed class ShopVisitCheckpoint
     {
+        public bool InTalentMarket;
         public string[] Commissions;
         public bool Signed;
         public string[] Slots;

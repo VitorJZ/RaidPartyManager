@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 0
   traitPower: 0
-  traitText: "守夜骨矢（75%） / 穿墓重矢（25%）"
+  traitText: "守夜骨矢优先射击被诅咒者，条件相同时选物防最低者。另有 25% 概率蓄力，下次行动狙击后排。"
   personality: 1
   attack: 6
   defense: 1
@@ -50,7 +50,7 @@ MonoBehaviour:
     - name: "守夜骨矢"
       weight: 75
       kind: 0
-      target: 4
+      target: 12
       power: 0
       damageType: 0
       status: -1

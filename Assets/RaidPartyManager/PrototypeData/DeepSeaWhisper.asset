@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: DeepSeaWhisper
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: DeepSeaWhisper
+  displayName: "深海轻语"
+  portrait: {fileID: 2800000, guid: 85e1226e7a655da3870372e4bc37696c, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: c101ff94a6595da885d2b3e6e9a79302, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: ca095206c23d5a53a18bf6918ca8a56a, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: c2c3f658228b5028a58b05f05d28b9b9, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 68b6c6e0aa1351da8b934d70dcf20bb1, type: 3}
+  battleProjectile: {fileID: 2800000, guid: fbc2f13137b5501083d08168409cef0a, type: 3}
+  profession: 3
+  rosterNumber: 36
+  stage: 2
+  reach: 2
+  fixedTrait: 48
+  traitPower: 1
+  traitText: "回合开始时，随机对1名存活敌方单位施加1层潮湿。"
+  personality: 7
+  attack: 6
+  defense: 1
+  specialDefense: 1
+  health: 15
+  actionInterval: 12
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 0
   traitPower: 0
-  traitText: "拱炉撞（63%） / 泄压冲锋（37%）"
+  traitText: "37% 概率蓄力。下次行动用火焰冲锋优先撞击有破绽者；无人有破绽时按普通近战规则选敌。"
   personality: 1
   attack: 7
   defense: 4
@@ -60,11 +60,11 @@ MonoBehaviour:
     - name: "泄压冲锋"
       weight: 37
       kind: 0
-      target: 0
-      power: 5
+      target: 13
+      power: 1
       damageType: 2
-      status: 8
-      layers: 1
+      status: -1
+      layers: 0
       requiresCharge: 1
       delayDecay: 0
     openingShield: 0

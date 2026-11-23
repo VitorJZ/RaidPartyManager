@@ -65,6 +65,7 @@ namespace RaidPartyManager.Presentation
         private sealed class Actor
         {
             public MeshRenderer body, shadow, castShadow;
+            public RidingWave wave;
         }
 
         public BattleStage(Transform owner, Camera sceneCamera, VisualElement panel, BattleStageArt art,
@@ -476,6 +477,7 @@ namespace RaidPartyManager.Presentation
                 return;
             actor.body.enabled = actor.shadow.enabled = false;
             if (actor.castShadow != null) actor.castShadow.enabled = false;
+            RidingWave.Hide(actor.wave);
             spare.Push(actor);
         }
 
@@ -536,7 +538,10 @@ namespace RaidPartyManager.Presentation
                 actor.body.enabled = actor.shadow.enabled = show;
                 if (actor.castShadow != null) actor.castShadow.enabled = show;
                 if (!show)
+                {
+                    RidingWave.Hide(actor.wave);
                     continue;
+                }
                 var source = image.sourceRect;
                 var texture = image.image;
                 if (source.width <= 0 || source.height <= 0)
@@ -562,6 +567,7 @@ namespace RaidPartyManager.Presentation
                 var frameUV = new Vector4((source.width - 1) / texture.width, (source.height - 1) / texture.height,
                     (source.x + .5f) / texture.width, 1 - (source.yMax - .5f) / texture.height);
                 Shape(actor.body, texture, frameUV, tint, image.Walk, surface: Surface.Paper);
+                RidingWave.Place(ref actor.wave, actor.body, texture, image.RideHeight);
                 if (actor.castShadow != null)
                 {
                     actor.castShadow.bounds = house.DeckBounds;

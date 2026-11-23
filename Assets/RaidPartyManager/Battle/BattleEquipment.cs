@@ -234,7 +234,7 @@ namespace RaidPartyManager.Battle
                 return;
             }
 
-            int bonus = status == Poison ? 2 * (actor?.Count(PoisonRecipe) ?? 0) : 0;
+            int bonus = status == Poison ? 2 * (actor?.Count(PoisonRecipe) ?? 0) + (target.Layers(Wet) > 0 ? 1 : 0) : 0;
             if (StatusRules.For(status).Negative && target.FirstTrigger(PlayerTrait.Unshaken)) return;
             if (status == Cursed && target.Energy.Remaining > 0 && target.FirstTrigger(PlayerTrait.CurseWard))
             {
@@ -252,11 +252,13 @@ namespace RaidPartyManager.Battle
                 target.Statuses.Clear();
                 target.DelayStatusDecay?.Clear();
             }
-            if (status == Chill && total >= 3)
+            bool wetAndCold = (status == Chill && target.Layers(Wet) > 0) || (status == Wet && target.Layers(Chill) > 0);
+            if (wetAndCold || (status == Chill && total >= 3))
             {
-                target.Statuses.Remove(Chill);
+                RemoveLayers(target, Wet, target.Layers(Wet));
+                RemoveLayers(target, Chill, target.Layers(Chill));
                 target.Statuses[Frozen] = 1;
-                Report(eventKind, actor, target, "冰冻", ActionKind.Shield, detail: "寒冷达到 3 层",
+                Report(eventKind, actor, target, "冰冻", ActionKind.Shield, detail: wetAndCold ? "潮湿遇寒冷" : "寒冷达到 3 层",
                     visual: visual, skillBookId: skillBookId);
                 return;
             }
@@ -364,6 +366,7 @@ namespace RaidPartyManager.Battle
                         GrantStatus(actor, target, Injured, 1);
             }
 
+            bool evaporated = SpendEvaporation(actor);
             if (actor.SweepSkill is { } sweep)
             {
                 int multiplier = actor.DoubleNextAttack ? 2 : 1;
@@ -379,7 +382,7 @@ namespace RaidPartyManager.Battle
                     if (enemy.Health == 0)
                         continue;
                     Hit(actor, enemy, action, sweepKind, reason, sweep.Name, multiplier: multiplier,
-                        firstTarget: sweepKind == BattleEventKind.Action, skillBookId: sweep.Id, reactions: reactions);
+                        evaporated: evaporated, firstTarget: sweepKind == BattleEventKind.Action, skillBookId: sweep.Id, reactions: reactions);
                     sweepKind = BattleEventKind.Effect;
                 }
                 foreach (var reaction in reactions)
@@ -402,7 +405,7 @@ namespace RaidPartyManager.Battle
                     if (unit.Health == 0)
                         continue;
                     if (Hit(actor, unit, action, kind, reason, falloff: falloff, visual: BattleVisualCue.PiercingArrow,
-                        firstTarget: kind == BattleEventKind.Action, reactions: reactions))
+                        evaporated: evaporated, firstTarget: kind == BattleEventKind.Action, reactions: reactions))
                         falloff++;
                     kind = BattleEventKind.Effect;
                 }
@@ -411,7 +414,7 @@ namespace RaidPartyManager.Battle
                 return;
             }
 
-            Hit(actor, target, action, BattleEventKind.Action, reason);
+            Hit(actor, target, action, BattleEventKind.Action, reason, evaporated: evaporated);
             if (actor.Trait == CharacterTrait.ArcherVolley)
             {
                 int LivingArchers() => units.Count(unit => unit != actor && unit.Health > 0 &&
@@ -427,11 +430,19 @@ namespace RaidPartyManager.Battle
             }
         }
 
+        private bool SpendEvaporation(Unit actor)
+        {
+            if (!RemoveLayers(actor, Evaporation, 1)) return false;
+            Report(BattleEventKind.Effect, actor, actor, "蒸发", ActionKind.Shield, detail: "本次攻击伤害减半");
+            return true;
+        }
+
         private bool Hit(Unit actor, Unit target, ActionDefinition action, BattleEventKind kind,
             DecisionReason reason, string equipmentName = null, int falloff = 0, bool canCounter = true,
             BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true, string skillBookId = null,
-            List<Action> reactions = null, bool singleTarget = true)
+            List<Action> reactions = null, bool singleTarget = true, bool? evaporated = null)
         {
+            bool halfDamage = evaporated ?? SpendEvaporation(actor);
             bool intercepted = false;
             if (singleTarget && actor.Input.Side != target.Input.Side && (reactions == null || action.Id == "enemy-configured"))
             {
@@ -478,7 +489,7 @@ namespace RaidPartyManager.Battle
                 int ember = actor.Layers(Ember);
                 var damage = ResolveStrike(actor, target, parts, name, kind, reason,
                     ignoreDefense: UsesShortbow(actor), weaponAttack: true, visual: visual, multiplier: multiplier,
-                    skillBookId: skillBookId, intercepted: intercepted);
+                    skillBookId: skillBookId, intercepted: intercepted, halfDamage: halfDamage);
                 actor.LastHitTarget = target.Input.Id;
                 if (damage.Total > 0 && actor.Trait == CharacterTrait.PoisonOnHit)
                     GrantStatus(actor, target, Poison, actor.TraitPower);
@@ -607,13 +618,15 @@ namespace RaidPartyManager.Battle
                 amount *= (type == DamageType.Fire ? 3 : 2) * (actor?.Talent == PlayerTrait.FrostAffinity ? 1.5m : 1m);
             if (type == DamageType.Fire)
                 amount *= 1m + 0.5m * target.Layers(Chill);
-            return (int)Math.Clamp(decimal.Floor(amount) + (actor?.Count(WindChime) ?? 0), 1, int.MaxValue);
+            return (int)Math.Clamp(decimal.Floor(amount) + (actor?.Count(WindChime) ?? 0) +
+                (type == DamageType.Lightning && target.Layers(Wet) > 0 ? 2 : 0), 1, int.MaxValue);
         }
 
         private int ProjectedDamage(Unit actor, Unit target, IReadOnlyList<(DamageType Type, int Power)> parts,
-            bool ignoreDefense = false) =>
+            bool ignoreDefense = false, bool weaponAttack = false) =>
             LimitDamage(target, Math.Max(0, DamageAfterGuard(target, SumDamage(parts.Select(part =>
-                Damage(actor, target, part.Power, FinalDamageType(actor, part.Type), ignoreDefense)))) - (actor?.Talent == PlayerTrait.ShieldPiercer && actor.Input.Side != target.Input.Side ? 0 : target.Shield)));
+                Damage(actor, target, part.Power, FinalDamageType(actor, part.Type), ignoreDefense))) /
+                (weaponAttack && actor.Layers(Evaporation) > 0 ? 2 : 1)) - (actor?.Talent == PlayerTrait.ShieldPiercer && actor.Input.Side != target.Input.Side ? 0 : target.Shield)));
 
         private int DamageAfterGuard(Unit target, int damage) =>
             damage > 0 ? Math.Max(1, damage - DockGuardReduction(target)) : 0;
@@ -632,13 +645,21 @@ namespace RaidPartyManager.Battle
         private (int Total, int Physical) ResolveStrike(Unit actor, Unit target,
             IReadOnlyList<(DamageType Type, int Power)> parts, string name, BattleEventKind kind, DecisionReason reason,
             bool ignoreDefense = false, bool weaponAttack = false, BattleVisualCue visual = BattleVisualCue.None,
-            int multiplier = 1, string skillBookId = null, bool intercepted = false)
+            int multiplier = 1, string skillBookId = null, bool intercepted = false, bool halfDamage = false)
         {
             // All components read the same defensive state before the combined hit consumes it.
+            int remainder = 0;
             var resolved = parts.Select(part =>
             {
                 var type = FinalDamageType(actor, part.Type);
                 int amount = (int)Math.Min(int.MaxValue, (long)Damage(actor, target, part.Power, type, ignoreDefense) * multiplier);
+                if (halfDamage)
+                {
+                    // Carry odd points between elements of the same hit.
+                    long combined = (long)amount + remainder;
+                    remainder = (int)(combined % 2);
+                    amount = (int)(combined / 2);
+                }
                 return (Type: type, Amount: intercepted && amount > 0 ? (int)Math.Ceiling(amount * .25) : amount);
             }).ToArray();
             // Keep the skill identity for the log, but use the converted element for the impact art.
@@ -655,12 +676,16 @@ namespace RaidPartyManager.Battle
             }
             int damage = actor != null && actor.Input.Side != target.Input.Side && Round > 0 && target.ProtectedRound == Round
                 ? 0 : guarded;
+            bool evaporates = false;
             if (damage > 0)
             {
                 RemoveLayers(target, Exposed, 1);
                 RemoveLayers(target, Frozen, target.Layers(Frozen));
                 if (resolved.Any(part => part.Type == DamageType.Fire && part.Amount > 0))
+                {
                     RemoveLayers(target, Chill, target.Layers(Chill));
+                    evaporates = RemoveLayers(target, Wet, target.Layers(Wet));
+                }
             }
 
             int absorbed = actor?.Talent == PlayerTrait.ShieldPiercer && actor.Input.Side != target.Input.Side ? 0 : Math.Min(target.Shield, damage);
@@ -678,6 +703,11 @@ namespace RaidPartyManager.Battle
             Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack,
                 loadout: loadout, visual: visual, skillBookId: skillBookId, damageTaken: lifeLost, poisonDamage: poisonDamage, shieldAbsorbed: absorbed,
                 charmTriggered: charmTriggered);
+            if (evaporates && target.Health > 0)
+            {
+                int steam = target.Statuses[Evaporation] = target.Layers(Evaporation) + 1;
+                Report(BattleEventKind.Effect, actor, target, "蒸发", ActionKind.Shield, detail: $"潮湿遇火，蒸发达到 {steam} 层");
+            }
             if (target.Health == 0)
                 Report(BattleEventKind.Defeated, actor, target, name, ActionKind.Attack);
             if (target.Health > 0 && absorbed > 0 && target.Shield == 0)

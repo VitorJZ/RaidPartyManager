@@ -29,6 +29,7 @@ namespace RaidPartyManager.Presentation
         private readonly RunTopBar topBar;
         private readonly List<string> forge = new List<string>();
         private bool choosingChestCompanion;
+        private string tideGear, tideBook;
         private readonly TreasureChestView treasureChest;
         private bool awaitingSigns, leftTable, leaving;
 
@@ -188,7 +189,7 @@ namespace RaidPartyManager.Presentation
                 var available = run.ForgeInputs.Select(item => item.Id).ToHashSet();
                 forge.RemoveAll(id => !available.Contains(id));
             }
-            if (StagedStory(visit.Event) || visit.PendingRecruit != null || visit.Event is AdventureEventKind.Forge or AdventureEventKind.LockedChest or
+            if (StagedStory(visit.Event) || visit.PendingRecruit != null || visit.Event is AdventureEventKind.TidePact or AdventureEventKind.Forge or AdventureEventKind.LockedChest or
                 AdventureEventKind.Ambush or AdventureEventKind.AscensionTrial or AdventureEventKind.LostTraveler)
                 RenderChoices();
         }
@@ -231,9 +232,9 @@ namespace RaidPartyManager.Presentation
                 {
                     _ when visit.Resolved => visit.Message,
                     _ when StagedStory(topic) && !string.IsNullOrEmpty(visit.Message) => visit.Message,
-                    _ when visit.PendingRecruit != null => "队伍满了。拉下哪位老队员的牌子，他就会离队，把位置让给新人。",
-                    AdventureEventKind.LockedChest when choosingChestCompanion => "选一位留下开锁的队员。要是还想带他赶路，拉下「返回」就能重选。",
-                    AdventureEventKind.Forge when run.ForgeInputs.Count < 2 => "这炉要用两件旧装备。您背包里的闲置装备还没凑够，可以整理装备，也可以拉下告辞牌离开。",
+                    _ when visit.PendingRecruit != null => "队伍满了。点选哪位老队员的牌子，他就会离队，把位置让给新人。",
+                    AdventureEventKind.LockedChest when choosingChestCompanion => "选一位留下开锁的队员。要是还想带他赶路，点击「返回」就能重选。",
+                    AdventureEventKind.Forge when run.ForgeInputs.Count < 2 => "这炉要用两件旧装备。您背包里的闲置装备还没凑够，可以整理装备，也可以点击告辞牌离开。",
                     AdventureEventKind.Investor when run.InvestmentPaid => "两件装备已经交给你们了。船也出港了，咱们继续赶路吧。",
                     AdventureEventKind.Investor when !visit.InvestorAvailable => "船主今天已经收好账本，这一趟不能再投钱了。",
                     _ => AdventureFlow.Narrative(topic)
@@ -314,6 +315,9 @@ namespace RaidPartyManager.Presentation
                     AdventureWidgets.Action(choices, "投入全部金币", "event-invest-all",
                         () => Collect("event-invest-all", () => run.Donate(run.Party.Gold)), run.Party.Gold > 0);
                     break;
+                case AdventureEventKind.TidePact:
+                    ShowTidePact();
+                    break;
                 case AdventureEventKind.FoundCoins:
                     AdventureWidgets.Action(choices, "拾起钱袋", "event-collect-coins", () => Collect("event-collect-coins", run.CollectCoins));
                     break;
@@ -380,6 +384,52 @@ namespace RaidPartyManager.Presentation
                 case AdventureEventKind.Alchemist:
                     ShowPotionBottles(visit);
                     break;
+            }
+        }
+
+        private void ShowTidePact()
+        {
+            var items = run.TideOfferings.ToArray();
+            var gear = items.Where(i => i.Definition is not SkillBookDefinition).ToArray();
+            var books = items.Where(i => i.Definition is SkillBookDefinition).ToArray();
+            bool room = run.Party.Members.Count < PartyRun.RosterLimit;
+            if (!room || gear.Length == 0 || books.Length == 0)
+            {
+                if (!room) choices.Note(PaperText("队伍已满，需要一个空位。", 14));
+                if (gear.Length == 0) choices.Note(PaperText("背包里缺少可交付的闲置装备。", 14));
+                if (books.Length == 0) choices.Note(PaperText("背包里缺少未学习的技能书。", 14));
+                return;
+            }
+            tideGear = Picker("装备", "tide-gear", gear, tideGear, id => tideGear = id);
+            tideBook = Picker("技能书", "tide-book", books, tideBook, id => tideBook = id);
+            choices.Choice("交付两件物品并签约", "sign-tide-pact", () =>
+            {
+                if (run.OfferTidePact(tideGear, tideBook))
+                {
+                    stage.HideTideSinger();
+                    GameAudio.Play(SoundCue.CompanionJoin);
+                }
+                RenderChoices();
+            }, tideGear != null && tideBook != null);
+
+            string Picker(string label, string id, EquipmentInstance[] stock, string selected, Action<string> set)
+            {
+                // Identical copies are interchangeable. Keep the exact instance selected until signing.
+                var options = stock.GroupBy(item => item.Definition.Id).Select(group =>
+                    group.FirstOrDefault(item => item.Id == selected) ?? group.First()).ToArray();
+                int index = Array.FindIndex(options, item => item.Id == selected);
+                var names = options.Select(item => item.Definition.Name).Prepend("请选择").ToList();
+                var field = new DropdownField(label, names, index + 1) { name = id };
+                field.labelElement.style.minWidth = 50;
+                field.labelElement.style.width = 50;
+                field.labelElement.style.color = PaperInk;
+                field.RegisterValueChangedCallback(_ =>
+                {
+                    set(field.index > 0 ? options[field.index - 1].Id : null);
+                    RenderChoices();
+                });
+                choices.Note(field);
+                return index >= 0 ? options[index].Id : null;
             }
         }
 

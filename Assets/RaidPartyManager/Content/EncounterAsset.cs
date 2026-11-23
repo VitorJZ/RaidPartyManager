@@ -236,6 +236,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private UnitEntry[] party = Array.Empty<UnitEntry>();
         [SerializeField] private UnitEntry[] enemies = Array.Empty<UnitEntry>();
         [SerializeField] private CharacterAsset[] additionalRecruits = Array.Empty<CharacterAsset>();
+        [SerializeField] private CharacterAsset[] eventRecruits = Array.Empty<CharacterAsset>();
         [SerializeField] private CharacterAsset[] enemyRoster = Array.Empty<CharacterAsset>();
         [SerializeField] private FormationEntry[] enemyFormations = Array.Empty<FormationEntry>();
         [SerializeField] private Texture2D[] statusIcons = Array.Empty<Texture2D>();
@@ -258,7 +259,7 @@ namespace RaidPartyManager.Content
                 .Where(character => character != null).Distinct().ToArray();
             var enemyChoices = enemyRoster.Where(character => character != null).Distinct().ToArray();
             var catalog = new Dictionary<string, CharacterAsset>(StringComparer.Ordinal);
-            var pending = new Queue<CharacterAsset>(recruits.Concat(enemies.Select(entry => entry.Character)).Concat(enemyChoices));
+            var pending = new Queue<CharacterAsset>(recruits.Concat(eventRecruits.Where(c => c != null)).Concat(enemies.Select(entry => entry.Character)).Concat(enemyChoices));
             while (pending.Count > 0)
             {
                 var character = pending.Dequeue();

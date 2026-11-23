@@ -55,16 +55,15 @@
           "damage": "Physical"
         },
         {
-          "name": "加急邮包",
           "weight": 34,
+          "name": "加急邮包",
           "kind": "Attack",
-          "target": "RearTwo",
+          "target": "ExposedOrRear",
           "power": 1,
-          "damage": "Fire",
-          "status": "Ember",
-          "layers": 1
+          "damage": "Fire"
         }
-      ]
+      ],
+      "mechanic": "34% 概率发射火焰邮包。优先投向有破绽的对手，条件相同时选最后方。"
     },
     {
       "attack": 7,
@@ -492,17 +491,16 @@
           "damage": "Physical"
         },
         {
-          "name": "泄压冲锋",
           "weight": 37,
+          "name": "泄压冲锋",
           "kind": "Attack",
-          "target": "Front",
-          "power": 5,
+          "target": "ExposedOrFront",
+          "power": 1,
           "damage": "Fire",
-          "status": "Exposed",
-          "layers": 1,
           "charge": true
         }
-      ]
+      ],
+      "mechanic": "37% 概率蓄力。下次行动用火焰冲锋优先撞击有破绽者；无人有破绽时按普通近战规则选敌。"
     },
     {
       "attack": 6,
@@ -554,15 +552,15 @@
           "damage": "Magic"
         },
         {
-          "name": "三脚聚焦",
           "weight": 37,
-          "kind": "Attack",
+          "name": "焦点校准",
+          "kind": "Status",
           "target": "HighestAttack",
-          "power": 4,
-          "damage": "Magic",
-          "charge": true
+          "status": "Exposed",
+          "layers": 1
         }
-      ]
+      ],
+      "mechanic": "37% 概率标记攻击最高的对手，施加 1 层破绽。铁豕会冲向仍有破绽的目标。"
     },
     {
       "attack": 7,
@@ -617,16 +615,17 @@
           "damage": "Magic"
         },
         {
-          "name": "复写毒墨",
           "weight": 34,
+          "name": "复写毒墨",
           "kind": "Attack",
           "target": "RearTwo",
           "power": 0,
           "damage": "Magic",
           "status": "Poison",
-          "layers": 2
+          "layers": 1
         }
-      ]
+      ],
+      "mechanic": "34% 概率向最后两名对手泼墨，各施加 1 层中毒。潮湿的目标会多得 1 层。"
     },
     {
       "attack": 6,
@@ -713,13 +712,15 @@
           "damage": "Physical"
         },
         {
-          "name": "营养雾",
           "weight": 34,
-          "kind": "Heal",
-          "target": "AllAllies",
-          "power": 5
+          "name": "灌溉喷头",
+          "kind": "Status",
+          "target": "Rear",
+          "status": "Wet",
+          "layers": 1
         }
-      ]
+      ],
+      "mechanic": "34% 概率淋湿最后方对手。潮湿期间，每次中毒额外增加 1 层。"
     },
     {
       "attack": 6,
@@ -1126,8 +1127,8 @@
       "name": "焦仓巡守",
       "enemies": [
         "CokeBoar",
-        "WeldFirefly",
         "LensSurveyor",
+        "WeldFirefly",
         "ValveMedic"
       ]
     },
@@ -1144,9 +1145,9 @@
       "name": "玻璃温室",
       "enemies": [
         "GlassGardener",
+        "InkScribe",
         "CivicNurse",
-        "Postmaster",
-        "InkScribe"
+        "Postmaster"
       ]
     },
     {

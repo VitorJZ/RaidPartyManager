@@ -8,7 +8,8 @@ namespace RaidPartyManager.Domain
     public enum EnemyTargetRule
     {
         Front, Rear, LowestHealth, HighestAttack, LowestDefense, Self, WoundedAlly,
-        FrontTwo, RearTwo, AllEnemies, AllAllies, StrongestAlly
+        FrontTwo, RearTwo, AllEnemies, AllAllies, StrongestAlly,
+        CursedOrLowestDefense, ExposedOrFront, ExposedOrRear
     }
 
     // Pure data. Content owns serialization; Battle owns rolls, targeting and execution.

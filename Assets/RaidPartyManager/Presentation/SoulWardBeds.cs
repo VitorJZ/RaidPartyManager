@@ -13,6 +13,7 @@ namespace RaidPartyManager.Presentation
         {
             internal string Id;
             internal MeshRenderer Figure;
+            internal RidingWave Wave;
             internal Texture2D Walk, Reclining;
             internal Vector3 Start;
             internal float Elapsed, Approach;
@@ -94,8 +95,10 @@ namespace RaidPartyManager.Presentation
                     float t = Mathf.SmoothStep(0,1,p.Elapsed / p.Approach);
                     p.Figure.transform.localPosition = Vector3.Lerp(p.Start,bedside,t);
                     SetFrame(p.Figure,p.Walk,AnimationCels.Count,AnimationCels.Loop(p.Elapsed,.54));
+                    RidingWave.Place(ref p.Wave, p.Figure, p.Walk, RidingWave.Envelope(p.Elapsed / p.Approach));
                     continue;
                 }
+                RidingWave.Hide(p.Wave);
                 float settle = Mathf.SmoothStep(0,1,(p.Elapsed-p.Approach)/.45f);
                 float width = 2.29f, height = width * p.Reclining.height / p.Reclining.width;
                 var rest = bed + new Vector3(0,MattressTop + height*.48f+.06f,-.07f);

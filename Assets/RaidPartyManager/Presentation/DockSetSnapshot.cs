@@ -35,6 +35,7 @@ namespace RaidPartyManager.Presentation
         private sealed class Performer
         {
             internal MeshRenderer ink;
+            internal RidingWave wave;
             internal Vector3 position, scale;
             internal DockSet.Player player;
             internal MaterialPropertyBlock rest;
@@ -51,7 +52,7 @@ namespace RaidPartyManager.Presentation
             var hinges = new Dictionary<Vector2, Piece>();
             foreach (var source in set.Root.GetComponentsInChildren<MeshRenderer>())
             {
-                if (!source.enabled || source.forceRenderingOff || castOnly && !set.Cast.ContainsKey(source)) continue;
+                if (source.TryGetComponent<RidingWave>(out _) || !source.enabled || source.forceRenderingOff || castOnly && !set.Cast.ContainsKey(source)) continue;
                 if (!source.TryGetComponent<MeshFilter>(out var filter) || filter.sharedMesh == null) continue;
                 var mesh = filter.sharedMesh;
                 var copy = new GameObject(source.name, typeof(MeshFilter), typeof(MeshRenderer)).GetComponent<MeshRenderer>();
@@ -134,7 +135,7 @@ namespace RaidPartyManager.Presentation
                 float progress = Mathf.SmoothStep(0, 1, Mathf.Clamp01(on * 1.19f - .05f * (i % 4)));
                 var view = actor.ink;
                 view.enabled = progress > .001f;
-                if (!view.enabled) continue;
+                if (!view.enabled) { RidingWave.Hide(actor.wave); continue; }
                 var position = actor.position;
                 position.x = Mathf.Lerp(actor.player.Right ? wing : -wing, position.x, progress);
                 var scale = actor.scale;
@@ -161,6 +162,7 @@ namespace RaidPartyManager.Presentation
                 else position.y += .038f * Mathf.Abs(Mathf.Sin(seconds * 13 + i));
                 view.transform.position = position;
                 view.transform.localScale = scale;
+                RidingWave.Place(ref actor.wave, view, actor.player.Walk, walking ? RidingWave.Envelope(entering ? progress : 1 - progress) : 0);
             }
         }
 
@@ -195,7 +197,14 @@ namespace RaidPartyManager.Presentation
             ShowPieces(visible);
         }
 
-        internal void HideCast() { foreach (var actor in cast) actor.ink.enabled = false; }
+        internal void HideCast()
+        {
+            foreach (var actor in cast)
+            {
+                actor.ink.enabled = false;
+                RidingWave.Hide(actor.wave);
+            }
+        }
         internal void ShowPieces(bool show) { foreach (var piece in pieces) piece.hinge.gameObject.SetActive(show); }
         internal void Dispose()
         {

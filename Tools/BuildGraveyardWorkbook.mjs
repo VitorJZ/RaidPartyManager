@@ -16,7 +16,7 @@ const ranks = { Normal: '普通', Elite: '精英', Boss: 'Boss' };
 const professions = { Warrior: '战士', Mage: '法师', Archer: '射手', Support: '后勤', Monster: '怪物' };
 const kinds = { Attack: '攻击', Status: '状态', Heal: '治疗', Shield: '护盾' };
 const targets = { Front: '最前存活对手', Rear: '最后存活对手', LowestHealth: '生命比例最低的对手',
-  HighestAttack: '攻击最高的对手', LowestDefense: '防御最低的对手', Self: '自身',
+  HighestAttack: '攻击最高的对手', CursedOrLowestDefense: '优先诅咒，同等情况下选防御最低者', LowestDefense: '防御最低的对手', Self: '自身',
   WoundedAlly: '生命比例最低的存活友方', FrontTwo: '最前两名存活对手', RearTwo: '最后两名存活对手',
   AllEnemies: '所有存活对手', AllAllies: '所有存活友方', StrongestAlly: '攻击最高的存活友方' };
 const statuses = { Vigor: '盛气', Swift: '迅捷', Resolve: '坚毅', Ember: '余烬', Poison: '中毒',

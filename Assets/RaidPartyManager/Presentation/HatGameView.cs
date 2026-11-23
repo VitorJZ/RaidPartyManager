@@ -30,7 +30,7 @@ namespace RaidPartyManager.Presentation
             name = "hat-game";
             pickingMode = PickingMode.Ignore;
             PrototypeStyle.Fill(this);
-            instruction = PrototypeStyle.Text("记住掀起的帽子下有什么。看清后，下拉「开始交换」。", 15, AdventureEventWindow.PaperInk);
+            instruction = PrototypeStyle.Text("记住掀起的帽子下有什么。看清后，点击「开始交换」。", 15, AdventureEventWindow.PaperInk);
             instruction.name = "hat-instruction";
             rack.Note(instruction);
             for (int i = 0; i < hats.Length; i++)
@@ -60,7 +60,7 @@ namespace RaidPartyManager.Presentation
             {
                 bool fresh = visit.HatStep == 0;
                 if (fresh) ShowPrize(0);
-                else instruction.text = "这局还没结束。下拉「继续交换」看完余下的几手。";
+                else instruction.text = "这局还没结束。点击「继续交换」看完余下的几手。";
                 start = rack.Choice(fresh ? "开始交换" : "继续交换", "hat-start", Begin, false);
             }
             schedule.Execute(Tick).Every(16);

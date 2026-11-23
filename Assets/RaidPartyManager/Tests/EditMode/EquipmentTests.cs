@@ -266,6 +266,35 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void WetReactsToTheResolvedElementAndSteamHalvesOnlyTheNextAttack()
+        {
+            var wet = new Dictionary<StatusKind, int> { { StatusKind.Wet, 1 } };
+            var foe = Unit("foe", Side.Enemy, stats: new Stats(8, 0, 0, 100), statuses: wet);
+            Combatant Caster(DamageType type, params EquipmentEffect[] items) =>
+                Unit("caster", Side.Party, gear: Gear(items), basic: new ActionDefinition("basic", "basic",
+                    ActionKind.Attack, TargetRule.FrontEnemy, 0, damageType: type));
+            Assert.That(Action(Fight(Caster(DamageType.Lightning), foe), "caster").Amount, Is.EqualTo(7));
+            var dry = Fight(2, Caster(DamageType.Lightning, ElementalQuartz), foe);
+            Assert.That(dry.Events.Single(e => e.ActorId == "caster" && e.TargetId == foe.Id && e.ActionName == "蒸发").TargetStatuses,
+                Does.Contain("蒸发 1").And.Not.Contain("潮湿"));
+            Assert.That(dry.Events.Where(e => e.ActorId == foe.Id && e.Kind == BattleEventKind.Action)
+                .Select(e => e.Amount), Is.EqualTo(new[] { 4, 8 }));
+            var poisoner = Unit("poisoner", Side.Party, trait: CharacterTrait.PoisonOpponents, traitPower: 2);
+            var poison = Fight(poisoner, foe).Events.Single(e => e.ActionName == "幽雾炼药");
+            Assert.That(poison.TargetStatuses, Does.Contain("中毒 3").And.Contain("潮湿 1"));
+            var cold = Unit("cold", Side.Enemy, statuses: new Dictionary<StatusKind, int> { [StatusKind.Chill] = 2 });
+            var singer = Unit("singer", Side.Party, trait: CharacterTrait.SoakEnemyEachRound, traitPower: 1);
+            var reaction = Fight(singer, cold).Events.Single(e => e.ActionName == "冰冻");
+            Assert.That(reaction.TargetStatuses, Is.EqualTo("冰冻 1"));
+            var both = Unit("both", Side.Enemy, statuses: new Dictionary<StatusKind, int>
+                { [StatusKind.Chill] = 2, [StatusKind.Wet] = 1 });
+            Assert.That(both.StartingStatuses.Keys, Is.EquivalentTo(new[] { StatusKind.Frozen }));
+            var frost = Fight(Caster(DamageType.Physical, IceRing), foe);
+            Assert.That(frost.Events.Single(e => e.ActionName == "冰冻").TargetStatuses,
+                Does.Contain("冰冻 1").And.Not.Contain("潮湿").And.Not.Contain("寒冷"));
+        }
+
+        [Test]
         public void ACompositeHitUsesSeparateDefensesAndConsumesFrozenOnceAfterAllComponents()
         {
             var basic = new ActionDefinition("mixed", "mixed", ActionKind.Attack, TargetRule.FrontEnemy, 0,
@@ -868,12 +897,12 @@ namespace RaidPartyManager.Tests
         private static Combatant Unit(string id, Side side, int position = 1, int? health = null, Stats? stats = null,
             EquipmentDefinition[] gear = null, IReadOnlyDictionary<StatusKind, int> statuses = null,
             ActionDefinition skill = null, ActionDefinition basic = null, Profession profession = Profession.Warrior,
-            AttackReach reach = AttackReach.Unspecified, int positionSlots = 1, CharacterTrait trait = CharacterTrait.None)
+            AttackReach reach = AttackReach.Unspecified, int positionSlots = 1, CharacterTrait trait = CharacterTrait.None, int traitPower = 0)
         {
             var attributes = stats ?? new Stats(side == Side.Party ? 5 : 2, 0, 0, 30);
             var definition = new CharacterDefinition(id, id, profession, Personality.Caring, attributes, 1,
                 basic ?? new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0), skill,
-                reach: reach, positionSlots: positionSlots, trait: trait);
+                reach: reach, positionSlots: positionSlots, trait: trait, traitPower: traitPower);
             return new Combatant(id, definition, side, position, attributes, health ?? attributes.Health, gear, statuses);
         }
 

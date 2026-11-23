@@ -10,28 +10,32 @@ namespace RaidPartyManager.Run
         public const int Limit = 2;
         private const int HealthPerAward = 3;
 
-        public int Attack, Defense, SpecialDefense, Health;
+        public int Attack, Defense, SpecialDefense, Health, Energy;
+        // Older checkpoints stored only the two awards earned at each visit.
+        public int CompletedSessions;
 
-        private int Awards => Attack + Defense + SpecialDefense + Health;
-        public int Sessions => Awards / 2;
+        private int Awards => Attack + Defense + SpecialDefense + Health + Energy;
+        public int Sessions => CompletedSessions == 0 ? Awards / 2 : CompletedSessions;
         public Stats Bonus => new Stats(Attack, Defense, SpecialDefense, Health * HealthPerAward);
 
         internal bool IsValid => Attack is >= 0 and <= Limit && Defense is >= 0 and <= Limit &&
             SpecialDefense is >= 0 and <= Limit && Health is >= 0 and <= Limit &&
-            Awards <= 2 * Limit && Awards % 2 == 0 &&
+            Energy >= 0 && Energy <= CompletedSessions && CompletedSessions is >= 0 and <= Limit &&
+            (CompletedSessions > 0 || Awards % 2 == 0) && Sessions <= Limit &&
+            Sessions <= Awards && Awards <= 2 * Sessions &&
             Attack <= Sessions && Defense <= Sessions && SpecialDefense <= Sessions && Health <= Sessions;
 
         internal static CampTraining Roll(Random random)
         {
-            int first = random.Next(4);
-            int second = random.Next(3);
-            if (second >= first) second++;
+            int project = random.Next(5);
             return new CampTraining
             {
-                Attack = first == 0 || second == 0 ? 1 : 0,
-                Defense = first == 1 || second == 1 ? 1 : 0,
-                SpecialDefense = first == 2 || second == 2 ? 1 : 0,
-                Health = first == 3 || second == 3 ? 1 : 0
+                Attack = project == 0 ? 1 : 0,
+                Defense = project == 1 ? 1 : 0,
+                SpecialDefense = project == 2 ? 1 : 0,
+                Health = project == 3 ? 1 : 0,
+                Energy = project == 4 ? 1 : 0,
+                CompletedSessions = 1
             };
         }
 
@@ -40,6 +44,8 @@ namespace RaidPartyManager.Run
             Attack = Attack + gains.Attack,
             Defense = Defense + gains.Defense,
             SpecialDefense = SpecialDefense + gains.SpecialDefense,
+            Energy = Energy + gains.Energy,
+            CompletedSessions = Sessions + gains.Sessions,
             Health = Health + gains.Health
         };
 
@@ -50,6 +56,7 @@ namespace RaidPartyManager.Run
             if (Defense > 0) bonuses.Add($"物防 +{Defense}");
             if (SpecialDefense > 0) bonuses.Add($"特防 +{SpecialDefense}");
             if (Health > 0) bonuses.Add($"最大生命 +{Bonus.Health}");
+            if (Energy > 0) bonuses.Add($"能量上限 +{Energy}");
             return string.Join("、", bonuses);
         }
     }

@@ -12,6 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6116ba6b72ae419a9b54859f0e27640d, type: 3}
   m_Name: DockAdventure
   m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.AdventureContentAsset
+  tideSinger: {fileID: 11400000, guid: 2ba72d0cffb8542098eb710933a7eccf, type: 2}
   encounter: {fileID: 11400000, guid: 116ee4b2085e45f468c778f20defc1a1, type: 2}
   backdrop: {fileID: 2800000, guid: d1538346d12e4d88888e19ea36f54969, type: 3}
   townBackdrop: {fileID: 2800000, guid: 455fc0d01d334dcb8fe18e03e27579a7, type: 3}

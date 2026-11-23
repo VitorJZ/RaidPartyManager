@@ -53,7 +53,7 @@ namespace RaidPartyManager.Run
     public sealed class CrewContract
     {
         public int StartDay, EndDay, DailyWage, ReleaseFee;
-        public bool BasePaid;
+        public bool BasePaid, TidePact;
         public int InstallmentsPaid;
         public WageInstallments Plan => Rates.Installments;
         // Old saves keep their signed fixed amounts and their first payment on the signing date.
@@ -110,6 +110,8 @@ namespace RaidPartyManager.Run
 
         internal bool ValidAt(int day)
         {
+            if (TidePact) return StartDay >= 1 && Days == 99 && EndDay > day && DailyWage == 0 &&
+                BasePaid && SigningFee == 0 && !Plan.Enabled && Bonuses == BonusTerms.None && Rates.Terms == BonusTerms.None;
             if (StartDay < 1 || EndDay <= StartDay || EndDay <= day || DailyWage < 1 || !Rates.Valid || !AgreedRates.Valid) return false;
             if (!Plan.Enabled) return !DeferredTerms || SigningFee >= Days;
             bool validSchedule = DeferredTerms ? Plan.Fits(Days) && SigningFee >= 0 && SigningFee <= BaseTotal &&

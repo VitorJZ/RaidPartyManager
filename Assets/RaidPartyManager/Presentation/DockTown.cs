@@ -67,6 +67,7 @@ namespace RaidPartyManager.Presentation
             var services = new VisualElement { name = "town-services", pickingMode = PickingMode.Ignore };
             PrototypeStyle.Fill(services);
             town.Insert(0,services);
+            FirstRunGuide.ShowFacility(town, run, GuideStep.Town);
             Service(services, "人才市场", TownService.Recruit, 0,
                 () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("TalentMarket", true)));
             Service(services, "商店", TownService.Shop, 1,
@@ -88,14 +89,14 @@ namespace RaidPartyManager.Presentation
         private void OpenQuest()
         {
             town.Clear();
-            var board = ContractPanel.Sheet($"{run.RegionName}委托", out var paper);
-            var back = HangingSign.Exit("close-town-quest", () => topBar.WhenRewardsArrive(() => {
+            void ReturnToTown() => topBar.WhenRewardsArrive(() => {
                 Render();
                 serviceSigns[(int)TownService.Quest].Focus();
-            }), belowTopBar: true);
-            back.tooltip = "下拉返回城镇";
-            back.style.right = StyleKeyword.Auto;
-            back.style.left = Length.Percent(9);
+            });
+            var board = ContractPanel.Sheet($"{run.RegionName}委托", out var paper, ReturnToTown);
+            var back = HangingSign.Exit("close-town-quest", ReturnToTown, belowTopBar: true, icon: assets.NodeIcon(NodeKind.Town));
+            back.tooltip = "点击返回城镇";
+            board.style.paddingTop = HangingSign.ExitTopGap + HangingSign.TownSignHeight + 8;
             board.Add(new StageSignMask(back));
             board.name = "town-quest-board";
             board.style.top = RunTopBar.Height;

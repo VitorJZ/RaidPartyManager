@@ -6,19 +6,13 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class HangingSign : Button
     {
-        internal const float PullDistance = 52;
         private static readonly Color Rim = new Color32(135, 96, 52, 255);
         private static readonly Color Lettering = new Color32(255, 233, 184, 255);
-        private int pointer = -1;
-        private float start, lift, velocity;
-        private double last;
-        private readonly IVisualElementScheduledItem spring;
         private readonly VisualElement rope;
         private readonly Action select;
         private readonly Texture2D grain;
         private readonly bool arrow;
-        internal bool MountedInScenery { get; private set; }
-        internal float ScenicPull => lift;
+        private bool mountedInScenery;
         private const string FlightLayer = "selected-sign-flight";
 
         internal HangingSign(string id, string caption, Action select, Texture2D grain = null, bool arrow = false)
@@ -28,7 +22,6 @@ namespace RaidPartyManager.Presentation
             this.select = select;
             this.grain = grain;
             this.arrow = arrow;
-            clickable = null;
             style.alignItems = Align.Center;
             style.justifyContent = Justify.Center;
             style.unityTextAlign = TextAnchor.MiddleCenter;
@@ -62,77 +55,38 @@ namespace RaidPartyManager.Presentation
             RegisterCallback<GeometryChangedEvent>(_ => FitRope());
             schedule.Execute(FitRope).Every(16);
 
-            spring = schedule.Execute(Rebound).Every(16);
-            spring.Pause();
-            RegisterCallback<PointerDownEvent>(e =>
+            clickable.clickedWithEventInfo += evt =>
             {
-                if (e.button != 0 || pointer >= 0 || !enabledInHierarchy || panel.visualTree.Q(FlightLayer) != null) return;
-                spring.Pause();
-                pointer = e.pointerId;
-                start = e.position.y - lift;
-                this.CapturePointer(pointer);
-                e.StopPropagation();
-            });
-            RegisterCallback<PointerMoveEvent>(e =>
-            {
-                if (e.pointerId != pointer) return;
-                Move(Mathf.Clamp(e.position.y - start, 0, PullDistance * 1.7f));
-                e.StopPropagation();
-            });
-            RegisterCallback<PointerUpEvent>(e =>
-            {
-                if (e.button != 0 || e.pointerId != pointer) return;
-                bool chosen = e.position.y - start >= PullDistance;
-                pointer = -1;
-                this.ReleasePointer(e.pointerId);
-                e.StopPropagation();
-                if (chosen && enabledInHierarchy) FlyToBeam();
-                else Release();
-            });
-            RegisterCallback<PointerCaptureOutEvent>(e => { if (e.pointerId == pointer) Release(); });
-            RegisterCallback<PointerCancelEvent>(e =>
-            {
-                if (e.pointerId != pointer) return;
-                Release();
-                this.ReleasePointer(e.pointerId);
-            });
-            RegisterCallback<DetachFromPanelEvent>(_ => { pointer = -1; spring.Pause(); Move(0); });
-            RegisterCallback<NavigationSubmitEvent>(e =>
-            {
-                e.StopPropagation();
-                if (enabledInHierarchy && pointer < 0 && panel.visualTree.Q(FlightLayer) == null) this.select();
-            });
+                if (panel == null || panel.visualTree.Q(FlightLayer) != null) return;
+                if (mountedInScenery || evt is NavigationSubmitEvent) select();
+                else FlyToBeam();
+            };
         }
 
-        internal static HangingSign Exit(string id, Action leave, bool belowTopBar = false)
+        internal const int TownSignWidth = 84, TownSignHeight = 58, ExitTopGap = 32;
+
+        internal static HangingSign Exit(string id, Action leave, bool belowTopBar = false, Texture2D icon = null)
         {
-            var sign = new HangingSign(id, "", leave, arrow: true);
+            var sign = new HangingSign(id, "", leave, arrow: icon == null);
+            if (icon != null)
+            {
+                var emblem = new Image { name = "route-node-icon", image = icon, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
+                emblem.style.width = emblem.style.height = 44;
+                sign.Add(emblem);
+                sign.style.left = Length.Percent(50);
+                sign.style.marginLeft = -TownSignWidth / 2;
+            }
+            else sign.style.right = Length.Percent(9);
             sign.style.position = Position.Absolute;
-            sign.style.right = Length.Percent(9);
-            sign.style.top = (belowTopBar ? 0 : RunTopBar.Height) + 32;
-            sign.style.width = 68;
-            sign.style.height = 35;
+            sign.style.top = (belowTopBar ? 0 : RunTopBar.Height) + ExitTopGap;
+            sign.style.width = icon == null ? 68 : TownSignWidth;
+            sign.style.height = icon == null ? 35 : TownSignHeight;
             return sign;
-        }
-
-        private void Move(float offset)
-        {
-            lift = offset;
-            style.translate = new Translate(0, offset);
-            FitRope();
         }
 
         private void FlyToBeam()
         {
-            if (MountedInScenery)
-            {
-                Move(0);
-                select();
-                return;
-            }
             var root = panel.visualTree;
-            if (root.Q(FlightLayer) != null) { Release(); return; }
-            spring.Pause();
             var startRect = root.WorldToLocal(worldBound);
             var layer = new VisualElement { name = FlightLayer };
             PrototypeStyle.Fill(layer);
@@ -157,7 +111,6 @@ namespace RaidPartyManager.Presentation
             opening.Add(board);
             while (childCount > 1) board.Add(this[1]);
             style.opacity = 0;
-            Move(0);
             float y = startRect.yMin-beam;
             board.style.top = y;
             double began = Time.realtimeSinceStartupAsDouble;
@@ -188,27 +141,9 @@ namespace RaidPartyManager.Presentation
             }
         }
 
-        private void Release()
-        {
-            pointer = -1;
-            velocity = 0;
-            last = Time.realtimeSinceStartupAsDouble;
-            spring.Resume();
-        }
-
-        private void Rebound()
-        {
-            double now = Time.realtimeSinceStartupAsDouble;
-            float dt = Mathf.Clamp((float)(now - last), .001f, .035f);
-            last = now;
-            velocity += (-170 * lift - 17 * velocity) * dt;
-            Move(lift + velocity * dt);
-            if (Mathf.Abs(lift) + Mathf.Abs(velocity) < .35f) { Move(0); spring.Pause(); }
-        }
-
         private void FitRope()
         {
-            if (MountedInScenery || panel == null || !float.IsFinite(rope.layout.height)) return;
+            if (mountedInScenery || panel == null || !float.IsFinite(rope.layout.height)) return;
             float beam = DockPlayhouse.StageOpeningTop(panel);
             // The bottom of the rope stays attached to the sign while its top stays at the beam.
             float length = Mathf.Max(0, rope.layout.height - rope.WorldToLocal(new Vector2(rope.worldBound.center.x, beam)).y);
@@ -218,7 +153,8 @@ namespace RaidPartyManager.Presentation
 
         internal void MountInScenery()
         {
-            MountedInScenery = true;
+            mountedInScenery = true;
+            style.marginLeft = 0;
             rope.style.display = DisplayStyle.None;
             if (arrow) generateVisualContent -= DrawArrow;
             style.backgroundColor = Color.clear;

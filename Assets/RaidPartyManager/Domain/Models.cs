@@ -17,7 +17,7 @@ namespace RaidPartyManager.Domain
         EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack,
         EnemyTideFollower, EnemyWreckScavenger, EnemyDeckSailor,
         EnemyMudEel, EnemySaltCrab, EnemyLanternMoth, EnemyFogSignalGunner, EnemyShipCaulker,
-        EnemyAnchorHermit, EnemyFogAngler, EnemyMooringWarden, EnemyBlockadeAdmiral, EnemyDrownedLanternRay
+        EnemyAnchorHermit, EnemyFogAngler, EnemyMooringWarden, EnemyBlockadeAdmiral, EnemyDrownedLanternRay, SoakEnemyEachRound
     }
     public enum Personality
     {
@@ -61,9 +61,10 @@ namespace RaidPartyManager.Domain
     {
         public const int Positions = 4;
         public const int EquipmentSlots = 3;
-        public static int PersonalEquipmentSlots(PlayerTrait talent) => EquipmentSlots + (talent == PlayerTrait.Warehouse ? 1 : 0);
-        public static bool ValidEquipmentSlots(int count, PlayerTrait talent) =>
-            count == PersonalEquipmentSlots(talent) || count == PersonalEquipmentSlots(talent) + 1;
+        public static int PersonalEquipmentSlots(PlayerTrait talent, bool extraSlot = false) =>
+            EquipmentSlots + (talent == PlayerTrait.Warehouse ? 1 : 0) + (extraSlot ? 1 : 0);
+        public static bool ValidEquipmentSlots(int count, PlayerTrait talent, bool extraSlot = false) =>
+            count == PersonalEquipmentSlots(talent, extraSlot) || count == PersonalEquipmentSlots(talent, extraSlot) + 1;
         public const int DefaultEnergy = 2;
         public const int MaximumEnergy = 8;
 
@@ -84,9 +85,9 @@ namespace RaidPartyManager.Domain
             Remaining = Math.Clamp(remaining, 0, Capacity);
         }
 
-        public static BattleEnergy Full(IEnumerable<EquipmentDefinition> equipment)
+        public static BattleEnergy Full(IEnumerable<EquipmentDefinition> equipment, int bonusEnergy = 0)
         {
-            int capacity = Rules.DefaultEnergy + 2 * equipment.Count(item => item.Effect == EquipmentEffect.EchoChalice);
+            int capacity = Rules.DefaultEnergy + bonusEnergy + 2 * equipment.Count(item => item.Effect == EquipmentEffect.EchoChalice);
             return new BattleEnergy(capacity, capacity);
         }
     }
@@ -311,12 +312,16 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<string> EquipmentSlots { get; }
         public IReadOnlyDictionary<StatusKind, int> StartingStatuses { get; }
         public IReadOnlyList<SkillBookDefinition> LearnedSkills { get; }
+        public int BonusEnergy { get; }
+        public bool ExtraEquipmentSlot { get; }
 
         public Combatant(string id, CharacterDefinition character, Side side, int position, Stats stats, int health,
             IEnumerable<EquipmentDefinition> equipment = null,
             IReadOnlyDictionary<StatusKind, int> startingStatuses = null, IEnumerable<string> equipmentSlots = null,
-            IEnumerable<SkillBookDefinition> learnedSkills = null, PlayerTrait talent = PlayerTrait.None)
+            IEnumerable<SkillBookDefinition> learnedSkills = null, PlayerTrait talent = PlayerTrait.None, int bonusEnergy = 0, bool extraEquipmentSlot = false)
         {
+            BonusEnergy = bonusEnergy;
+            ExtraEquipmentSlot = extraEquipmentSlot;
             Talent = talent;
             Character = character ?? throw new ArgumentNullException(nameof(character));
             if (string.IsNullOrWhiteSpace(id) || !Rules.Fits(position, Character.PositionSlots) ||
@@ -330,12 +335,18 @@ namespace RaidPartyManager.Domain
             Equipment = Array.AsReadOnly(equipment?.ToArray() ?? Array.Empty<EquipmentDefinition>());
             EquipmentSlots = Array.AsReadOnly(equipmentSlots?.ToArray() ?? Array.Empty<string>());
             LearnedSkills = Array.AsReadOnly(learnedSkills?.Where(skill => skill != null).ToArray() ?? Array.Empty<SkillBookDefinition>());
-            if (EquipmentSlots.Count != 0 && (!Rules.ValidEquipmentSlots(EquipmentSlots.Count, talent) ||
+            if (EquipmentSlots.Count != 0 && (!Rules.ValidEquipmentSlots(EquipmentSlots.Count, talent, extraEquipmentSlot) ||
                 EquipmentSlots.Count(slot => slot != null) != Equipment.Count))
                 throw new ArgumentException("Combat equipment slots must match the supplied equipped instances.", nameof(equipmentSlots));
-            StartingStatuses = new System.Collections.ObjectModel.ReadOnlyDictionary<StatusKind, int>(
-                startingStatuses?.Where(status => status.Value > 0).ToDictionary(status => status.Key, status => status.Value)
-                ?? new Dictionary<StatusKind, int>());
+            var initial = startingStatuses?.Where(status => status.Value > 0).ToDictionary(status => status.Key, status => status.Value)
+                ?? new Dictionary<StatusKind, int>();
+            if (initial.ContainsKey(StatusKind.Wet) && initial.ContainsKey(StatusKind.Chill))
+            {
+                initial.Remove(StatusKind.Wet);
+                initial.Remove(StatusKind.Chill);
+                initial[StatusKind.Frozen] = 1;
+            }
+            StartingStatuses = new System.Collections.ObjectModel.ReadOnlyDictionary<StatusKind, int>(initial);
         }
     }
 

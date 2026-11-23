@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 0
   traitPower: 0
-  traitText: "投递铅丸（66%） / 加急邮包（34%）"
+  traitText: "34% 概率发射火焰邮包。优先投向有破绽的对手，条件相同时选最后方。"
   personality: 1
   attack: 6
   defense: 2
@@ -60,11 +60,11 @@ MonoBehaviour:
     - name: "加急邮包"
       weight: 34
       kind: 0
-      target: 8
+      target: 14
       power: 1
       damageType: 2
-      status: 6
-      layers: 1
+      status: -1
+      layers: 0
       requiresCharge: 0
       delayDecay: 0
     openingShield: 0

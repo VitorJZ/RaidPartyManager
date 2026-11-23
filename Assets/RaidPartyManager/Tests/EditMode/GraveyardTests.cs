@@ -131,6 +131,64 @@ namespace RaidPartyManager.Tests
             }
         }
 
+        [TestCase("Roadside", "潮线拦截", "冰冻", "front", "潮湿遇寒冷")]
+        [TestCase("ClockworkCapital", "玻璃温室", "中毒", "rear", "达到 2 层")]
+        public void TwoMemberFormationsCanTriggerTheirElementalCombination(string region, string formation,
+            string reaction, string target, string detail)
+        {
+            var data = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
+                $"Assets/RaidPartyManager/PrototypeData/{region}Encounter.asset").ToData();
+            var enemies = data.EnemyFormations.Single(group => group.Name == formation).CreateLineup("enemy", 2);
+            var party = new[] { Dummy("front", 1), Dummy("rear", 4) };
+            var session = new BattleSimulator(random: new FixedRoll(99)).Start(
+                new BattleRequest("combination", party.Concat(enemies), 100));
+            var events = session.AdvanceRound();
+            Assert.That(events.Any(entry => entry.ActionName == reaction && entry.TargetId == target && entry.Detail == detail), Is.True);
+        }
+
+        [TestCase("WhisperingGraveyard", "墓园普通突击", 71, "翻起尸瘴", "守夜骨矢", "front")]
+        [TestCase("ClockworkCapital", "焦仓巡守", 99, "焦点校准", "泄压冲锋", "rear")]
+        public void AnEnemyCanDesignateAnUnexpectedTargetForItsPartner(string region, string formation, int roll,
+            string markerAction, string followup, string target)
+        {
+            var data = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
+                $"Assets/RaidPartyManager/PrototypeData/{region}Encounter.asset").ToData();
+            var enemies = data.EnemyFormations.Single(group => group.Name == formation).CreateLineup("enemy", 2);
+            var guard = Dummy("front", 1);
+            var archer = Dummy("rear", 4);
+            var party = new[] { new Combatant("front", guard.Character, Side.Party, 1, new Stats(0, 5, 0, 999), 999),
+                new Combatant("rear", archer.Character, Side.Party, 4, new Stats(3, 0, 0, 999), 999) };
+            var session = new BattleSimulator(random: new FixedRoll(roll)).Start(new BattleRequest("designation", party.Concat(enemies), 100));
+            var events = session.AdvanceRound().ToList();
+            Assert.That(events.Single(entry => entry.ActionName == markerAction).TargetId, Is.EqualTo(target));
+            if (enemies.Any(unit => unit.Character.EnemyBehavior.Actions.Any(action => action.Name == followup && action.RequiresCharge)))
+                events.AddRange(session.AdvanceRound());
+            Assert.That(events.Single(entry => entry.ActionName == followup).TargetId, Is.EqualTo(target));
+        }
+
+        [TestCase("WhisperingGraveyard", "VigilCrossbow", "守夜骨矢", StatusKind.Cursed, 0, "rear", "front")]
+        [TestCase("ClockworkCapital", "CokeBoar", "泄压冲锋", StatusKind.Exposed, 99, "rear", "front")]
+        [TestCase("ClockworkCapital", "MailSphere", "加急邮包", StatusKind.Exposed, 99, "front", "rear")]
+        public void HuntersPrioritizeMarkedOpponentsAndFallBackWhenUnmarked(string region, string id, string action,
+            StatusKind mark, int roll, string markedTarget, string fallback)
+        {
+            var data = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
+                $"Assets/RaidPartyManager/PrototypeData/{region}Encounter.asset").ToData();
+            var hunter = data.EnemyRoster.Single(enemy => enemy.Id == "Enemy" + id);
+            foreach (bool marked in new[] { true, false })
+            {
+                var party = new[] { Dummy("front", 1), Dummy("rear", 4) }.Select(unit =>
+                    new Combatant(unit.Id, unit.Character, unit.Side, unit.Position, unit.Stats, unit.Health,
+                        startingStatuses: marked && unit.Id == markedTarget ? new Dictionary<StatusKind, int> { [mark] = 2 } : null));
+                var enemy = new Combatant("hunter", hunter, Side.Enemy, 1, hunter.BaseStats, hunter.BaseStats.Health);
+                var session = new BattleSimulator(random: new FixedRoll(roll)).Start(new BattleRequest("hunt", party.Append(enemy), 100));
+                var events = session.AdvanceRound().ToList();
+                if (hunter.EnemyBehavior.Actions.Single(candidate => candidate.Name == action).RequiresCharge)
+                    events.AddRange(session.AdvanceRound());
+                Assert.That(events.Single(entry => entry.ActionName == action).TargetId, Is.EqualTo(marked ? markedTarget : fallback));
+            }
+        }
+
         [Test]
         public void GroupAttacksPublishOneActionAndOrderedPerTargetEffects()
         {

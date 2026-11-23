@@ -247,6 +247,7 @@ namespace RaidPartyManager.Presentation
                     movingImage.style.translate = sprite.Figure.style.translate;
                 }
             }
+            movingImage.RideHeight = now < poseStart ? RidingWave.Envelope(approaching) : RidingWave.Envelope(retreating);
             float orientation = (now >= returnAt ? -direction : direction) * (sprite.FacesLeft ? -1f : 1f);
             movingImage.style.scale = new Scale(new Vector3(orientation, 1f, 1f));
             SetBounds(movingImage, new Rect(x - size.x * 0.5f, source.yMax - size.y - lift, size.x, size.y));

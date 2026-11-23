@@ -31,6 +31,12 @@ namespace RaidPartyManager.Presentation
         private readonly VisualElement items;
         private readonly VisualElement actions;
         private readonly Button teamButton;
+        private sealed class RenewalReminder
+        {
+            public int Day = -1;
+        }
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<PartyRun, RenewalReminder> reminders = new();
+        private IVisualElementScheduledItem renewalPulse;
         private PartyEditorView editor;
         private EquipmentTooltip itemTooltip;
 
@@ -80,6 +86,8 @@ namespace RaidPartyManager.Presentation
                     HideTooltip();
                     openEditor();
                 });
+                if (FirstRunGuide.AtDeparture(party) && !FirstRunGuide.Prepared)
+                    PrototypeStyle.Outline(teamButton, PrototypeStyle.Accent, 4);
                 teamButton.style.marginRight = 8;
                 Add(teamButton);
             }
@@ -233,11 +241,18 @@ namespace RaidPartyManager.Presentation
             }
             teamButton?.SetEnabled(false);
 
+            Label guide = null;
             editor = new PartyEditorView(enemyParty ?? party, content, Close,
                 enemyParty == null ? Side.Party : Side.Enemy, OnEdited, supplyTestItems: !AdventureFlow.CanSave(party));
             PrototypeStyle.Fill(editor);
             editor.style.top = Height;
             root.Add(editor);
+            if (enemyParty == null && FirstRunGuide.AtDeparture(party))
+            {
+                guide = FirstRunGuide.EditorHint(editor);
+                bag.style.display = items.style.display = DisplayStyle.None;
+                Insert(IndexOf(items), guide);
+            }
             Refresh();
             editor.Q<Button>("back-party-editor").Focus();
 
@@ -249,6 +264,11 @@ namespace RaidPartyManager.Presentation
 
             void Close()
             {
+                if (guide != null)
+                {
+                    guide.RemoveFromHierarchy();
+                    bag.style.display = items.style.display = DisplayStyle.Flex;
+                }
                 editor.RemoveFromHierarchy();
                 editor = null;
                 if (actions != null)
@@ -366,11 +386,45 @@ namespace RaidPartyManager.Presentation
             if (teamButton == null || party.Day == 0) return;
             bool due = party.NeedsRenewal;
             teamButton.style.backgroundColor = due ? new Color(.35f, .065f, .065f) : PrototypeStyle.Inset;
-            teamButton.Q("team-icon")?.MarkDirtyRepaint();
+            var icon = teamButton.Q("team-icon");
+            icon.MarkDirtyRepaint();
+            UpdateRenewalPulse(icon, due);
             teamButton.tooltip = due ? "右击队员续约 · " + string.Join("、", party.Members
                 .Where(m => m.ContractEndDay - party.Day <= 3)
                 .Select(m => $"{m.Character.Name}剩 {m.ContractEndDay - party.Day} 天")) : "编队 · 右击队员查看合约";
+            var adventure = AdventureFlow.Active;
+            if (due && AdventureFlow.OnRoute && adventure.Party == party &&
+                (adventure.Current is { Resolved: true, Kind: NodeKind.Event or NodeKind.TreasureChest } ||
+                 adventure.Current == null && adventure.LastClosedEventDay == party.Day))
+                PlayRenewalReminder();
             if (!party.CanAdvanceDay) gold.text += "　出发前请续约";
+        }
+
+        private void PlayRenewalReminder()
+        {
+            var reminder = reminders.GetValue(party, _ => new RenewalReminder());
+            if (reminder.Day == party.Day) return;
+            reminder.Day = party.Day;
+            GameAudio.Play(SoundCue.UiTurnAdvance);
+        }
+
+        private void UpdateRenewalPulse(VisualElement icon, bool due)
+        {
+            if (!due)
+            {
+                renewalPulse?.Pause();
+                icon.style.opacity = 1f;
+                return;
+            }
+
+            if (renewalPulse == null)
+                renewalPulse = icon.schedule.Execute(() =>
+                {
+                    double phase = Time.realtimeSinceStartupAsDouble % 1;
+                    icon.style.opacity = .65f + .35f * Mathf.Cos((float)phase * Mathf.PI * 2);
+                }).Every(60);
+            else if (!renewalPulse.isActive)
+                renewalPulse.Resume();
         }
 
         public void Refresh()

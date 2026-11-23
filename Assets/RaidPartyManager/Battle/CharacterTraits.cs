@@ -48,6 +48,12 @@ namespace RaidPartyManager.Battle
             {
                 switch (unit.Trait)
                 {
+                    case SoakEnemyEachRound:
+                        var targets = Opponents(unit).ToArray();
+                        if (targets.Length > 0)
+                            GrantStatus(unit, targets[random.Next(targets.Length)], Wet, unit.TraitPower,
+                                "深海轻语", kind: BattleEventKind.Effect);
+                        break;
                     case PoisonOpponents:
                         foreach (var enemy in Opponents(unit))
                             GrantStatus(unit, enemy, Poison, unit.TraitPower,

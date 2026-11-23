@@ -170,7 +170,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void ChaliceAddsToTheCapacityEarnedForExpensiveSkills()
+        public void ChaliceCapacityDoesNotChargeAgainForAnAlreadyAffordableSkill()
         {
             var baseUnit = Unit("party", Side.Party, 1, maxHealth: 100);
             var enemy = Unit("enemy", Side.Enemy, 1, maxHealth: 200, attack: 1);
@@ -182,7 +182,7 @@ namespace RaidPartyManager.Tests
             for (int round = 1; round <= 4; round++)
             {
                 battle.AdvanceRound();
-                Assert.That(battle.ReadPartyEnergy().Single().Value.Capacity, Is.EqualTo(System.Math.Min(6, round + 3)));
+                Assert.That(battle.ReadPartyEnergy().Single().Value.Capacity, Is.EqualTo(4));
             }
         }
 

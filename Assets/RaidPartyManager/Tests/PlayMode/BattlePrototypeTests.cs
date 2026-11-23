@@ -597,6 +597,69 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator DeepSeaWhisperRidesAboveTheCastAndLandsInHerSlot()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var field = typeof(BattlePrototype).GetField("encounter", PrivateInstance);
+            var encounter = Object.Instantiate((EncounterAsset)field.GetValue(scene));
+            var roster = (object[])typeof(EncounterAsset).GetField("party", PrivateInstance).GetValue(encounter);
+            var guests = (CharacterAsset[])typeof(EncounterAsset).GetField("eventRecruits", PrivateInstance).GetValue(encounter);
+            roster[1].GetType().GetField("character", PrivateInstance).SetValue(roster[1], guests.Single(c => c.name == "DeepSeaWhisper"));
+            scene.enabled = false;
+            ResetRun();
+            field.SetValue(scene, encounter);
+            scene.enabled = true;
+            yield return null;
+
+            var theatre = scene.transform.Find("Paper Theatre");
+            float peak = 0, deadline = Time.realtimeSinceStartup + 4;
+            MeshRenderer wave = null;
+            var ink = new MaterialPropertyBlock();
+            var waveFrames = new HashSet<Vector4>();
+            while (Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+                if (wave == null) wave = theatre.Find("entrance-mage/DeepSeaWhisper wave")?.GetComponent<MeshRenderer>();
+                if (wave == null) continue;
+                if (!wave.enabled && peak > 0) break;
+                if (!wave.enabled) continue;
+                var rider = wave.transform.parent.GetComponent<MeshRenderer>();
+                float rise = (rider.bounds.min.y - wave.bounds.min.y) / rider.bounds.size.y;
+                peak = Mathf.Max(peak, rise);
+                wave.GetPropertyBlock(ink);
+                waveFrames.Add(ink.GetVector("_MainTex_ST"));
+                Assert.That(ink.GetTexture("_MainTex").name, Is.EqualTo("DeepSeaWhisper-Wave"));
+                if (rise < .73f) continue;
+                rider.GetPropertyBlock(ink);
+                Assert.That(ink.GetFloat("_RideFoam"), Is.GreaterThan(.9f));
+                Assert.That(ink.GetTexture("_RideWaveTex").name, Is.EqualTo("DeepSeaWhisper-Wave"));
+                Assert.That(wave.bounds.size.x, Is.GreaterThan(2 * rider.bounds.size.x));
+                Assert.That(wave.sortingOrder, Is.LessThan(rider.sortingOrder));
+                Assert.That(Mathf.Abs(wave.bounds.max.y - rider.bounds.min.y), Is.LessThan(.2f * rider.bounds.size.y));
+            }
+            Assert.That(peak, Is.InRange(.76f, .85f), "Rise by one painted character height.");
+            Assert.That(waveFrames.Count, Is.GreaterThan(2));
+            Assert.That(wave.enabled, Is.False, "The wake must disappear on landing.");
+            var inks = new MaterialPropertyBlock();
+            MeshRenderer Standing() => theatre.GetComponentsInChildren<MeshRenderer>().FirstOrDefault(r =>
+            {
+                r.GetPropertyBlock(inks);
+                return r.enabled && r.name == "battle-sprite" && inks.GetTexture("_MainTex")?.name == "DeepSeaWhisper-Combat";
+            });
+            deadline = Time.realtimeSinceStartup + 2;
+            while (Standing() == null && Time.realtimeSinceStartup < deadline) yield return null;
+            var standing = Standing();
+            Assert.That(standing, Is.Not.Null, "The grounded idle pose should take over after landing.");
+            var ally = theatre.GetComponentsInChildren<MeshRenderer>().First(r => r != standing && r.enabled && r.name == "battle-sprite");
+            Assert.That(standing.bounds.min.y, Is.EqualTo(ally.bounds.min.y).Within(.06f * standing.bounds.size.y));
+            Assert.That(standing.bounds.size.y, Is.EqualTo(ally.bounds.size.y).Within(.06f * standing.bounds.size.y));
+            scene.enabled = false;
+            Object.Destroy(encounter);
+        }
+
+        [UnityTest]
         public IEnumerator BothSidesWalkIntoTheirSlotsBeforeTheFirstRound()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
@@ -1296,8 +1359,25 @@ namespace RaidPartyManager.Tests
             start = Now(); real = Time.unscaledTimeAsDouble;
             yield return new WaitForSecondsRealtime(.15f);
             Assert.That((Now() - start) / (Time.unscaledTimeAsDouble - real), Is.EqualTo(1).Within(.05));
+            Press(root, "battle-speed");
             yield return ResolveBattle(root);
             Assert.That(root.Q("battle-speed"), Is.Null);
+
+            yield return SceneManager.LoadSceneAsync("WhisperingGraveyard");
+            yield return null;
+            scene = Object.FindAnyObjectByType<BattlePrototype>();
+            root = scene.GetComponent<UIDocument>().rootVisualElement;
+            Press(root, "start");
+            Assert.That(root.Q<Button>("battle-speed").text, Is.EqualTo("倍速 2×"));
+            start = Now(); real = Time.unscaledTimeAsDouble;
+            yield return new WaitForSecondsRealtime(.15f);
+            Assert.That((Now() - start) / (Time.unscaledTimeAsDouble - real), Is.EqualTo(2).Within(.05));
+            Press(root, "battle-speed");
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            root = Object.FindAnyObjectByType<BattlePrototype>().GetComponent<UIDocument>().rootVisualElement;
+            Press(root, "start");
+            Assert.That(root.Q<Button>("battle-speed").text, Is.EqualTo("倍速 1×"));
         }
 
         [UnityTest]
@@ -1455,7 +1535,7 @@ namespace RaidPartyManager.Tests
             var popup = root.Q("party-replacement");
             Assert.That(popup, Is.Not.Null);
             var candidates = popup.Q<ScrollView>("replacement-candidates");
-            Assert.That(candidates.Query<Button>().ToList().Count, Is.EqualTo(35));
+            Assert.That(candidates.Query<Button>().ToList().Count, Is.EqualTo(36));
             yield return null;
             Assert.That(candidates.verticalScroller.highValue, Is.GreaterThan(0));
             Assert.That(popup.Q<Button>("replace-with-CampGuard").enabledInHierarchy, Is.False);

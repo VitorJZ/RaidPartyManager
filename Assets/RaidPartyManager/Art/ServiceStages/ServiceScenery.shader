@@ -26,6 +26,7 @@ Shader "Raid Party Manager/Service Scenery"
             #pragma fragment frag
             #include "UnityCG.cginc"
             #include "../Stagecraft/ScenicPaint.cginc"
+            #include "../Stagecraft/RidingFoam.cginc"
             #include "../Stagecraft/StageLighting.cginc"
             sampler2D _MainTex;
             float4 _MainTex_ST, _Color, _FireLight, _Walk;
@@ -63,7 +64,7 @@ Shader "Raid Party Manager/Service Scenery"
                     }
                     return half4(1,.26+.34*saturate(sparks),.055,saturate(.20*bloom*_FireLight.w+sparks));
                 }
-                half4 ink=tex2D(_MainTex,i.uv)*_Color;
+                half4 ink = WithRidingFoam(tex2D(_MainTex,i.uv), i.uv, _MainTex_ST) * _Color;
                 half luminance = dot(ink.rgb, half3(.299,.587,.114));
                 ink.rgb = lerp(ink.rgb, half3(luminance,luminance,luminance), _Desaturation);
                 if (_Surface == 8) ink = SawnFlat(ink, _MainTex, i.uv);

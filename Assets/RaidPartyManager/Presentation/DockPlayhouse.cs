@@ -31,6 +31,7 @@ namespace RaidPartyManager.Presentation
         internal Mesh FloorPattern { get; private set; }
         internal Mesh PanoramaPattern { get; private set; }
         private VisualElement panel, inputShield;
+        private Label finale;
         private StyleFloat previousOpacity;
         private MaterialPropertyBlock folds;
         private Cue cue;
@@ -275,6 +276,8 @@ namespace RaidPartyManager.Presentation
             performance.Unbind();
             if (panel != null) panel.style.opacity = previousOpacity;
             inputShield?.RemoveFromHierarchy();
+            finale?.RemoveFromHierarchy();
+            finale = null;
             panel = inputShield = null;
             owner = null;
             afterClose = null;
@@ -295,12 +298,35 @@ namespace RaidPartyManager.Presentation
                 current.performance.Change(next, toSigns, turn);
                 return;
             }
-            if (current.cue is Cue.Closing or Cue.Closed) return;
-            current.cue = Cue.Closing;
-            current.closedFrame = false;
-            current.hold = 0;
-            current.afterClose = next;
-            current.ApplyCue();
+            current.CloseCurtain(next);
+        }
+
+        internal void ShowFinalCurtain(Action returnToMenu)
+        {
+            performance.EndFirstEntrance();
+            cueSpeed = 1;
+            CloseCurtain(() =>
+            {
+                finale = PrototypeStyle.Text("恭喜通关，感谢游玩", 36, PrototypeStyle.Accent);
+                finale.name = "campaign-finale";
+                PrototypeStyle.Fill(finale);
+                PrototypeStyle.Middle(finale);
+                finale.style.unityFontDefinition = panel.resolvedStyle.unityFontDefinition;
+                finale.style.unityFontStyleAndWeight = FontStyle.Bold;
+                // The gameplay document has faded out. Print the title above the closed travellers.
+                panel.parent.Add(finale);
+                finale.schedule.Execute(returnToMenu).StartingIn(5000);
+            });
+        }
+
+        private void CloseCurtain(Action next)
+        {
+            if (cue is Cue.Closing or Cue.Closed) return;
+            cue = Cue.Closing;
+            closedFrame = false;
+            hold = 0;
+            afterClose = next;
+            ApplyCue();
         }
 
         private void LateUpdate()

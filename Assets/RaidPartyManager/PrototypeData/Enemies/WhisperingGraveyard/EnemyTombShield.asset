@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 0
   traitPower: 0
-  traitText: "碑盾撞击（70%） / 立碑护身（30%）"
+  traitText: "开战自带 4 点护盾。30% 概率为己方攻击最高者增加 4 点护盾。"
   personality: 1
   attack: 4
   defense: 4
@@ -57,11 +57,11 @@ MonoBehaviour:
       layers: 0
       requiresCharge: 0
       delayDecay: 0
-    - name: "立碑护身"
+    - name: "借碑作掩"
       weight: 30
       kind: 3
-      target: 5
-      power: 5
+      target: 11
+      power: 4
       damageType: 0
       status: -1
       layers: 0

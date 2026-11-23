@@ -7,7 +7,7 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class FormationSwap
     {
-        private const int HoldMilliseconds = 300;
+        private const int HoldMilliseconds = 150;
         private const int PreviewWidth = 76;
         private const int PreviewHeight = 96;
 

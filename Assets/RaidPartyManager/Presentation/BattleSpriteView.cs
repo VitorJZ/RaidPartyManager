@@ -164,6 +164,7 @@ namespace RaidPartyManager.Presentation
             {
                 retreating = false;
                 retreatWalk = null;
+                figure.RideHeight = 0;
                 figure.style.scale = new Scale(Vector3.one);
                 figure.style.opacity = 1;
                 SetMotion(Motion.Idle, alive.HasValue ? now : now - idleOffset);
@@ -247,6 +248,7 @@ namespace RaidPartyManager.Presentation
         private void DrawRetreat(float elapsed)
         {
             float progress = Mathf.Clamp01(elapsed / DeathEnds[^1]);
+            figure.RideHeight = RidingWave.Envelope(progress);
             if (retreatWalk != null)
             {
                 int frame = AnimationCels.Loop(elapsed, 6f / 16f);

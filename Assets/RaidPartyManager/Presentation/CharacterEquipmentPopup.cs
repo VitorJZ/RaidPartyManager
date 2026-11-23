@@ -13,7 +13,7 @@ namespace RaidPartyManager.Presentation
     {
         private const int Columns = 4;
         private const int PageSize = Columns * Columns;
-        private const int HoldMilliseconds = 300;
+        private const int HoldMilliseconds = 150;
         private const float TileSize = 73;
         private const float SlotSize = 65;
         private const float BagCellMargin = 2;
@@ -375,6 +375,7 @@ namespace RaidPartyManager.Presentation
 
         private void ChangePage()
         {
+            if (showSkillBooks) FirstRunGuide.SupplyBook(run);
             CancelInteraction();
             Render();
         }
@@ -551,8 +552,19 @@ namespace RaidPartyManager.Presentation
                 PrototypeStyle.Outline(dropTarget.View, PrototypeStyle.Ally, 5);
         }
 
-        private void RestoreCellOutline(Cell cell) => PrototypeStyle.Outline(cell.View,
-            keyboardSlot == (cell.Kind, cell.Index) || cell.LearnedSkill != null ? PrototypeStyle.Accent : PrototypeStyle.Edge, 5);
+        private void RestoreCellOutline(Cell cell)
+        {
+            var color = cell.Kind switch
+            {
+                CellKind.EquipmentSlot => PrototypeStyle.EquipmentSilver,
+                CellKind.SkillSlot => PrototypeStyle.SkillGold,
+                _ => PrototypeStyle.Edge
+            };
+            PrototypeStyle.Outline(cell.View, color, 5);
+            var style = cell.View.style;
+            int width = keyboardSlot == (cell.Kind, cell.Index) ? 3 : cell.IsSlot ? 2 : 1;
+            style.borderTopWidth = style.borderBottomWidth = style.borderLeftWidth = style.borderRightWidth = width;
+        }
 
         private void MoveGhost()
         {
@@ -592,6 +604,7 @@ namespace RaidPartyManager.Presentation
             {
                 if (!run.TryLearnSkill(memberId, target.Index, from.Item.Id))
                     return;
+                FirstRunGuide.Practiced(run, GuideStep.Learned);
                 GameAudio.Play(SoundCue.SkillLearn);
                 slot = target;
             }
@@ -603,6 +616,7 @@ namespace RaidPartyManager.Presentation
                 if (!run.TryEquip(memberId, slot.Index, unequipping ? null : bagCell.Item?.Id))
                     return;
 
+                if (!unequipping) FirstRunGuide.Practiced(run, GuideStep.Equipped);
                 GameAudio.Play(unequipping ? SoundCue.Unequip : SoundCue.Equip);
                 if (unequipping && bagCell.Item == null)
                 {

@@ -31,16 +31,24 @@ namespace RaidPartyManager.Presentation
         {
             root = GetComponent<UIDocument>().rootVisualElement;
             PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
-            run = AdventureFlow.Select(assets, AdventureFlow.InspectionMode);
-            ShowRun();
+            ShowRun(AdventureFlow.InspectionMode);
         }
 
-        private void ShowRun()
+        private void ShowRun(bool inspection)
         {
-            if (run?.HasBattleRewardScreen == true && run.Current.Event == null)
-                root.schedule.Execute(() => AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(run.Current.Kind)));
-            else
-                Render();
+            run = AdventureFlow.Select(assets, inspection, out bool resumeMarket);
+            if (run?.Current?.Kind == NodeKind.Town || (run?.HasBattleRewardScreen == true && run.Current.Event == null))
+            {
+                var scene = resumeMarket ? "TalentMarket" : AdventureFlow.SceneFor(run.Current.Kind);
+                // OnEnable can run while the menu is still loading this hub.
+                PrototypeSceneMenu.AfterSceneLoad(() =>
+                {
+                    if (this != null && isActiveAndEnabled)
+                        AdventureFlow.OpenNodeScene(scene, fromTown: resumeMarket);
+                });
+                return;
+            }
+            Render();
         }
 
         private void Update() => stage?.Tick();
@@ -112,9 +120,6 @@ namespace RaidPartyManager.Presentation
             if (run.Current != null) PresentVisit();
         }
 
-        private void Switch(bool inspection)
-        { run = AdventureFlow.Select(assets, inspection); ShowRun(); }
-
         private void ResetAdventure()
         {
             run = AdventureFlow.Select(assets, run.IsInspection, true);
@@ -136,8 +141,8 @@ namespace RaidPartyManager.Presentation
             var toolbar = PrototypeStyle.Row();
             toolbar.style.marginTop = 14;
             toolbar.style.alignItems = Align.Center;
-            toolbar.Add(PrototypeStyle.Button("事件检查", "event-tab-inspect", () => Switch(true), true));
-            toolbar.Add(PrototypeStyle.Button("讨伐路线", "event-tab-route", () => Switch(false)));
+            toolbar.Add(PrototypeStyle.Button("事件检查", "event-tab-inspect", () => ShowRun(true), true));
+            toolbar.Add(PrototypeStyle.Button("讨伐路线", "event-tab-route", () => ShowRun(false)));
             toolbar.Add(PrototypeStyle.Button("重置当前试游", "reset-adventure", ResetAdventure));
             toolbar.Add(PrototypeStyle.Button("推进 1 个关卡", "inspection-advance", () => { run.AdvanceInspection(); Render(); }));
             toolbar.Add(PrototypeStyle.Button("下一层", "inspection-next-floor", NextFloor));
@@ -145,14 +150,14 @@ namespace RaidPartyManager.Presentation
             if (!string.IsNullOrEmpty(run.ReturnMessage))
                 screen.Add(PrototypeStyle.Text(run.ReturnMessage, 17, PrototypeStyle.Accent));
 
-            var hint = PrototypeStyle.Text("任选一幕试演。墓园和遗都事件结算后可阅读结果，拉动出口牌返回。", 13, PrototypeStyle.Muted);
+            var hint = PrototypeStyle.Text("任选一幕试演。墓园和遗都事件结算后可阅读结果，点击出口牌返回。", 13, PrototypeStyle.Muted);
             hint.style.marginTop = hint.style.marginBottom = 10; screen.Add(hint);
             var scroll = new ScrollView { name = "event-catalog" }; scroll.style.flexGrow = 1; scroll.style.minHeight = 0;
             var grid = PrototypeStyle.Row(); grid.style.flexWrap = Wrap.Wrap; scroll.Add(grid); screen.Add(scroll);
             foreach (AdventureEventKind kind in Enum.GetValues(typeof(AdventureEventKind)))
             {
                 var captured = kind;
-                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, (GraveStories.Contains(kind) || CapitalStories.Contains(kind)) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
+                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, (GraveStories.Contains(kind) || CapitalStories.Contains(kind) || kind == AdventureEventKind.TidePact) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
                 { if (run.Inspect(NodeKind.Event, captured)) PresentVisit(); }, kind == AdventureEventKind.FoundCoins);
             }
             foreach (var kind in new[] { NodeKind.Town, NodeKind.Camp, NodeKind.NormalBattle, NodeKind.EliteBattle, NodeKind.Boss, NodeKind.TreasureChest })
@@ -178,6 +183,12 @@ namespace RaidPartyManager.Presentation
                 stage.ShowCompany(run.Party, assets.Encounter);
             HideBackdrop();
             root.style.backgroundColor = Color.clear;
+            if (run.CampaignWon) { AdventureFlow.FinishCampaign(); return; }
+            if (FirstRunGuide.AtDeparture(run.Party))
+            {
+                FirstRunGuide.ShowDeparture(screen, Render);
+                if (!FirstRunGuide.Prepared) return;
+            }
             screen.Add(new StageSignMask(new DockRouteSigns(run, assets, stageArt.graveyardStone, EnterRoute, NextFloor)));
         }
 
@@ -213,6 +224,7 @@ namespace RaidPartyManager.Presentation
 
         private bool EnterRoute(int index, StageTurn turn)
         {
+            bool firstDeparture = FirstRunGuide.AtDeparture(run.Party);
             if (!run.EnterRoute(index))
             {
                 GameAudio.Play(SoundCue.UiRestricted);
@@ -225,6 +237,7 @@ namespace RaidPartyManager.Presentation
                 return false;
             }
             GameAudio.Play(SoundCue.UiMapMarker);
+            if (firstDeparture) FirstRunGuide.Remember(GuideStep.Departed);
             var kind = run.Current.Kind;
             AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(kind), turn: turn);
             return true;
@@ -327,6 +340,7 @@ namespace RaidPartyManager.Presentation
             bool changed = false;
             topBar.EditParty(() =>
             {
+                if (FirstRunGuide.AtDeparture(run.Party)) { Render(); return; }
                 if (!changed) return;
                 screen.Q("adventure-party")?.RemoveFromHierarchy();
                 if (run.IsInspection) RenderParty();
@@ -353,6 +367,7 @@ namespace RaidPartyManager.Presentation
         private static string Gate(AdventureEventKind kind) => CapitalStories.Contains(kind) ? "机巧遗都 · 随机事件" : GraveStories.Contains(kind) ? "低语墓园 · 随机事件" : kind switch
         {
             AdventureEventKind.Investor => "首层第 3 关之后 · 每层一次",
+            AdventureEventKind.TidePact => "弥雾码头 · 离开城镇后必定遇见",
             AdventureEventKind.Ambush => "全局事件",
             AdventureEventKind.LostTraveler or AdventureEventKind.FoundCoins or AdventureEventKind.HatTrick => "第 1～3 关事件",
             AdventureEventKind.Forge or AdventureEventKind.LockedChest => "第 4～6 关事件", _ => "第 7～9 关事件"

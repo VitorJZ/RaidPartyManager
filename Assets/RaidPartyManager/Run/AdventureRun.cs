@@ -6,7 +6,7 @@ using RaidPartyManager.Domain;
 namespace RaidPartyManager.Run
 {
     public enum NodeKind { Event, Camp, Shop, Town, NormalBattle, EliteBattle, Boss, TreasureChest }
-    public enum AdventureEventKind { Investor, Ambush, LostTraveler, FoundCoins, HatTrick, Forge, LockedChest, AscensionTrial, Alchemist, Obituary, Pallbearer, ClaimDesk, Auction, Sponsorship, HoundWalk, DeadLetters, WeepingWall, Ravens, BellRope, SoulWard, SoupQueue, WhisperWall, Epitaph, BorrowedName, FareGate, DeadMail, TimeOffice, WaterCharter, LostFreight, ClinicQueue, WrongSwitch, StreetCurrent, ElectionPress, BoilerUnion, SilentOrchestra, SeedArchive, SpareHands, GoldStandard, LastMeridian }
+    public enum AdventureEventKind { Investor, Ambush, LostTraveler, FoundCoins, HatTrick, Forge, LockedChest, AscensionTrial, Alchemist, Obituary, Pallbearer, ClaimDesk, Auction, Sponsorship, HoundWalk, DeadLetters, WeepingWall, Ravens, BellRope, SoulWard, SoupQueue, WhisperWall, Epitaph, BorrowedName, FareGate, DeadMail, TimeOffice, WaterCharter, LostFreight, ClinicQueue, WrongSwitch, StreetCurrent, ElectionPress, BoilerUnion, SilentOrchestra, SeedArchive, SpareHands, GoldStandard, LastMeridian, TidePact }
     public enum TownService { Recruit, Shop, Camp, Quest }
 
     public sealed class RouteNode
@@ -207,6 +207,8 @@ namespace RaidPartyManager.Run
     public sealed partial class AdventureRun
     {
         private Random random;
+        public const string TideSingerId = "DeepSeaWhisper";
+        private readonly CharacterDefinition tideSinger;
         private readonly CharacterDefinition[] characters;
         private readonly EquipmentDefinition[] equipment;
         private readonly EquipmentDefinition[] shopCatalogue;
@@ -229,8 +231,12 @@ namespace RaidPartyManager.Run
         public string RegionName => InCapital ? "机巧遗都" : InGraveyard ? "低语墓园" : "弥雾码头";
         public bool CrossingChapter => !IsInspection && Floor <= 2 && Stage == DockRoute.Stages &&
             !Failed && Current is { Kind: NodeKind.Boss, Resolved: true, Battle: { Settled: true } };
+        public bool CampaignWon => !IsInspection && InCapital && !Failed && Stage == DockRoute.Stages &&
+            (Current == null ? FloorCleared :
+                Current is { Kind: NodeKind.Boss, Resolved: true, Battle: { Settled: true } } && !HasBattleRewardScreen);
         public int Stage { get; private set; } = 1;
         public int CompletedNodes { get; private set; }
+        public int LastClosedEventDay { get; private set; } = -1;
         public int Investment { get; private set; }
         public bool InvestmentPaid { get; private set; }
         public bool InvestorVisitedThisFloor => investorFloors.Contains(Floor);
@@ -255,7 +261,9 @@ namespace RaidPartyManager.Run
             IEnumerable<EquipmentDefinition> equipment, bool inspection, Random random = null, bool foundingGrant = false)
         {
             Party = party ?? throw new ArgumentNullException(nameof(party));
-            this.characters = characters.Where(c => c.RosterNumber > 0).ToArray();
+            var roster = characters.Where(c => c.RosterNumber > 0).ToArray();
+            tideSinger = roster.FirstOrDefault(c => c.Id == TideSingerId);
+            this.characters = roster.Where(c => c.Id != TideSingerId).ToArray();
             var items = equipment.GroupBy(e => e.Id).Select(g => g.First()).ToArray();
             bossCatalogue = items;
             items = items.Where(item => item.AvailableInRegularPool).ToArray();
@@ -334,7 +342,7 @@ namespace RaidPartyManager.Run
                     Kind = node.Kind, Fork = node.IsFork, Replaces = -1,
                     AlternativePlusOne = node.Alternative.HasValue ? (int)node.Alternative.Value + 1 : 0
                 }).ToArray(),
-                Options = routeOptions?.ToArray(), FollowingOptions = followingOptions?.ToArray(), Current = new CheckpointStop(RouteCurrent),
+                Options = (LeavingForPact ? PactStop : routeOptions)?.ToArray(), FollowingOptions = followingOptions?.ToArray(), Current = new CheckpointStop(RouteCurrent),
                 Previous = new CheckpointStop(RoutePrevious.GetValueOrDefault()), HasPrevious = RoutePrevious.HasValue,
                 Choice = choice, FinishVisit = finishVisit,
                 Away = away.Select(companion => new CheckpointCompanion
@@ -437,7 +445,7 @@ namespace RaidPartyManager.Run
                 else if (saved.Party.Day == 0 && run.Current.Recruits.Count < 8)
                 {
                     var existing = run.Current.Recruits.Select(c => c.Id).Concat(party.Members.Select(m => m.Character.Id)).ToHashSet();
-                    var additions = catalog.Where(c => c.RosterNumber > 0 && !existing.Contains(c.Id)).OrderBy(_ => run.random.Next());
+                    var additions = run.characters.Where(c => !existing.Contains(c.Id)).OrderBy(_ => run.random.Next());
                     run.Current.Recruits = run.Current.Recruits.Concat(additions).Take(8).ToArray();
                 }
                 run.Current.UsedServices.UnionWith(shop.UsedServices);
@@ -457,8 +465,16 @@ namespace RaidPartyManager.Run
             return run;
         }
 
-        public IReadOnlyList<NodeKind> RouteOptions => routeOptions ??=
-            Route.Options(Stage, eventsTaken, elitesTaken, random);
+        private bool PactAhead => tideSinger != null && !InGraveyard && !InCapital &&
+            !seenEvents.Contains(AdventureEventKind.TidePact);
+        private bool LeavingForPact => PactAhead && RouteCurrent.Kind == NodeKind.Town && RouteCurrent.Number == Stage;
+        private static readonly IReadOnlyList<NodeKind> PactStop = Array.AsReadOnly(new[] { NodeKind.Event });
+
+        private IReadOnlyList<NodeKind> OptionsAt(int stage) =>
+            PactAhead && Route.Nodes[stage - 1].Kind == NodeKind.Town
+                ? new[] { NodeKind.Town } : Route.Options(stage, eventsTaken, elitesTaken, random);
+
+        public IReadOnlyList<NodeKind> RouteOptions => routeOptions ??= LeavingForPact ? PactStop : OptionsAt(Stage);
 
         private IReadOnlyList<NodeKind> followingOptions;
 
@@ -467,14 +483,14 @@ namespace RaidPartyManager.Run
                 Current.Kind is NodeKind.Camp or NodeKind.Town);
 
         public IReadOnlyList<NodeKind> FollowingOptions => CanChooseFollowing
-            ? followingOptions ??= Route.Options(Stage + 1, eventsTaken, elitesTaken, random)
+            ? (Current.Kind == NodeKind.Town && PactAhead ? PactStop : followingOptions ??= OptionsAt(Stage + 1))
             : Array.Empty<NodeKind>();
 
         public RouteStop FollowingChoice(int index)
         {
             var options = FollowingOptions;
             int lane = RouteDestination.Value.Lane + (options.Count > 1 ? (index == 0 ? -1 : 1) : 0);
-            return new RouteStop(Stage + 1, lane, options[index]);
+            return new RouteStop(Current.Kind == NodeKind.Town && PactAhead ? Stage : Stage + 1, lane, options[index]);
         }
 
         public bool EnterFollowing(int index)
@@ -520,9 +536,10 @@ namespace RaidPartyManager.Run
             random = new Random(seed);
             SuspendedChoice = null;
             RouteDestination = destination;
+            bool tidePact = kind == NodeKind.Event && LeavingForPact;
             if (kind == NodeKind.Event) eventsTaken++;
             if (kind == NodeKind.EliteBattle) elitesTaken++;
-            Open(kind, kind == NodeKind.Event ? RollEvent() : (AdventureEventKind?)null);
+            Open(kind, tidePact ? AdventureEventKind.TidePact : kind == NodeKind.Event ? RollEvent() : (AdventureEventKind?)null);
             return true;
         }
 
@@ -698,6 +715,18 @@ namespace RaidPartyManager.Run
                 Party.RememberRoadEvent(EmployeeThought.Traveler, recruit.Name, exceptCharacter: recruit.Id);
                 Finish($"{recruit.Name}拍了拍旅途的尘土，加入了讨伐队。");
             }
+            return true;
+        }
+
+        public IEnumerable<EquipmentInstance> TideOfferings => Party.SaleableItems.Where(item =>
+            !item.Definition.IsPotion && item.Definition.Effect != EquipmentEffect.RecruitmentNotice);
+
+        public bool OfferTidePact(string equipmentId, string bookId)
+        {
+            if (!At(AdventureEventKind.TidePact) || tideSinger == null ||
+                !Party.TrySignTidePact(tideSinger, equipmentId, bookId)) return false;
+            Party.RememberRoadEvent(EmployeeThought.Traveler, tideSinger.Name, exceptCharacter: tideSinger.Id);
+            Finish("深海轻语收下装备和技能书，乘浪跟上了队伍。她已签下 99 天的零薪合同。");
             return true;
         }
 
@@ -1141,6 +1170,7 @@ namespace RaidPartyManager.Run
         public bool CloseVisit()
         {
             if (Current == null || !Current.Resolved) return false;
+            if (Current.Kind is NodeKind.Event or NodeKind.TreasureChest) LastClosedEventDay = Party.Day;
             Current = null;
             AdvanceCompletedVisit();
             return true;
@@ -1156,7 +1186,8 @@ namespace RaidPartyManager.Run
                 RouteCurrent = destination;
                 RouteDestination = null;
                 if (Stage == DockRoute.Stages) FloorCleared = !Failed;
-                else Stage++;
+                else if (destination.Kind != NodeKind.Town || !PactAhead) Stage++;
+                else followingOptions = null; // The pact takes a day at the wharf before the next numbered stop.
             }
             nodeCheckpoint = null;
             routeOptions = followingOptions;
@@ -1179,7 +1210,7 @@ namespace RaidPartyManager.Run
 
         public bool NextFloor()
         {
-            if (!IsInspection && !FloorCleared || Current != null) return false;
+            if (CampaignWon || !IsInspection && !FloorCleared || Current != null) return false;
             if (Party.HasBorrowedName) return false;
             seenEvents.RemoveWhere(kind => GraveStories.Contains(kind) || CapitalStories.Contains(kind));
             Floor++; Stage = 1; FloorCleared = Failed = false; eventsTaken = elitesTaken = 0;

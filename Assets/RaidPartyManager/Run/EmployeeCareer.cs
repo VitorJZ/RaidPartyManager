@@ -152,6 +152,7 @@ namespace RaidPartyManager.Run
         private static bool Underpaid(Member member, int expected)
         {
             var contract = member.LastContract;
+            if (contract.TidePact) return false;
             if (member.Attributes.Loyalty < 4 && member.Attributes.Obedience < 4)
                 return contract.DailyWage < expected;
             return contract.DailyWage < CrewContract.MinimumWage(expected, contract.AgreedRates, member.Attributes);
@@ -296,21 +297,29 @@ namespace RaidPartyManager.Run
             FinishGoal(member, ref career.Raise);
             FinishGoal(member, ref career.Renewal);
             FinishGoal(member, ref career.Relationship);
-            if (member.Contract is { } contract)
+            int remaining = LimitActiveGoals(ref career);
+            if (member.Contract != null)
             {
-                if (career.Renewal.Kind == EmployeeGoalKind.None && member.LastContract.EndDay - Day <= 3 && Day <= int.MaxValue - 10)
+                if (remaining > 0 && career.Renewal.Kind == EmployeeGoalKind.None && member.LastContract.EndDay - Day <= 3 && Day <= int.MaxValue - 10)
+                {
                     career.Renewal = Goal(EmployeeGoalKind.Renewal, Day + 10);
+                    remaining--;
+                }
                 int expected = ExpectedWage(member);
-                if (career.Raise.Kind == EmployeeGoalKind.None && career.ServiceDays >= 2 &&
+                if (remaining > 0 && career.Raise.Kind == EmployeeGoalKind.None && career.ServiceDays >= 2 &&
                     Underpaid(member, expected) && expected > career.HighestWage)
+                {
                     career.Raise = Goal(EmployeeGoalKind.Raise, expected);
+                    remaining--;
+                }
                 career.HighestWage = Math.Max(career.HighestWage, member.LastContract.DailyWage);
             }
-            if (career.Relationship.Kind == EmployeeGoalKind.None && career.RivalIncidents >= 2 &&
+            if (remaining > 0 && career.Relationship.Kind == EmployeeGoalKind.None && career.RivalIncidents >= 2 &&
                 FindCurrentRival(member) is { } rival)
+            {
                 career.Relationship = Goal(EmployeeGoalKind.SeparateLineups, 2, subjectId: rival.Id, subjectName: rival.Character.Name);
-
-            int remaining = LimitActiveGoals(ref career);
+                remaining--;
+            }
             if (remaining > 0 && career.Work.Kind == EmployeeGoalKind.None)
             {
                 career.Work = NextWorkGoal(member);
@@ -421,27 +430,22 @@ namespace RaidPartyManager.Run
 
             if (goal.SubjectId == "grave-epitaph") member.Career.RecordedEpitaph = goal.SubjectName;
             goal.Progress = goal.Target;
-            var rating = RewardFor(goal.Kind);
-            if (!member.Attributes.TryRaise(rating, out int level))
+            var eligible = Ratings.Where(r => member.Attributes.Level(r) < 5).ToArray();
+            if (eligible.Length > 0)
             {
-                rating = EmployeeRating.Satisfaction;
-                if (!member.Attributes.TryRaise(rating, out level)) rating = EmployeeRating.None;
+                var rating = eligible[employeeRandom.Next(eligible.Length)];
+                member.Attributes.TryRaise(rating, out int level);
+                goal.Awarded = rating;
+                goal.AwardedLevel = level;
+                if (level == 5 && rating == EmployeeRating.Loyalty && member.Health > 0) member.Health += 3;
+                if (level == 5 && rating == EmployeeRating.PlayingTime && activeBattle == null) RefreshEquipmentSlots();
             }
-            goal.Awarded = rating;
-            goal.AwardedLevel = level;
             member.Career.GoalsCompleted++;
             member.Career.LastCompleted = goal;
             goal = default;
         }
 
-        private static EmployeeRating RewardFor(EmployeeGoalKind goal) => goal switch
-        {
-            EmployeeGoalKind.Raise or EmployeeGoalKind.Renewal or EmployeeGoalKind.Tenure => EmployeeRating.Loyalty,
-            EmployeeGoalKind.Blocking or EmployeeGoalKind.Damage => EmployeeRating.Hardiness,
-            EmployeeGoalKind.Appearances => EmployeeRating.PlayingTime,
-            EmployeeGoalKind.Healing or EmployeeGoalKind.Training or EmployeeGoalKind.Victories => EmployeeRating.Obedience,
-            EmployeeGoalKind.Kills => EmployeeRating.PayPreference,
-            _ => EmployeeRating.Satisfaction
-        };
+        private static readonly EmployeeRating[] Ratings = { EmployeeRating.Loyalty, EmployeeRating.Obedience,
+            EmployeeRating.PayPreference, EmployeeRating.PlayingTime, EmployeeRating.Satisfaction, EmployeeRating.Hardiness };
     }
 }

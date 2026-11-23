@@ -15,7 +15,7 @@ namespace RaidPartyManager.Presentation
             Vector2.up * -1, new(Horizontal, -.5f), new(Horizontal, .5f),
             Vector2.up, new(-Horizontal, .5f), new(-Horizontal, -.5f)
         };
-        private readonly (string Key, string Title, int Value)[] axes;
+        private readonly (string Key, string Title, int Value, string Bonus)[] axes;
         private readonly VisualElement plot;
         private readonly VisualElement[] captions = new VisualElement[Directions.Length];
 
@@ -33,12 +33,12 @@ namespace RaidPartyManager.Presentation
             Add(title);
 
             axes = new[] {
-                ("loyalty", "忠诚程度", ratings.Loyalty),
-                ("obedience", "战术服从", ratings.Obedience),
-                ("pay-preference", "薪酬偏好", ratings.PayPreference),
-                ("playing-time", "上场需求", ratings.PlayingTime),
-                ("satisfaction", "满意程度", ratings.Satisfaction),
-                ("hardiness", "吃苦耐劳", ratings.Hardiness)
+                ("loyalty", "忠诚程度", ratings.Loyalty, "最大生命 +3"),
+                ("obedience", "战术服从", ratings.Obedience, "特防 +1"),
+                ("pay-preference", "薪酬偏好", ratings.PayPreference, "能量上限 +1"),
+                ("playing-time", "上场需求", ratings.PlayingTime, "装备栏 +1"),
+                ("satisfaction", "满意程度", ratings.Satisfaction, "攻击 +1"),
+                ("hardiness", "吃苦耐劳", ratings.Hardiness, "防御 +1")
             };
             plot = new VisualElement { name = "employee-attribute-radar" };
             plot.style.height = 146;
@@ -49,7 +49,7 @@ namespace RaidPartyManager.Presentation
             for (int i = 0; i < axes.Length; i++)
             {
                 var axis = axes[i];
-                var caption = new VisualElement();
+                var caption = new VisualElement { tooltip = $"{axis.Title}达到 5 点时，{axis.Bonus}" };
                 caption.style.position = Position.Absolute;
                 caption.style.width = CaptionWidth;
                 caption.style.height = CaptionHeight;

@@ -1,4 +1,5 @@
 using System;
+using RaidPartyManager.Domain;
 
 namespace RaidPartyManager.Run
 {
@@ -12,23 +13,30 @@ namespace RaidPartyManager.Run
         public int Satisfaction;
         public int Hardiness;
 
+        internal Stats Bonus => new Stats(Satisfaction == 5 ? 1 : 0, Hardiness == 5 ? 1 : 0,
+            Obedience == 5 ? 1 : 0, Loyalty == 5 ? 3 : 0);
+        internal int BonusEnergy => PayPreference == 5 ? 1 : 0;
+        internal bool ExtraEquipmentSlot => PlayingTime == 5;
+
         internal bool IsValid => IsRating(Loyalty) && IsRating(Obedience) &&
             IsRating(PayPreference) && IsRating(PlayingTime) && IsRating(Satisfaction) && IsRating(Hardiness);
 
         private static bool IsRating(int rating) => rating is >= 1 and <= 5;
 
+        internal int Level(EmployeeRating rating) => rating switch
+        {
+            EmployeeRating.Loyalty => Loyalty,
+            EmployeeRating.Obedience => Obedience,
+            EmployeeRating.PayPreference => PayPreference,
+            EmployeeRating.PlayingTime => PlayingTime,
+            EmployeeRating.Satisfaction => Satisfaction,
+            EmployeeRating.Hardiness => Hardiness,
+            _ => 0
+        };
+
         internal bool TryRaise(EmployeeRating rating, out int level)
         {
-            level = rating switch
-            {
-                EmployeeRating.Loyalty => Loyalty,
-                EmployeeRating.Obedience => Obedience,
-                EmployeeRating.PayPreference => PayPreference,
-                EmployeeRating.PlayingTime => PlayingTime,
-                EmployeeRating.Satisfaction => Satisfaction,
-                EmployeeRating.Hardiness => Hardiness,
-                _ => 0
-            };
+            level = Level(rating);
             if (level is < 1 or >= 5) return false;
             level++;
             switch (rating)

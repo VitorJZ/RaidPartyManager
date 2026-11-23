@@ -79,15 +79,9 @@ namespace RaidPartyManager.Battle
                 return TalentUsed = true;
             }
 
-            public int ChargeTarget
-            {
-                get
-                {
-                    int skillLimit = Math.Max(Rules.DefaultEnergy, Original.LearnedSkills.Select(b => b.Cost).DefaultIfEmpty(0).Max());
-                    int bonus = BattleEnergy.Full(Equipped.Select(slot => slot.Definition)).Capacity - Rules.DefaultEnergy;
-                    return Math.Min(Rules.MaximumEnergy, skillLimit + bonus);
-                }
-            }
+            // Passive capacity is available immediately. Round charging only bridges the gap to a learned skill.
+            public int ChargeTarget => Math.Max(Energy.Capacity,
+                Original.LearnedSkills.Select(book => book.Cost).DefaultIfEmpty(0).Max());
 
             public bool Charge()
             {
@@ -121,8 +115,8 @@ namespace RaidPartyManager.Battle
                 Health = input.Health;
                 Stats = input.Stats;
                 Gear = input.Equipment.ToArray();
-                Energy = BattleEnergy.Full(Gear);
-                Slots = new EquippedItem[Math.Max(Math.Max(Rules.PersonalEquipmentSlots(input.Talent), input.EquipmentSlots.Count), Gear.Length)];
+                Energy = BattleEnergy.Full(Gear, input.BonusEnergy);
+                Slots = new EquippedItem[Math.Max(Math.Max(Rules.PersonalEquipmentSlots(input.Talent, input.ExtraEquipmentSlot), input.EquipmentSlots.Count), Gear.Length)];
                 if (input.EquipmentSlots.Count == 0)
                 {
                     for (int index = 0; index < Gear.Length; index++)
@@ -148,7 +142,8 @@ namespace RaidPartyManager.Battle
                 var stats = Input.Stats + new Stats(next.Attack - before.Attack, next.Defense - before.Defense,
                     next.SpecialDefense - before.SpecialDefense, next.Health - before.Health);
                 Health = Math.Min(Health, stats.Health + BonusMaximumHealth);
-                Input = new Combatant(Input.Id, form, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), Input.Equipment);
+                Input = new Combatant(Input.Id, form, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), Input.Equipment,
+                    bonusEnergy: Original.BonusEnergy, extraEquipmentSlot: Original.ExtraEquipmentSlot);
                 GrowthTriggers = 0;
                 SkillReadyAt = 0;
             }
@@ -166,8 +161,9 @@ namespace RaidPartyManager.Battle
                     previous.SpecialDefense - oldBonus.SpecialDefense + newBonus.SpecialDefense,
                     previous.Health - oldBonus.Health + newBonus.Health);
                 Health = Math.Min(Health, stats.Health + BonusMaximumHealth);
-                Input = new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), equipment);
-                int capacity = Math.Min(Rules.MaximumEnergy, chargeGained + BattleEnergy.Full(equipment).Capacity);
+                Input = new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, stats, Math.Min(Health, stats.Health), equipment,
+                    bonusEnergy: Original.BonusEnergy, extraEquipmentSlot: Original.ExtraEquipmentSlot);
+                int capacity = Math.Min(Rules.MaximumEnergy, chargeGained + BattleEnergy.Full(equipment, Original.BonusEnergy).Capacity);
                 Energy = new BattleEnergy(capacity, capacity - spentEnergy);
             }
 
@@ -191,7 +187,7 @@ namespace RaidPartyManager.Battle
             public int Layers(StatusKind status) => Statuses.GetValueOrDefault(status);
 
             public Combatant Snapshot() =>
-                new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, Stats, Health, Input.Equipment);
+                new Combatant(Input.Id, Input.Character, Input.Side, Input.Position, Stats, Health, Input.Equipment, bonusEnergy: Original.BonusEnergy, extraEquipmentSlot: Original.ExtraEquipmentSlot);
         }
 
         private readonly BattleRequest request;
@@ -377,7 +373,7 @@ namespace RaidPartyManager.Battle
                 if (!side.Any(unit => unit.Health > 0 && unit.Trait == CharacterTrait.ChorusArmory)) continue;
                 foreach (var ally in side)
                 {
-                    int count = Rules.PersonalEquipmentSlots(ally.Talent) + 1;
+                    int count = Rules.PersonalEquipmentSlots(ally.Talent, ally.Original.ExtraEquipmentSlot) + 1;
                     if (ally.Slots.Length < count) Array.Resize(ref ally.Slots, count);
                 }
             }
@@ -496,7 +492,7 @@ namespace RaidPartyManager.Battle
                     enemies = enemies.Reverse().Take(1);
                 foreach (var target in enemies)
                     options.Add(new ActionOption(action, target.Snapshot(), target.Health,
-                        ProjectedDamage(actor, target, AttackComponents(actor, target, action), UsesShortbow(actor))));
+                        ProjectedDamage(actor, target, AttackComponents(actor, target, action), UsesShortbow(actor), weaponAttack: true)));
                 return;
             }
 

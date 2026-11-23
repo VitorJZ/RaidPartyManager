@@ -26,6 +26,7 @@ Shader "Raid Party Manager/Printed Scenery"
             #pragma multi_compile_local __ RPM_DOCK_MOON
             #include "UnityCG.cginc"
             #include "../Stagecraft/ScenicPaint.cginc"
+            #include "../Stagecraft/RidingFoam.cginc"
             #include "../Stagecraft/StageLighting.cginc"
             sampler2D _MainTex;
             float4 _MainTex_ST, _Color, _Walk;
@@ -81,7 +82,7 @@ Shader "Raid Party Manager/Printed Scenery"
             }
             half4 frag(Varyings i) : SV_Target
             {
-                half4 color = tex2D(_MainTex,i.uv) * _Color;
+                half4 color = WithRidingFoam(tex2D(_MainTex,i.uv), i.uv, _MainTex_ST) * _Color;
                 if (_ScenicFlat > .5) color = SawnFlat(color, _MainTex, i.uv);
                 if (_PaintedSurface == SURFACE_SKY)
                     color.rgb = CycloramaWash(color.rgb, i.world);

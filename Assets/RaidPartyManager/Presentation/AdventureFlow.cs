@@ -20,6 +20,9 @@ namespace RaidPartyManager.Presentation
         private static string checkpointPathOverride;
         private static string CheckpointPath => checkpointPathOverride ??
             Path.Combine(Application.persistentDataPath, "raid-adventure-v1.json");
+        internal static string GuideKey => "RaidPartyManager.Guide.v1:" + CheckpointPath;
+        internal static SkillBookDefinition PracticeBook => routeArt.Encounter.SkillBooks.FirstOrDefault(book =>
+            book.AvailableInRegularPool && book.Requirement == SkillRequirement.None && book.Cost == 1);
         private static string invalidatedPath;
         private static string InvalidatedSaveKey => "RaidPartyManager.InvalidatedSave:" + CheckpointPath;
         internal static bool HasSave => File.Exists(CheckpointPath) && invalidatedPath != CheckpointPath &&
@@ -44,8 +47,12 @@ namespace RaidPartyManager.Presentation
             destination = origin = null;
         }
 
-        internal static AdventureRun Select(AdventureContentAsset assets, bool inspectionMode, bool reset = false)
+        internal static AdventureRun Select(AdventureContentAsset assets, bool inspectionMode, bool reset = false) =>
+            Select(assets, inspectionMode, out _, reset);
+
+        internal static AdventureRun Select(AdventureContentAsset assets, bool inspectionMode, out bool resumeMarket, bool reset = false)
         {
+            resumeMarket = false;
             routeArt = assets;
             InspectionMode = inspectionMode;
             if (inspectionMode)
@@ -60,7 +67,7 @@ namespace RaidPartyManager.Presentation
             else if (reset)
                 route = null;
             else if (route == null && HasSave)
-                route = LoadCheckpoint(assets.Encounter);
+                route = LoadCheckpoint(assets.Encounter, out resumeMarket);
 
             Active = inspectionMode ? inspection : route;
             destination = "EventSelect";
@@ -102,6 +109,7 @@ namespace RaidPartyManager.Presentation
             if (selected.Count != 2 || selected[0].Id == selected[1].Id)
                 throw new ArgumentException("A new route needs two different starters.", nameof(selected));
 
+            FirstRunGuide.Remember(GuideStep.Started);
             return Active = route = CreateRun(content, selected, false, new System.Random());
         }
 
@@ -120,11 +128,36 @@ namespace RaidPartyManager.Presentation
             return new AdventureRun(party, content.CharacterCatalog, gear.Concat(content.SkillBooks), inspectionMode, random, foundingGrant: true);
         }
 
-        private static AdventureRun LoadCheckpoint(EncounterData content)
+        private static AdventureCheckpoint ReadCheckpoint() =>
+            JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(CheckpointPath));
+
+        internal static (string[] Members, int Day, int Floor) MenuCompany()
         {
+            if (!HasSave)
+                return route == null ? default : (
+                    route.Party.Members.OrderBy(member => member.Position ?? int.MaxValue).Select(member => member.Character.Id).ToArray(),
+                    route.Party.Day, route.Floor);
             try
             {
-                var saved = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(CheckpointPath));
+                var saved = ReadCheckpoint();
+                if (saved is { Version: AdventureCheckpoint.CurrentVersion, Failed: false, Party: { Members: { } members } })
+                    return (members.Where(member => member != null && !string.IsNullOrEmpty(member.Character))
+                        .OrderBy(member => member.Position == 0 ? int.MaxValue : member.Position)
+                        .Select(member => member.Character).ToArray(), saved.Party.Day, saved.Floor);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or ArgumentException)
+            {
+                Debug.LogWarning("Unable to preview the saved company: " + exception.Message);
+            }
+            return default;
+        }
+
+        private static AdventureRun LoadCheckpoint(EncounterData content, out bool resumeMarket)
+        {
+            resumeMarket = false;
+            try
+            {
+                var saved = ReadCheckpoint();
                 if (saved is { Failed: true })
                 {
                     InvalidateCheckpoint();
@@ -132,7 +165,9 @@ namespace RaidPartyManager.Presentation
                 }
                 var items = content.StartingEquipment.Concat(content.SkillBooks)
                     .Append(content.VictoryReward).Where(item => item != null);
-                return AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, items);
+                var restored = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, items);
+                resumeMarket = saved.HasShopVisit && saved.ShopVisit.InTalentMarket && restored.Current?.Kind == NodeKind.Town;
+                return restored;
             }
             catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or
                 ArgumentException or KeyNotFoundException)
@@ -155,7 +190,10 @@ namespace RaidPartyManager.Presentation
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                File.WriteAllText(temporary, JsonUtility.ToJson(Active.CheckpointForExit()));
+                var checkpoint = Active.CheckpointForExit();
+                if (checkpoint.HasShopVisit)
+                    checkpoint.ShopVisit.InTalentMarket = destination == "TalentMarket";
+                File.WriteAllText(temporary, JsonUtility.ToJson(checkpoint));
                 if (File.Exists(path))
                     File.Replace(temporary, path, null);
                 else
@@ -343,8 +381,8 @@ namespace RaidPartyManager.Presentation
         internal static void AddTownReturnSign(VisualElement parent, string buttonName,
             Action returnToTown, Func<bool> visible = null)
         {
-            var sign = HangingSign.Exit(buttonName, () => { if (visible == null || visible()) returnToTown(); });
-            sign.tooltip = "下拉返回城镇";
+            var sign = HangingSign.Exit(buttonName, () => { if (visible == null || visible()) returnToTown(); }, icon: routeArt.NodeIcon(NodeKind.Town));
+            sign.tooltip = "点击返回城镇";
             var mask = new StageSignMask(sign) { name = "town-return-sign" };
             parent.Add(mask);
             if (visible != null)
@@ -366,8 +404,21 @@ namespace RaidPartyManager.Presentation
             return HangingSign.Exit("return-event-select", onReturn ?? ReturnFromNode);
         }
 
+        internal static void FinishCampaign()
+        {
+            if (Active?.CampaignWon != true) return;
+            Active.CloseVisit();
+            InvalidateCheckpoint();
+            DockPlayhouse.Current.ShowFinalCurtain(EndRouteAndOpenMenu);
+        }
+
         internal static void ReturnFromNode()
         {
+            if (Active?.CampaignWon == true)
+            {
+                FinishCampaign();
+                return;
+            }
             // A district change must turn to the incoming set instead of holding the outgoing battle behind its signs.
             bool signs = origin != "Town" && Active?.CrossingChapter != true &&
                 (!IsBattleScene(destination) || Active?.Current?.Resolved == true);
@@ -403,7 +454,7 @@ namespace RaidPartyManager.Presentation
 
         internal static string EventName(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Title : GraveStories.Contains(kind) ? GraveStories.Title(kind) : kind switch
         {
-            AdventureEventKind.Investor => "引资的创业者", AdventureEventKind.Ambush => "随机敌人",
+            AdventureEventKind.TidePact => "潮汐之约", AdventureEventKind.Investor => "引资的创业者", AdventureEventKind.Ambush => "随机敌人",
             AdventureEventKind.LostTraveler => "呼朋引伴", AdventureEventKind.FoundCoins => "捡到钱了",
             AdventureEventKind.HatTrick => "帽子戏法", AdventureEventKind.Forge => "锻造台",
             AdventureEventKind.LockedChest => "上锁的宝箱", AdventureEventKind.AscensionTrial => "升阶试炼", _ => "炼药师的小白鼠"
@@ -417,11 +468,12 @@ namespace RaidPartyManager.Presentation
 
         internal static string Narrative(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Intro + "\n" + string.Join("\n", CapitalStories.For(kind).Choices.Select(c => c.Label + "：" + c.Terms)) : GraveStories.Contains(kind) ? GraveStories.Intro(kind) : kind switch
         {
-            AdventureEventKind.Investor => "船主还差钱造船。填好金额，再拉下出资牌。账上凑满 50 金币，她才送两件装备，不足 50 就先记账。",
-            AdventureEventKind.Ambush => "灯一灭，埋伏的人就围上来了！准备好就拉下应战牌，打赢这场能拿 12～18 金币。",
+            AdventureEventKind.TidePact => "深海轻语浮出水面，指了指你的背包。她想用 99 天的同行换一件装备和一本技能书，期间不收工资。",
+            AdventureEventKind.Investor => "船主还差钱造船。填好金额，再点击出资牌。账上凑满 50 金币，她才送两件装备，不足 50 就先记账。",
+            AdventureEventKind.Ambush => "灯一灭，埋伏的人就围上来了！准备好就点击应战牌，打赢这场能拿 12～18 金币。",
             AdventureEventKind.LostTraveler => "雾里有人答应来投奔咱们。您喊一声，等人走到跟前，就知道谁应了招。",
-            AdventureEventKind.FoundCoins => "海鸥正啄地上的钱袋呢。拉下拾取牌，把剩下的金币收进队伍钱包吧。",
-            AdventureEventKind.HatTrick => "先记住展示宝物的那顶帽子。拉下「开始交换」，一直盯住它。等帽子停稳，点中它就能带走宝物。",
+            AdventureEventKind.FoundCoins => "海鸥正啄地上的钱袋呢。点击拾取牌，把剩下的金币收进队伍钱包吧。",
+            AdventureEventKind.HatTrick => "先记住展示宝物的那顶帽子。点击「开始交换」，一直盯住它。等帽子停稳，点中它就能带走宝物。",
             AdventureEventKind.Forge => "铁匠肯用两件旧装备换一件更好的。先挑两件背包里没穿戴的，再确认锻造。确认后，两件旧装备都会用掉。",
             AdventureEventKind.LockedChest => "这把锁一时半会儿打不开。留一名队员开箱，他会缺席接下来三个节点，再带着收获归队。赶时间也可以直接走。",
             AdventureEventKind.AscensionTrial => "门外的包裹可以直接拿走。要是想让队员升阶，就放下包裹，挑战门里的精英。两条路只能选一条。",

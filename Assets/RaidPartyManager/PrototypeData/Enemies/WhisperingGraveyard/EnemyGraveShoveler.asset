@@ -29,7 +29,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 0
   traitPower: 0
-  traitText: "腐锹拍击（70%） / 泥骨溅射（30%）"
+  traitText: "30% 概率向最前方对手施加 1 层诅咒，使其无法受疗。守夜弩骸会优先射击被诅咒者。"
   personality: 1
   attack: 6
   defense: 0
@@ -57,16 +57,16 @@ MonoBehaviour:
       layers: 0
       requiresCharge: 0
       delayDecay: 0
-    - name: "泥骨溅射"
+    - name: "翻起尸瘴"
       weight: 30
-      kind: 0
-      target: 7
-      power: -2
+      kind: 1
+      target: 0
+      power: 0
       damageType: 0
-      status: -1
-      layers: 0
+      status: 13
+      layers: 1
       requiresCharge: 0
-      delayDecay: 0
+      delayDecay: 1
     openingShield: 0
     phaseThresholdPercent: 0
     phaseAttackBonus: 0

@@ -415,7 +415,8 @@ namespace RaidPartyManager.Presentation
                 run.ExpectedDailyWage(member.Id), member.EmployeeAttributes,
                 (days, terms, fee) => run.SetContract(member.Id, days, terms, fee),
                 () => { CloseModal(); RenderEditedRoster(); closed?.Invoke(); }, member.Renewals);
-            OpenModal(member.Id, popup, "close-contract");
+            OpenModal(member.Id, popup, "dismiss-paper");
+            FirstRunGuide.Practiced(run, GuideStep.ReadContract);
         }
 
         private void OpenReplacement(MemberView member)

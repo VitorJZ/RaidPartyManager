@@ -72,7 +72,10 @@ namespace RaidPartyManager.Tests
                 Fight();
             }
             Assert.That(party.EmployeeProfileFor("a").Career.EquipmentWishFulfilled, Is.True);
-            Assert.That(party.Members[0].EmployeeAttributes.Satisfaction, Is.EqualTo(4));
+            var ratings = party.Members[0].EmployeeAttributes;
+            Assert.That(ratings.Loyalty + ratings.Obedience + ratings.PlayingTime + ratings.Hardiness + ratings.PayPreference + ratings.Satisfaction,
+                Is.EqualTo(18 + party.EmployeeProfileFor("a").Career.GoalsCompleted));
+            Assert.That(party.EmployeeProfileFor("a").Goals.Count, Is.EqualTo(2));
         }
 
         [Test]

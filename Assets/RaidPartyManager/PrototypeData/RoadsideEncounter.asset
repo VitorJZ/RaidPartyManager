@@ -51,6 +51,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e9883a6899f84fb98ba85e36096bdff9, type: 2}
   - {fileID: 11400000, guid: 00b94dc802544dc3895cf647ebc0884c, type: 2}
   - {fileID: 11400000, guid: 57dfd33b56844fbea294cf01807fc0a6, type: 2}
+  eventRecruits:
+  - {fileID: 11400000, guid: 2ba72d0cffb8542098eb710933a7eccf, type: 2}
   enemyRoster:
   - {fileID: 11400000, guid: 94588175931f4c14a7340144b069c146, type: 2}
   - {fileID: 11400000, guid: b588a08f656249bab3111e6a0b15744c, type: 2}
@@ -102,9 +104,9 @@ MonoBehaviour:
     - EnemyShipCaulker
   - name: 潮线拦截
     enemyIds:
-    - EnemySaltCrab
     - EnemyTideFollower
     - EnemyMudEel
+    - EnemySaltCrab
     - EnemyLanternMoth
   - name: 破陶火线
     enemyIds:
@@ -163,6 +165,8 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 1b08a96c842bf9949a7bd59c77cf722f, type: 3}
   - {fileID: 2800000, guid: 4d7c2a6d218cddf45aaf37b7069645ab, type: 3}
   - {fileID: 2800000, guid: 879b90eeddb94c84ebb3ae86e35165f6, type: 3}
+  - {fileID: 2800000, guid: 8e54c4b0fbf5505ebdb748d58cca4a7a, type: 3}
+  - {fileID: 2800000, guid: 9a227e0b019e5f258165c222686bb70c, type: 3}
   arrowProjectile: {fileID: 2800000, guid: 592b8d7b00a541ed8c5516141b82a550, type: 3}
   magicProjectile: {fileID: 2800000, guid: 8460af5164db4b4e9ab5379f5339dc49, type: 3}
   startingEquipment:

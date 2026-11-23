@@ -29,6 +29,7 @@ namespace RaidPartyManager.Presentation
         private static readonly Dictionary<EncounterAsset, PartyRun> enemySessions = new();
         private static readonly HashSet<EncounterAsset> editedEnemyEncounters = new();
         private static bool partyEdited;
+        private static int playbackSpeed = 1;
         private readonly System.Random draftRandom = new System.Random();
         private bool initialized;
 
@@ -101,7 +102,6 @@ namespace RaidPartyManager.Presentation
         private bool settingsOpen;
         private VisualElement document;
 
-        private int playbackSpeed = 1;
         private double clockOrigin, playbackAtOrigin;
         private double PlaybackNow => playbackAtOrigin + (Time.unscaledTimeAsDouble - clockOrigin) * playbackSpeed;
         private BattleCharacterDetails characterDetails;
@@ -120,6 +120,7 @@ namespace RaidPartyManager.Presentation
             enemySessions.Clear();
             editedEnemyEncounters.Clear();
             partyEdited = false;
+            playbackSpeed = 1;
         }
 
         internal static PartyRun GetPlaySession(EncounterData content)
@@ -196,7 +197,6 @@ namespace RaidPartyManager.Presentation
         private void ResetDemo(bool reroll = false)
         {
             settingsOpen = false;
-            playbackSpeed = 1;
             playbackAtOrigin = clockOrigin = Time.unscaledTimeAsDouble;
             entrance.Clear(unitCards);
             ClearAction();
@@ -339,7 +339,7 @@ namespace RaidPartyManager.Presentation
             {
                 health.TryAdd(unit.Id, unit.Health);
                 if (unit.Side == Side.Party)
-                    partyEnergy.TryAdd(unit.Id, BattleEnergy.Full(unit.Equipment));
+                    partyEnergy.TryAdd(unit.Id, BattleEnergy.Full(unit.Equipment, unit.BonusEnergy));
                 appearances.TryAdd(unit.Id, (unit.Character, unit.Stats.Health));
             }
             eventIndex = 0;
@@ -800,7 +800,7 @@ namespace RaidPartyManager.Presentation
             Texture2D projectile = null;
             Texture2D fragments = null;
             IReadOnlyList<BattleEvent> projectileHits = null;
-            bool isArrow = character.Profession == Profession.Archer || character.Id == "EnemyForkFisher" ||
+            bool isArrow = character.Profession == Profession.Archer || character.Id is "EnemyForkFisher" or "DeepSeaWhisper" ||
                 character.Trait == CharacterTrait.EnemyDeckSailor;
             bool isSweep = entry.Kind == BattleEventKind.Action && entry.SkillBookId != null && entry.ActionKind == ActionKind.Attack;
             if (entry.ActionKind == ActionKind.Attack && entry.ActorId != entry.TargetId)
@@ -1229,7 +1229,7 @@ namespace RaidPartyManager.Presentation
                     ? slots : member?.EquipmentIds;
                 var skills = member == null ? Array.Empty<SkillBookDefinition>() :
                     member.LearnedSkills.Take(member.SkillSlotCount).ToArray();
-                cards.Add(EquipmentCard(position, id, character, equipment, inventory, skills, previousInspection));
+                cards.Add(EquipmentCard(position, id, character, equipment, inventory, skills, previousInspection, member?.BonusEnergy ?? 0));
             }
             roster.Add(cards);
             if (phase == Phase.Preparation)
@@ -1246,7 +1246,7 @@ namespace RaidPartyManager.Presentation
 
         private VisualElement EquipmentCard(int position, string id, CharacterDefinition character,
             IReadOnlyList<string> equipment, IReadOnlyList<EquipmentInstance> inventory,
-            IReadOnlyList<SkillBookDefinition> skills, Vector2? previousInspection)
+            IReadOnlyList<SkillBookDefinition> skills, Vector2? previousInspection, int bonusEnergy)
         {
             var card = PrototypeStyle.Row($"equipment-position-{position}");
             card.style.flexGrow = 1;
@@ -1317,7 +1317,7 @@ namespace RaidPartyManager.Presentation
             bar.style.backgroundColor = PrototypeStyle.Background;
             PrototypeStyle.Outline(bar, new Color32(103, 77, 127, 255), 7);
             var energy = phase != Phase.Preparation && partyEnergy.TryGetValue(id, out var current)
-                ? current : BattleEnergy.Full(equippedItems.Where(item => item != null));
+                ? current : BattleEnergy.Full(equippedItems.Where(item => item != null), bonusEnergy);
             PaintEnergy(bar, energy);
             energyBars[id] = bar;
             card.Add(bar);
@@ -1355,7 +1355,7 @@ namespace RaidPartyManager.Presentation
             view.style.minWidth = 0;
             view.style.maxWidth = Length.Percent(100);
             view.style.backgroundColor = item == null ? PrototypeStyle.Inset : PrototypeStyle.PanelColor;
-            PrototypeStyle.Outline(view, PrototypeStyle.Edge, 4);
+            PrototypeStyle.Outline(view, PrototypeStyle.EquipmentSilver, 4);
             if (item == null)
             {
                 var empty = PrototypeStyle.Text(slot?.ToString() ?? "", 11, PrototypeStyle.Muted);

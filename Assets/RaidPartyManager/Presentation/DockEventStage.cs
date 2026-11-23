@@ -237,7 +237,12 @@ namespace RaidPartyManager.Presentation
         internal bool AtTable => zoom >= 1 && !returningWide;
 
         private Texture2D tellerStrip, propArt;
-        private MeshRenderer gull, graveProp;
+        private MeshRenderer gull, graveProp, tideSinger;
+        private Texture2D tideFront;
+        internal void HideTideSinger()
+        {
+            if (tideSinger != null) tideSinger.gameObject.SetActive(false);
+        }
         private AdventureEventKind graveKind;
         private float gravePhaseStarted;
         private int gravePhase;
@@ -287,7 +292,7 @@ namespace RaidPartyManager.Presentation
             bool atTable = lab || kind is AdventureEventKind.HatTrick or AdventureEventKind.Auction;
             bool city = CapitalStories.Contains(kind);
             bool cemetery = GraveStories.Contains(kind) || city;
-            tellerStrip = Resources.Load<Texture2D>("StoryEvents/Cast/" + (city ? (CapitalStories.For(kind.Value).District switch { 0 => "LostTraveler", 1 => "Forge", _ => "Investor" }) : cemetery ? "GraveChronicler" : kind.Value.ToString()));
+            tellerStrip = Resources.Load<Texture2D>("StoryEvents/Cast/" + (city ? (CapitalStories.For(kind.Value).District switch { 0 => "LostTraveler", 1 => "Forge", _ => "Investor" }) : cemetery ? "GraveChronicler" : kind == AdventureEventKind.TidePact ? "LostTraveler" : kind.Value.ToString()));
             var mark = atTable ? new Vector3(Table.x+(lab ? .8f : 1.25f),.95f,Table.z+.95f) : new Vector3(kind == AdventureEventKind.Ambush ? 2.2f : 3.2f,.95f,-2.15f);
             if (kind == AdventureEventKind.Auction)
             {
@@ -325,6 +330,14 @@ namespace RaidPartyManager.Presentation
             if (kind == AdventureEventKind.SoulWard)
             {
                 SyncPatients(run, assets.Encounter, false);
+                return;
+            }
+            if (kind == AdventureEventKind.TidePact)
+            {
+                tideFront = assets.EventInkArt(AdventureEventKind.TidePact);
+                tideSinger = Flat("Deep sea visitor", new Vector3(.1f, 1.08f, -2.4f), 2.25f, 2.25f, tideFront);
+                SetFrame(tideSinger, tideFront, AnimationCels.Count, 0);
+                Dressing.Cast[tideSinger] = new DockSet.Player(true);
                 return;
             }
             propArt = EventProp(kind.Value);
@@ -511,6 +524,7 @@ namespace RaidPartyManager.Presentation
             {
                 beat = nextBeat;
                 SetFrame(resident,tellerStrip,AnimationCels.Count,beat);
+                if (tideSinger != null) SetFrame(tideSinger, tideFront, AnimationCels.Count, beat);
                 if (gull != null) SetFrame(gull,propArt,AnimationCels.Count,beat);
             }
             if (hats[0] == null && bottles[0] == null && cases[0] == null) return;

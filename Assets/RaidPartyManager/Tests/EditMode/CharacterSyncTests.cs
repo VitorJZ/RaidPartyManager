@@ -19,9 +19,20 @@ namespace RaidPartyManager.Tests
 
             Assert.That(scene.Party.Select(unit => unit.Stats.Health), Is.EqualTo(new[] { 10, 7, 12, 8 }));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0)
-                .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 35)));
+                .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 36)));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0).Select(character => character.Skill),
                 Is.All.Null);
+            var singer = scene.CharacterCatalog.Single(character => character.RosterNumber == 36);
+            Assert.That(singer.Trait, Is.EqualTo(CharacterTrait.SoakEnemyEachRound));
+            Assert.That(scene.RecruitmentPool.Select(c => c.Id), Does.Not.Contain(singer.Id));
+            Assert.That(scene.ProjectileFor(singer).name, Is.EqualTo("DeepSeaWhisper-WaveBlade"));
+            Assert.That(scene.StatusIcon(StatusKind.Wet), Is.Not.Null);
+            Assert.That(scene.StatusIcon(StatusKind.Evaporation), Is.Not.Null);
+            var result = new BattleSimulator(random: new Random(11)).Simulate(new BattleRequest("tide",
+                new[] { new Combatant("singer", singer, Side.Party, 1, singer.BaseStats, 15),
+                    Fighter("front", Side.Enemy, 1, health: 100), Fighter("rear", Side.Enemy, 2, health: 100) }, singer.ActionInterval));
+            Assert.That(result.Events.Count(e => e.ActorId == "singer" && e.TargetStatuses?.Contains("潮湿 1") == true &&
+                e.ActionName == "深海轻语"), Is.EqualTo(1));
             var officer = scene.RecruitmentPool.Single(character => character.RosterNumber == 33);
             var archer = scene.RecruitmentPool.Single(character => character.RosterNumber == 34);
             var darkForm = scene.CharacterCatalog.Single(character => character.RosterNumber == 35);
@@ -419,11 +430,11 @@ namespace RaidPartyManager.Tests
             var result = simulator.Simulate(request);
 
             Assert.That(result.Events.First(entry => entry.Kind == BattleEventKind.FormChanged).Form.Id, Is.EqualTo(chronomancer.Id));
-            Assert.That(result.PermanentAttackGains["star"], Is.EqualTo(2));
+            Assert.That(result.PermanentAttackGains["star"], Is.EqualTo(1));
             Assert.That(run.TrySettle(result, out _), Is.True);
             var original = run.Members.Single(member => member.Id == "star");
             Assert.That(original.Character.Id, Is.EqualTo(ally.Id));
-            Assert.That(original.EffectiveStats.Attack, Is.EqualTo(ally.BaseStats.Attack + 2));
+            Assert.That(original.EffectiveStats.Attack, Is.EqualTo(ally.BaseStats.Attack + 1));
         }
 
         private static EncounterData LoadEncounter() => AssetDatabase.LoadAssetAtPath<EncounterAsset>(

@@ -9,6 +9,7 @@ namespace RaidPartyManager.Presentation
         private readonly bool drawnOnStage;
         public Color Ink { get; private set; } = Color.white;
         public Vector4 Walk { get; set; }
+        internal float RideHeight { get; set; }
         internal DockSet.Player Performer { get; set; }
         public bool InMotion { get; }
 

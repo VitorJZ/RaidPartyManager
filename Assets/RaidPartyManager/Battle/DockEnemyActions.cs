@@ -17,7 +17,7 @@ namespace RaidPartyManager.Battle
             switch (actor.Trait)
             {
                 case EnemyTideFollower when random.NextDouble() >= 0.70:
-                    GrantStatus(actor, TargetableOpponents(actor).First(), Exposed, 1, "逐潮标记", BattleVisualCue.TideMark);
+                    GrantStatus(actor, TargetableOpponents(actor).First(), Wet, 1, "拍岸泼潮", BattleVisualCue.TideMark);
                     return true;
                 case EnemyWreckScavenger:
                     var victim = FrontAttackTargets(actor).First();
@@ -29,7 +29,7 @@ namespace RaidPartyManager.Battle
                     EnemyHit(actor, softest, "普攻", BattleVisualCue.None);
                     return true;
                 case EnemyMudEel when random.NextDouble() >= 0.70:
-                    GrantStatus(actor, Opponents(actor).First(), Chill, 1, "盐霜吐息", BattleVisualCue.EelFrost);
+                    GrantStatus(actor, TargetableOpponents(actor).First(), Chill, 1, "盐霜吐息", BattleVisualCue.EelFrost);
                     return true;
                 case EnemyLanternMoth when random.NextDouble() >= 0.60:
                     var frailest = Opponents(actor).OrderBy(unit => (double)unit.Health / unit.Stats.Health).First();

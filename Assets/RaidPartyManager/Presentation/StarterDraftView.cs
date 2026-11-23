@@ -52,7 +52,8 @@ namespace RaidPartyManager.Presentation
             {
                 if (selected.Count != SelectionLimit) return;
                 var starters = candidates.Where(selected.Contains).ToArray();
-                var sheet = ContractPanel.Sheet("起始队员 · 入队合约", out var paper);
+                VisualElement sheet = null;
+                sheet = ContractPanel.Sheet("起始队员 · 入队合约", out var paper, () => sheet.RemoveFromHierarchy());
                 foreach (var c in starters)
                     paper.Add(ContractPanel.Text(ContractPanel.Summary(c, Run.CrewContract.Offer(c, 1)), 17));
                 paper.Add(ContractPanel.Text($"两份首约的基础薪资共 {starters.Sum(c => Run.CrewContract.Offer(c, 1).BaseTotal)} 金币，由创队经费当场结清。签约后队伍可用资金为 50 金币。", 15));
