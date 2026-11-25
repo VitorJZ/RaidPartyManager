@@ -73,7 +73,7 @@ namespace RaidPartyManager.Presentation
             state.pickingMode = PickingMode.Ignore;
             PrototypeStyle.Middle(state);
             button.Add(state);
-            button.tooltip = string.IsNullOrEmpty(character.TraitText) ? "" : "被动 · " + character.TraitText;
+            CharacterChoicePreview.Attach(button, character, portrait);
             button.SetEnabled(!inParty);
             return button;
         }

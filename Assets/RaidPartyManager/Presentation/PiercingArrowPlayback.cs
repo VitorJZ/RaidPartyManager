@@ -21,7 +21,11 @@ namespace RaidPartyManager.Presentation
         private float direction;
         private float travel;
 
-        public string LastTargetId => targets[^1];
+        private int nextHit;
+
+        public double NextImpactAt => releaseAt + (flightEnd - releaseAt) * impactProgress[nextHit];
+
+        public bool AdvanceHit() => ++nextHit < targets.Length;
 
         public PiercingArrowPlayback(Texture2D projectile, Texture2D particle, IReadOnlyList<BattleEvent> hits,
             double releaseAt, double flightEnd)
@@ -48,12 +52,6 @@ namespace RaidPartyManager.Presentation
         }
 
         public static float FlightDuration(int hits) => 0.55f + 0.15f * hits;
-
-        public double ImpactAt(string targetId)
-        {
-            int index = System.Array.IndexOf(targets, targetId);
-            return releaseAt + (flightEnd - releaseAt) * impactProgress[index];
-        }
 
         public void Draw(double now, VisualElement layer, Rect source, IReadOnlyDictionary<string, BattleUnitCard> cards)
         {
@@ -111,7 +109,12 @@ namespace RaidPartyManager.Presentation
             var start = new Vector2(source.center.x + direction * releaseOffset, source.yMin + 0.5f * source.height);
             travel = Mathf.Abs(targetCenters[^1] - start.x) + ArrowWidth + 20f;
             for (int i = 0; i < targetCenters.Length; i++)
-                impactProgress[i] = Mathf.Clamp01((targetCenters[i] - start.x) * direction / travel);
+            {
+                float offset = (targetCenters[i] - start.x) * direction;
+                if (i > 0)
+                    offset = Mathf.Max(offset, impactProgress[i - 1] * travel + 12f);
+                impactProgress[i] = Mathf.Clamp01(offset / travel);
+            }
             launchTip = start;
             return true;
         }

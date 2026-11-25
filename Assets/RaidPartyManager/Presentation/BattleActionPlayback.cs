@@ -44,15 +44,14 @@ namespace RaidPartyManager.Presentation
         public double ImpactAt { get; }
         public double FinishAt { get; }
         public bool IsPiercing => piercingArrow != null;
-        public bool LogsAtImpact => meteor != null || IsPiercing;
 
-        public double PiercingImpactAt(string id) => piercingArrow.ImpactAt(id);
-        public bool HasMorePiercingHits(string id) => id != piercingArrow.LastTargetId;
+        public double NextPiercingImpactAt => piercingArrow.NextImpactAt;
+        public bool AdvancePiercingHit() => piercingArrow.AdvanceHit();
 
         public BattleActionPlayback(BattleSpriteView sprite, ActionKind kind, Texture2D walkSheet,
             Texture2D projectile, Texture2D fragments, bool isArrow, BattleEvent action, IReadOnlyList<BattleEvent> projectileHits,
             double now, float scale, Texture2D special, bool hasImpactEffect, bool critical, bool cannon = false,
-            Texture2D piercingParticle = null, SoundCue releaseSound = SoundCue.None)
+            Texture2D piercingParticle = null, SoundCue releaseSound = SoundCue.None, Texture2D signatureProjectile = null)
         {
             this.releaseSound = releaseSound;
             this.sprite = sprite;
@@ -67,14 +66,15 @@ namespace RaidPartyManager.Presentation
             float travel = walkSheet != null ? WalkTime * scale : 0f;
             float poseScale = scale * PosePace;
             poseStart = now + travel;
+            bool hasProjectile = projectile != null || signatureProjectile != null;
             float windup = sprite?.PlayAction(kind, poseStart, poseScale,
-                projectile != null || walkSheet != null || hasImpactEffect, special,
+                hasProjectile || walkSheet != null || hasImpactEffect, special,
                 fullPose: DockEnemyEffectPlayback.Supports(action.VisualCue))
                 ?? 0.20f * scale;
             releaseAt = poseStart + windup;
             bool dropsMeteor = projectile != null && fragments != null;
             bool pierces = projectile != null && action.VisualCue == BattleVisualCue.PiercingArrow;
-            float flightTime = projectile == null ? 0f : dropsMeteor ? MeteorPlayback.FallDuration :
+            float flightTime = !hasProjectile ? 0f : dropsMeteor ? MeteorPlayback.FallDuration :
                 pierces ? PiercingArrowPlayback.FlightDuration(projectileHits.Count) : isArrow ? ArrowFlightTime : OrbFlightTime;
             ImpactAt = releaseAt + flightTime * scale;
             returnAt = sprite == null ? ImpactAt : poseStart + sprite.ActionLength * poseScale;
@@ -89,10 +89,12 @@ namespace RaidPartyManager.Presentation
             }
             if (pierces)
                 piercingArrow = new PiercingArrowPlayback(projectile, piercingParticle, projectileHits, releaseAt, ImpactAt);
-            flights = projectile == null || dropsMeteor || pierces ? Array.Empty<(string, bool, Image)>() :
+            flights = !hasProjectile || dropsMeteor || pierces ? Array.Empty<(string, bool, Image)>() :
                 (projectileHits ?? new[] { action }).Select(hit =>
                 {
-                    var view = MakeImage("battle-projectile");
+                    Image view = signatureProjectile != null
+                        ? new AttackSignatureImage("battle-projectile", signatureProjectile, inFlight: true)
+                        : MakeImage("battle-projectile");
                     if (projectileHits != null)
                         view.AddToClassList(action.SkillBookId != null ? "skill-volley-projectile" : "dock-broadside-projectile");
                     return (hit.TargetId, hit.Detail == "未命中", view);
@@ -198,14 +200,21 @@ namespace RaidPartyManager.Presentation
             var direction = (end - start).normalized;
             float releaseOffset = !isArrow && sprite?.HasWideAttack == true ? 0.50f : 0.30f;
             start += direction * source.width * releaseOffset;
-            float width = broadside ? 56f : isArrow ? 50f : 32f;
-            float height = width * projectile.height / projectile.width;
+            var signature = view as AttackSignatureImage;
+            float width = signature != null ? isArrow ? 76f : 66f : broadside ? 56f : isArrow ? 50f : 32f;
+            float height = signature != null ? width : width * projectile.height / projectile.width;
             if (isArrow)
                 end -= direction * width * 0.43f;
             var center = Vector2.Lerp(start, end, progress);
-            SetImage(view, projectile, AnimationCels.RectFor(projectile, AnimationCels.At(progress)));
-            view.tintColor = critical ? new Color(1f, 0.34f, 0.28f) : Color.white;
-            view.style.rotate = new Rotate(new Angle(isArrow ? Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg : 0f));
+            if (signature != null)
+                signature.ShowFrame(progress);
+            else
+            {
+                SetImage(view, projectile, AnimationCels.RectFor(projectile, AnimationCels.At(progress)));
+                view.tintColor = critical ? new Color(1f, 0.34f, 0.28f) : Color.white;
+            }
+            bool followsPath = signature != null || isArrow;
+            view.style.rotate = new Rotate(new Angle(followsPath ? Mathf.Atan2(direction.y, direction.x) * Mathf.Rad2Deg : 0f));
             SetBounds(view, new Rect(center - new Vector2(width, height) * 0.5f, new Vector2(width, height)));
         }
 

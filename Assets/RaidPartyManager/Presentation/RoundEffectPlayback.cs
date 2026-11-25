@@ -38,7 +38,7 @@ namespace RaidPartyManager.Presentation
         public static bool IsRoundStart(BattleVisualCue visual) =>
             visual is >= BattleVisualCue.RoundStartExposed and <= BattleVisualCue.RoundStartBonus;
 
-        public RoundEffectPlayback(BattleEvent entry, int absorbed, double now, float scale, Texture2D transferIcon, int labelLane)
+        public RoundEffectPlayback(BattleEvent entry, int absorbed, double now, float scale, Texture2D transferIcon, int labelLane, bool drawParticles = true)
         {
             TargetId = entry.TargetId;
             ActorId = entry.ActorId;
@@ -65,7 +65,7 @@ namespace RaidPartyManager.Presentation
             view = new VisualElement { name = phase + "effect", pickingMode = PickingMode.Ignore };
             view.AddToClassList(phase + cue);
             PrototypeStyle.Fill(view);
-            view.generateVisualContent += Paint;
+            if (drawParticles) view.generateVisualContent += Paint;
 
             caption = PrototypeStyle.Text(Caption(entry, absorbed), 13, color);
             caption.name = phase + "effect-label";

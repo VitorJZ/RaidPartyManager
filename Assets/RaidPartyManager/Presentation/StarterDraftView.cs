@@ -133,7 +133,7 @@ namespace RaidPartyManager.Presentation
             attributes.style.marginTop = attributes.style.marginBottom = 5;
             PrototypeStyle.Middle(attributes);
             card.Add(attributes);
-            var trait = PrototypeStyle.Text(string.IsNullOrEmpty(character.TraitText) ? "" : "被动 · " + character.TraitText, 12);
+            var trait = PrototypeStyle.Text(string.IsNullOrEmpty(character.TraitText) ? "" : "被动：" + character.TraitText, 12, PrototypeStyle.Passive);
             trait.style.minHeight = 41;
             PrototypeStyle.Middle(trait);
             card.Add(trait);

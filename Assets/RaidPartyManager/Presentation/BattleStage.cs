@@ -48,8 +48,8 @@ namespace RaidPartyManager.Presentation
         private readonly double openedAt;
         private readonly float drapeAspect;
         private bool disposed, shotApplied;
-        private VisualElement shotSubject;
-        private float shotHeight, shotWeight;
+        private VisualElement shotSubject, shotProp;
+        private BossEntranceCue.Shot shot;
         private Matrix4x4 restingLens, shotLens;
         private readonly AudienceForeground audience;
         private readonly DockPlayhouse house;
@@ -61,6 +61,35 @@ namespace RaidPartyManager.Presentation
         private readonly MeshRenderer surf, derrickFooting, mooring, creel, leftDressing, rightDressing;
         private readonly BattleStageArt stageArt;
         private readonly SceneryFlipbook scenery;
+
+        private MeshRenderer teller, tellerShadow;
+
+        internal bool DrawTeller(Texture2D sheet, int frame, float viewportHeight, out Vector2 head)
+        {
+            head = default;
+            if (sheet == null) return false;
+            if (teller == null)
+            {
+                teller = Sheet("Battle commentator", -15);
+                tellerShadow = Sheet("Commentator foot shadow", -17);
+                Shape(tellerShadow, Texture2D.whiteTexture, new Vector4(1, 1, 0, 0), new Color(.03f, .02f, .04f, .4f), shadow: true);
+                house?.Set.Atmosphere.Add(teller);
+                house?.Set.Atmosphere.Add(tellerShadow);
+            }
+            // Place her on a separate mark upstage of both front ranks.
+            float z = (house != null ? castDistance - CameraDistance : 0) + 2.4f;
+            var foot = new Vector3(0, .005f, z);
+            var bottom = camera.WorldToViewportPoint(foot);
+            var crown = camera.ViewportToWorldPoint(bottom + Vector3.up * viewportHeight);
+            float height = (crown.y - foot.y) / BattleTellerView.InkSpan;
+            teller.transform.position = foot - Vector3.up * (height * BattleTellerView.BootInset);
+            teller.transform.localScale = new Vector3(height * sheet.width / sheet.height, height, 1);
+            Shape(teller, sheet, AnimationCels.UV(frame), Color.white, surface: Surface.Paper);
+            tellerShadow.transform.SetPositionAndRotation(foot + Vector3.back * .10f, Quaternion.Euler(90, 0, 0));
+            tellerShadow.transform.localScale = new Vector3(.72f, .30f, 1);
+            head = camera.WorldToViewportPoint(crown);
+            return shot.Weight < .02f;
+        }
 
         private sealed class Actor
         {
@@ -453,7 +482,7 @@ namespace RaidPartyManager.Presentation
                 return;
             var actor = spare.Count == 0 ? new Actor { body = Sheet("Actor", 0), shadow = Sheet("Foot shadow", -10) } : spare.Pop();
             actor.body.name = image.name;
-            actor.body.sortingOrder = image.InMotion ? 5 : 1;
+            actor.body.sortingOrder = image.SceneryOrder ?? (image.InMotion ? 5 : 1);
             var mesh = image.Walk.z != 0 ? walkMesh : quad;
             actor.body.GetComponent<MeshFilter>().sharedMesh = mesh;
             if (house != null)
@@ -481,11 +510,11 @@ namespace RaidPartyManager.Presentation
             spare.Push(actor);
         }
 
-        internal void SetBossShot(VisualElement subject, float height, float weight)
+        internal void SetBossShot(VisualElement subject, VisualElement prop, BossEntranceCue.Shot framing)
         {
             shotSubject = subject;
-            shotHeight = height;
-            shotWeight = weight;
+            shotProp = prop;
+            shot = framing;
         }
 
         private void BeforeCamera(ScriptableRenderContext context, Camera rendering) => BeforeCull(rendering);
@@ -503,20 +532,28 @@ namespace RaidPartyManager.Presentation
             // Place the paper cast through the auditorium lens first. The close-up then
             // magnifies the cast and set together without moving actors on the boards.
             DrawActors();
-            if (shotWeight <= 0 || shotSubject?.panel == null) return;
+            if (shot.Weight <= 0 || shotSubject?.panel == null) return;
             var screen = panel.worldBound;
             var body = shotSubject.worldBound;
             if (!(screen.width > 0 && screen.height > 0 && body.width > 0 && body.height > 0)) return;
-            float fullZoom = Mathf.Clamp(Mathf.Min(screen.height * .70f / body.height,
+            if (shot.PropFocus > 0 && shotProp?.panel != null)
+            {
+                var ink = shotProp.contentRect;
+                if (ink.height > ink.width) ink.yMin = ink.yMax - ink.width;
+                var prop = shotProp.LocalToWorld(ink);
+                body = new Rect(Vector2.Lerp(body.position, prop.position, shot.PropFocus),
+                    Vector2.Lerp(body.size, prop.size, shot.PropFocus));
+            }
+            float fullZoom = Mathf.Clamp(Mathf.Min(screen.height * shot.Coverage / body.height,
                 screen.width * .88f / body.width), 1.25f, 2.55f);
-            float zoom = Mathf.Lerp(1, fullZoom, shotWeight);
+            float zoom = Mathf.Lerp(1, fullZoom, shot.Weight);
             float x = 2 * (body.center.x - screen.xMin) / screen.width - 1;
-            float y = 1 - 2 * (body.yMin + body.height * shotHeight - screen.yMin) / screen.height;
+            float y = 1 - 2 * (body.yMin + body.height * shot.Height - screen.yMin) / screen.height;
             // Restrict the crop to the visible set even as the actor enters at its edge.
             var crop = Matrix4x4.identity;
             crop.m00 = crop.m11 = zoom;
-            crop.m03 = Mathf.Clamp((.06f - zoom * x) * shotWeight, 1 - zoom, zoom - 1);
-            crop.m13 = Mathf.Clamp((.05f - zoom * y) * shotWeight, 1 - zoom, zoom - 1);
+            crop.m03 = Mathf.Clamp((shot.LeadRoom - zoom * x) * shot.Weight, 1 - zoom, zoom - 1);
+            crop.m13 = Mathf.Clamp((.05f - zoom * y) * shot.Weight, 1 - zoom, zoom - 1);
             restingLens = camera.projectionMatrix;
             shotLens = crop * restingLens;
             camera.projectionMatrix = shotLens;
@@ -535,8 +572,9 @@ namespace RaidPartyManager.Presentation
                 var rect = image.contentRect;
                 bool show = image.visible && image.image != null && rect.width > 0 && rect.height > 0 &&
                     image.resolvedStyle.opacity > 0.001f && screen.Overlaps(image.worldBound);
-                actor.body.enabled = actor.shadow.enabled = show;
-                if (actor.castShadow != null) actor.castShadow.enabled = show;
+                actor.body.enabled = show;
+                actor.shadow.enabled = show && !image.SceneryOrder.HasValue;
+                if (actor.castShadow != null) actor.castShadow.enabled = actor.shadow.enabled;
                 if (!show)
                 {
                     RidingWave.Hide(actor.wave);

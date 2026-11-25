@@ -15,9 +15,9 @@ namespace RaidPartyManager.Presentation
 
         public DockEventStage(Transform owner, VisualElement panel, ServiceStageArt art, bool treasure,
             AdventureEventKind? play = null, bool graveyard = false, bool capital = false, int cityDistrict = 0)
-            : base(owner, panel, art, capital || CapitalStories.Contains(play) ? StageLighting.Clockwork(VenueFor(play)) : StageLighting.For(graveyard || GraveStories.Contains(play), VenueFor(play)))
+            : base(owner, panel, art, capital || CapitalStories.Contains(play) ? StageLighting.Clockwork(VenueFor(play)) : StageLighting.For(graveyard || GraveStories.Contains(play) || play == AdventureEventKind.GraveSeed, VenueFor(play)))
         {
-            Cemetery = graveyard || GraveStories.Contains(play);
+            Cemetery = graveyard || GraveStories.Contains(play) || play == AdventureEventKind.GraveSeed;
             Capital = capital || CapitalStories.Contains(play);
             if (Capital)
             {
@@ -104,6 +104,12 @@ namespace RaidPartyManager.Presentation
         {
             switch (play)
             {
+                case AdventureEventKind.GraveSeed:
+                    HangBackdrop("Cemetery greenhouse garden", art.yewPath);
+                    Deck(art.soil, new Vector2(2.7f, 2.5f), new Color(.50f,.57f,.46f), true);
+                    FloorProp("Garden ferns", art.ferns, -4.1f, .80f, 2.6f, -8);
+                    FloorProp("Cemetery water urn", art.stoneUrn, 4.45f, -.54f, 1.24f, 6);
+                    break;
                 case AdventureEventKind.Auction:
                     HangBackdrop("Estate auction chapel", art.estateSale);
                     Deck(art.guildParquet, new Vector2(2.4f, 1.5f), new Color(.53f,.44f,.40f));
@@ -291,7 +297,7 @@ namespace RaidPartyManager.Presentation
             bool lab = kind == AdventureEventKind.Alchemist;
             bool atTable = lab || kind is AdventureEventKind.HatTrick or AdventureEventKind.Auction;
             bool city = CapitalStories.Contains(kind);
-            bool cemetery = GraveStories.Contains(kind) || city;
+            bool cemetery = GraveStories.Contains(kind) || kind == AdventureEventKind.GraveSeed || city;
             tellerStrip = Resources.Load<Texture2D>("StoryEvents/Cast/" + (city ? (CapitalStories.For(kind.Value).District switch { 0 => "LostTraveler", 1 => "Forge", _ => "Investor" }) : cemetery ? "GraveChronicler" : kind == AdventureEventKind.TidePact ? "LostTraveler" : kind.Value.ToString()));
             var mark = atTable ? new Vector3(Table.x+(lab ? .8f : 1.25f),.95f,Table.z+.95f) : new Vector3(kind == AdventureEventKind.Ambush ? 2.2f : 3.2f,.95f,-2.15f);
             if (kind == AdventureEventKind.Auction)
@@ -338,6 +344,19 @@ namespace RaidPartyManager.Presentation
                 tideSinger = Flat("Deep sea visitor", new Vector3(.1f, 1.08f, -2.4f), 2.25f, 2.25f, tideFront);
                 SetFrame(tideSinger, tideFront, AnimationCels.Count, 0);
                 Dressing.Cast[tideSinger] = new DockSet.Player(true);
+                return;
+            }
+            if (kind == AdventureEventKind.GraveSeed)
+            {
+                var greenhouse = assets.EventInkArt(AdventureEventKind.GraveSeed);
+                if (greenhouse != null)
+                {
+                    const float greenhouseHeight = 2.75f;
+                    float greenhouseWidth = greenhouseHeight * greenhouse.width / greenhouse.height;
+                    var foot = new Vector3(-1.05f, 0, -2.55f);
+                    Shadow(foot, greenhouseWidth * .91f, 1.2f);
+                    Flat("Cemetery greenhouse", foot + Vector3.up * (greenhouseHeight / 2), greenhouseWidth, greenhouseHeight, greenhouse);
+                }
                 return;
             }
             propArt = EventProp(kind.Value);

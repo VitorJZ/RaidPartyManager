@@ -34,13 +34,13 @@ namespace RaidPartyManager.Presentation
         }
 
         private readonly PartyRun run;
-        private readonly string memberId;
-        private readonly Texture2D portraitArt;
+        private string memberId;
+        private readonly Func<string, Texture2D> portraitFor;
         private readonly List<string> bag;
         private readonly Func<string, Texture2D> iconFor;
         private readonly Action changed;
         private readonly Action close;
-        private readonly Action openContract;
+        private readonly Action<string> openContract;
         private readonly int[] pages = new int[2];
         private bool showSkillBooks;
         private bool showEmployeeDossier;
@@ -59,12 +59,15 @@ namespace RaidPartyManager.Presentation
         private int pointerId = -1;
         private Vector2 pointer;
 
-        public CharacterEquipmentPopup(PartyRun run, string memberId, Texture2D portraitArt, Func<string, Texture2D> iconFor, List<string> bag,
-            Action changed, Action close, Action openContract, bool startAtDossier)
+        internal string SelectedMemberId => memberId;
+
+        public CharacterEquipmentPopup(PartyRun run, string memberId, Func<string, Texture2D> portraitFor,
+            Func<string, Texture2D> iconFor, List<string> bag, Action changed, Action close,
+            Action<string> openContract, bool startAtDossier)
         {
             this.run = run;
             this.memberId = memberId;
-            this.portraitArt = portraitArt;
+            this.portraitFor = portraitFor;
             this.iconFor = iconFor;
             this.bag = bag;
             this.changed = changed;
@@ -106,12 +109,21 @@ namespace RaidPartyManager.Presentation
         private void Render()
         {
             Clear();
-            var selected = run.Members.Single(member => member.Id == memberId);
-            var inventory = run.Inventory.ToDictionary(item => item.Id);
+            var members = run.Members;
+            var selected = members.Single(member => member.Id == memberId);
+            bool displayDossier = showEmployeeDossier || selected.IsAway;
+
+            var frame = PrototypeStyle.Row("character-details-frame");
+            frame.style.width = Length.Percent(95);
+            frame.style.maxWidth = 774;
+            frame.style.alignItems = Align.Stretch;
+            frame.Add(BuildMemberBookmarks(members));
+
             var dialog = PrototypeStyle.Panel();
             dialog.name = "character-details";
-            dialog.style.width = Length.Percent(89);
-            dialog.style.maxWidth = 730;
+            dialog.style.flexGrow = 1;
+            dialog.style.flexBasis = 0;
+            dialog.style.minWidth = 0;
             dialog.style.marginTop = 0;
             dialog.style.paddingTop = dialog.style.paddingBottom = 16;
             dialog.style.paddingLeft = dialog.style.paddingRight = 19;
@@ -147,15 +159,19 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(dismiss, PrototypeStyle.Accent, 23);
             header.Add(dismiss);
             dialog.Add(header);
-            if (showEmployeeDossier)
+            frame.Add(dialog);
+            Add(frame);
+
+            if (displayDossier)
             {
-                dialog.style.height = Length.Percent(90);
-                dialog.Add(new EmployeeDossier(selected, run.EmployeeProfileFor(memberId), openContract));
-                Add(dialog);
+                frame.style.height = Length.Percent(90);
+                dialog.Add(new EmployeeDossier(selected, run.EmployeeProfileFor(memberId), () => openContract(memberId)));
                 return;
             }
+
+            var inventory = run.Inventory.ToDictionary(item => item.Id);
             if (selected.Trait != PlayerTrait.None)
-                dialog.Add(PrototypeStyle.Text(PlayerMarket.Describe(selected.Trait), 13, PrototypeStyle.Accent));
+                dialog.Add(PrototypeStyle.Text(PlayerMarket.Describe(selected.Trait), 13, PrototypeStyle.Trait));
 
             var body = PrototypeStyle.Row();
             body.style.alignItems = Align.Stretch;
@@ -172,7 +188,6 @@ namespace RaidPartyManager.Presentation
             body.Add(BuildBackpack(inventory, selected.EquipmentIds.Any(id => id != null)));
             body.Add(BuildBookmarks());
             dialog.Add(body);
-            Add(dialog);
 
             void AddTab(string title, string id, bool dossier)
             {
@@ -224,6 +239,7 @@ namespace RaidPartyManager.Presentation
             portrait.style.backgroundColor = PrototypeStyle.Inset;
             portrait.style.overflow = Overflow.Hidden;
             PrototypeStyle.Outline(portrait, PrototypeStyle.Edge, 5);
+            var portraitArt = portraitFor(member.Character.Id);
             ProfessionFrame.AddTo(portrait, member.Character.Profession, portraitArt);
             if (portraitArt == null)
             {
@@ -253,7 +269,7 @@ namespace RaidPartyManager.Presentation
 
             if (!string.IsNullOrWhiteSpace(member.Character.TraitText))
             {
-                var trait = PrototypeStyle.Text("被动 · " + member.Character.TraitText, 12, PrototypeStyle.Muted);
+                var trait = PrototypeStyle.Text("被动：" + member.Character.TraitText, 12, PrototypeStyle.Passive);
                 trait.name = "details-fixed-trait";
                 trait.style.marginTop = 8;
                 trait.style.flexGrow = 1;
@@ -274,6 +290,46 @@ namespace RaidPartyManager.Presentation
             stat.style.flexGrow = 1;
             PrototypeStyle.Middle(stat);
             return stat;
+        }
+
+        private VisualElement BuildMemberBookmarks(IReadOnlyList<MemberView> members)
+        {
+            var bookmarks = new VisualElement { name = "loadout-member-bookmarks" };
+            bookmarks.style.width = 44;
+            bookmarks.style.flexShrink = 0;
+            bookmarks.style.justifyContent = Justify.Center;
+            var ordered = members.OrderBy(member => member.Position ?? int.MaxValue).ToArray();
+            for (int i = 0; i < Math.Max(PartyRun.RosterLimit, ordered.Length); i++)
+            {
+                var member = ordered.ElementAtOrDefault(i);
+                bool selected = member?.Id == memberId;
+                string name = $"loadout-member-{i + 1}";
+                var bookmark = PrototypeStyle.Button((i + 1).ToString(), name, member == null ? null : () =>
+                {
+                    if (member.Id == memberId) return;
+                    CancelInteraction();
+                    keyboardSlot = null;
+                    memberId = member.Id;
+                    Render();
+                    this.Q<Button>(name).Focus();
+                });
+                bookmark.tooltip = member == null ? "空位" : member.Character.Name + (member.IsAway ? " · 外出中" : "");
+                bookmark.EnableInClassList("loadout-member-selected", selected);
+                bookmark.SetEnabled(member != null);
+                bookmark.style.height = 32;
+                bookmark.style.paddingLeft = bookmark.style.paddingRight = 0;
+                bookmark.style.marginLeft = 0;
+                bookmark.style.marginRight = -1;
+                bookmark.style.fontSize = 16;
+                bookmark.style.unityFontStyleAndWeight = FontStyle.Bold;
+                bookmark.style.backgroundColor = selected ? PrototypeStyle.Accent :
+                    member == null ? PrototypeStyle.Inset : (Color)new Color32(166, 128, 81, 255);
+                bookmark.style.color = member == null ? PrototypeStyle.Muted : PrototypeStyle.Background;
+                PrototypeStyle.Outline(bookmark, selected ? PrototypeStyle.Accent : PrototypeStyle.Edge, 0);
+                bookmark.style.borderTopLeftRadius = bookmark.style.borderBottomLeftRadius = 5;
+                bookmarks.Add(bookmark);
+            }
+            return bookmarks;
         }
 
         private VisualElement BuildBookmarks()

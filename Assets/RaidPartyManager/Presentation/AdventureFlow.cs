@@ -18,11 +18,12 @@ namespace RaidPartyManager.Presentation
         private static string destination;
         private static string origin;
         private static string checkpointPathOverride;
+        private static AdventureVisit savedResolvedVisit;
         private static string CheckpointPath => checkpointPathOverride ??
             Path.Combine(Application.persistentDataPath, "raid-adventure-v1.json");
         internal static string GuideKey => "RaidPartyManager.Guide.v1:" + CheckpointPath;
         internal static SkillBookDefinition PracticeBook => routeArt.Encounter.SkillBooks.FirstOrDefault(book =>
-            book.AvailableInRegularPool && book.Requirement == SkillRequirement.None && book.Cost == 1);
+            book.AvailableInRegularPool && book.Requirement == SkillRequirement.None && !book.SpendsAllEnergy && book.Cost == 1);
         private static string invalidatedPath;
         private static string InvalidatedSaveKey => "RaidPartyManager.InvalidatedSave:" + CheckpointPath;
         internal static bool HasSave => File.Exists(CheckpointPath) && invalidatedPath != CheckpointPath &&
@@ -36,6 +37,7 @@ namespace RaidPartyManager.Presentation
         {
             inspection = route = Active = null;
             destination = origin = null;
+            savedResolvedVisit = null;
             InspectionMode = true;
         }
 
@@ -76,7 +78,7 @@ namespace RaidPartyManager.Presentation
 
         internal static CharacterDefinition[] DrawStarters(EncounterData content, System.Random random)
         {
-            var pool = content.CharacterCatalog.Where(c => c.RosterNumber > 0 && c.Stage == 1).ToList();
+            var pool = content.CharacterCatalog.Where(c => c.RosterNumber > 0 && c.Stage == 1 && !AdventureRun.IsGardenerForm(c.Id)).ToList();
             var warriors = pool.Where(c => c.Profession == Profession.Warrior).ToArray();
             var warrior = warriors[random.Next(warriors.Length)];
             pool.Remove(warrior);
@@ -94,7 +96,7 @@ namespace RaidPartyManager.Presentation
 
         private static CharacterDefinition[] DrawInspectionParty(EncounterData content, System.Random random)
         {
-            var initial = content.CharacterCatalog.Where(c => c.RosterNumber > 0 && c.Stage == 1).ToArray();
+            var initial = content.CharacterCatalog.Where(c => c.RosterNumber > 0 && c.Stage == 1 && !AdventureRun.IsGardenerForm(c.Id)).ToArray();
             return new[] { Profession.Warrior, Profession.Mage, Profession.Archer, Profession.Support }.Select(profession =>
             {
                 var pool = initial.Where(c => c.Profession == profession).ToArray();
@@ -185,12 +187,29 @@ namespace RaidPartyManager.Presentation
             if (!CanSave(party))
                 return "当前没有可保存的讨伐。";
 
+            string error = WriteCheckpoint(Active);
+            if (error == null) EndRouteAndOpenMenu();
+            return error;
+        }
+
+        internal static void AutoSaveResolvedVisit(AdventureRun run)
+        {
+            if (run?.Current is not { Resolved: true } visit || run.HasBattleRewardScreen ||
+                ReferenceEquals(visit, savedResolvedVisit)) return;
+            if (AutoSave(run)) savedResolvedVisit = visit;
+        }
+
+        internal static bool AutoSave(AdventureRun run) =>
+            OnRoute && ReferenceEquals(Active, run) && !run.Failed && WriteCheckpoint(run) == null;
+
+        private static string WriteCheckpoint(AdventureRun run)
+        {
             string path = CheckpointPath;
             string temporary = path + ".tmp";
             try
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
-                var checkpoint = Active.CheckpointForExit();
+                var checkpoint = run.CheckpointForExit();
                 if (checkpoint.HasShopVisit)
                     checkpoint.ShopVisit.InTalentMarket = destination == "TalentMarket";
                 File.WriteAllText(temporary, JsonUtility.ToJson(checkpoint));
@@ -206,7 +225,6 @@ namespace RaidPartyManager.Presentation
             }
 
             ClearInvalidatedCheckpoint();
-            EndRouteAndOpenMenu();
             return null;
         }
 
@@ -288,6 +306,7 @@ namespace RaidPartyManager.Presentation
         {
             Active = route = null;
             destination = origin = null;
+            savedResolvedVisit = null;
         }
 
         internal static void OpenHub() => OpenHub(true);
@@ -347,6 +366,7 @@ namespace RaidPartyManager.Presentation
             DockRouteSigns signs = null;
             signs = new DockRouteSigns(run, routeArt, stone, Choose, null, following: true);
             parent.Add(new StageSignMask(signs));
+            AutoSaveResolvedVisit(run);
 
             bool Choose(int index, StageTurn turn)
             {
@@ -366,7 +386,7 @@ namespace RaidPartyManager.Presentation
                 parent.SetEnabled(false);
                 bar.WhenRewardsArrive(() =>
                 {
-                    if (FromTownFacility || run.Current != visit || !run.EnterFollowing(index))
+                    if (FromTownFacility || run.Current != visit || !run.EnterFollowing(index, () => AutoSave(run)))
                     {
                         parent.SetEnabled(true);
                         return;
@@ -409,7 +429,7 @@ namespace RaidPartyManager.Presentation
             if (Active?.CampaignWon != true) return;
             Active.CloseVisit();
             InvalidateCheckpoint();
-            DockPlayhouse.Current.ShowFinalCurtain(EndRouteAndOpenMenu);
+            DockPlayhouse.Current.ShowFinalCurtain(Active.Party.Gold, Active.Party.PayrollDebt, EndRouteAndOpenMenu);
         }
 
         internal static void ReturnFromNode()
@@ -434,13 +454,10 @@ namespace RaidPartyManager.Presentation
                 PrototypeSceneMenu.OpenScene("Town");
                 return;
             }
-            if (!IsBattleScene(destination)) Active.Leave();
-            else if (Active.Current?.Resolved == true)
-            {
-                bool inspectedEvent = Active.IsInspection && Active.Current.Event.HasValue;
-                Active.CloseVisit();
-                if (inspectedEvent) Active = inspection = null;
-            }
+            bool inspectedEvent = IsBattleScene(destination) && Active.IsInspection && Active.Current?.Event != null;
+            bool completed = IsBattleScene(destination) ? Active.CloseVisit() : Active.Leave();
+            if (completed) AutoSave(Active);
+            if (completed && inspectedEvent) Active = inspection = null;
             destination = "EventSelect"; origin = null;
             PrototypeSceneMenu.OpenScene("EventSelect");
         }
@@ -454,7 +471,7 @@ namespace RaidPartyManager.Presentation
 
         internal static string EventName(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Title : GraveStories.Contains(kind) ? GraveStories.Title(kind) : kind switch
         {
-            AdventureEventKind.TidePact => "潮汐之约", AdventureEventKind.Investor => "引资的创业者", AdventureEventKind.Ambush => "随机敌人",
+            AdventureEventKind.GraveSeed => "温室里的种子", AdventureEventKind.TidePact => "潮汐之约", AdventureEventKind.Investor => "引资的创业者", AdventureEventKind.Ambush => "随机敌人",
             AdventureEventKind.LostTraveler => "呼朋引伴", AdventureEventKind.FoundCoins => "捡到钱了",
             AdventureEventKind.HatTrick => "帽子戏法", AdventureEventKind.Forge => "锻造台",
             AdventureEventKind.LockedChest => "上锁的宝箱", AdventureEventKind.AscensionTrial => "升阶试炼", _ => "炼药师的小白鼠"
@@ -468,6 +485,7 @@ namespace RaidPartyManager.Presentation
 
         internal static string Narrative(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Intro + "\n" + string.Join("\n", CapitalStories.For(kind).Choices.Select(c => c.Label + "：" + c.Terms)) : GraveStories.Contains(kind) ? GraveStories.Intro(kind) : kind switch
         {
+            AdventureEventKind.GraveSeed => "温室的桌上放着一个钱袋和一颗奇怪的种子。字条上写着：拿走一样。选了种子，就让一名出战队员装备它。",
             AdventureEventKind.TidePact => "深海轻语浮出水面，指了指你的背包。她想用 99 天的同行换一件装备和一本技能书，期间不收工资。",
             AdventureEventKind.Investor => "船主还差钱造船。填好金额，再点击出资牌。账上凑满 50 金币，她才送两件装备，不足 50 就先记账。",
             AdventureEventKind.Ambush => "灯一灭，埋伏的人就围上来了！准备好就点击应战牌，打赢这场能拿 12～18 金币。",

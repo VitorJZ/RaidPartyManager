@@ -18,6 +18,8 @@ namespace RaidPartyManager.Presentation
         private readonly IReadOnlyList<CharacterDefinition> roster;
         private readonly Func<string, Texture2D> portraitFor;
         private readonly Func<string, Texture2D> iconFor;
+        private readonly Texture2D statusBackdrop;
+        private readonly Texture2D contractsBackdrop;
         private readonly VisualElement overview;
         private readonly VisualElement modalLayer;
         private string memberId;
@@ -25,7 +27,9 @@ namespace RaidPartyManager.Presentation
         private int reservePage;
 
         private const float EmptyPortraitAspect = 2f / 3f;
-        private const float PartyCardWidthPercent = 24f;
+        private const int DefaultReserveSlots = PartyRun.RosterLimit - Rules.Positions;
+        private const float PartyCardCaptionHeight = 24f;
+        private const float PartyPortraitMargin = 2f;
         private readonly List<string> backpackCells = new List<string>();
 
         public PartyEditorView(PartyRun run, EncounterData content, Action back, Side side = Side.Party, Action edited = null,
@@ -50,16 +54,24 @@ namespace RaidPartyManager.Presentation
             name = "party-editor";
             style.flexGrow = 1;
             style.backgroundColor = PrototypeStyle.Background;
+            if (side == Side.Party)
+            {
+                statusBackdrop = Resources.Load<Texture2D>("PartyStatusBackdrop");
+                contractsBackdrop = Resources.Load<Texture2D>("PartyContractsBackdrop");
+                style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
+            }
 
-            overview = new ScrollView();
+            overview = side == Side.Party ? new VisualElement { name = "party-editor-overview" } : new ScrollView();
             overview.style.flexGrow = 1;
+            overview.style.minHeight = 0;
             overview.contentContainer.style.paddingLeft = overview.contentContainer.style.paddingRight = 22;
-            overview.contentContainer.style.paddingTop = overview.contentContainer.style.paddingBottom = 18;
+            overview.contentContainer.style.paddingTop = overview.contentContainer.style.paddingBottom = side == Side.Party ? 14 : 18;
             Add(overview);
 
             var header = PrototypeStyle.Row("party-editor-header");
             header.style.alignItems = Align.Center;
             const int buttonWidth = 100;
+            const int headerGap = 6;
             var leftSpacer = new VisualElement { pickingMode = PickingMode.Ignore };
             leftSpacer.style.width = buttonWidth;
             leftSpacer.style.flexShrink = 0;
@@ -72,12 +84,26 @@ namespace RaidPartyManager.Presentation
                     toggle.text = showContracts ? "查看状态" : "查看合约";
                     RenderRoster();
                 };
-                header.Add(toggle);
-                RegisterCallback<GeometryChangedEvent>(evt =>
+                var contracts = PrototypeStyle.Row();
+                contracts.style.flexShrink = 0;
+                contracts.Add(toggle);
+                if (run.Day > 0)
                 {
-                    if (overview.Q("editor-roster") is { } grid)
-                        FitPartyRoster(grid, evt.newRect.height);
-                });
+                    var repay = PrototypeStyle.Button("偿还薪资", "roster-repay-wages", null);
+                    repay.clicked += () =>
+                    {
+                        var popup = ContractPanel.RepayWages(run, () =>
+                        {
+                            CloseModal();
+                            repay.Focus();
+                        }, RenderEditedRoster);
+                        OpenModal(null, popup, "dismiss-paper");
+                    };
+                    repay.style.width = buttonWidth;
+                    repay.style.marginLeft = headerGap;
+                    contracts.Add(repay);
+                }
+                header.Add(contracts);
             }
             else header.Add(leftSpacer);
             var title = PrototypeStyle.Text(side == Side.Party ? "角色编辑" : "敌方编辑", 27);
@@ -87,6 +113,7 @@ namespace RaidPartyManager.Presentation
             var backButton = PrototypeStyle.Button("返回", "back-party-editor", back);
             backButton.style.width = buttonWidth;
             backButton.style.flexShrink = 0;
+            if (side == Side.Party && run.Day > 0) backButton.style.marginLeft = buttonWidth + headerGap;
             header.Add(backButton);
             overview.Add(header);
             if (side == Side.Enemy && content.EnemyFormations.Count > 0)
@@ -105,7 +132,7 @@ namespace RaidPartyManager.Presentation
             {
                 if (evt.keyCode != KeyCode.Escape)
                     return;
-                if (memberId != null)
+                if (modalLayer.childCount > 0)
                     CloseModal();
                 else
                     back();
@@ -146,15 +173,21 @@ namespace RaidPartyManager.Presentation
             };
         }
 
-        private static void FitPartyRoster(VisualElement grid, float editorHeight)
+        private static VisualElement PartyRow(string name, float weight)
         {
-            // Leave room for both rows of names and status bars. A short window can scroll.
-            float portraitHeight = Mathf.Clamp((editorHeight - 294f) * .5f, 164f, 300f);
-            grid.style.maxWidth = portraitHeight * EmptyPortraitAspect * 100f / PartyCardWidthPercent;
+            var row = PrototypeStyle.Row(name);
+            row.style.flexGrow = weight;
+            row.style.flexBasis = 0;
+            row.style.minHeight = 0;
+            row.style.alignItems = Align.FlexStart;
+            row.style.justifyContent = Justify.Center;
+            return row;
         }
 
         private void RenderRoster()
         {
+            if (side == Side.Party)
+                style.backgroundImage = new StyleBackground(showContracts ? contractsBackdrop : statusBackdrop);
             var oldRoster = overview.Q("editor-roster");
             oldRoster?.RemoveFromHierarchy();
             var layout = new VisualElement { name = "editor-roster" };
@@ -163,7 +196,10 @@ namespace RaidPartyManager.Presentation
             {
                 layout.style.alignSelf = Align.Center;
                 layout.style.width = Length.Percent(100);
-                if (!float.IsNaN(this.layout.height)) FitPartyRoster(layout, this.layout.height);
+                layout.style.maxWidth = 840;
+                layout.style.flexGrow = 1;
+                layout.style.flexBasis = 0;
+                layout.style.minHeight = 0;
             }
 
             var drag = new FormationSwap(layout, (from, to) =>
@@ -183,12 +219,20 @@ namespace RaidPartyManager.Presentation
                     RenderEditedRoster();
                 }
             }, slot => OpenMember(slot.MemberId));
-            layout.Add(PrototypeStyle.Text(side == Side.Party ? (run.Day > 0 ? $"队员 {run.Members.Count}/{PartyRun.RosterLimit}　·　长按换位，左键查看装备，右键查看合约。" : "长按立绘换位，左键查看装备，右键替换队员。")
-                : "长按立绘换位，点击立绘可替换敌人。", 13, PrototypeStyle.Muted));
-            if (side == Side.Party) layout.Add(PrototypeStyle.Text("出战队伍", 15, PrototypeStyle.Accent));
-            var row = PrototypeStyle.Row("editor-positions");
-            row.style.justifyContent = Justify.SpaceAround;
             var members = run.Members;
+            string instructions = "长按立绘换位，点击立绘可替换敌人。";
+            if (side == Side.Party)
+            {
+                string controls = showContracts ? "点击查看合约，长按换位。" :
+                    run.Day > 0 ? "点击查看装备，长按换位，右击查看合约。" : "点击查看装备，长按换位，右击替换队员。";
+                instructions = $"队员 {members.Count}/{PartyRun.RosterLimit}　·　{controls}";
+            }
+            var hint = PrototypeStyle.Text(instructions, 13, PrototypeStyle.Muted);
+            hint.style.flexShrink = 0;
+            layout.Add(hint);
+            if (side == Side.Party) layout.Add(PrototypeStyle.Text("出战队伍", 15, PrototypeStyle.Accent));
+            var row = side == Side.Party ? PartyRow("editor-positions", 1.15f) : PrototypeStyle.Row("editor-positions");
+            if (side == Side.Enemy) row.style.justifyContent = Justify.SpaceAround;
             var displayed = new HashSet<string>();
             for (int index = 0; index < Rules.Positions; index++)
             {
@@ -196,7 +240,7 @@ namespace RaidPartyManager.Presentation
                 var member = members.FirstOrDefault(entry => entry.Position == position);
                 if (member != null)
                     displayed.Add(member.Id);
-                row.Add(BuildCard(position, member, drag));
+                row.Add(BuildCard(position, member, drag, row));
                 if (side == Side.Enemy && member != null)
                     index += member.Character.PositionSlots - 1;
             }
@@ -204,10 +248,14 @@ namespace RaidPartyManager.Presentation
             if (side == Side.Party)
             {
                 var reserves = members.Where(member => !displayed.Contains(member.Id)).ToArray();
-                int pages = Math.Max(1, (reserves.Length + 3) / 4);
+                int slots = Mathf.Clamp(reserves.Length, DefaultReserveSlots, Rules.Positions);
+                int pages = Math.Max(1, (reserves.Length + slots - 1) / slots);
                 reservePage = Mathf.Clamp(reservePage, 0, pages - 1);
                 var heading = PrototypeStyle.Row("editor-bench");
                 heading.style.marginTop = 6;
+                heading.style.alignItems = Align.Center;
+                heading.style.minHeight = 24;
+                heading.style.flexShrink = 0;
                 var title = PrototypeStyle.Text("闲置成员", 15, PrototypeStyle.Accent);
                 title.style.flexGrow = 1;
                 heading.Add(title);
@@ -223,10 +271,9 @@ namespace RaidPartyManager.Presentation
                 }
                 drag.Register(new FormationSwap.Slot { View = heading, Border = heading, Borderless = true, CanDrop = true });
                 layout.Add(heading);
-                var seats = PrototypeStyle.Row("reserve-positions");
-                seats.style.justifyContent = Justify.SpaceAround;
-                for (int i = 0; i < Rules.Positions; i++)
-                    seats.Add(BuildCard(i + 1, reserves.ElementAtOrDefault(reservePage * 4 + i), drag, true));
+                var seats = PartyRow("reserve-positions", 1);
+                for (int i = 0; i < slots; i++)
+                    seats.Add(BuildCard(i + 1, reserves.ElementAtOrDefault(reservePage * slots + i), drag, seats, true));
                 layout.Add(seats);
                 overview.Add(layout);
                 return;
@@ -265,16 +312,22 @@ namespace RaidPartyManager.Presentation
             overview.Add(layout);
         }
 
-        private VisualElement BuildCard(int position, MemberView member, FormationSwap drag, bool reserve = false)
+        private VisualElement BuildCard(int position, MemberView member, FormationSwap drag, VisualElement row, bool reserve = false)
         {
             var card = new VisualElement { name = reserve ? $"reserve-position-{position}" : $"edit-position-{position}" };
             int span = member?.Character.PositionSlots ?? 1;
-            card.style.width = Length.Percent(side == Side.Party ? PartyCardWidthPercent : 17 * span);
+            card.style.width = Length.Percent(side == Side.Party ? 22 : 17 * span);
             if (side == Side.Enemy) card.style.maxWidth = 224 * span;
             var namePlate = PrototypeStyle.Text(member?.Character.Name ?? "空位", 18,
                 member != null ? PrototypeStyle.Ink : PrototypeStyle.Muted);
             namePlate.name = "character-name";
-            namePlate.style.height = side == Side.Party ? 25 : 42;
+            namePlate.style.height = side == Side.Party ? PartyCardCaptionHeight : 42;
+            if (side == Side.Party)
+            {
+                namePlate.style.whiteSpace = WhiteSpace.NoWrap;
+                namePlate.style.overflow = Overflow.Hidden;
+                namePlate.style.textOverflow = TextOverflow.Ellipsis;
+            }
             namePlate.style.backgroundColor = PrototypeStyle.PanelColor;
             PrototypeStyle.Middle(namePlate);
             PrototypeStyle.Outline(namePlate, PrototypeStyle.Edge, 4);
@@ -282,13 +335,24 @@ namespace RaidPartyManager.Presentation
 
             var art = portraitFor(member?.Character.Id);
             float aspect = art != null ? (float)art.width / art.height : EmptyPortraitAspect;
+            if (side == Side.Party)
+            {
+                card.style.marginLeft = card.style.marginRight = 4;
+                float maxWidth = reserve ? 152 : 184;
+                card.style.maxWidth = maxWidth;
+                row.RegisterCallback<GeometryChangedEvent>(evt =>
+                {
+                    float portraitHeight = Mathf.Max(0, evt.newRect.height - 2 * (PartyCardCaptionHeight + PartyPortraitMargin));
+                    card.style.maxWidth = Mathf.Min(maxWidth, portraitHeight * aspect);
+                });
+            }
             var portrait = new VisualElement { name = "character-portrait" };
             portrait.style.alignSelf = Align.Center;
             portrait.style.width = Length.Percent(100);
             if (side == Side.Enemy) portrait.style.maxWidth = 364f * aspect;
             portrait.style.aspectRatio = new StyleRatio(new Ratio(aspect));
             portrait.style.flexShrink = 0;
-            portrait.style.marginTop = portrait.style.marginBottom = side == Side.Party ? 2 : 7;
+            portrait.style.marginTop = portrait.style.marginBottom = side == Side.Party ? PartyPortraitMargin : 7;
             portrait.style.overflow = Overflow.Hidden;
             portrait.style.backgroundColor = PrototypeStyle.Inset;
             PrototypeStyle.Outline(portrait, PrototypeStyle.Edge, 4);
@@ -317,7 +381,7 @@ namespace RaidPartyManager.Presentation
             card.Add(portrait);
 
             var life = new VisualElement { name = "character-health" };
-            life.style.height = side == Side.Party ? 24 : 33;
+            life.style.height = side == Side.Party ? PartyCardCaptionHeight : 33;
             life.style.overflow = Overflow.Hidden;
             life.style.backgroundColor = PrototypeStyle.Inset;
             PrototypeStyle.Outline(life, PrototypeStyle.Edge, 4);
@@ -353,7 +417,9 @@ namespace RaidPartyManager.Presentation
                 var open = new Button(() => OpenMember(member.Id))
                 {
                     name = $"edit-member-{member.Id}",
-                    tooltip = side == Side.Party ? $"打开{member.Character.Name}的面板和背包" : $"替换{member.Character.Name}"
+                    tooltip = side != Side.Party ? $"替换{member.Character.Name}" :
+                        showContracts && member.Contract != null ? $"查看{member.Character.Name}的合约" :
+                        $"打开{member.Character.Name}的面板和背包"
                 };
                 PrototypeStyle.Fill(open);
                 open.style.marginTop = open.style.marginRight = open.style.marginBottom = open.style.marginLeft = 0;
@@ -375,16 +441,15 @@ namespace RaidPartyManager.Presentation
 
         private void OpenDetails(string id, bool dossier = false)
         {
-            var member = run.Members.Single(candidate => candidate.Id == id);
-            OpenModal(id, new CharacterEquipmentPopup(run, id, portraitFor(member.Character.Id), iconFor, backpackCells,
-                RenderEditedRoster, CloseModal, ShowContract, dossier || member.IsAway), "close-character-details");
+            OpenModal(id, new CharacterEquipmentPopup(run, id, portraitFor, iconFor, backpackCells,
+                RenderEditedRoster, CloseModal, ShowContract, dossier), "close-character-details");
 
-            void ShowContract()
+            void ShowContract(string selectedId)
             {
                 CloseModal();
-                OpenContract(run.Members.Single(candidate => candidate.Id == id), () =>
+                OpenContract(run.Members.Single(candidate => candidate.Id == selectedId), () =>
                 {
-                    if (run.Members.Any(candidate => candidate.Id == id)) OpenDetails(id, dossier: true);
+                    if (run.Members.Any(candidate => candidate.Id == selectedId)) OpenDetails(selectedId, dossier: true);
                 });
             }
         }
@@ -393,6 +458,7 @@ namespace RaidPartyManager.Presentation
         {
             var member = run.Members.Single(m => m.Id == id);
             if (side != Side.Party) OpenReplacement(member);
+            else if (showContracts && member.Contract != null) OpenContract(member);
             else OpenDetails(id);
         }
 
@@ -450,7 +516,7 @@ namespace RaidPartyManager.Presentation
 
         private void CloseModal()
         {
-            string previous = memberId;
+            string previous = modalLayer.Q<CharacterEquipmentPopup>()?.SelectedMemberId ?? memberId;
             memberId = null;
             modalLayer.Clear();
             modalLayer.style.display = DisplayStyle.None;

@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "浑浊的水"
   effect: 23
   icon: {fileID: 2800000, guid: d3c4bfd7803147a2bbc19e7b6b94e0e5, type: 3}
-  description: "药水的效果额外触发一次"
+  description: "每次饮用的药水额外触发一次药效。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

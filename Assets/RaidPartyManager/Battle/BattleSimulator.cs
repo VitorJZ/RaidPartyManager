@@ -53,6 +53,7 @@ namespace RaidPartyManager.Battle
             public CharacterTrait? CopiedTrait;
             public int CopiedTraitPower;
             public int AttackGrowth;
+            public int GourdAttack;
             public int PermanentAttack;
             public int GrowthTriggers;
             public int BorrowedAttack;
@@ -91,7 +92,6 @@ namespace RaidPartyManager.Battle
                 return true;
             }
             public EquippedItem[] Slots;
-            public string LastHitTarget;
             public readonly HashSet<string> DamagedTargets = new HashSet<string>();
             public bool Revived;
             public bool ResolvingDamageHeal;
@@ -175,7 +175,7 @@ namespace RaidPartyManager.Battle
 
             public Combatant EquipmentInput() =>
                 new Combatant(Input.Id, Input.Character, Input.Side, Input.Position,
-                    PlayerMarket.GearAndPosition(Talent, Slots.Count(item => item != null), Input.Position, Input.Stats) + new Stats(AttackGrowth + PermanentAttack + BorrowedAttack,
+                    PlayerMarket.GearAndPosition(Talent, Slots.Count(item => item != null), Input.Position, Input.Stats) + new Stats(AttackGrowth + GourdAttack + PermanentAttack + BorrowedAttack,
                         Trait == CharacterTrait.EnemyAnchorHermit && EnemyTriggered ? -2 : 0, 0, BonusMaximumHealth), Health, Input.Equipment);
 
             public Combatant RecruitmentResult() =>
@@ -275,16 +275,22 @@ namespace RaidPartyManager.Battle
                 StartRound();
                 if (FinishIfDecided())
                     return events.GetRange(firstEvent, events.Count - firstEvent);
-                ApplyRoundStartTraits();
+                var frozenTurns = new List<Unit>();
                 foreach (var actor in RoundOrder())
                 {
-                    if (CanActThisRound(actor))
-                        Act(actor);
+                    if (CanActThisRound(actor, ignoreFreeze: true))
+                    {
+                        if (actor.Layers(StatusKind.Frozen) > 0)
+                            frozenTurns.Add(actor);
+                        else
+                            Act(actor);
+                    }
+                    PlayThawedTurns(frozenTurns);
                     if (FinishIfDecided())
                         return events.GetRange(firstEvent, events.Count - firstEvent);
                 }
 
-                EndRound();
+                EndRound(frozenTurns);
                 foreach (var unit in units.Where(unit => unit.Health > 0))
                 {
                     if (unit.Trait == CharacterTrait.LightningChant)
@@ -318,8 +324,23 @@ namespace RaidPartyManager.Battle
         private int RoundInterval() => units.Where(unit => unit.Health > 0)
             .Max(unit => unit.Input.Character.ActionInterval);
 
-        private bool CanActThisRound(Unit unit) =>
-            unit.Health > 0 && !(Round == 1 && unit.Input.Id == request.PallbearerId) && unit.BlockedRound != Round && unit.Layers(StatusKind.Stunned) == 0;
+        private bool CanActThisRound(Unit unit, bool ignoreFreeze = false) =>
+            unit.Health > 0 && !(Round == 1 && unit.Input.Id == request.PallbearerId) && unit.BlockedRound != Round &&
+            unit.Layers(StatusKind.Stunned) == 0 && (ignoreFreeze || unit.Layers(StatusKind.Frozen) == 0);
+
+        private void PlayThawedTurns(List<Unit> frozenTurns)
+        {
+            // Check again after each recovered turn, which can thaw someone else waiting in line.
+            int ready;
+            while ((ready = frozenTurns.FindIndex(unit => CanActThisRound(unit))) >= 0)
+            {
+                var actor = frozenTurns[ready];
+                if (!Opponents(actor).Any())
+                    return;
+                frozenTurns.RemoveAt(ready);
+                Act(actor);
+            }
+        }
 
         private IEnumerable<Unit> RoundOrder()
         {
@@ -340,6 +361,9 @@ namespace RaidPartyManager.Battle
                 (order[last], order[index]) = (order[index], order[last]);
             }
         }
+
+        private static IEnumerable<Unit> InEquipmentOrder(IEnumerable<Unit> candidates) =>
+            candidates.OrderBy(unit => unit.Input.Position).ThenBy(unit => unit.Input.Side);
 
         private IEnumerable<Unit> Opponents(Unit actor) =>
             units.Where(unit => unit.Input.Side != actor.Input.Side && unit.Health > 0);
@@ -424,6 +448,10 @@ namespace RaidPartyManager.Battle
                 .SelectMany(owner => owner.Equipped.Where(item => item.Definition.Effect != EquipmentEffect.RedCord)
                     .Select(item => (owner, item))));
 
+        private static bool IsActiveGear(Unit recipient, Unit owner, EquippedItem item) =>
+            owner.Health > 0 && (owner == recipient || owner.LinkedFront == recipient) &&
+            !item.Disabled && owner.Slots.Contains(item);
+
         private static bool UsesShortbow(Unit actor) =>
             actor.Input.Character.Reach == AttackReach.Ranged && actor.Has(EquipmentEffect.Shortbow);
 
@@ -478,19 +506,22 @@ namespace RaidPartyManager.Battle
             }
         }
 
+        private IEnumerable<Unit> AttackTargets(Unit actor, ActionDefinition action)
+        {
+            var enemies = TargetableOpponents(actor);
+            if (actor.Trait == CharacterTrait.PiercingArrow && !UsesShortbow(actor))
+                return enemies.Take(1);
+            if (UsesShortbow(actor) || action.Target == TargetRule.FrontEnemy ||
+                IsMelee(actor) && action == actor.Input.Character.BasicAttack && action.Target == TargetRule.AnyEnemy)
+                return FrontAttackTargets(actor);
+            return action.Target == TargetRule.RearEnemy ? enemies.Reverse().Take(1) : enemies;
+        }
+
         private void AddLegalOptions(Unit actor, ActionDefinition action, List<ActionOption> options)
         {
             if (action.Kind == ActionKind.Attack)
             {
-                var enemies = TargetableOpponents(actor);
-                if (actor.Trait == CharacterTrait.PiercingArrow && !UsesShortbow(actor))
-                    enemies = enemies.Take(1);
-                else if (UsesShortbow(actor) || action.Target == TargetRule.FrontEnemy ||
-                    IsMelee(actor) && action == actor.Input.Character.BasicAttack && action.Target == TargetRule.AnyEnemy)
-                    enemies = FrontAttackTargets(actor);
-                else if (action.Target == TargetRule.RearEnemy)
-                    enemies = enemies.Reverse().Take(1);
-                foreach (var target in enemies)
+                foreach (var target in AttackTargets(actor, action))
                     options.Add(new ActionOption(action, target.Snapshot(), target.Health,
                         ProjectedDamage(actor, target, AttackComponents(actor, target, action), UsesShortbow(actor), weaponAttack: true)));
                 return;
@@ -576,13 +607,46 @@ namespace RaidPartyManager.Battle
                 countdown: new BattleCountdown(kind, remaining)));
         }
 
+        private void ApplyGravePollen(Unit attacker, Unit target)
+        {
+            if (attacker.Input.Side == target.Input.Side) return;
+            foreach (var gardener in units.Where(unit => unit.Input.Side != attacker.Input.Side &&
+                (unit.Health > 0 || unit == target) &&
+                unit.Trait is CharacterTrait.GravePollen or CharacterTrait.RottenBloom).OrderBy(unit => unit.Input.Position))
+                GrantStatus(gardener, attacker, StatusKind.Poison, 2);
+        }
+
+        private void SpreadRottenBloom(Unit fallen)
+        {
+            int layers = fallen.Layers(StatusKind.Poison);
+            if (layers == 0) return;
+            var witch = units.Where(unit => unit.Health > 0 && unit.Trait == CharacterTrait.RottenBloom)
+                .OrderBy(unit => unit.Input.Position).FirstOrDefault();
+            if (witch == null) return;
+
+            var enemies = Opponents(witch).ToLookup(unit =>
+            {
+                if (fallen.Input.Side == witch.Input.Side)
+                    return fallen.Input.Position + unit.Input.Position;
+                if (unit.Input.Position < fallen.Input.Position)
+                    return fallen.Input.Position - (unit.Input.Position + unit.Input.Character.PositionSlots - 1);
+                return unit.Input.Position - (fallen.Input.Position + fallen.Input.Character.PositionSlots - 1);
+            });
+            if (enemies.Count == 0) return;
+            var nearest = enemies[enemies.Min(group => group.Key)].ToArray();
+            var recipient = nearest.Length == 1 ? nearest[0] : nearest[random.Next(nearest.Length)];
+            if (GrantStatus(witch, recipient, StatusKind.Poison, layers, "腐花传毒",
+                kind: BattleEventKind.Effect, transfer: true))
+                RemoveLayers(fallen, StatusKind.Poison, layers);
+        }
+
         private void Report(BattleEventKind kind, Unit actor, Unit target, string name, ActionKind action,
             int amount = 0, DecisionReason reason = DecisionReason.Default, string detail = null,
             CharacterDefinition form = null, BattleLoadout loadout = null, bool weaponAttack = false,
             BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
             BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
             bool poisonDamage = false, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null,
-            bool charmTriggered = false)
+            bool charmTriggered = false, EquipmentEffect equipment = EquipmentEffect.None)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
@@ -591,8 +655,14 @@ namespace RaidPartyManager.Battle
                 ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
                 target.Health, target.Shield, StatusText(target), detail, form, target.Stats.Health, statuses,
-                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage, shieldAbsorbed: shieldAbsorbed, copiedTraitSource: copiedTraitSource, charmTriggered: charmTriggered));
-            if (kind == BattleEventKind.Defeated) FallenTraits(target);
+                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage, shieldAbsorbed: shieldAbsorbed, copiedTraitSource: copiedTraitSource, charmTriggered: charmTriggered, equipment: equipment));
+            if (kind == BattleEventKind.Action && action == ActionKind.Attack && actor != null)
+                ApplyGravePollen(actor, target);
+            if (kind == BattleEventKind.Defeated)
+            {
+                SpreadRottenBloom(target);
+                FallenTraits(target);
+            }
         }
     }
 }

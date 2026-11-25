@@ -20,10 +20,12 @@ namespace RaidPartyManager.Battle
             return amount;
         }
 
-        private int ShieldAlly(Unit actor, Unit target, int amount, string name, string book = null)
+        private int ShieldAlly(Unit actor, Unit target, int amount, string name, string book = null,
+            EquipmentEffect equipment = EquipmentEffect.None)
         {
             int gained = GiveShield(target, amount);
-            Report(BattleEventKind.Effect, actor, target, name, ActionKind.Shield, gained, skillBookId: book);
+            Report(BattleEventKind.Effect, actor, target, name, ActionKind.Shield, gained, skillBookId: book,
+                equipment: gained > 0 ? equipment : EquipmentEffect.None);
             return gained;
         }
 
@@ -53,7 +55,7 @@ namespace RaidPartyManager.Battle
                         Report(BattleEventKind.Effect, unit, unit, "豁命开场", ActionKind.Attack, lost, loadout: loadout,
                             damageTaken: new[] { (DamageType.Fixed, lost) }, charmTriggered: charmTriggered);
                         if (unit.Health == 0) Report(BattleEventKind.Defeated, unit, unit, "豁命开场", ActionKind.Attack);
-                        else { TriggerCrown(unit); GrantStatus(unit, unit, Vigor, 1, "豁命开场"); }
+                        else GrantStatus(unit, unit, Vigor, 1, "豁命开场");
                         break;
                     case PlayerTrait.Distracted:
                         unit.SpendEnergy(1);
@@ -72,7 +74,7 @@ namespace RaidPartyManager.Battle
                     Heal(unit, rear, 2, "搭把手", BattleEventKind.Effect);
                 if (Round == 2 && unit.Talent == PlayerTrait.Warmup)
                     GrantStatus(unit, unit, Swift, 1);
-                if (unit.ThunderRound == Round && unit.Layers(Stunned) == 0)
+                if (unit.ThunderRound == Round && unit.Layers(Stunned) == 0 && unit.Layers(Frozen) == 0)
                     foreach (var enemy in Opponents(unit).ToArray())
                         Strike(unit, enemy, 2 * CurrentAttack(unit) + 6, DamageType.Lightning, "雷暴裁决", BattleEventKind.Effect, skillBookId: "skill-book-30");
             }

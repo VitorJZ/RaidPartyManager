@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "荆棘药水"
   effect: 14
   icon: {fileID: 2800000, guid: 74a9d7c39b734956b3043a7a77b3889d, type: 3}
-  description: "战斗开始时，获得2层荆棘。触发后消耗。"
+  description: "获得 2 层荆棘。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

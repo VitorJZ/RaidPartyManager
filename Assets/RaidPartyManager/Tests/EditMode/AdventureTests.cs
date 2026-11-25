@@ -33,7 +33,9 @@ namespace RaidPartyManager.Tests
         [Test]
         public void DockTownGuaranteesOneTidePactAndTheFreeContractSurvivesReload()
         {
-            var saved = Create(42, false).CheckpointForExit();
+            var opening = Create(42, false);
+            Assert.That(opening.DaysUntilFinalPayroll, Is.EqualTo(31));
+            var saved = opening.CheckpointForExit();
             saved.Stage = 9;
             saved.Nodes[8].Kind = NodeKind.Town;
             saved.Nodes[8].Fork = true;
@@ -42,15 +44,19 @@ namespace RaidPartyManager.Tests
             AdventureRun Restore(AdventureCheckpoint data) =>
                 AdventureRun.RestoreCheckpoint(data, content.CharacterCatalog, catalog);
             var run = Restore(saved);
+            Assert.That(run.DaysUntilFinalPayroll, Is.EqualTo(23));
             Assert.That(run.RouteOptions, Is.EqualTo(new[] { NodeKind.Town }));
             Assert.That(run.EnterRoute(0), Is.True);
+            Assert.That(run.DaysUntilFinalPayroll, Is.EqualTo(22));
             var equipment = run.Party.AddEquipment(gear.First(e => !e.IsPotion && e.Effect != EquipmentEffect.RecruitmentNotice));
             var book = run.Party.AddEquipment(content.SkillBooks.First());
             Assert.That(run.OfferTidePact(equipment.Id, book.Id), Is.False);
             run = Restore(run.CheckpointForExit());
             Assert.That(run.EnterFollowing(0), Is.True);
             Assert.That(run.Current.Event, Is.EqualTo(AdventureEventKind.TidePact));
+            Assert.That(run.DaysUntilFinalPayroll, Is.EqualTo(21));
             run = Restore(run.CheckpointForExit());
+            Assert.That(run.DaysUntilFinalPayroll, Is.EqualTo(22));
             Assert.That(run.EnterRoute(0), Is.True);
             Assert.That(run.Current.Event, Is.EqualTo(AdventureEventKind.TidePact));
             Assert.That(run.OfferTidePact(equipment.Id, equipment.Id), Is.False);
@@ -65,6 +71,105 @@ namespace RaidPartyManager.Tests
                 Is.EqualTo((run.Party.Day, 99, 0L, 0)));
             Assert.That(run.Stage, Is.EqualTo(10));
             Assert.That(run.RouteOptions, Is.EqualTo(new[] { NodeKind.Boss }));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void CemeteryOffersTheSeedForkOnceEvenAcrossReload(bool enterSeedEvent)
+        {
+            var saved = Create(42, false).CheckpointForExit();
+            saved.Floor = 2;
+            saved.Stage = 2;
+            saved.Nodes[1].Kind = NodeKind.Camp;
+            saved.Nodes[1].Fork = true;
+            saved.Nodes[1].AlternativePlusOne = (int)NodeKind.Event + 1;
+            saved.Nodes[2].Kind = NodeKind.Event;
+            saved.Nodes[2].Fork = false;
+            AdventureRun Restore(AdventureCheckpoint state) =>
+                AdventureRun.RestoreCheckpoint(state, content.CharacterCatalog, gear);
+            var run = Restore(saved);
+            Assert.That(run.RouteOptions, Is.EqualTo(new[] { NodeKind.Camp, NodeKind.Event }));
+            run = Restore(run.CheckpointForExit());
+            Assert.That(run.EnterRoute(enterSeedEvent ? 1 : 0), Is.True);
+            if (enterSeedEvent)
+            {
+                Assert.That(run.Current.Event, Is.EqualTo(AdventureEventKind.GraveSeed));
+                int gold = run.Party.Gold;
+                Assert.That(run.TakeGraveSeedReward(false), Is.True);
+                Assert.That(run.Party.Gold, Is.EqualTo(gold + 50));
+                Assert.That(run.TakeGraveSeedReward(true), Is.False);
+            }
+            else Assert.That(run.Current.Kind, Is.EqualTo(NodeKind.Camp));
+
+            Assert.That(run.Leave(), Is.True);
+            run = Restore(run.CheckpointForExit());
+            Assert.That(run.EnterRoute(0), Is.True);
+            Assert.That(run.Current.Event, Is.Not.Null.And.Not.EqualTo(AdventureEventKind.GraveSeed));
+        }
+
+        [Test]
+        public void SeedFollowsItsEquipmentInstanceAndRecruitsOnlyAfterEnoughDeployedBattles()
+        {
+            var saved = Create(42, false).CheckpointForExit();
+            saved.Floor = 2;
+            saved.Stage = 2;
+            saved.GraveSeedStage = saved.Stage;
+            saved.Options = new[] { NodeKind.NormalBattle, NodeKind.Event };
+            AdventureRun Restore(AdventureCheckpoint state) =>
+                AdventureRun.RestoreCheckpoint(state, content.CharacterCatalog, gear);
+            var run = Restore(saved);
+            Assert.That(run.EnterRoute(1) && run.TakeGraveSeedReward(true) && run.CloseVisit(), Is.True);
+            var seed = run.Party.Inventory.Single(item => item.Definition.Effect == EquipmentEffect.StrangeSeed);
+            Assert.That(seed.Definition.AvailableInRegularPool, Is.False);
+            Assert.That((seed.Definition.Tier, seed.Definition.Price), Is.EqualTo((3, 10)));
+
+            CheckpointItem SeedState() => run.CheckpointForExit().Party.Inventory.Single(i => i.Id == seed.Id);
+            int threshold = SeedState().BattlesToBloom;
+            Assert.That(threshold, Is.InRange(3, 5));
+
+            void Enter(NodeKind kind)
+            {
+                var state = run.CheckpointForExit();
+                state.Options = new[] { kind };
+                run = Restore(state);
+                Assert.That(run.EnterRoute(0), Is.True);
+            }
+
+            string Win()
+            {
+                Enter(NodeKind.NormalBattle);
+                var foes = run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
+                var battle = run.Party.BeginBattle(foes, 100, null);
+                run.BindBattle(battle.Id);
+                var result = new BattleResult(battle.Id, BattleOutcome.Victory,
+                    battle.Combatants.ToDictionary(c => c.Id, c => c.Side == Side.Enemy ? 0 : c.Health),
+                    Array.Empty<BattleEvent>());
+                Assert.That(run.Party.TryFinishBattle(result, out _), Is.True);
+                Assert.That(run.SettleBattle(result), Is.True);
+                Assert.That(run.SettleBattle(result), Is.False);
+                string wearer = run.Current.Battle.BloomWearer;
+                Assert.That(run.Leave(), Is.True);
+                return wearer;
+            }
+
+            Assert.That(Win(), Is.Null);
+            Assert.That(SeedState().BattlesWithSeed, Is.Zero);
+            var first = run.Party.Members[0].Id;
+            var next = run.Party.Members[1].Id;
+            Assert.That(run.Party.TryEquip(first, 0, seed.Id), Is.True);
+            Assert.That(Win(), Is.Null);
+            var state = UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(
+                UnityEngine.JsonUtility.ToJson(run.CheckpointForExit()));
+            run = Restore(state);
+            Assert.That(run.Party.TryEquip(first, 0, null) && run.Party.TryEquip(next, 0, seed.Id), Is.True);
+            for (int battles = 2; battles <= threshold; battles++)
+                Assert.That(Win(), Is.EqualTo(battles == threshold ? next : null));
+
+            Assert.That(run.Party.Inventory.Any(i => i.Id == seed.Id), Is.False);
+            var recruit = run.Party.Members.Single(m => m.Character.Id == AdventureRun.GraveGardenerId);
+            Enter(NodeKind.Camp);
+            Assert.That(run.EvolveAtCamp(recruit.Id, "RotBloomWitch"), Is.True);
+            Assert.That(run.Party.Members.Single(m => m.Id == recruit.Id).Character.Id, Is.EqualTo("RotBloomWitch"));
         }
 
         [Test]
@@ -329,6 +434,103 @@ namespace RaidPartyManager.Tests
             Assert.That(outlay, Is.EqualTo(12L * wage + agreement.ScheduledInterest));
         }
 
+        [Test]
+        public void PayingOneEmployeesPrincipalLowersTheOpenPeriodAndLaterInterestAfterReload()
+        {
+            var saved = Create(42, false).CheckpointForExit();
+            var first = saved.Party.Members[0];
+            first.Contract = new CrewContract
+            {
+                DeferredTerms = true, StartDay = 1, EndDay = 31, DailyWage = 10, InterestPercent = 20,
+                Rates = new PerformanceBonuses
+                {
+                    Installments = new WageInstallments { Enabled = true, Count = 3, IntervalDays = 10 }
+                }
+            };
+            saved.Party.Gold = 100;
+            var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            Assert.That(run.Party.Members[0].Contract.AccruedInterest, Is.EqualTo(20));
+            Assert.That(run.Party.Members[0].Contract.ScheduledInterest, Is.EqualTo(40));
+
+            saved = RoundTrip(run.CheckpointForExit());
+            saved.Party.Day = 4;
+            run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            Assert.That(run.Party.WageBalanceFor(first.Id), Is.EqualTo(306));
+            Assert.That(run.Party.TryRepayWages(first.Id, 101), Is.False);
+            Assert.That(run.Party.TryRepayWages(first.Id, 60), Is.True);
+
+            run = AdventureRun.RestoreCheckpoint(RoundTrip(run.CheckpointForExit()), content.CharacterCatalog, gear);
+            var updated = run.Party.Members[0].Contract;
+            Assert.That(run.Party.Gold, Is.EqualTo(40));
+            Assert.That(run.Party.WageBalanceFor(first.Id), Is.EqualTo(246));
+            Assert.That(updated.RemainingPrincipal, Is.EqualTo(240));
+            Assert.That(updated.ScheduledInterest, Is.EqualTo(30));
+            Assert.That(Enumerable.Range(1, 3).Select(updated.ScheduledPayment), Is.EqualTo(new long[] { 117, 109, 44 }));
+            Assert.That(run.Party.Members[1].Contract.PrincipalPaidEarly, Is.Zero);
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void FinalBossDismissesUnpaidMembersBeforeStartingAndKeepsTheRemainingTeamOnReload(bool saveOneMember)
+        {
+            var saved = Create(42, false).CheckpointForExit();
+            saved.Floor = 3;
+            saved.Stage = DockRoute.Stages;
+            saved.Options = new[] { NodeKind.Boss };
+            saved.Party.Day = 30;
+            saved.Party.Gold = 30;
+            saved.Party.PayrollDebt = 5;
+            saved.Party.Members = saved.Party.Members.Take(2).ToArray();
+            var first = saved.Party.Members[0];
+            var second = saved.Party.Members[1];
+            first.Contract = Installment(0);
+            second.Contract = Installment(45);
+            second.UnpaidWages = 5;
+
+            CrewContract Installment(int deposit) => new CrewContract
+            {
+                DeferredTerms = true, StartDay = 1, EndDay = 61, DailyWage = 1, SigningFee = deposit,
+                Rates = new PerformanceBonuses
+                {
+                    Installments = new WageInstallments { Enabled = true, Count = 1, IntervalDays = 60 }
+                }
+            };
+
+            var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            Assert.That(run.DaysUntilFinalPayroll, Is.EqualTo(1));
+            Assert.That(run.EnterRoute(0), Is.True);
+            Assert.That(run.DaysUntilFinalPayroll, Is.Zero);
+            Assert.That(run.NeedsFinalPayroll, Is.True);
+            Assert.That(run.Party.TryRepayWages(first.Id, 10), Is.True);
+            if (saveOneMember) Assert.That(run.Party.TryRepayWages(second.Id, 20), Is.True);
+
+            run = AdventureRun.RestoreCheckpoint(RoundTrip(run.CheckpointForExit()), content.CharacterCatalog, gear);
+            Assert.That(run.PreparingFinalBoss, Is.True);
+            Assert.That(run.DaysUntilFinalPayroll, Is.Zero);
+            Assert.That(run.Party.Day, Is.EqualTo(31));
+            Assert.That(run.Party.WageBalanceFor(first.Id), Is.EqualTo(50));
+            Assert.That(run.Party.WageBalanceFor(second.Id), Is.EqualTo(saveOneMember ? 0 : 20));
+            Assert.That(run.ConfirmFinalPayroll(), Is.EqualTo(saveOneMember));
+            Assert.That(run.Party.PayrollDebt, Is.EqualTo(saveOneMember ? 50 : 70));
+            Assert.That(run.Failed, Is.EqualTo(!saveOneMember));
+
+            if (!saveOneMember)
+            {
+                Assert.That(run.Party.Members, Is.Empty);
+                return;
+            }
+
+            run = AdventureRun.RestoreCheckpoint(RoundTrip(run.CheckpointForExit()), content.CharacterCatalog, gear);
+            Assert.That(run.Party.Members.Single().Id, Is.EqualTo(second.Id));
+            Assert.That(run.PayrollDepartures.Count, Is.EqualTo(1));
+            Assert.That(run.Party.CanStartBattle, Is.True);
+            Assert.That(run.NeedsFinalPayroll, Is.False);
+            Assert.That(run.ConfirmFinalPayroll(), Is.True);
+            Assert.That(run.Party.PayrollDebt, Is.EqualTo(50));
+            run.BindBattle("final-boss");
+            Assert.That(run.DaysUntilFinalPayroll, Is.Null);
+        }
+
         [TestCase(true)]
         [TestCase(false)]
         public void FutureInstallmentsStartOnlyWhenThePreviousContractEnds(bool sell)
@@ -360,9 +562,10 @@ namespace RaidPartyManager.Tests
 
         [TestCase(Personality.Caring, 100)]
         [TestCase(Personality.Optimist, 100)]
-        [TestCase(Personality.Stoic, 105)]
-        [TestCase(Personality.Competitive, 115)]
-        [TestCase(Personality.Frugal, 120)]
+        [TestCase(Personality.Stoic, 107)]
+        [TestCase(Personality.Frank, 112)]
+        [TestCase(Personality.Competitive, 117)]
+        [TestCase(Personality.Frugal, 122)]
         public void InstallmentPremiumUsesTheEmployeesOwnPersonality(Personality personality, int required) =>
             Assert.That(100 + WageInstallments.PremiumPercent(personality), Is.EqualTo(required));
 
@@ -911,13 +1114,18 @@ namespace RaidPartyManager.Tests
             Assert.That(hire.Contract.CurrentReleaseFee, Is.Zero);
             Assert.That(hire.Position, Is.Null);
             foreach (var c in content.CharacterCatalog.Where(c => c.RosterNumber > 0)) run.Party.TryRecruit(c);
-            Assert.That(run.Party.Members.Count, Is.EqualTo(8));
+            Assert.That(run.Party.Members.Count, Is.EqualTo(6));
+            var nextHire = content.CharacterCatalog.First(c => c.RosterNumber > 0 &&
+                run.Party.Members.All(m => m.Character.Id != c.Id));
+            Assert.That(run.Party.TryRecruit(nextHire), Is.False);
             Assert.That(run.Party.CaptureFormation(Side.Party).Count, Is.EqualTo(4));
             Assert.That(run.Party.CanStartBattle, Is.True);
             int offer = run.Party.TransferOffer(hire.Id);
             Assert.That(offer, Is.LessThan(hire.MarketValue));
             Assert.That(run.Party.SellMember(hire.Id), Is.True);
             Assert.That(run.Party.Gold, Is.EqualTo(balance - price - hire.Contract.BaseTotal + offer - hire.Contract.ReleaseFee));
+            Assert.That(run.Party.TryRecruit(nextHire), Is.True);
+            Assert.That(run.Party.Members.Count, Is.EqualTo(6));
         }
 
         [Test]
@@ -1020,7 +1228,12 @@ namespace RaidPartyManager.Tests
             Assert.That(run.EnterFollowing(2), Is.False);
             var expected = service == NodeKind.Camp ? NodeKind.Camp : NodeKind.Event;
             Assert.That(run.Current.Kind, Is.EqualTo(expected));
-            Assert.That(run.EnterFollowing(1), Is.True);
+            int departureDay = run.Party.Day;
+            AdventureCheckpoint completed = null;
+            Assert.That(run.EnterFollowing(1, () => completed = run.CheckpointForExit()), Is.True);
+            Assert.That(completed.Party.Day, Is.EqualTo(departureDay));
+            Assert.That(completed.Choice, Is.EqualTo(-1));
+            Assert.That(completed.CompletedNodes, Is.EqualTo(run.CompletedNodes));
             Assert.That(run.RouteCurrent.Kind, Is.EqualTo(expected));
             Assert.That(run.Current.Kind, Is.EqualTo(NodeKind.NormalBattle));
             Assert.That(run.RouteDestination.Value, Is.EqualTo(destination));
@@ -1459,6 +1672,41 @@ namespace RaidPartyManager.Tests
                 Assert.That(run.ClaimReward(0), Is.True); Assert.That(run.ClaimReward(1), Is.False);
                 Assert.That(run.Party.Inventory.Count, Is.EqualTo(count + 1));
             }
+        }
+
+        [TestCase(1, NodeKind.NormalBattle, 6, 9, 14, 20)]
+        [TestCase(2, NodeKind.NormalBattle, 10, 13, 21, 27)]
+        [TestCase(3, NodeKind.NormalBattle, 14, 17, 28, 34)]
+        [TestCase(2, NodeKind.EliteBattle, 10, 13, 21, 27)]
+        [TestCase(3, NodeKind.EliteBattle, 14, 17, 28, 34)]
+        [TestCase(2, NodeKind.Boss, 10, 13, 21, 27)]
+        [TestCase(3, NodeKind.Boss, 14, 17, 28, 34)]
+        public void AdventureBattleGoldUsesTheLayerOfTheEncounter(int floor, NodeKind kind,
+            int normalMinimum, int normalMaximum, int eliteMinimum, int eliteMaximum)
+        {
+            var saved = Create(42, false).CheckpointForExit();
+            saved.Floor = floor;
+            saved.Stage = kind == NodeKind.Boss ? DockRoute.Stages : 5;
+            saved.Options = new[] { kind };
+            var encounters = floor switch
+            {
+                2 => AssetDatabase.LoadAssetAtPath<EncounterAsset>("Assets/RaidPartyManager/PrototypeData/WhisperingGraveyardEncounter.asset").ToData(),
+                3 => AssetDatabase.LoadAssetAtPath<EncounterAsset>("Assets/RaidPartyManager/PrototypeData/ClockworkCapitalEncounter.asset").ToData(),
+                _ => content
+            };
+            var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear.Concat(content.SkillBooks));
+            Assert.That(run.EnterRoute(0), Is.True);
+            var enemies = run.PrepareEnemies(encounters.EnemyRoster, encounters.EnemyFormations);
+            run.BindBattle("layer-gold");
+            var victory = new BattleResult("layer-gold", BattleOutcome.Victory,
+                enemies.ToDictionary(enemy => enemy.Id, _ => 0), Array.Empty<BattleEvent>());
+            Assert.That(run.SettleBattle(victory, out int gold), Is.True);
+            int elite = run.Current.Battle.EliteIds.Count;
+            int normal = enemies.Count - elite;
+            int minimum = normal * normalMinimum + elite * eliteMinimum;
+            int maximum = normal * normalMaximum + elite * eliteMaximum;
+            int appearanceFees = kind == NodeKind.NormalBattle ? run.Party.Members.Count(m => m.Trait == PlayerTrait.AppearanceFee) : 0;
+            Assert.That(gold, Is.InRange(minimum - appearanceFees, maximum));
         }
 
         [TestCase("EnemyBlockadeAdmiral", EquipmentEffect.HarborWhistle, 31)]

@@ -37,7 +37,8 @@ namespace RaidPartyManager.Presentation
         private void ShowRun(bool inspection)
         {
             run = AdventureFlow.Select(assets, inspection, out bool resumeMarket);
-            if (run?.Current?.Kind == NodeKind.Town || (run?.HasBattleRewardScreen == true && run.Current.Event == null))
+            if (run?.Current?.Kind == NodeKind.Town || run?.PreparingFinalBoss == true ||
+                run?.HasBattleRewardScreen == true && run.Current.Event == null)
             {
                 var scene = resumeMarket ? "TalentMarket" : AdventureFlow.SceneFor(run.Current.Kind);
                 // OnEnable can run while the menu is still loading this hub.
@@ -157,7 +158,7 @@ namespace RaidPartyManager.Presentation
             foreach (AdventureEventKind kind in Enum.GetValues(typeof(AdventureEventKind)))
             {
                 var captured = kind;
-                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, (GraveStories.Contains(kind) || CapitalStories.Contains(kind) || kind == AdventureEventKind.TidePact) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
+                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, (GraveStories.Contains(kind) || CapitalStories.Contains(kind) || kind is AdventureEventKind.TidePact or AdventureEventKind.GraveSeed) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
                 { if (run.Inspect(NodeKind.Event, captured)) PresentVisit(); }, kind == AdventureEventKind.FoundCoins);
             }
             foreach (var kind in new[] { NodeKind.Town, NodeKind.Camp, NodeKind.NormalBattle, NodeKind.EliteBattle, NodeKind.Boss, NodeKind.TreasureChest })
@@ -367,6 +368,7 @@ namespace RaidPartyManager.Presentation
         private static string Gate(AdventureEventKind kind) => CapitalStories.Contains(kind) ? "机巧遗都 · 随机事件" : GraveStories.Contains(kind) ? "低语墓园 · 随机事件" : kind switch
         {
             AdventureEventKind.Investor => "首层第 3 关之后 · 每层一次",
+            AdventureEventKind.GraveSeed => "低语墓园 · 必定出现在一个分岔",
             AdventureEventKind.TidePact => "弥雾码头 · 离开城镇后必定遇见",
             AdventureEventKind.Ambush => "全局事件",
             AdventureEventKind.LostTraveler or AdventureEventKind.FoundCoins or AdventureEventKind.HatTrick => "第 1～3 关事件",

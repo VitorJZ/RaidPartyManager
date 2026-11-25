@@ -45,13 +45,15 @@ namespace RaidPartyManager.Presentation
 
             var voice = EmployeeVoice.For(member?.Personality ?? character.Personality);
             var personality = AddText(this, "personality",
-                $"{voice.Name} · {voice.Description}", 12);
+                $"性格：{voice.Name} · {voice.Description}", 12, PrototypeStyle.Personality);
             personality.style.marginTop = 7;
             if (!string.IsNullOrWhiteSpace(character.TraitText))
             {
-                var trait = AddText(this, "trait", "被动 · " + character.TraitText, 13);
+                var trait = AddText(this, "trait", "被动：" + character.TraitText, 13, PrototypeStyle.Passive);
                 trait.style.marginTop = 5;
             }
+            if (member != null && member.Trait != PlayerTrait.None)
+                AddText(this, "character-talent", PlayerMarket.Describe(member.Trait), 12, PrototypeStyle.Trait);
             IgnorePicking(this);
         }
 

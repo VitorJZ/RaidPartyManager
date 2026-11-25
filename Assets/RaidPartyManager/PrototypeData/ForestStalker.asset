@@ -24,8 +24,8 @@ MonoBehaviour:
   stage: 2
   reach: 2
   fixedTrait: 3
-  traitPower: 4
-  traitText: "连续攻击同一目标时，下次造成的伤害+4"
+  traitPower: 1
+  traitText: "每次攻击先对目标施加1层森之印。每层使目标受到来自森语巡猎的伤害+1，层数跨回合保留。"
   personality: 8
   attack: 7
   defense: 1

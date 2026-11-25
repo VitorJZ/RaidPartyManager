@@ -21,6 +21,7 @@ namespace RaidPartyManager.Presentation
             public readonly Texture2D WalkSheet;
             public readonly BossEntranceCue Cue;
             public readonly Texture2D EntranceSheet;
+            public readonly StageActorImage Prop, CoffinRim;
             public double Duration => Cue != null ? Cue.Seconds : TravelTime;
             public readonly bool UsesPortrait;
             public int LastStep = -1;
@@ -33,7 +34,12 @@ namespace RaidPartyManager.Presentation
                 if (unit.Side == Side.Enemy && unit.Character.Rank == EnemyRank.Boss)
                     Cue = BossEntranceCue.For(unit.Character.Id);
                 if (Cue != null)
+                {
                     EntranceSheet = Resources.Load<Texture2D>("BossEntrances/" + unit.Character.Id);
+                    Prop = LoadProp(unit.Character.Id, Cue.PropOrder);
+                    if (Cue.HasCoffinRim)
+                        CoffinRim = LoadProp(unit.Character.Id + "-Rim", 6);
+                }
                 WalkSheet = content.BattleWalkFor(unit.Character.Id);
                 var art = content.BattleSpriteFor(unit.Character.Id);
                 UsesPortrait = content.BattlePortraitFor(unit.Character.Id) != null;
@@ -48,6 +54,22 @@ namespace RaidPartyManager.Presentation
                     };
                 Figure.name = "entrance-" + unit.Id;
                 Figure.style.position = Position.Absolute;
+
+                StageActorImage LoadProp(string resource, int order)
+                {
+                    var sheet = Resources.Load<Texture2D>("BossEntranceProps/" + resource);
+                    if (sheet == null) return null;
+                    var prop = new StageActorImage(stage, sceneryOrder: order)
+                    {
+                        name = (resource.EndsWith("-Rim") ? "entrance-rim-" : "entrance-prop-") + unit.Id,
+                        image = sheet, scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore
+                    };
+                    prop.style.position = Position.Absolute;
+                    // Extended scenery has its suspension chain above the painted key.
+                    prop.style.transformOrigin = new TransformOrigin(Length.Percent(50),
+                        Length.Percent(100 - 50f * sheet.width / sheet.height));
+                    return prop;
+                }
             }
         }
 
@@ -80,8 +102,8 @@ namespace RaidPartyManager.Presentation
             previousFrame = ready ? now : null;
 
             float focus = 0;
-            VisualElement subject = null;
-            float focusHeight = .45f;
+            VisualElement subject = null, focusProp = null;
+            BossEntranceCue.Shot shot = default;
             for (int i = arrivals.Count - 1; i >= 0; i--)
             {
                 var arrival = arrivals[i];
@@ -90,6 +112,8 @@ namespace RaidPartyManager.Presentation
                 if (elapsed >= arrival.Duration)
                 {
                     arrival.Figure.RemoveFromHierarchy();
+                    arrival.Prop?.RemoveFromHierarchy();
+                    arrival.CoffinRim?.RemoveFromHierarchy();
                     card?.SetEntranceVisible(true);
                     arrivals.RemoveAt(i);
                     continue;
@@ -111,53 +135,78 @@ namespace RaidPartyManager.Presentation
                 float t = Mathf.Clamp01((float)(elapsed / arrival.Duration));
                 if (arrival.Figure is StageActorImage rider) rider.RideHeight = RidingWave.Envelope(t);
                 var cue = arrival.Cue;
-                if (cue == null)
+                if (cue != null)
                 {
-                    int step = (int)(elapsed / .29);
-                    if (step != arrival.LastStep)
+                    var camera = cue.CameraAt(t);
+                    if (camera.Weight > focus)
                     {
-                        GameAudio.Play(BattleSounds.Step(arrival.Unit.Character), .30f);
-                        arrival.LastStep = step;
+                        focus = camera.Weight;
+                        subject = arrival.Figure;
+                        focusProp = arrival.Prop;
+                        shot = camera;
                     }
-                }
-                else
-                {
-                    if (arrival.LastStep < 0 && t >= cue.Beat)
+                    if (arrival.LastStep < 0 && t >= cue.LeadBeat)
                     {
-                        GameAudio.Play(cue.Sound, .52f);
+                        GameAudio.Play(cue.LeadSound, .39f);
                         arrival.LastStep = 0;
                     }
-                    float weight = cue.ShotWeight(t);
-                    if (weight > focus)
+                    if (arrival.LastStep < 1 && t >= cue.Beat)
                     {
-                        focus = weight;
-                        subject = arrival.Figure;
-                        focusHeight = cue.FocusHeight;
+                        GameAudio.Play(cue.Sound, .52f);
+                        arrival.LastStep = 1;
                     }
+
+                    Place(arrival.Figure, body, cue.Actor(t), body.width, arrival.EntranceSheet ?? arrival.WalkSheet, t);
+                    if (arrival.Figure is EntranceWalkPose fallback)
+                        fallback.ShowFrame(AnimationCels.At(t));
+                    if (arrival.Prop != null)
+                    {
+                        if (arrival.Prop.parent != layer)
+                        {
+                            int index = layer.IndexOf(arrival.Figure);
+                            layer.Insert(cue.PropOrder < 0 ? index : index + 1, arrival.Prop);
+                        }
+                        var propPose = cue.Prop(t);
+                        float propTime = cue.PropProgress(t);
+                        Place(arrival.Prop, body, propPose, body.height, arrival.Prop.image, propTime);
+                        if (arrival.CoffinRim != null)
+                        {
+                            if (arrival.CoffinRim.parent != layer)
+                                layer.Insert(layer.IndexOf(arrival.Figure) + 1, arrival.CoffinRim);
+                            Place(arrival.CoffinRim, body, propPose, body.height, arrival.CoffinRim.image, propTime);
+                        }
+                    }
+                    continue;
                 }
-                int frame = arrival.EntranceSheet != null ? AnimationCels.At(t) : AnimationCels.Loop(elapsed, .4);
+
+                int step = (int)(elapsed / .29);
+                if (step != arrival.LastStep)
+                {
+                    GameAudio.Play(BattleSounds.Step(arrival.Unit.Character), .30f);
+                    arrival.LastStep = step;
+                }
+                int frame = AnimationCels.Loop(elapsed, .4);
                 if (arrival.Figure is EntranceWalkPose pose)
                     pose.ShowFrame(frame);
-                else if (arrival.Figure is Image image && (arrival.EntranceSheet != null || arrival.WalkSheet != null) &&
+                else if (arrival.Figure is Image image && arrival.WalkSheet != null &&
                     arrival.DisplayedFrame != frame)
                 {
                     arrival.DisplayedFrame = frame;
-                    image.sourceRect = AnimationCels.RectFor(arrival.EntranceSheet ?? arrival.WalkSheet, frame);
+                    image.sourceRect = AnimationCels.RectFor(arrival.WalkSheet, frame);
                     image.MarkDirtyRepaint();
                 }
 
                 float startX = arrival.Unit.Side == Side.Party ? -body.width : layer.layout.width;
-                float progress = Mathf.SmoothStep(0, 1, cue == null ? t : Mathf.Clamp01(t / cue.Beat));
-                var offset = cue?.Offset(t) ?? Vector2.zero;
-                float lift = cue == null && arrival.UsesPortrait ? Mathf.Abs(Mathf.Sin(progress * 3f * Mathf.PI) * 4f) : 0;
-                arrival.Figure.style.left = Mathf.Lerp(startX, body.xMin, progress) + body.width * offset.x;
-                arrival.Figure.style.top = body.yMin + body.height * offset.y - lift;
+                float progress = Mathf.SmoothStep(0, 1, t);
+                float lift = arrival.UsesPortrait ? Mathf.Abs(Mathf.Sin(progress * 3f * Mathf.PI) * 4f) : 0;
+                arrival.Figure.style.left = Mathf.Lerp(startX, body.xMin, progress);
+                arrival.Figure.style.top = body.yMin - lift;
                 arrival.Figure.style.width = body.width;
                 arrival.Figure.style.height = body.height;
             }
 
             HudOpacity = stage != null ? 1 - Mathf.Clamp01(focus * 2.5f) : 1;
-            stage?.SetBossShot(subject, focusHeight, focus);
+            stage?.SetBossShot(subject, focusProp, shot);
             if (stage != null && (focus > 0 || fadedHud))
             {
                 fadedHud = focus > 0;
@@ -168,16 +217,39 @@ namespace RaidPartyManager.Presentation
                 ResetClock();
         }
 
+        private static void Place(VisualElement element, Rect mark, BossEntranceCue.Pose pose, float baseWidth,
+            Texture sheet, float progress)
+        {
+            float width = baseWidth * pose.Scale;
+            float height = mark.height * pose.Scale;
+            if (element is StageActorImage { SceneryOrder: not null } && sheet != null)
+                height = width * sheet.height / sheet.width;
+            element.style.left = mark.center.x + pose.X * mark.height - width * .5f;
+            element.style.top = mark.yMax + pose.Y * mark.height - height;
+            element.style.width = width;
+            element.style.height = height * (1 - pose.CropBottom);
+            element.style.rotate = new Rotate(new Angle(pose.Angle));
+            element.style.opacity = pose.Alpha;
+            if (element is Image image && sheet != null)
+            {
+                var cel = AnimationCels.RectFor(sheet, AnimationCels.At(progress));
+                cel.height *= 1 - pose.CropBottom;
+                image.sourceRect = cel;
+            }
+        }
+
         public void Clear(IReadOnlyDictionary<string, BattleUnitCard> cards)
         {
             foreach (var arrival in arrivals)
             {
                 arrival.Figure.RemoveFromHierarchy();
+                arrival.Prop?.RemoveFromHierarchy();
+                arrival.CoffinRim?.RemoveFromHierarchy();
                 if (cards.TryGetValue(arrival.Unit.Id, out var card))
                     card.SetEntranceVisible(true);
             }
             arrivals.Clear();
-            stage?.SetBossShot(null, 0, 0);
+            stage?.SetBossShot(null, null, default);
             if (fadedHud)
                 foreach (var card in cards.Values)
                     card.SetEntranceHudOpacity(1);

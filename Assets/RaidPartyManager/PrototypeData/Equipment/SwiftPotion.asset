@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "迅捷药水"
   effect: 11
   icon: {fileID: 2800000, guid: 58ca02b6744f4819b1427a90309edc36, type: 3}
-  description: "战斗开始时，获得3层迅捷。触发后消耗。"
+  description: "获得 3 层迅捷。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

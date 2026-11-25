@@ -24,13 +24,13 @@ MonoBehaviour:
   stage: 1
   reach: 2
   fixedTrait: 5
-  traitPower: 1
-  traitText: "攻击造成伤害时，对目标施加1层中毒"
+  traitPower: 2
+  traitText: "攻击造成伤害时，对目标施加2层中毒"
   evolutions:
   - {fileID: 11400000, guid: 073b61052ee344ad99ddcad8662fd4b5, type: 2}
   - {fileID: 11400000, guid: 6061c98492e642bc8bda76784a6c1cd3, type: 2}
   personality: 0
-  attack: 5
+  attack: 3
   defense: 2
   specialDefense: 2
   health: 8

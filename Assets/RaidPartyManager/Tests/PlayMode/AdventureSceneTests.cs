@@ -346,11 +346,11 @@ namespace RaidPartyManager.Tests
             typeof(PartyRun).GetProperty(nameof(PartyRun.Day)).SetValue(run.Party, guard.Contract.EndDay - 3);
             Press(root, "open-town-editor");
             Assert.That(root.Q("editor-positions").childCount, Is.EqualTo(4));
-            Assert.That(root.Q("reserve-positions").childCount, Is.EqualTo(4));
+            Assert.That(root.Q("reserve-positions").childCount, Is.EqualTo(3));
             Assert.That(root.Q("contract-remaining"), Is.Null);
             Press(root, "roster-display");
             var reminders = root.Query<Label>("contract-remaining").ToList();
-            Assert.That(reminders.Count, Is.EqualTo(8));
+            Assert.That(reminders.Count, Is.EqualTo(7));
             var expiring = reminders.First(row => row.text == "合约剩余 3 天");
             Assert.That((Color32)expiring.style.color.value, Is.EqualTo(new Color32(255, 115, 103, 255)));
             Assert.That(reminders.Any(row => row.text.StartsWith("合约剩余") && row.text != expiring.text &&
@@ -486,6 +486,82 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Button>("finish-event"), Is.Not.Null);
             Press(root, "finish-event");
             yield return WaitForEventExit(root);
+        }
+
+        [UnityTest]
+        public IEnumerator GraveSeedWindowOffersGoldOrTheSeed()
+        {
+            yield return OpenMenu();
+            var root = Root<AdventureEventHub>();
+            Press(root, "inspect-event-GraveSeed");
+            yield return WaitForShow();
+            Assert.That(root.Q<Button>("grave-seed-gold"), Is.Not.Null);
+            Assert.That(root.Q<Button>("grave-seed-item"), Is.Not.Null);
+            Assert.That(GameObject.Find("Cemetery greenhouse"), Is.Not.Null);
+            int gold = run.Party.Gold;
+            Press(root, "grave-seed-item");
+            Assert.That(run.Current.Resolved, Is.True);
+            Assert.That(run.Party.Gold, Is.EqualTo(gold));
+            Assert.That(run.Party.Inventory.Count(item => item.Definition.Effect == EquipmentEffect.StrangeSeed), Is.EqualTo(1));
+        }
+
+        [UnityTest]
+        public IEnumerator MatureGraveSeedPlaysTheRecruitmentSceneBeforeVictoryRewards()
+        {
+            yield return OpenMenu();
+            var hub = Object.FindAnyObjectByType<AdventureEventHub>();
+            var assets = (AdventureContentAsset)typeof(AdventureEventHub).GetField("assets", Private).GetValue(hub);
+            var content = assets.Encounter;
+            var party = new PartyRun(content.Party.Take(2).Select(unit => new PartyMemberStart(unit.Id,
+                unit.Character, unit.Position, unit.Health)), System.Array.Empty<EquipmentDefinition>());
+            var start = new AdventureRun(party, content.CharacterCatalog, content.StartingEquipment, false,
+                new System.Random(62), foundingGrant: true).CheckpointForExit();
+            start.Floor = 2;
+            start.Stage = 2;
+            start.GraveSeedStage = 2;
+            start.Options = new[] { NodeKind.NormalBattle, NodeKind.Event };
+            var seeded = AdventureRun.RestoreCheckpoint(start, content.CharacterCatalog, content.StartingEquipment);
+            Assert.That(seeded.EnterRoute(1) && seeded.TakeGraveSeedReward(true) && seeded.CloseVisit(), Is.True);
+            var seed = seeded.Party.Inventory.Single(i => i.Definition.Effect == EquipmentEffect.StrangeSeed);
+            Assert.That(seeded.Party.TryEquip(seeded.Party.Members[0].Id, 1, seed.Id), Is.True);
+            var checkpoint = seeded.CheckpointForExit();
+            int seedIndex = System.Array.FindIndex(checkpoint.Party.Inventory, i => i.Id == seed.Id);
+            checkpoint.Party.Inventory[seedIndex].BattlesWithSeed = checkpoint.Party.Inventory[seedIndex].BattlesToBloom - 1;
+            checkpoint.Options = new[] { NodeKind.NormalBattle };
+            PlayerPrefs.SetInt("RaidPartyManager.Guide.v1:" + savePath, 127);
+            File.WriteAllText(savePath, JsonUtility.ToJson(checkpoint));
+            ResetAdventureFlow();
+
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            run = CurrentRoute();
+            AddTestWeapons();
+            yield return WaitForRoadstone(Root<AdventureEventHub>());
+            Press(Root<AdventureEventHub>(), "route-choice-0");
+            yield return WaitScene("WhisperingGraveyard");
+            FastBattle();
+
+            var battle = Root<BattlePrototype>();
+            float until = Time.realtimeSinceStartup + 25;
+            while (battle.Q("gardener-recruitment") == null && Time.realtimeSinceStartup < until) yield return null;
+            Assert.That(battle.Q("gardener-recruitment"), Is.Not.Null);
+            Assert.That(battle.Q("victory-rewards"), Is.Null);
+            var figures = battle.Q("gardener-recruitment").Query<Image>().ToList();
+            Assert.That(figures.Count, Is.EqualTo(3));
+            Assert.That(figures.All(image => image.image != null), Is.True);
+            Assert.That(run.Party.Members.Any(member => member.Character.Id == AdventureRun.GraveGardenerId), Is.True);
+            yield return WaitSettlement();
+            Assert.That(battle.Q("gardener-recruitment"), Is.Null);
+            Assert.That(battle.Q("victory-rewards"), Is.Not.Null);
+            ClaimBonusLoot(battle);
+            if (battle.Q<Button>("claim-gold") != null) Press(battle, "claim-gold");
+            Press(battle, "claim-route-loot-0");
+            var autosave = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            Assert.That(autosave.FinishVisit, Is.True);
+            Assert.That(autosave.Party.Gold, Is.EqualTo(run.Party.Gold));
+            Assert.That(autosave.Party.Members.Any(member => member.Character == AdventureRun.GraveGardenerId), Is.True);
         }
 
         [UnityTest]
@@ -892,7 +968,7 @@ namespace RaidPartyManager.Tests
             Assert.That(preview, Is.Not.Null);
             Assert.That(preview.Q<Label>("character-preview-name").text, Is.EqualTo(expected.Name));
             Assert.That(preview.Q<Label>("character-preview-stats").text, Does.Contain("特防"));
-            Assert.That(preview.Q<Label>("character-preview-trait")?.text, Is.EqualTo("被动 · " + expected.TraitText));
+            Assert.That(preview.Q<Label>("character-preview-trait")?.text, Is.EqualTo("被动：" + expected.TraitText));
         }
 
         private static IEnumerator CheckEditorTopBar(VisualElement root, string openEditor, string goldLabel, int gold)
@@ -1261,6 +1337,52 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator MenuWalkCycleChangesTheRenderedSprite()
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null) Assert.Ignore("Requires UI rendering.");
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
+            var document = Object.FindAnyObjectByType<PrototypeSceneMenu>().GetComponent<UIDocument>();
+            var march = document.rootVisualElement.Q("menu-march");
+            march.Q("menu-promenade-strip").visible = false;
+            var walkers = march.Children().Where(child => child.name?.StartsWith("menu-walker-") == true).ToArray();
+            var sprite = walkers.First().Q<Image>();
+            foreach (var other in walkers.Skip(1))
+                other.visible = false;
+            var previousTarget = document.panelSettings.targetTexture;
+            var target = new RenderTexture(960, 540, 24, RenderTextureFormat.ARGB32);
+            var pixels = new Texture2D(target.width, target.height, TextureFormat.RGB24, false);
+            document.panelSettings.targetTexture = target;
+            try
+            {
+                yield return new WaitForSecondsRealtime(.12f);
+                var first = CaptureWalker();
+                var originalCel = sprite.sourceRect;
+                yield return new WaitForSecondsRealtime(.18f);
+                var second = CaptureWalker();
+
+                Assert.That(sprite.sourceRect, Is.Not.EqualTo(originalCel));
+                Assert.That(second.Where((pixel, index) => !pixel.Equals(first[index])).Count(), Is.GreaterThan(50),
+                    "The walking atlas must change rendered pixels when it advances.");
+            }
+            finally
+            {
+                document.panelSettings.targetTexture = previousTarget;
+                Object.Destroy(pixels);
+                Object.Destroy(target);
+            }
+
+            Color32[] CaptureWalker()
+            {
+                var active = RenderTexture.active;
+                RenderTexture.active = target;
+                pixels.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0);
+                RenderTexture.active = active;
+                return pixels.GetPixels32();
+            }
+        }
+
+        [UnityTest]
         public IEnumerator NewRouteDraftsTwoOfFourAndUsesOnlyTheRolledGear()
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");
@@ -1515,7 +1637,7 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator SavingAfterAnEventRewardKeepsTheRewardAndOnlyOffersTheNextNode()
+        public IEnumerator EventCompletionAutosavesTheRewardAndOnlyOffersTheNextNode()
         {
             yield return OpenMenu();
             var hub = Object.FindAnyObjectByType<AdventureEventHub>();
@@ -1561,6 +1683,9 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Button>("finish-event"), Is.Null);
             int rewardGold = run.Party.Gold;
             Assert.That(rewardGold - beforeCoins, Is.InRange(10, 20));
+            var autosave = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            Assert.That(autosave.FinishVisit, Is.True);
+            Assert.That(autosave.Party.Gold, Is.EqualTo(rewardGold));
             Assert.That(root.Q("reward-flight").Q("reward-gold-icon"), Is.Not.Null);
             var teamIcon = root.Q("team-icon");
             Assert.That(run.Party.NeedsRenewal, Is.True);
@@ -1575,8 +1700,8 @@ namespace RaidPartyManager.Tests
             var played = cues[cue];
             root.Q("run-top-bar").GetType().GetMethod("Refresh").Invoke(root.Q("run-top-bar"), null);
             Assert.That(cues[cue], Is.EqualTo(played));
-            SaveAndExit(root);
-            yield return WaitScene("MainMenu");
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
 
             ResetAdventureFlow();
             Press(Root<PrototypeSceneMenu>(), "open-route");
@@ -1707,6 +1832,86 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator CapitalBossWaitsForPayrollAndDismissesOnlyTheUnpaidMember()
+        {
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            ConfirmFirstPair(Root<AdventureEventHub>());
+            SaveAndExit(Root<AdventureEventHub>());
+            yield return WaitScene("MainMenu");
+            var saved = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            saved.Floor = 3;
+            saved.Stage = DockRoute.Stages;
+            saved.Choice = 0;
+            saved.Options = new[] { NodeKind.Boss };
+            saved.HasFinalBossPreparation = true;
+            saved.Party.Gold = 15;
+            int day = saved.Party.Day;
+            var employee = saved.Party.Members[0];
+            employee.Contract = new CrewContract
+            {
+                DeferredTerms = true, StartDay = day, EndDay = day + 60, DailyWage = 1,
+                Rates = new PerformanceBonuses
+                {
+                    Installments = new WageInstallments { Enabled = true, Count = 1, IntervalDays = 60 }
+                }
+            };
+            var teammate = saved.Party.Members[1];
+            teammate.Contract = new CrewContract
+            {
+                DeferredTerms = true, StartDay = day, EndDay = day + 60, DailyWage = 1, SigningFee = 50,
+                Rates = employee.Contract.Rates
+            };
+            File.WriteAllText(savePath, JsonUtility.ToJson(saved));
+            ResetAdventureFlow();
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("ClockworkCapital");
+            yield return WaitForShow();
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var route = (AdventureRun)typeof(BattlePrototype).GetField("adventure", Private).GetValue(scene);
+            var root = Root<BattlePrototype>();
+            Assert.That(root.Q("battle-phase"), Is.Null);
+            Assert.That(root.Q("payroll-panel"), Is.Not.Null);
+            var deadline = root.Q<Label>("run-payroll-deadline");
+            Assert.That(deadline.text, Is.EqualTo("今日结薪"));
+            Assert.That(deadline.tooltip, Does.Contain($"第 {route.Party.Day} 天"));
+            Press(root, "dismiss-paper");
+            Press(root, "open-party-editor");
+            var editor = root.Q("party-editor");
+            Assert.That(editor.style.backgroundImage.value.texture.name, Is.EqualTo("PartyStatusBackdrop"));
+            Press(root, "roster-display");
+            Assert.That(editor.style.backgroundImage.value.texture.name, Is.EqualTo("PartyContractsBackdrop"));
+            yield return null;
+            var employeeCard = root.Q<Button>("edit-member-" + employee.Id);
+            Down(employeeCard);
+            Up(employeeCard, employeeCard.worldBound.center);
+            Assert.That(root.Q<Button>("sign-crew-contract").text, Is.EqualTo("签署续约合同"));
+            Press(root, "dismiss-paper");
+            Press(root, "roster-repay-wages");
+            root.Q<DropdownField>("payroll-member").index = 1;
+            root.Q<IntegerField>("payroll-amount").value = 5;
+            Press(root, "payroll-pay");
+            Assert.That(route.Party.Gold, Is.EqualTo(10));
+            Assert.That(route.Party.WageBalanceFor(employee.Id), Is.EqualTo(60));
+            Assert.That(route.Party.WageBalanceFor(teammate.Id), Is.EqualTo(5));
+            root.Q<IntegerField>("payroll-amount").value = 5;
+            Press(root, "payroll-pay");
+            Assert.That(route.Party.WageBalanceFor(teammate.Id), Is.Zero);
+
+            Press(root, "dismiss-paper");
+            Press(root, "back-party-editor");
+            Press(root, "start");
+            Assert.That(root.Q<Button>("confirm-final-payroll").text, Does.Contain("1 人离队"));
+            Press(root, "confirm-final-payroll");
+            Assert.That(route.Party.Members.Select(member => member.Id), Is.EqualTo(new[] { teammate.Id }));
+            Assert.That(root.Q("battle-phase"), Is.Not.Null);
+            Assert.That(route.Party.PayrollDebt, Is.EqualTo(60));
+            Assert.That(root.Q("run-payroll-deadline").style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [UnityTest]
         public IEnumerator CapitalBossRewardsLeadToFiveSecondsBehindTheClosedCurtain()
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");
@@ -1727,6 +1932,8 @@ namespace RaidPartyManager.Tests
                 Kind = NodeKind.Boss, Resolved = true, Gold = 5,
                 Items = System.Array.Empty<string>(), Choices = System.Array.Empty<string>()
             };
+            saved.Party.Gold = 0;
+            saved.Party.PayrollDebt = 60;
             File.WriteAllText(savePath, JsonUtility.ToJson(saved));
             ResetAdventureFlow();
             Press(Root<PrototypeSceneMenu>(), "open-route");
@@ -1738,6 +1945,8 @@ namespace RaidPartyManager.Tests
             float deadline = Time.realtimeSinceStartup + 6;
             while (root.panel.visualTree.Q("campaign-finale") == null && Time.realtimeSinceStartup < deadline) yield return null;
             Assert.That(root.panel.visualTree.Q<Label>("campaign-finale")?.text, Is.EqualTo("恭喜通关，感谢游玩"));
+            Assert.That(root.panel.visualTree.Q<Label>("campaign-payroll-summary")?.text,
+                Is.EqualTo("剩余 0 金币  ·  仍欠工资 55 金币"));
             var folds = new MaterialPropertyBlock();
             GameObject.Find("Mist Dock Playhouse/Curtain R").GetComponent<MeshRenderer>().GetPropertyBlock(folds);
             Assert.That(folds.GetFloat("_Travel"), Is.Zero);
@@ -1893,6 +2102,11 @@ namespace RaidPartyManager.Tests
             Assert.That(GameObject.Find("Service theatre/Graveyard treasure chest"), Is.Not.Null);
             Assert.That(route.Current.Kind, Is.EqualTo(NodeKind.TreasureChest));
             Assert.That(route.Party.Day, Is.EqualTo(townDay + 1));
+            var townAutosave = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            Assert.That(townAutosave.CompletedNodes, Is.EqualTo(route.CompletedNodes));
+            Assert.That(townAutosave.Party.Day, Is.EqualTo(townDay));
+            Assert.That(townAutosave.Stage, Is.EqualTo(route.Stage));
+            Assert.That(townAutosave.Choice, Is.EqualTo(-1));
 
             void ClickFacilityExit(VisualElement root)
             {

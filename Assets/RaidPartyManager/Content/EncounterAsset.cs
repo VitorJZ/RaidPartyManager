@@ -172,9 +172,13 @@ namespace RaidPartyManager.Content
             };
         }
 
+        public Texture2D AuthoredProjectileFor(string characterId) =>
+            battleProjectiles.TryGetValue(characterId, out var projectile) ? projectile : null;
+
         public Texture2D ProjectileFor(CharacterDefinition character)
         {
-            if (battleProjectiles.TryGetValue(character.Id, out var projectile))
+            var projectile = AuthoredProjectileFor(character.Id);
+            if (projectile != null)
                 return projectile;
             return character.Profession switch
             {
@@ -244,6 +248,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D magicProjectile;
         [SerializeField] private Texture2D backpackIcon;
         [SerializeField] private EquipmentAsset[] startingEquipment = Array.Empty<EquipmentAsset>();
+        [SerializeField] private EquipmentAsset[] eventEquipment = Array.Empty<EquipmentAsset>();
         [SerializeField, Min(1)] private int startingCopies = 1;
         [SerializeField] private SkillCatalogAsset skillCatalog;
         [SerializeField] private EquipmentAsset victoryReward;
@@ -277,7 +282,7 @@ namespace RaidPartyManager.Content
                 .ToDictionary(character => character.Id, character => character.BattleAttackSheet, StringComparer.Ordinal);
             var battleWalkSheets = catalog.Values.Where(character => character.BattleWalkSheet != null)
                 .ToDictionary(character => character.Id, character => character.BattleWalkSheet, StringComparer.Ordinal);
-            var equipmentIcons = startingEquipment.Append(victoryReward)
+            var equipmentIcons = startingEquipment.Concat(eventEquipment).Append(victoryReward)
                 .Where(item => item != null && item.Icon != null)
                 .GroupBy(item => item.ToDefinition().Id, StringComparer.Ordinal)
                 .ToDictionary(group => group.Key, group => group.First().Icon, StringComparer.Ordinal);
@@ -300,7 +305,8 @@ namespace RaidPartyManager.Content
                 throw new InvalidOperationException($"Encounter '{displayName}' has duplicate enemy formation names.");
 
             return new EncounterData(displayName, partyInputs, enemyInputs,
-                startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies)).ToArray(),
+                startingEquipment.SelectMany(item => Enumerable.Repeat(item.ToDefinition(), startingCopies))
+                    .Concat(eventEquipment.Where(item => item != null).Select(item => item.ToDefinition())).ToArray(),
                 victoryReward != null ? victoryReward.ToDefinition() : null, tickLimit, portraits, equipmentIcons,
                 recruits.Select(character => character.ToDefinition()).ToArray(),
                 catalog.Values.Select(character => character.ToDefinition()).ToArray(), statusIcons, battleSpriteSheets,

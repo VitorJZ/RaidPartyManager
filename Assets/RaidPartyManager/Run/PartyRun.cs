@@ -29,6 +29,8 @@ namespace RaidPartyManager.Run
         public string Id { get; }
         public EquipmentDefinition Definition { get; }
         internal long AcquisitionOrder { get; }
+        internal int BattlesToBloom { get; set; }
+        internal int BattlesWithSeed { get; set; }
 
         internal EquipmentInstance(string id, EquipmentDefinition definition, long acquisitionOrder)
         {
@@ -100,6 +102,7 @@ namespace RaidPartyManager.Run
             public EmployeeAttributes Attributes;
             public EmployeeCareer Career;
             public CrewContract Contract;
+            public long UnpaidWages;
             public readonly List<CrewContract> Renewals = new();
             public CrewContract LastContract => Renewals.LastOrDefault() ?? Contract;
             public string[] Slots = new string[Rules.EquipmentSlots];
@@ -153,10 +156,14 @@ namespace RaidPartyManager.Run
                 NextEditorItemId = nextEditorItemId, NextBattleId = nextBattleId,
                 Inventory = inventory.Values.Where(item => !editorSupplies.Contains(item.Id) || assigned.Contains(item.Id))
                     .OrderBy(item => item.AcquisitionOrder)
-                    .Select(item => new CheckpointItem { Id = item.Id, Definition = item.Definition.Id }).ToArray(),
+                    .Select(item => new CheckpointItem
+                    {
+                        Id = item.Id, Definition = item.Definition.Id,
+                        BattlesToBloom = item.BattlesToBloom, BattlesWithSeed = item.BattlesWithSeed
+                    }).ToArray(),
                 Members = members.Select(member => new CheckpointMember
                 {
-                    Trait = member.Trait, Contract = member.Contract?.Copy(), Renewals = member.Renewals.Select(c => c.Copy()).ToArray(), EmployeeAttributes = member.Attributes,
+                    Trait = member.Trait, Contract = member.Contract?.Copy(), Renewals = member.Renewals.Select(c => c.Copy()).ToArray(), EmployeeAttributes = member.Attributes, UnpaidWages = member.UnpaidWages,
                     EmployeeCareer = member.Career,
                     Id = member.Id, StartingCharacter = member.Start.Character.Id, StartingPosition = member.Start.Position,
                     StartingHealth = member.Start.Health, InitialStatuses = CaptureStatuses(member.Start.StartingStatuses),
@@ -171,7 +178,7 @@ namespace RaidPartyManager.Run
         internal static PartyRun RestoreCheckpoint(PartyCheckpoint saved, IReadOnlyDictionary<string, CharacterDefinition> characters,
             IReadOnlyDictionary<string, EquipmentDefinition> items)
         {
-            // Squads saved under the previous ten-member limit keep their signed employees.
+            // Squads saved under earlier limits keep their signed employees.
             const int legacyRosterLimit = 10;
             if (saved?.Members == null || saved.Inventory == null || saved.Day < 0 || saved.PayrollDebt < 0 || saved.Members.Length is < 1 or > legacyRosterLimit)
                 throw new ArgumentException("Invalid saved party.");
@@ -186,7 +193,10 @@ namespace RaidPartyManager.Run
             foreach (var item in saved.Inventory)
             {
                 var definition = items[item.Definition];
-                party.inventory.Add(item.Id, new EquipmentInstance(item.Id, definition, ++party.nextAcquisitionOrder));
+                party.inventory.Add(item.Id, new EquipmentInstance(item.Id, definition, ++party.nextAcquisitionOrder)
+                {
+                    BattlesToBloom = item.BattlesToBloom, BattlesWithSeed = item.BattlesWithSeed
+                });
                 party.RegisterReward(definition);
             }
             foreach (var entry in saved.Members)
@@ -196,12 +206,14 @@ namespace RaidPartyManager.Run
                     (int)entry.Trait < 0 || (int)entry.Trait > PlayerMarket.TraitCount ||
                     saved.Day > 0 && (entry.Contract == null || !entry.Contract.ValidAt(saved.Day)) ||
                     entry.Skills?.Length is not (2 or 3) || !Rules.IsPosition(entry.StartingPosition) ||
-                    entry.Position != 0 && !Rules.IsPosition(entry.Position) || entry.Health < 0 || entry.PermanentHealth < 0 || !entry.Training.IsValid)
+                    entry.Position != 0 && !Rules.IsPosition(entry.Position) || entry.Health < 0 || entry.PermanentHealth < 0 ||
+                    entry.UnpaidWages < 0 || !entry.Training.IsValid)
                     throw new ArgumentException("Invalid saved party member.");
                 var member = new Member(new PartyMemberStart(entry.Id, characters[entry.StartingCharacter], entry.StartingPosition,
                     entry.StartingHealth, RestoreStatuses(entry.InitialStatuses)))
                 {
                     Trait = entry.Trait, Contract = saved.Day == 0 ? null : entry.Contract.Copy(), Slots = new string[entry.Slots.Length],
+                    UnpaidWages = entry.UnpaidWages,
                     Character = characters[entry.Character].WithPersonality(characters[entry.StartingCharacter].Personality),
                     Position = entry.Position == 0 ? (int?)null : entry.Position,
                     Health = entry.Health, PermanentAttack = entry.PermanentAttack, PermanentHealth = entry.PermanentHealth, IsAway = entry.IsAway,
@@ -212,6 +224,7 @@ namespace RaidPartyManager.Run
                     Career = entry.EmployeeCareer.Initialized ? entry.EmployeeCareer :
                         new EmployeeCareer { ServiceDays = Math.Max(0, saved.Day - (entry.Contract?.StartDay ?? saved.Day)) }
                 };
+                member.Contract?.OpenInterestPeriod(saved.Day);
                 foreach (var next in entry.Renewals ?? Array.Empty<CrewContract>())
                 {
                     if (member.LastContract == null || next == null || next.StartDay != member.LastContract.EndDay || !next.ValidAt(saved.Day))
@@ -511,7 +524,11 @@ namespace RaidPartyManager.Run
             // An absent companion retains a party slot, including against recruitment-notice summons.
             if (members.Count >= RosterLimit || members.Any(member => member.IsAway) && members.Count(member => member.Health > 0) >= Rules.Positions)
                 recruitmentPool = null;
-            var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit, recruitmentPool, characterCatalog, Gold, Math.Max(0, RosterLimit - members.Count), hardFight, grave.Porter, grave.Bell, capitalField);
+            int reserveArchers = members.Count(member => member.Health > 0 && !IsDeployed(member) &&
+                member.Character.Profession == Profession.Archer);
+            var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit,
+                recruitmentPool, characterCatalog, Gold, Math.Max(0, RosterLimit - members.Count), hardFight, grave.Porter,
+                grave.Bell, capitalField, reserveArcherCount: reserveArchers);
             nextBattleId++;
             activeBattle = request;
             activeReward = victoryReward;
@@ -729,15 +746,8 @@ namespace RaidPartyManager.Run
             long remaining = repaid;
             foreach (var member in members)
             {
-                var contract = member.Contract;
                 if (remaining == 0) break;
-                if (contract == null || contract.Arrears == 0) continue;
-                long principal = Math.Min(remaining, contract.PrincipalInArrears);
-                contract.PrincipalInArrears -= principal;
-                long interest = Math.Min(remaining - principal, contract.InterestInArrears);
-                contract.InterestInArrears -= interest;
-                remaining -= principal + interest;
-                contract.BasePaid = contract.Outstanding == 0;
+                remaining -= RepayArrears(member, remaining);
             }
             RecordExpense("补付拖欠薪资", repaid);
             Gold += amount - repaid;
@@ -816,6 +826,34 @@ namespace RaidPartyManager.Run
             foreach (var id in ids)
                 inventory.Remove(id);
             return true;
+        }
+
+        internal (string Wearer, bool WaitingForRoom) FinishSeedBattle(BattleResult result, CharacterDefinition gardener)
+        {
+            if (activeBattle != null || gardener == null ||
+                members.Any(member => AdventureRun.IsGardenerForm(member.Character.Id)))
+                return default;
+
+            foreach (var member in members.Where(member => result.HealthById.ContainsKey(member.Id)).ToArray())
+            {
+                for (int slot = 0; slot < member.Slots.Length; slot++)
+                {
+                    var itemId = member.Slots[slot];
+                    if (itemId == null || !inventory.TryGetValue(itemId, out var seed) ||
+                        seed.Definition.Effect != EquipmentEffect.StrangeSeed || seed.BattlesToBloom < 3)
+                        continue;
+                    seed.BattlesWithSeed = Math.Min(seed.BattlesToBloom, seed.BattlesWithSeed + 1);
+                    if (seed.BattlesWithSeed < seed.BattlesToBloom) continue;
+                    // The new member can change the slot layout, so clear by instance ID after recruitment.
+                    if (!TryRecruit(gardener)) return (null, true);
+                    int currentSlot = Array.IndexOf(member.Slots, itemId);
+                    if (currentSlot >= 0) member.Slots[currentSlot] = null;
+                    inventory.Remove(itemId);
+                    RefreshEquipmentSlots();
+                    return (member.Id, false);
+                }
+            }
+            return default;
         }
 
         public bool TryRecruit(CharacterDefinition character) => TryRecruit(character, default);

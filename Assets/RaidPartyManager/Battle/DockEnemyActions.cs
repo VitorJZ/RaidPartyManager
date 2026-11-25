@@ -21,8 +21,11 @@ namespace RaidPartyManager.Battle
                     return true;
                 case EnemyWreckScavenger:
                     var victim = FrontAttackTargets(actor).First();
-                    if (EnemyHit(actor, victim, "普攻", BattleVisualCue.None) && actor.Health > 0 && !actor.EnemyTriggered)
-                        Scavenge(actor, victim);
+                    Hit(actor, victim, actor.Input.Character.BasicAttack, BattleEventKind.Action, DecisionReason.Default, "普攻",
+                        onHit: defender =>
+                        {
+                            if (actor.Health > 0 && !actor.EnemyTriggered) Scavenge(actor, defender);
+                        });
                     return true;
                 case EnemyDeckSailor:
                     var softest = TargetableOpponents(actor).OrderBy(unit => unit.Stats.Defense).First();

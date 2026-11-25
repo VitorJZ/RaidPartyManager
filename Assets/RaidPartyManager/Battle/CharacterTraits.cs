@@ -60,14 +60,15 @@ namespace RaidPartyManager.Battle
                                 "幽雾炼药", BattleVisualCue.RoundStartPoison, BattleEventKind.Effect);
                         break;
                     case BorrowAllyAttack:
-                        var behind = living.FirstOrDefault(ally => ally.Input.Side == unit.Input.Side &&
-                            ally.Input.Position > unit.Input.Position);
+                        var behind = living.Where(ally => ally.Input.Side == unit.Input.Side &&
+                                ally.Input.Position > unit.Input.Position)
+                            .OrderBy(ally => ally.Input.Position).FirstOrDefault();
                         if (behind != null)
                         {
                             unit.BorrowedAttack = CurrentAttack(behind);
-                            behind.BlockedRound = Round;
-                            Report(BattleEventKind.Effect, unit, behind, "地煞借力", ActionKind.Shield,
-                                detail: $"地煞攻击 +{unit.BorrowedAttack}，队友本回合无法行动", visual: BattleVisualCue.RoundStartBonus);
+                            Report(BattleEventKind.Effect, unit, unit, "地煞借力", ActionKind.Shield,
+                                detail: $"借用{behind.Input.Character.Name}的攻击力，攻击 +{unit.BorrowedAttack}",
+                                visual: BattleVisualCue.RoundStartBonus);
                         }
                         break;
                 }
@@ -93,10 +94,17 @@ namespace RaidPartyManager.Battle
                 }
                 else if (unit.Trait == LightningChant && Round % 3 == 0)
                 {
-                    foreach (var enemy in Opponents(unit).ToArray())
-                        if (enemy.Health > 0)
-                            Strike(unit, enemy, unit.TraitPower, DamageType.Lightning, "灾厄吟唱", BattleEventKind.Effect,
-                                visual: BattleVisualCue.RoundEndLightning);
+                    for (int strike = 0; strike < unit.TraitPower && unit.Health > 0; strike++)
+                    {
+                        int power = CurrentAttack(unit);
+                        foreach (var enemy in Opponents(unit).ToArray())
+                        {
+                            if (unit.Health == 0) break;
+                            if (enemy.Health > 0)
+                                Strike(unit, enemy, power, DamageType.Lightning, "灾厄吟唱", BattleEventKind.Effect,
+                                    visual: BattleVisualCue.RoundEndLightning);
+                        }
+                    }
                 }
 
                 var formId = unit.Input.Character.BattleFormId;
@@ -119,7 +127,6 @@ namespace RaidPartyManager.Battle
 
         private void OnLifeLost(Unit source, Unit target, int amount)
         {
-            if (amount > 0) TriggerCrown(target);
             if (amount > 0 && target.Health > 0 && target.Health * 2 <= target.Stats.Health && target.FirstTrigger(PlayerTrait.Grit))
                 GrantStatus(target, target, StatusKind.Resolve, 1, "硬撑");
             if (amount == 0)

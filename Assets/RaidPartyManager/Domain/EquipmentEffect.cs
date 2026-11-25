@@ -13,13 +13,14 @@ namespace RaidPartyManager.Domain
         ScarletRose, Bludgeon, LoneWolf, ImperialSeal, PoisonRecipe, StealthCloak, CounterHorn,
         Bagua, Megaphone, TreeRoot, Shortbow, ExecutionMask, ThunderEye, ElementalQuartz, StaticPrism, PanaceaBottle,
         LionGoldStatue, ArcaneCrystal, InsulatingOrb, CoinDevourer, MoneyTreeBranch, EchoChalice, WindChime,
-        HarborWhistle, SunkenFrostChain, FacelessCrown, ColdSoulReliquary, StoneArmor, PressureGovernor, CelestialGyro, CrucibleHeart
+        HarborWhistle, SunkenFrostChain, FacelessCrown, ColdSoulReliquary, StoneArmor, PressureGovernor, CelestialGyro, CrucibleHeart,
+        ZuixianGourd, StrangeSeed
     }
 
     public enum StatusKind
     {
         Vigor, Swift, Resolve, Undying, Greed, Purity, Ember, Poison, Exposed, Weakened,
-        Thorns, Stunned, Injured, Cursed, Chill, Frozen, Wet, Evaporation
+        Thorns, Stunned, Injured, Cursed, Chill, Frozen, Wet, Evaporation, ForestMark
     }
 
     public static class EquipmentFormation
@@ -27,85 +28,60 @@ namespace RaidPartyManager.Domain
         // Units entering this calculation have their personal flat equipment bonuses applied.
         public static IReadOnlyDictionary<string, Stats> Resolve(IReadOnlyList<Combatant> units)
         {
-            var living = units.Where(unit => unit.Health > 0).ToArray();
+            var living = units.Where(unit => unit.Health > 0)
+                .OrderBy(unit => unit.Position).ThenBy(unit => unit.Side).ToArray();
             var stats = units.ToDictionary(unit => unit.Id, unit => unit.Stats);
-            var sharing = living.ToDictionary(unit => unit.Id,
-                unit => living.Where(owner => owner.Equipment.Any(item => item.Effect == EquipmentEffect.RedCord)
-                        && AdjacentFrontOf(living, owner) == unit)
-                    .SelectMany(owner => owner.Equipment.Where(item => item.Effect != EquipmentEffect.RedCord)).ToArray());
+            var sharedGear = living
+                .Where(owner => owner.Equipment.Any(item => item.Effect == EquipmentEffect.RedCord))
+                .Select(owner => (Owner: owner, Front: AdjacentFrontOf(living, owner)))
+                .Where(link => link.Front != null)
+                .ToDictionary(link => link.Front.Id, link => link.Owner.Equipment
+                    .Where(item => item.Effect != EquipmentEffect.RedCord).ToArray());
 
-            int Count(Combatant unit, EquipmentEffect effect) =>
-                unit.Equipment.Count(item => item.Effect == effect) + sharing[unit.Id].Count(item => item.Effect == effect);
+            // Flat bonuses, including those shared by Red Cord, are inputs to the ordered effects.
+            foreach (var (id, gear) in sharedGear)
+                foreach (var item in gear)
+                    stats[id] += new Stats(item.Bonus.Attack, item.Bonus.Defense, item.Bonus.SpecialDefense, 0);
 
+            // Read the current values at this slot. Never revisit a copy or conversion later in the pass.
             foreach (var unit in living)
-                foreach (var item in sharing[unit.Id])
-                    stats[unit.Id] += new Stats(item.Bonus.Attack, item.Bonus.Defense, item.Bonus.SpecialDefense, 0);
-
-            foreach (var side in living.GroupBy(unit => unit.Side))
             {
-                var team = side.ToArray();
-                int attack = team.Max(unit => stats[unit.Id].Attack);
-                int defense = team.Max(unit => stats[unit.Id].Defense);
-                int special = team.Max(unit => stats[unit.Id].SpecialDefense);
-                foreach (var unit in team)
+                var gear = unit.Equipment.Concat(sharedGear.GetValueOrDefault(unit.Id) ?? Array.Empty<EquipmentDefinition>());
+                foreach (var item in gear)
                 {
                     var current = stats[unit.Id];
-                    if (Count(unit, EquipmentEffect.GreedyHand) > 0)
-                        current = new Stats(attack, defense, special, current.Health);
-                    if (Count(unit, EquipmentEffect.ScarletRose) > 0)
-                        current = new Stats(current.Attack + current.Defense + current.SpecialDefense, 0, 0, current.Health);
-                    stats[unit.Id] = current;
-                }
-
-                var defenseFromBanners = team.ToDictionary(unit => unit.Id,
-                    unit => stats[unit.Id].Defense * Count(unit, EquipmentEffect.GuardianBanner));
-                foreach (var unit in team)
-                {
-                    if (Count(unit, EquipmentEffect.ScarletRose) > 0)
+                    switch (item.Effect)
                     {
-                        var current = stats[unit.Id];
-                        stats[unit.Id] = current + new Stats(BannerDefense(unit), 0, 0, 0);
-                    }
-                    else
-                        stats[unit.Id] += new Stats(0, BannerDefense(unit), 0, 0);
-                }
-
-                // Copy the highest attack after Scarlet Rose has converted defense, including banner bonuses.
-                int highestAttack = team.Max(unit => stats[unit.Id].Attack);
-                foreach (var unit in team.Where(unit => Count(unit, EquipmentEffect.GreedyHand) > 0))
-                {
-                    var current = stats[unit.Id];
-                    stats[unit.Id] = new Stats(highestAttack, current.Defense, current.SpecialDefense, current.Health);
-                }
-
-                int BannerDefense(Combatant unit) =>
-                    team.Where(ally => ally.Position < unit.Position).Sum(ally => defenseFromBanners[ally.Id]);
-            }
-
-            if (living.Any(unit => Count(unit, EquipmentEffect.ImperialSeal) > 0))
-            {
-                var attacks = living.GroupBy(unit => unit.Character.Profession)
-                    .ToDictionary(group => group.Key, group => group.Sum(unit => stats[unit.Id].Attack));
-                foreach (var unit in living.Where(unit => Count(unit, EquipmentEffect.ImperialSeal) > 0))
-                {
-                    var current = stats[unit.Id];
-                    stats[unit.Id] = new Stats(attacks[unit.Character.Profession], current.Defense, current.SpecialDefense, current.Health);
-                }
-
-                foreach (var side in living.GroupBy(unit => unit.Side))
-                {
-                    int highest = side.Max(unit => stats[unit.Id].Attack);
-                    foreach (var unit in side.Where(unit => Count(unit, EquipmentEffect.GreedyHand) > 0 &&
-                        Count(unit, EquipmentEffect.ImperialSeal) == 0))
-                    {
-                        var current = stats[unit.Id];
-                        stats[unit.Id] = new Stats(highest, current.Defense, current.SpecialDefense, current.Health);
+                        case EquipmentEffect.GreedyHand:
+                            var team = living.Where(ally => ally.Side == unit.Side).Select(ally => stats[ally.Id]).ToArray();
+                            stats[unit.Id] = new Stats(team.Max(value => value.Attack), team.Max(value => value.Defense),
+                                team.Max(value => value.SpecialDefense), current.Health);
+                            break;
+                        case EquipmentEffect.ScarletRose:
+                            stats[unit.Id] = new Stats(StatValue((long)current.Attack + current.Defense + current.SpecialDefense),
+                                0, 0, current.Health);
+                            break;
+                        case EquipmentEffect.GuardianBanner:
+                            foreach (var ally in living.Where(ally => ally.Side == unit.Side && ally.Position > unit.Position))
+                            {
+                                var rear = stats[ally.Id];
+                                stats[ally.Id] = new Stats(rear.Attack, StatValue((long)rear.Defense + current.Defense),
+                                    rear.SpecialDefense, rear.Health);
+                            }
+                            break;
+                        case EquipmentEffect.ImperialSeal:
+                            long attack = living.Where(other => other.Character.Profession == unit.Character.Profession)
+                                .Sum(other => (long)stats[other.Id].Attack);
+                            stats[unit.Id] = new Stats(StatValue(attack), current.Defense, current.SpecialDefense, current.Health);
+                            break;
                     }
                 }
             }
 
             return stats;
         }
+
+        private static int StatValue(long value) => (int)Math.Clamp(value, int.MinValue, int.MaxValue);
 
         public static Combatant AdjacentFrontOf(IEnumerable<Combatant> units, Combatant owner) =>
             units.FirstOrDefault(unit => unit.Side == owner.Side && unit.Health > 0 &&

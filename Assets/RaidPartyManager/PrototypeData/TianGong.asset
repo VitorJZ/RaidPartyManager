@@ -22,15 +22,14 @@ MonoBehaviour:
   battleProjectile: {fileID: 2800000, guid: 50884fcb2ff741ca83a759535bb1063f, type: 3}
   profession: 2
   rosterNumber: 34
-  stage: 1
+  stage: 2
   reach: 2
   fixedTrait: 18
   traitPower: 0
-  traitText: "攻击会对前方的所有单位造成伤害，每命中一个单位，此伤害-1；回合结束时，切换为地煞。"
-  battleForm: {fileID: 11400000, guid: 513fe91324cb45b18e69a8805184c8e5, type: 2}
+  traitText: "攻击会对敌方每个有单位占据的格子造成伤害，每命中一次，后续伤害降低1点。"
   personality: 4
-  attack: 7
-  defense: 1
+  attack: 8
+  defense: 2
   specialDefense: 1
   health: 11
   actionInterval: 10

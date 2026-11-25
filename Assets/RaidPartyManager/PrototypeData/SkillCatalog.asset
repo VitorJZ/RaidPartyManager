@@ -114,7 +114,7 @@ MonoBehaviour:
     cost: 2
     skillEffect: 9
     tier: 2
-    description: "对1名角色施加等同于使用者攻击力层数的中毒"
+    description: "对1名敌人施加等同于自身攻击力层数的中毒。有合适的巫医玩偶佩戴者时，有30%概率改为对其施毒，可选中自身。"
   - number: 12
     displayName: "血肉盛宴"
     icon: {fileID: 2800000, guid: c20660494a964527b692878af3aeb530, type: 3}
@@ -285,7 +285,7 @@ MonoBehaviour:
     cost: 8
     skillEffect: 28
     tier: 1
-    description: "蓄力至下一回合开始。若施法者仍存活且未被眩晕，对全体敌人造成（2×攻击力+6）点雷电伤害。"
+    description: "蓄力至下一回合开始。若施法者仍存活且未被眩晕或冰冻，对全体敌人造成（2×攻击力+6）点雷电伤害。"
   - number: 31
     displayName: "封港连炮"
     icon: {fileID: 2800000, guid: 297a76b3109353fcaaaa94d239d12906, type: 3}
@@ -356,3 +356,12 @@ MonoBehaviour:
     tier: 0
     rewardBossId: EnemyCrucibleRegent
     description: 为所有存活友方各恢复4点生命并给予6点护盾。
+  - number: 38
+    displayName: "饮鸩强袭"
+    icon: {fileID: 2800000, guid: 4f30767ff50158b9848a69712241b776, type: 3}
+    battleEffect: {fileID: 2800000, guid: 0ea80cf13e165ce3b6dcfe37a7580530, type: 3}
+    requirement: 0
+    cost: 1
+    skillEffect: 36
+    tier: 1
+    description: "消耗全部剩余能量。每消耗1点，对每名敌人施加3层中毒，对自身施加1层中毒。至少需要1点能量。"

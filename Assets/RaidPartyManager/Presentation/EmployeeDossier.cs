@@ -35,7 +35,7 @@ namespace RaidPartyManager.Presentation
 
             var thoughts = Section("想法", "employee-thoughts");
             var voice = EmployeeVoice.For(member.Personality);
-            var personality = PrototypeStyle.Text("性格 · " + voice.Name, 13, PrototypeStyle.Accent);
+            var personality = PrototypeStyle.Text("性格：" + voice.Name, 13, PrototypeStyle.Personality);
             personality.name = "employee-personality";
             personality.tooltip = voice.Description;
             thoughts.Add(personality);

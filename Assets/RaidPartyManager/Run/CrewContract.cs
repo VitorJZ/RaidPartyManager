@@ -11,6 +11,8 @@ namespace RaidPartyManager.Run
     [Serializable]
     public struct WageInstallments
     {
+        public const int MaximumPremiumPercent = 22;
+
         public bool Enabled;
         public int Count, IntervalDays, Amount;
         // Amount is read only by contracts saved with the original, fixed-payment schedule.
@@ -19,10 +21,10 @@ namespace RaidPartyManager.Run
         public static int PremiumPercent(Personality personality) => personality switch
         {
             Personality.Caring or Personality.Optimist => 0,
-            Personality.Stoic or Personality.Curious => 5,
-            Personality.Frank or Personality.Deadpan => 10,
-            Personality.Theatrical or Personality.Competitive => 15,
-            _ => 20
+            Personality.Stoic or Personality.Curious => 7,
+            Personality.Frank or Personality.Deadpan => 12,
+            Personality.Theatrical or Personality.Competitive => 17,
+            _ => MaximumPremiumPercent
         };
 
     }
@@ -61,51 +63,132 @@ namespace RaidPartyManager.Run
         public long SigningFee;
         public int InterestPercent;
         public long PrincipalInArrears, InterestInArrears, AccruedInterest, InterestRemainder;
+        public long PrincipalPaidEarly;
+        public int InterestThroughDay;
         public int Days => EndDay - StartDay;
         public long BaseTotal => DeferredTerms && !Plan.Enabled ? SigningFee : (long)DailyWage * Days;
         public long DueAtSigning => DeferredTerms ? SigningFee : Plan.Enabled ? Plan.Amount : BaseTotal;
-        private long Financed => BaseTotal - SigningFee;
+        private long Financed => DeferredTerms ? BaseTotal - SigningFee : (long)Plan.Count * Plan.Amount;
+        private long InterestDivisor => (long)Days * 100;
         public long Arrears => PrincipalInArrears + InterestInArrears;
-        public long RemainingPrincipal => !Plan.Enabled ? 0 : DeferredTerms
-            ? PrincipalAfter(InstallmentsPaid) + PrincipalInArrears : (long)(Plan.Count - InstallmentsPaid) * Plan.Amount;
+        public long RemainingPrincipal => !Plan.Enabled ? 0 : PrincipalAfter(InstallmentsPaid) + PrincipalInArrears;
         public long Outstanding => RemainingPrincipal + InterestInArrears + AccruedInterest + (InterestRemainder > 0 ? 1 : 0);
         public int CurrentReleaseFee => Plan.Enabled && Outstanding > 0 ? (int)Math.Min(Outstanding, ReleaseFee) : 0;
         public long ExitCost => Outstanding + CurrentReleaseFee;
         public int? NextDueDay => Plan.Enabled && !BasePaid && InstallmentsPaid < Plan.Count
             ? StartDay + (InstallmentsPaid + (DeferredTerms ? 1 : 0)) * Plan.IntervalDays : (int?)null;
         internal CrewContract Copy() => (CrewContract)MemberwiseClone();
-        internal void RecordSigningPayment() => BasePaid = Outstanding == 0;
-
-        private long PrincipalAfter(int count) =>
-            Financed - (Financed / Plan.Count * count + Math.Min(count, Financed % Plan.Count));
-        public long PrincipalAt(int period) => PrincipalAfter(period - 1) - PrincipalAfter(period);
-
-        // Sum of the opening balances for the first k periods. This also supports very long contracts
-        // without constructing a payment list. Only the final interest charge rounds up.
-        private long ScheduledInterestThrough(int k)
+        internal void RecordSigningPayment()
         {
-            long extra = Math.Min(k, Financed % Plan.Count);
-            decimal paidBalances = (decimal)(Financed / Plan.Count) * k * (k - 1) / 2
-                + (decimal)extra * (extra - 1) / 2 + (decimal)(k - extra) * extra;
-            decimal exposure = ((decimal)k * Financed - paidBalances) * Plan.IntervalDays;
-            long divisor = (long)Days * 100;
-            decimal remainder = exposure % divisor;
-            decimal whole = (exposure - remainder) / divisor * InterestPercent;
-            decimal fraction = remainder * InterestPercent / divisor;
-            // With a nearly full deposit, the principal can be paid off before the last listed period.
-            return (long)(whole + (PrincipalAfter(k) == 0 ? decimal.Ceiling(fraction) : decimal.Floor(fraction)));
+            BasePaid = Outstanding == 0;
+            if (BasePaid) InterestThroughDay = 0;
         }
 
-        public long ScheduledPayment(int period) => !DeferredTerms ? Plan.Amount :
-            PrincipalAt(period) + ScheduledInterestThrough(period) - ScheduledInterestThrough(period - 1);
-        public long ScheduledInterest => !Plan.Enabled ? 0 : DeferredTerms ? ScheduledInterestThrough(Plan.Count) : 0;
+        private long PrincipalAfter(int count) => Math.Max(0,
+            Financed - Financed / Plan.Count * count - Math.Min(count, Financed % Plan.Count) - PrincipalPaidEarly);
+        public long PrincipalAt(int period) => PrincipalAfter(period - 1) - PrincipalAfter(period);
 
-        internal void AccrueDay()
+        private static decimal SumBalances(long opening, long reduction, int count)
         {
-            long divisor = (long)Days * 100;
-            decimal units = (decimal)RemainingPrincipal * InterestPercent + InterestRemainder;
-            AccruedInterest += (long)(units / divisor);
-            InterestRemainder = (long)(units % divisor);
+            if (opening <= 0 || count <= 0) return 0;
+            if (reduction > 0)
+                count = (int)Math.Min(count, (opening - 1) / reduction + 1);
+            return (decimal)opening * count - (decimal)reduction * count * (count - 1) / 2;
+        }
+
+        // The principal schedule has at most two rates because its first installments carry the remainder.
+        private decimal ScheduledBalanceSum(int count)
+        {
+            int extra = (int)Math.Min(count, Financed % Plan.Count);
+            long regular = Financed / Plan.Count;
+            return SumBalances(Financed - PrincipalPaidEarly, regular + 1, extra)
+                + SumBalances(PrincipalAfter(extra), regular, count - extra);
+        }
+
+        private long ScheduledInterestThrough(int period)
+        {
+            if (period <= InstallmentsPaid || !DeferredTerms) return 0;
+            int projectedFrom = InstallmentsPaid + (InterestThroughDay > 0 ? 1 : 0);
+            decimal exposure = (ScheduledBalanceSum(period) - ScheduledBalanceSum(projectedFrom)) * Plan.IntervalDays;
+            decimal fraction = exposure % InterestDivisor;
+            decimal whole = (exposure - fraction) / InterestDivisor * InterestPercent;
+            decimal extra = (fraction * InterestPercent + InterestRemainder) / InterestDivisor;
+            return AccruedInterest + (long)(whole + (PrincipalAfter(period) == 0 ? decimal.Ceiling(extra) : decimal.Floor(extra)));
+        }
+
+        public long ScheduledPayment(int period) => PrincipalAt(period)
+            + ScheduledInterestThrough(period) - ScheduledInterestThrough(period - 1);
+        public long ScheduledInterest => Plan.Enabled ? ScheduledInterestThrough(Plan.Count) : 0;
+
+        private decimal PeriodInterest(long principal, int days) => (decimal)principal * InterestPercent * days;
+
+        private void AdjustInterest(decimal change)
+        {
+            decimal units = change + InterestRemainder;
+            decimal remainder = units % InterestDivisor;
+            if (remainder < 0) remainder += InterestDivisor;
+            AccruedInterest += (long)((units - remainder) / InterestDivisor);
+            InterestRemainder = (long)remainder;
+        }
+
+        internal void OpenInterestPeriod(int day)
+        {
+            if (!DeferredTerms || day < StartDay || InterestThroughDay != 0 || NextDueDay is not int due)
+                return;
+            InterestThroughDay = due;
+            AdjustInterest(PeriodInterest(RemainingPrincipal, Math.Max(0, due - day)));
+        }
+
+        private void CreditEarlyInterest(long principal, int day)
+        {
+            if (DeferredTerms && InterestThroughDay > day && principal > 0)
+                AdjustInterest(-PeriodInterest(principal, InterestThroughDay - day));
+        }
+
+        internal long PayoffToday(int day)
+        {
+            if (InterestThroughDay <= day || RemainingPrincipal == 0) return Outstanding;
+            var closing = Copy();
+            closing.CreditEarlyInterest(closing.RemainingPrincipal, day);
+            return closing.Outstanding;
+        }
+
+        internal long RepayArrears(long amount, int day)
+        {
+            long principal = Math.Min(amount, PrincipalInArrears);
+            PrincipalInArrears -= principal;
+            CreditEarlyInterest(principal, day);
+            long interest = Math.Min(amount - principal, InterestInArrears);
+            InterestInArrears -= interest;
+            if (Plan.Enabled) RecordSigningPayment();
+            return principal + interest;
+        }
+
+        internal void PayEarly(long amount, int day)
+        {
+            if (amount == 0) return;
+            long principal = Math.Min(amount, RemainingPrincipal - PrincipalInArrears);
+            PrincipalPaidEarly += principal;
+            CreditEarlyInterest(principal, day);
+            long interest = amount - principal;
+            if (interest > AccruedInterest)
+                AccruedInterest = InterestRemainder = 0;
+            else
+                AccruedInterest -= interest;
+            RecordSigningPayment();
+        }
+
+        internal long CloseInterestPeriod(bool roundUp)
+        {
+            long interest = AccruedInterest;
+            if (roundUp && InterestRemainder > 0)
+            {
+                interest++;
+                InterestRemainder = 0;
+            }
+            AccruedInterest = 0;
+            InterestThroughDay = 0;
+            return interest;
         }
 
         internal bool ValidAt(int day)
@@ -115,10 +198,13 @@ namespace RaidPartyManager.Run
             if (StartDay < 1 || EndDay <= StartDay || EndDay <= day || DailyWage < 1 || !Rates.Valid || !AgreedRates.Valid) return false;
             if (!Plan.Enabled) return !DeferredTerms || SigningFee >= Days;
             bool validSchedule = DeferredTerms ? Plan.Fits(Days) && SigningFee >= 0 && SigningFee <= BaseTotal &&
-                InterestPercent is >= 0 and <= 20 && PrincipalInArrears >= 0 && InterestInArrears >= 0 && AccruedInterest >= 0 &&
+                InterestPercent is >= 0 and <= WageInstallments.MaximumPremiumPercent && PrincipalInArrears >= 0 && InterestInArrears >= 0 && AccruedInterest >= 0 &&
                 InterestRemainder >= 0 && InterestRemainder < (long)Days * 100 :
                 Plan.Count >= 2 && Plan.IntervalDays > 0 && Plan.Amount > 0 && ((long)Plan.Count - 1) * Plan.IntervalDays <= Days;
-            return validSchedule && InstallmentsPaid >= (DeferredTerms ? 0 : 1) && InstallmentsPaid <= Plan.Count && !(NextDueDay <= day);
+            return validSchedule && InstallmentsPaid >= (DeferredTerms ? 0 : 1) && InstallmentsPaid <= Plan.Count &&
+                PrincipalPaidEarly >= 0 && PrincipalPaidEarly <= Financed &&
+                (InterestThroughDay == 0 || DeferredTerms && InterestThroughDay > day && InterestThroughDay <= EndDay) &&
+                !(NextDueDay <= day);
         }
 
         public BonusTerms Bonuses;
@@ -179,7 +265,7 @@ namespace RaidPartyManager.Run
 
     public sealed partial class PartyRun
     {
-        public const int RosterLimit = 8;
+        public const int RosterLimit = 6;
         private int talentSeed;
         public int Day { get; private set; }
         public long PayrollDebt { get; private set; }
@@ -239,6 +325,7 @@ namespace RaidPartyManager.Run
         {
             var member = members.Single(m => m.Character.Id == characterId);
             draft.RecordSigningPayment();
+            draft.OpenInterestPeriod(Day);
             member.Contract = draft;
             RefreshEmployeeGoals(member);
         }
@@ -251,7 +338,11 @@ namespace RaidPartyManager.Run
             if (draft == null || draft.DueAtSigning > Gold) return false;
             PaySigningWage(m.Character.Name, draft);
             draft.RecordSigningPayment();
-            if (m.Contract == null) m.Contract = draft;
+            if (m.Contract == null)
+            {
+                m.Contract = draft;
+                draft.OpenInterestPeriod(Day);
+            }
             else m.Renewals.Add(draft);
             RefreshEmployeeGoals(m);
             return true;
@@ -341,6 +432,47 @@ namespace RaidPartyManager.Run
             return paid;
         }
 
+        private void PayWages(Member member, long amount, string reason) =>
+            member.UnpaidWages += amount - Pay(amount, member.Character.Name + " · " + reason);
+
+        private long WageBalance(Member member) => member.UnpaidWages + (member.Contract?.PayoffToday(Day) ?? 0);
+
+        public long WageBalanceFor(string memberId) =>
+            FindMember(memberId) is { } member ? WageBalance(member) : 0;
+
+        public bool TryRepayWages(string memberId, int amount)
+        {
+            var member = FindMember(memberId);
+            if (member == null || amount <= 0 || amount > WageBalance(member) ||
+                !TrySpendGold(amount, member.Character.Name + " · 偿还薪资")) return false;
+
+            long repaid = RepayArrears(member, amount);
+            PayrollDebt -= repaid;
+            member.Contract?.PayEarly(amount - repaid, Day);
+            return true;
+        }
+
+        private long RepayArrears(Member member, long amount)
+        {
+            long contract = member.Contract?.RepayArrears(amount, Day) ?? 0;
+            long wages = Math.Min(amount - contract, member.UnpaidWages);
+            member.UnpaidWages -= wages;
+            return contract + wages;
+        }
+
+        internal string[] RemoveUnpaidEmployees()
+        {
+            var leaving = members.Where(member => WageBalance(member) > 0).ToArray();
+            foreach (var member in leaving)
+            {
+                // Their earned and contracted wages stay in the company ledger after departure.
+                PayrollDebt += WageBalance(member) - member.UnpaidWages - (member.Contract?.Arrears ?? 0);
+                members.Remove(member);
+            }
+            DeployReserveIfNeeded();
+            return leaving.Select(member => member.Character.Name).ToArray();
+        }
+
         public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 && m.LastContract.EndDay > (long)Day + 1);
 
         internal void AdvanceDay()
@@ -351,39 +483,25 @@ namespace RaidPartyManager.Run
             {
                 member.Career.ServiceDays++;
                 var contract = member.Contract;
-                if (contract.DeferredTerms && contract.Plan.Enabled)
+                if (contract.NextDueDay == Day)
                 {
-                    contract.AccrueDay();
-                    bool due = contract.NextDueDay == Day;
-                    long principal = due ? contract.PrincipalAt(++contract.InstallmentsPaid) : 0;
-                    bool final = contract.InstallmentsPaid == contract.Plan.Count;
-                    if (due || final)
-                    {
-                        long interest = contract.AccruedInterest;
-                        if (contract.InterestRemainder > 0 && (Day == contract.EndDay || contract.RemainingPrincipal == 0 && Gold >= principal))
-                        {
-                            interest++;
-                            contract.InterestRemainder = 0;
-                        }
-                        contract.AccruedInterest = 0;
-                        int paid = Pay(principal + interest, $"{member.Character.Name} · 第 {contract.InstallmentsPaid} 期工资");
-                        contract.PrincipalInArrears += Math.Max(0, principal - paid);
-                        contract.InterestInArrears += interest - Math.Max(0, paid - principal);
-                    }
-                    contract.BasePaid = contract.Outstanding == 0;
-                }
-                else if (contract.NextDueDay == Day)
-                {
-                    contract.InstallmentsPaid++;
-                    Pay(contract.Plan.Amount, $"{member.Character.Name} · 第 {contract.InstallmentsPaid} 期工资");
-                    contract.BasePaid = contract.InstallmentsPaid == contract.Plan.Count;
+                    long principal = contract.PrincipalAt(++contract.InstallmentsPaid);
+                    long interest = contract.CloseInterestPeriod(contract.InstallmentsPaid == contract.Plan.Count ||
+                        contract.RemainingPrincipal == 0 && Gold >= principal);
+                    int paid = Pay(principal + interest, $"{member.Character.Name} · 第 {contract.InstallmentsPaid} 期工资");
+                    contract.PrincipalInArrears += Math.Max(0, principal - paid);
+                    contract.InterestInArrears += interest - Math.Max(0, paid - principal);
+                    contract.RecordSigningPayment();
+                    contract.OpenInterestPeriod(Day);
                 }
                 else if (!contract.BasePaid && !contract.Plan.Enabled)
-                    Pay(contract.DailyWage, member.Character.Name + " · 每日工资");
+                    PayWages(member, contract.DailyWage, "每日工资");
                 if (contract.EndDay == Day && member.Renewals.Count > 0)
                 {
+                    member.UnpaidWages += contract.Arrears;
                     member.Contract = member.Renewals[0];
                     member.Renewals.RemoveAt(0);
+                    member.Contract.OpenInterestPeriod(Day);
                 }
             }
             members.RemoveAll(m => m.Contract.EndDay <= Day);
@@ -397,21 +515,21 @@ namespace RaidPartyManager.Run
             foreach (var m in members.Where(m => m.Contract != null && deployed.Contains(m.Id)))
             {
                 var rates = m.Contract.AgreedRates;
-                Pay(rates.Appearance, m.Character.Name + " · 出场费");
+                PayWages(m, rates.Appearance, "出场费");
                 if (rates.Kill > 0)
                 {
                     int kills = result.Events.Count(e => e.Kind == BattleEventKind.Defeated && e.ActorId == m.Id && enemies.Contains(e.TargetId));
-                    Pay((long)rates.Kill * kills, m.Character.Name + " · 击杀奖");
+                    PayWages(m, (long)rates.Kill * kills, "击杀奖");
                 }
                 if (rates.DamageTaken > 0)
                 {
                     long damage = result.Events.Where(e => e.TargetId == m.Id).Sum(e => e.DamageTaken.Sum(d => (long)d.Amount));
-                    Pay(rates.DamageTaken * (damage / 5), m.Character.Name + " · 承伤奖");
+                    PayWages(m, rates.DamageTaken * (damage / 5), "承伤奖");
                 }
                 if (rates.Shield > 0)
                 {
                     long blocked = result.Events.Where(e => e.TargetId == m.Id && enemies.Contains(e.ActorId)).Sum(e => (long)e.ShieldAbsorbed);
-                    Pay(rates.Shield * (blocked / 5), m.Character.Name + " · 抗伤奖");
+                    PayWages(m, rates.Shield * (blocked / 5), "抗伤奖");
                 }
             }
         }

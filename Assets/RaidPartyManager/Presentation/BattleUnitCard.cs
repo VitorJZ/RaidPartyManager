@@ -9,7 +9,7 @@ namespace RaidPartyManager.Presentation
     internal sealed class BattleUnitCard : VisualElement
     {
         private int maximumHealth;
-        private readonly Label healthLabel;
+        private readonly Label healthLabel, characterName;
         private readonly VisualElement healthFill;
         private readonly VisualElement portrait;
         private readonly VisualElement badges, caption, life, conditions;
@@ -19,6 +19,10 @@ namespace RaidPartyManager.Presentation
         private readonly Color sideColor;
 
         public Rect BodyBounds => battleSprite?.Figure.worldBound ?? portrait.worldBound;
+        private readonly float partyInkSpan;
+        public Rect CaptionBounds => characterName.worldBound;
+        public float PartyBodyHeight => (battleSprite?.Figure.layout.height ?? portrait.layout.height) * partyInkSpan;
+        private const float BadgeSize = 27, BadgeRow = 30;
         public int PositionSlots { get; }
 
         public BattleUnitCard(Side side, string unitId, CharacterDefinition character,
@@ -31,6 +35,10 @@ namespace RaidPartyManager.Presentation
             this.statusIcon = statusIcon;
             this.statusTooltip = statusTooltip;
             this.battleSprite = battleSprite;
+            var framing = ShopStage.FramingFor(character.RosterNumber);
+            partyInkSpan = side == Side.Party ? battleSprite?.UsesPortrait == false ? framing.sideSpan : 1f : 0f;
+            float crownInset = side == Side.Party && battleSprite?.UsesPortrait == false
+                ? 1f - framing.sideInset - framing.sideSpan : .045f;
             sideColor = side == Side.Party ? PrototypeStyle.Ally : PrototypeStyle.Enemy;
 
             life = new VisualElement { name = "health-bar", pickingMode = PickingMode.Ignore };
@@ -58,7 +66,8 @@ namespace RaidPartyManager.Presentation
 
             portrait = new VisualElement { name = "combatant-portrait" };
             portrait.style.height = portraitHeight;
-            portrait.style.marginTop = portrait.style.marginBottom = 4;
+            portrait.style.marginTop = 0;
+            portrait.style.marginBottom = 3;
             portrait.style.overflow = Overflow.Hidden;
             if (battleSprite == null)
             {
@@ -81,13 +90,15 @@ namespace RaidPartyManager.Presentation
 
             caption = PrototypeStyle.Row("combatant-caption");
             caption.style.paddingLeft = caption.style.paddingRight = 5;
-            caption.style.paddingTop = caption.style.paddingBottom = 4;
-            caption.style.minHeight = 27;
+            caption.style.paddingTop = caption.style.paddingBottom = 0;
+            caption.style.height = 20;
             caption.style.alignItems = Align.Center;
-            var characterName = PrototypeStyle.Text(character.Name, 14);
+            caption.style.justifyContent = Justify.Center;
+            characterName = PrototypeStyle.Text(character.Name, 14);
             characterName.name = "combatant-name";
-            characterName.style.flexGrow = 1;
+            characterName.style.maxWidth = Length.Percent(100);
             characterName.style.minWidth = 0;
+            PrototypeStyle.Middle(characterName);
             characterName.style.whiteSpace = WhiteSpace.NoWrap;
             characterName.style.overflow = Overflow.Hidden;
             characterName.style.textOverflow = TextOverflow.Ellipsis;
@@ -98,7 +109,8 @@ namespace RaidPartyManager.Presentation
             Add(life);
 
             conditions = new VisualElement { name = $"status-row-{unitId}" };
-            conditions.style.minHeight = 29;
+            conditions.style.height = conditions.style.minHeight = 2 * BadgeRow;
+            conditions.style.flexShrink = 0;
             conditions.style.marginTop = 3;
             Add(conditions);
             badges = PrototypeStyle.Row("status-badges");
@@ -106,6 +118,21 @@ namespace RaidPartyManager.Presentation
             badges.style.justifyContent = Justify.Center;
             conditions.Add(badges);
 
+            conditions.RegisterCallback<GeometryChangedEvent>(_ => FitBadges());
+            if (battleSprite != null)
+            {
+                var figure = battleSprite.Figure;
+                RegisterCallback<AttachToPanelEvent>(_ => figure.RegisterCallback<GeometryChangedEvent>(AlignName));
+                RegisterCallback<DetachFromPanelEvent>(_ => figure.UnregisterCallback<GeometryChangedEvent>(AlignName));
+                portrait.RegisterCallback<GeometryChangedEvent>(AlignName);
+                void AlignName(GeometryChangedEvent _)
+                {
+                    if (figure.layout.height <= 0 || float.IsNaN(figure.layout.height)) return;
+                    // Small units share the boss's foot line; their names follow their own idle figure.
+                    float inset = battleSprite.layout.y + figure.layout.y + figure.layout.height * crownInset;
+                    caption.style.translate = new Translate(0, Mathf.Max(0, inset - 1));
+                }
+            }
             Refresh(health, shield, now);
         }
 
@@ -162,6 +189,8 @@ namespace RaidPartyManager.Presentation
                 if (!active.Contains(badges[index].name))
                     badges.RemoveAt(index);
 
+            FitBadges();
+
             void UpdateBadge(string id, int count, string title, string description, Texture2D icon, Color color, bool isShield = false,
                 BattleCountdownKind? countdown = null, string unit = null)
             {
@@ -175,6 +204,15 @@ namespace RaidPartyManager.Presentation
                 }
                 badge.SetCount(count);
             }
+        }
+
+        private void FitBadges()
+        {
+            if (badges.childCount == 0 || !(conditions.layout.width > 0)) return;
+            int perRow = (badges.childCount + 1) / 2;
+            float size = Mathf.Min(BadgeSize, Mathf.Max(1, Mathf.Floor(conditions.layout.width / perRow) - 4));
+            foreach (var badge in badges.Children())
+                badge.style.width = badge.style.height = size;
         }
 
         private sealed class StatusBadge : VisualElement

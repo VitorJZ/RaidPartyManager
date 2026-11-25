@@ -59,7 +59,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: e9883a6899f84fb98ba85e36096bdff9, type: 2}
   - {fileID: 11400000, guid: 00b94dc802544dc3895cf647ebc0884c, type: 2}
   - {fileID: 11400000, guid: 57dfd33b56844fbea294cf01807fc0a6, type: 2}
+  - {fileID: 11400000, guid: 513fe91324cb45b18e69a8805184c8e5, type: 2}
+  - {fileID: 11400000, guid: c227c210bd634fb3b1e5f9e7359b9d13, type: 2}
   eventRecruits:
+  - {fileID: 11400000, guid: e3aa677843de5c36b407b78790893a76, type: 2}
   - {fileID: 11400000, guid: 2ba72d0cffb8542098eb710933a7eccf, type: 2}
   enemyRoster:
   - {fileID: 11400000, guid: 56410735d22a5068873a2e625b2fda44, type: 2}
@@ -163,6 +166,7 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 879b90eeddb94c84ebb3ae86e35165f6, type: 3}
   - {fileID: 2800000, guid: 8e54c4b0fbf5505ebdb748d58cca4a7a, type: 3}
   - {fileID: 2800000, guid: 9a227e0b019e5f258165c222686bb70c, type: 3}
+  - {fileID: 2800000, guid: c3b8846a9d9b5d0c9b199371e31e83f7, type: 3}
   arrowProjectile: {fileID: 2800000, guid: 592b8d7b00a541ed8c5516141b82a550, type: 3}
   magicProjectile: {fileID: 2800000, guid: 8460af5164db4b4e9ab5379f5339dc49, type: 3}
   startingEquipment:
@@ -224,7 +228,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 0cf1cd216fdf51fcac1db872947dcfca, type: 2}
   - {fileID: 11400000, guid: 388914f351a7505395b944a91abbd5d8, type: 2}
   - {fileID: 11400000, guid: 0fbd3fde4a8357bfb534fff149bc0d05, type: 2}
+  - {fileID: 11400000, guid: 5a97eeb3566555c1a915d5ea6544f6fb, type: 2}
   backpackIcon: {fileID: 2800000, guid: 6e47ea84955e41c9997c3d367af2fb70, type: 3}
+  eventEquipment:
+  - {fileID: 11400000, guid: e35d7632e4d253d4b6e293b7b67dce46, type: 2}
   startingCopies: 4
   skillCatalog: {fileID: 11400000, guid: 5d2799f97ec448aab35b51a5ed0ce044, type: 2}
   victoryReward: {fileID: 11400000, guid: 756e87ec389e6924f86f5145ab2e62cc, type: 2}

@@ -68,12 +68,86 @@ namespace RaidPartyManager.Presentation
             return text;
         }
 
+        public static VisualElement RepayWages(PartyRun party, Action close, Action paid, Action enterBoss = null)
+        {
+            var view = Sheet(enterBoss == null ? "偿还薪资" : "遗都首领战 · 战前结薪", out var paper, close);
+            view.name = "payroll-panel";
+            var members = new DropdownField("队员") { name = "payroll-member" };
+            var amount = new IntegerField("还款金额（金币）") { name = "payroll-amount" };
+            var funds = Text("", 15);
+            var schedule = Text("", 14);
+            var feedback = Text("", 14);
+            var candidates = Array.Empty<MemberView>();
+            string selected = null;
+            var confirm = PrototypeStyle.Button("偿还", "payroll-pay", null, true);
+            if (enterBoss != null)
+                paper.Add(Text("现在需要结清已生效合同的余款。确认开战后，名单中仍有欠款的队员会离开队伍。", 16));
+            paper.Add(funds);
+            paper.Add(members);
+            paper.Add(schedule);
+            paper.Add(amount);
+            paper.Add(confirm);
+            paper.Add(feedback);
+            var proceed = enterBoss == null ? null : PrototypeStyle.Button("", "confirm-final-payroll", enterBoss);
+            if (proceed != null) paper.Add(proceed);
+            confirm.clicked += () =>
+            {
+                if (!party.TryRepayWages(selected, amount.value)) return;
+                feedback.text = $"已偿还 {amount.value} 金币。";
+                paid();
+                Refresh();
+            };
+            members.RegisterValueChangedCallback(_ =>
+            {
+                selected = members.index >= 0 ? candidates[members.index].Id : null;
+                RefreshSelection();
+            });
+            amount.RegisterValueChangedCallback(_ => EnablePayment());
+            Refresh();
+            return view;
+
+            void Refresh()
+            {
+                candidates = party.Members.Where(member => party.WageBalanceFor(member.Id) > 0).ToArray();
+                int index = Array.FindIndex(candidates, member => member.Id == selected);
+                if (index < 0 && candidates.Length > 0) index = 0;
+                members.choices = candidates.Select(member => $"{member.Character.Name} · {party.WageBalanceFor(member.Id)} 金币").ToList();
+                if (index >= 0) members.SetValueWithoutNotify(members.choices[index]);
+                else members.SetValueWithoutNotify("");
+                selected = index >= 0 ? candidates[index].Id : null;
+                members.SetEnabled(index >= 0);
+                funds.text = candidates.Length == 0 ? $"余额 {party.Gold} 金币 · 队员薪资已结清" : $"余额 {party.Gold} 金币";
+                if (proceed != null)
+                    proceed.text = candidates.Length == 0 ? "开始战斗" : $"确认开战 · {candidates.Length} 人离队";
+                RefreshSelection();
+            }
+
+            void RefreshSelection()
+            {
+                var contract = candidates.FirstOrDefault(member => member.Id == selected)?.Contract;
+                long balance = party.WageBalanceFor(selected);
+                schedule.text = balance == 0 ? "" : $"今天结清需 {balance} 金币。";
+                if (contract?.NextDueDay is int next)
+                {
+                    long interest = contract.ScheduledPayment(contract.InstallmentsPaid + 1)
+                        - contract.PrincipalAt(contract.InstallmentsPaid + 1);
+                    schedule.text += $"\n下期第 {next} 天付款，预计利息 {interest} 金币，剩余各期预计利息合计 {contract.ScheduledInterest} 金币。";
+                }
+                amount.SetValueWithoutNotify((int)Math.Min(balance, party.Gold));
+                amount.SetEnabled(balance > 0 && party.Gold > 0);
+                EnablePayment();
+            }
+
+            void EnablePayment() => confirm.SetEnabled(amount.value > 0 && amount.value <= party.Gold &&
+                amount.value <= party.WageBalanceFor(selected));
+        }
+
         public static VisualElement Negotiate(CharacterDefinition c, int day, PlayerTrait talent, int tradeQuote,
             CrewContract current, int expectedWage, EmployeeAttributes ratings, Func<int, PerformanceBonuses, long, bool> sign, Action close, IReadOnlyList<CrewContract> renewals = null)
         {
             int startDay = (renewals?.LastOrDefault() ?? current)?.EndDay ?? day;
             var view = Sheet(c.Name + (current == null ? " · 讨伐队合约" : " · 续约合同"), out var paper, close);
-            paper.Add(Text(PlayerMarket.Describe(talent), 15));
+            paper.Add(PrototypeStyle.Text(PlayerMarket.Describe(talent), 15, new Color32(126, 71, 18, 255)));
             if (current != null)
             {
                 paper.Add(Text(Summary(c, current) + $" 剩余 {current.EndDay - day} 天。", 16));
@@ -104,7 +178,7 @@ namespace RaidPartyManager.Presentation
             var count = new IntegerField("期数") { name = "installment-count", value = plan.Enabled ? plan.Count : 2 };
             var interval = new IntegerField("每期间隔（天）") { name = "installment-days", value = plan.Enabled ? plan.IntervalDays : 5 };
             schedule.Add(interval); schedule.Add(count);
-            schedule.Add(Text($"按期望日薪计算底薪，签字费抵本金。分期利率 {premium}%（按整个合同期限折算），每天只对尚未还清的本金计息。", 14));
+            schedule.Add(Text($"签字费抵本金。分期利率 {premium}%（按整个合同期限折算）。每期首日按剩余本金计息，提前还本金可减免本期剩余天数的利息，并降低后续利息。遗都首领开战前须结清已生效合同。", 14));
             var payments = Text("", 14);
             payments.name = "contract-payment-schedule";
             schedule.Add(payments);
@@ -203,7 +277,8 @@ namespace RaidPartyManager.Presentation
                         int i = (int)k;
                         long principal = draft.PrincipalAt(i);
                         long amount = draft.ScheduledPayment(i);
-                        lines.Add($"第 {i} 期　 第 {startDay + i * interval.value} 天　 {amount} 金币（本金 {principal}，利息 {amount - principal}）");
+                        int paymentDay = startDay + i * interval.value;
+                        lines.Add($"第 {i} 期　 第 {paymentDay - interval.value} 天计息 · 第 {paymentDay} 天付款　 {amount} 金币（本金 {principal}，利息 {amount - principal}）");
                     }
                     payments.text = string.Join("\n", lines);
                     pages.style.display = count.value > pageSize ? DisplayStyle.Flex : DisplayStyle.None;

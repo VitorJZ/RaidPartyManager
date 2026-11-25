@@ -9,6 +9,8 @@ namespace RaidPartyManager.Battle
 {
     public sealed partial class BattleSession
     {
+        private const double ToxicMistDollChance = .30;
+
         private void AddLearnedSkillOptions(Unit actor, List<ActionOption> options)
         {
             var enemies = Opponents(actor).ToArray();
@@ -101,8 +103,17 @@ namespace RaidPartyManager.Battle
                             Add(target, Estimate(target, 3, DamageType.Lightning) * (long)(enemies.Length + 1));
                         break;
                     case ToxicMist:
-                        foreach (var target in TargetableOpponents(actor).Where(enemy => CanAffect(enemy, Poison)))
+                        var poisonTargets = TargetableOpponents(actor).Where(enemy => CanAffect(enemy, Poison)).ToArray();
+                        foreach (var target in poisonTargets)
                             Add(target, attack);
+                        if (!charging && attack > 0 && poisonTargets.Length == 0 &&
+                            ToxicMistDollTarget(actor) is { } doll && random.NextDouble() < ToxicMistDollChance)
+                            Add(doll, Math.Max(1, HealingGain(doll, attack)));
+                        break;
+                    case VenomSurge when !charging:
+                        int enemyPoison = 3 * book.EnergyCost(actor.Energy.Remaining);
+                        Add(actor, enemies.Where(enemy => CanAffect(enemy, Poison))
+                            .Sum(enemy => (long)Math.Min(enemy.Health, enemyPoison)));
                         break;
                     case FleshFeast:
                         foreach (var corpse in units.Where(unit => unit.Input.Side != actor.Input.Side &&
@@ -159,7 +170,7 @@ namespace RaidPartyManager.Battle
                     Math.Min(target.Health, ProjectedDamage(actor, target, new[] { (type, power) }));
             }
             if (reserveCost > 0)
-                options.RemoveAll(option => option.Book.Cost + reserveCost > reachableEnergy &&
+                options.RemoveAll(option => option.Book.EnergyCost(actor.Energy.Remaining) + reserveCost > reachableEnergy &&
                     reserveValue > option.ProjectedAmount);
         }
 
@@ -169,6 +180,10 @@ namespace RaidPartyManager.Battle
         private static bool CanAffect(Unit target, StatusKind status) =>
             target.Layers(Purity) == 0 && (status == Poison || target.Layers(status) == 0);
 
+        private Unit ToxicMistDollTarget(Unit actor) => Teammates(actor)
+            .Where(ally => ally.Has(EquipmentEffect.WitchDoctorDoll) && CanAffect(ally, Poison) && ally.Layers(Cursed) == 0)
+            .OrderByDescending(ally => ally.Stats.Health - ally.Health).FirstOrDefault();
+
         private static int ArrowPower(Unit target) => Math.Max(1, target.Health / 5);
 
         private IEnumerable<Unit> NearbyEnemies(Unit actor, Unit target) =>
@@ -176,11 +191,12 @@ namespace RaidPartyManager.Battle
 
         private void CastLearnedSkill(Unit actor, Unit target, SkillBookDefinition book, DecisionReason reason)
         {
-            actor.SpendEnergy(book.Cost);
+            int spent = book.EnergyCost(actor.Energy.Remaining);
+            actor.SpendEnergy(spent);
             actor.LastSkillRound = Round;
             actor.LastBookCast[book.Id] = Round;
             Report(BattleEventKind.Action, actor, actor, book.Name, ActionKind.Shield,
-                detail: $"消耗 {book.Cost} 点能量", actorEnergy: actor.Energy, skillBookId: book.Id);
+                detail: $"消耗 {spent} 点能量", actorEnergy: actor.Energy, skillBookId: book.Id);
 
             RefundHardFight(actor);
             int attack = CurrentAttack(actor);
@@ -305,7 +321,15 @@ namespace RaidPartyManager.Battle
                         DamageEnemy(target, 3, DamageType.Lightning);
                     break;
                 case ToxicMist:
+                    if (target.Input.Side != actor.Input.Side && ToxicMistDollTarget(actor) is { } doll &&
+                        random.NextDouble() < ToxicMistDollChance)
+                        target = doll;
                     Apply(target, Poison, attack);
+                    break;
+                case VenomSurge:
+                    foreach (var enemy in Opponents(actor).ToArray())
+                        Apply(enemy, Poison, 3 * spent);
+                    Apply(actor, Poison, spent);
                     break;
                 case FleshFeast:
                     target.CorpseConsumed = true;

@@ -8,7 +8,7 @@ namespace RaidPartyManager.Presentation
     {
         public static (string Name, string Description, string Unit, Color Color) Details(BattleCountdownKind kind) => kind switch
         {
-            BattleCountdownKind.CalamityChant => ("灾厄吟唱", "每 3 回合结束时，若仍然存活，对所有敌方单位造成雷电伤害。",
+            BattleCountdownKind.CalamityChant => ("灾厄吟唱", "每 3 回合结束时，若仍然存活，对所有敌方单位发动 3 次雷击，每次造成等同于当前攻击力的雷电伤害。",
                 "回合", new Color32(211, 169, 255, 255)),
             BattleCountdownKind.ScavengerEscape => ("携赃逃跑", "拾荒者将在倒计时结束时带走偷来的装备。提前击败它可夺回装备。",
                 "回合", new Color32(255, 195, 109, 255)),

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using RaidPartyManager.Battle;
@@ -12,14 +13,14 @@ namespace RaidPartyManager.Tests
     public sealed class CharacterSyncTests
     {
         [Test]
-        public void EncounterIncludesSyncedStatsRecruitsPortraitsAndBattleForms()
+        public void EncounterIncludesSyncedStatsRecruitsPortraitsAndEvolutions()
         {
             var scene = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
                 "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
 
             Assert.That(scene.Party.Select(unit => unit.Stats.Health), Is.EqualTo(new[] { 10, 7, 12, 8 }));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0)
-                .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 36)));
+                .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 39)));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0).Select(character => character.Skill),
                 Is.All.Null);
             var singer = scene.CharacterCatalog.Single(character => character.RosterNumber == 36);
@@ -28,6 +29,7 @@ namespace RaidPartyManager.Tests
             Assert.That(scene.ProjectileFor(singer).name, Is.EqualTo("DeepSeaWhisper-WaveBlade"));
             Assert.That(scene.StatusIcon(StatusKind.Wet), Is.Not.Null);
             Assert.That(scene.StatusIcon(StatusKind.Evaporation), Is.Not.Null);
+            Assert.That(scene.StatusIcon(StatusKind.ForestMark)?.name, Is.EqualTo("19-森之印"));
             var result = new BattleSimulator(random: new Random(11)).Simulate(new BattleRequest("tide",
                 new[] { new Combatant("singer", singer, Side.Party, 1, singer.BaseStats, 15),
                     Fighter("front", Side.Enemy, 1, health: 100), Fighter("rear", Side.Enemy, 2, health: 100) }, singer.ActionInterval));
@@ -35,13 +37,38 @@ namespace RaidPartyManager.Tests
                 e.ActionName == "深海轻语"), Is.EqualTo(1));
             var officer = scene.RecruitmentPool.Single(character => character.RosterNumber == 33);
             var archer = scene.RecruitmentPool.Single(character => character.RosterNumber == 34);
-            var darkForm = scene.CharacterCatalog.Single(character => character.RosterNumber == 35);
+            var diSha = scene.RecruitmentPool.Single(character => character.RosterNumber == 35);
+            var whiteFeather = scene.RecruitmentPool.Single(character => character.RosterNumber == 37);
             Assert.That(officer.Trait, Is.EqualTo(CharacterTrait.RevealEnemies));
-            Assert.That(archer.BattleFormId, Is.EqualTo(darkForm.Id));
-            Assert.That(darkForm.BattleFormId, Is.EqualTo(archer.Id));
-            Assert.That(scene.PortraitFor(officer.Id), Is.Not.Null);
-            Assert.That(scene.PortraitFor(archer.Id), Is.Not.Null);
-            Assert.That(scene.PortraitFor(darkForm.Id), Is.Not.Null);
+            Assert.That(archer.Stage, Is.EqualTo(2));
+            Assert.That(archer.BaseStats, Is.EqualTo(new Stats(8, 2, 1, 11)));
+            Assert.That(archer.BattleFormId, Is.Null);
+            Assert.That(diSha.Stage, Is.EqualTo(2));
+            Assert.That(diSha.Profession, Is.EqualTo(Profession.Warrior));
+            Assert.That(diSha.Reach, Is.EqualTo(AttackReach.Melee));
+            Assert.That(diSha.BaseStats, Is.EqualTo(new Stats(5, 3, 2, 11)));
+            Assert.That(diSha.Trait, Is.EqualTo(CharacterTrait.BorrowAllyAttack));
+            Assert.That(diSha.BattleFormId, Is.Null);
+            Assert.That(whiteFeather.Stage, Is.EqualTo(1));
+            Assert.That(whiteFeather.Profession, Is.EqualTo(Profession.Archer));
+            Assert.That(whiteFeather.Reach, Is.EqualTo(AttackReach.Ranged));
+            Assert.That(whiteFeather.BaseStats, Is.EqualTo(new Stats(7, 1, 0, 9)));
+            Assert.That(whiteFeather.Trait, Is.EqualTo(CharacterTrait.DoubleShot));
+            var branches = new[] { archer.Id, diSha.Id };
+            Assert.That(whiteFeather.EvolutionIds, Is.EqualTo(branches));
+            Assert.That(PlayerMarket.BaseValue(whiteFeather), Is.EqualTo(25));
+            Assert.That(PlayerMarket.BaseValue(archer), Is.EqualTo(48));
+
+            foreach (string branch in branches)
+            {
+                var party = new PartyRun(new[] { new PartyMemberStart("archer", whiteFeather, 1, whiteFeather.BaseStats.Health) },
+                    Array.Empty<EquipmentDefinition>());
+                var run = new AdventureRun(party, scene.CharacterCatalog, scene.StartingEquipment, true, new Random(19));
+                Assert.That(run.Inspect(NodeKind.Camp), Is.True);
+                Assert.That(run.EvolutionForms("archer").Select(form => form.Id), Is.EqualTo(branches));
+                Assert.That(run.EvolveAtCamp("archer", branch), Is.True);
+                Assert.That(party.Members.Single().Character.Id, Is.EqualTo(branch));
+            }
 
             foreach (var entry in scene.CharacterCatalog.Where(character => character.RosterNumber > 0))
             {
@@ -61,6 +88,52 @@ namespace RaidPartyManager.Tests
                     $"Missing or invalid attack atlas for {entry.Name}.");
                 Assert.That(walk != null && walk.width % 4 == 0 && walk.height == walk.width, Is.True,
                     $"Missing or invalid sixteen-frame walk atlas for {entry.Name}.");
+            }
+        }
+
+        [Test]
+        public void GravePollenPunishesEnemyAttacksAndWitchTransfersOnlyToTheClosestEnemy()
+        {
+            var gardener = Load("GraveGardener");
+            var witch = Load("RotBloomWitch");
+            Assert.That(gardener.BaseStats, Is.EqualTo(new Stats(5, 0, 0, 13)));
+            Assert.That(witch.BaseStats, Is.EqualTo(new Stats(7, 0, 0, 13)));
+
+            var tank = Fighter("tank", Side.Party, 1);
+            var attacker = Fighter("attacker", Side.Enemy, 1);
+            var pollenFight = new BattleSimulator(random: new FixedOrder()).Simulate(new BattleRequest("pollen",
+                new[] { tank, Unit(gardener, "gardener", 2), attacker }, 10));
+            Assert.That(pollenFight.Events.Any(e => e.ActorId == "attacker" && e.TargetId == "tank" && e.Kind == BattleEventKind.Action), Is.True);
+            Assert.That(pollenFight.Events.Any(e => e.ActorId == "gardener" && e.TargetId == "attacker" &&
+                e.StatusStacks?.Any(status => status.Kind == StatusKind.Poison && status.Layers == 2) == true), Is.True);
+
+            var victim = Fighter("victim", Side.Enemy, 1, health: 1);
+            var poisoned = new Combatant(victim.Id, victim.Character, Side.Enemy, 1, victim.Stats, 1,
+                startingStatuses: new Dictionary<StatusKind, int> { [StatusKind.Poison] = 3 });
+            var spread = new BattleSimulator(random: new FixedOrder()).Simulate(new BattleRequest("spread",
+                new[] { Fighter("breaker", Side.Party, 1, attack: 100), Unit(witch, "witch", 2), poisoned,
+                    Fighter("near", Side.Enemy, 2, health: 200), Fighter("far", Side.Enemy, 4) }, witch.ActionInterval));
+            var transfer = spread.Events.Single(e => e.ActionName == "腐花传毒");
+            Assert.That(transfer.TargetId, Is.EqualTo("near"));
+            Assert.That(transfer.StatusStacks.Single(status => status.Kind == StatusKind.Poison).Layers, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void EveryRegionalCombatantHasAnImportedSixteenFrameAttackAtlas()
+        {
+            const string artwork = "Assets/RaidPartyManager/Art/BattleEffects/Resources/AttackEffects";
+            var regions = new[] { "Roadside", "WhisperingGraveyard", "ClockworkCapital" }.Select(region =>
+                AssetDatabase.LoadAssetAtPath<EncounterAsset>($"Assets/RaidPartyManager/PrototypeData/{region}Encounter.asset").ToData());
+            var characters = regions.SelectMany(region => region.CharacterCatalog.Where(unit => unit.RosterNumber > 0)
+                .Concat(region.EnemyRoster)).GroupBy(unit => unit.Id).Select(group => group.First());
+            foreach (var character in characters)
+            {
+                string path = $"{artwork}/{character.Id}.png";
+                var atlas = AssetDatabase.LoadAssetAtPath<UnityEngine.Texture2D>(path);
+                Assert.That(atlas, Is.Not.Null, character.Name);
+                Assert.That((atlas.width, atlas.height), Is.EqualTo((512, 512)), character.Name);
+                var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+                Assert.That(importer.DoesSourceTextureHaveAlpha(), Is.True, character.Name);
             }
         }
 
@@ -366,49 +439,105 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void ArcherPiercesForwardAndDarkFormBorrowsFromNearestRearAlly()
+        public void TianGongPiercesEachOccupiedEnemySlotWithoutHittingTeammates()
         {
             var archer = Unit(Load("TianGong"), "archer", 2);
-            var darkForm = Load("DiSha");
-            var front = Fighter("front", Side.Party, 1);
-            var rear = Fighter("rear", Side.Party, 3, attack: 4);
-            var enemy = Fighter("enemy", Side.Enemy, 1);
-            var backEnemy = Fighter("back-enemy", Side.Enemy, 3);
+            var ally = Fighter("ally", Side.Party, 1, attack: 0);
+            var elite = Fighter("elite", Side.Enemy, 1, attack: 0, slots: 2);
+            var rear = Fighter("rear", Side.Enemy, 4, attack: 0);
             var battle = new BattleSimulator(random: new FixedOrder()).Start(
-                new BattleRequest("forms", new[] { archer, front, rear, enemy, backEnemy }, 24,
-                    characterCatalog: new[] { archer.Character, darkForm }));
+                new BattleRequest("piercing", new[] { ally, archer, elite, rear }, 24));
 
             var first = battle.AdvanceRound();
             var arrows = first.Where(entry => entry.ActorId == archer.Id && entry.ActionKind == ActionKind.Attack).ToArray();
-            Assert.That(arrows.Select(entry => entry.TargetId), Is.EqualTo(new[] { front.Id, enemy.Id, backEnemy.Id }));
-            Assert.That(arrows.Select(entry => entry.Amount), Is.EqualTo(new[] { 7, 6, 5 }));
+            Assert.That(arrows.Select(entry => entry.TargetId), Is.EqualTo(new[] { elite.Id, elite.Id, rear.Id }));
+            Assert.That(arrows.Select(entry => entry.Amount), Is.EqualTo(new[] { 8, 7, 6 }));
             Assert.That(arrows.Select(entry => entry.VisualCue), Is.All.EqualTo(BattleVisualCue.PiercingArrow));
             Assert.That(arrows.Select(entry => entry.Kind),
                 Is.EqualTo(new[] { BattleEventKind.Action, BattleEventKind.Effect, BattleEventKind.Effect }));
-            Assert.That(first.Single(entry => entry.Kind == BattleEventKind.FormChanged).Form.Id, Is.EqualTo(darkForm.Id));
+            Assert.That(first.Concat(battle.AdvanceRound()).Select(entry => entry.Kind), Has.None.EqualTo(BattleEventKind.FormChanged));
+        }
 
-            var second = battle.AdvanceRound();
-            Assert.That(second.Any(entry => entry.Kind == BattleEventKind.Action && entry.ActorId == rear.Id), Is.False);
-            Assert.That(second.Single(entry => entry.Kind == BattleEventKind.Action && entry.ActorId == archer.Id).Amount,
-                Is.EqualTo(9));
-            Assert.That(second.Single(entry => entry.Kind == BattleEventKind.FormChanged).Form.Id, Is.EqualTo(archer.Character.Id));
+        [TestCase(100, "front", 2)]
+        [TestCase(6, "rear", 3)]
+        public void WhiteFeatherFiresAnIndependentHalfAttackAndRetargetsAfterAKill(int health, string secondTarget, int secondDamage)
+        {
+            var archer = Unit(Load("WhiteFeatherArcher"), "archer", 1);
+            var front = Fighter("front", Side.Enemy, 1, attack: 0, health: health, defense: 1, trait: CharacterTrait.DrawAttacks);
+            var rear = Fighter("rear", Side.Enemy, 2, attack: 0, defense: 0);
+            var battle = new BattleSimulator(random: new FixedOrder()).Start(
+                new BattleRequest("double-shot", new[] { archer, front, rear }, 12));
+
+            // Front is the sole legal initial target while it draws attacks.
+            var attacks = battle.AdvanceRound()
+                .Where(e => e.ActorId == archer.Id && e.Kind == BattleEventKind.Action && e.ActionKind == ActionKind.Attack).ToArray();
+            Assert.That(attacks.Select(e => e.TargetId), Is.EqualTo(new[] { "front", secondTarget }));
+            Assert.That(attacks[1].ActionName, Is.EqualTo("白羽追射"));
+            Assert.That(attacks[1].Amount, Is.EqualTo(secondDamage));
         }
 
         [Test]
-        public void MageGrowthEscalatesAndLightningHitsEveryEnemyOnRoundThree()
+        public void DiShaBorrowsFromTheNearestRearAllyEveryRoundAndDoublesWeaponDamage()
+        {
+            var diSha = Unit(Load("DiSha"), "di-sha", 1);
+            var nearest = Fighter("nearest", Side.Party, 2, attack: 4);
+            var farther = Fighter("farther", Side.Party, 4, attack: 7);
+            var enemy = Fighter("enemy", Side.Enemy, 1, attack: 0, defense: 3);
+            var battle = new BattleSimulator(random: new FixedOrder()).Start(
+                new BattleRequest("di-sha", new[] { diSha, farther, nearest, enemy }, 33));
+
+            for (int i = 0; i < 2; i++)
+            {
+                var round = battle.AdvanceRound();
+                var loan = round.Single(entry => entry.ActionName == "地煞借力");
+                Assert.That(loan.TargetId, Is.EqualTo(diSha.Id));
+                Assert.That(loan.Detail, Does.Contain(nearest.Character.Name));
+                Assert.That(round.Any(entry => entry.ActorId == nearest.Id && entry.Kind == BattleEventKind.Action), Is.True);
+                Assert.That(round.Single(entry => entry.ActorId == diSha.Id && entry.Kind == BattleEventKind.Action).Amount,
+                    Is.EqualTo(12));
+            }
+        }
+
+        [Test]
+        public void DiShaDoublesWeaponDamageEvenWithoutARearAlly()
+        {
+            var diSha = Unit(Load("DiSha"), "di-sha", 4);
+            var ally = Fighter("front-ally", Side.Party, 2, attack: 7);
+            var enemy = Fighter("enemy", Side.Enemy, 1, attack: 0, defense: 3);
+            var battle = new BattleSimulator(random: new FixedOrder()).Start(
+                new BattleRequest("di-sha-solo", new[] { diSha, ally, enemy }, 12));
+
+            var round = battle.AdvanceRound();
+            Assert.That(round.Select(entry => entry.ActionName), Does.Not.Contain("地煞借力"));
+            Assert.That(round.Single(entry => entry.ActorId == diSha.Id && entry.Kind == BattleEventKind.Action).Amount,
+                Is.EqualTo(4));
+        }
+
+        [TestCase(0, 7)]
+        [TestCase(4, 11)]
+        public void CalamityChantHitsEachEnemyThreeTimesOnRoundThree(int bonusAttack, int expectedDamage)
         {
             var mage = Unit(Load("StarMage"), "mage", 1);
-            var chanter = Unit(Load("CalamityChanter"), "chanter", 2);
+            var definition = Load("CalamityChanter");
+            Assert.That(definition.BaseStats.Attack, Is.EqualTo(7));
+            var bonus = new Stats(bonusAttack, 0, 0, 0);
+            var chanter = new Combatant("chanter", definition, Side.Party, 2, definition.BaseStats + bonus,
+                definition.BaseStats.Health, new[] { new EquipmentDefinition("chant-bonus", "护符", bonus) });
             var front = Fighter("front", Side.Enemy, 1);
             var rear = Fighter("rear", Side.Enemy, 2);
+            var wetRear = new Combatant(rear.Id, rear.Character, rear.Side, rear.Position, rear.Stats, rear.Health,
+                startingStatuses: new Dictionary<StatusKind, int> { [StatusKind.Wet] = 1 });
             var result = new BattleSimulator(random: new FixedOrder()).Simulate(
-                new BattleRequest("growth", new[] { mage, chanter, front, rear }, 33));
+                new BattleRequest("growth", new[] { mage, chanter, front, wetRear }, 33));
 
             Assert.That(result.Events.Where(entry => entry.ActionName == "星辉增长").Select(entry => entry.Detail),
                 Is.EqualTo(new[] { "攻击 +1", "攻击 +2", "攻击 +3" }));
             var lightning = result.Events.Where(entry => entry.ActionName == "灾厄吟唱").ToArray();
-            Assert.That(lightning.Select(entry => entry.TargetId), Is.EqualTo(new[] { front.Id, rear.Id }));
-            Assert.That(lightning.All(entry => entry.Tick == 33 && entry.Amount == 30 && entry.Detail == "雷电"), Is.True);
+            Assert.That(lightning.Select(entry => entry.TargetId),
+                Is.EqualTo(new[] { front.Id, rear.Id, front.Id, rear.Id, front.Id, rear.Id }));
+            Assert.That(lightning.All(entry => entry.Tick == 33 && entry.Detail == "雷电"), Is.True);
+            Assert.That(lightning.Select(entry => entry.Amount),
+                Is.EqualTo(Enumerable.Range(0, 3).SelectMany(_ => new[] { expectedDamage, expectedDamage + 2 })));
             Assert.That(result.Events.Where(entry => entry.Countdown?.Kind == BattleCountdownKind.CalamityChant)
                 .Select(entry => entry.Countdown.Value.Remaining), Is.EqualTo(new[] { 3, 2, 1, 3 }));
         }
@@ -452,11 +581,13 @@ namespace RaidPartyManager.Tests
         private static Combatant Unit(CharacterDefinition character, string id, int position) =>
             new Combatant(id, character, Side.Party, position, character.BaseStats, character.BaseStats.Health);
 
-        private static Combatant Fighter(string id, Side side, int position, int attack = 1, int health = 100)
+        private static Combatant Fighter(string id, Side side, int position, int attack = 1, int health = 100,
+            int defense = 0, int slots = 1, CharacterTrait trait = CharacterTrait.None)
         {
-            var stats = new Stats(attack, 0, 0, health);
+            var stats = new Stats(attack, defense, 0, health);
             var basic = new ActionDefinition("basic", "普攻", ActionKind.Attack, TargetRule.FrontEnemy, 0);
-            var character = new CharacterDefinition(id, id, Profession.Warrior, Personality.Frank, stats, 1, basic);
+            var character = new CharacterDefinition(id, id, Profession.Warrior, Personality.Frank, stats, 1, basic,
+                positionSlots: slots, trait: trait);
             return new Combatant(id, character, side, position, stats, health);
         }
 

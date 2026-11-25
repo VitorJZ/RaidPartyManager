@@ -15,6 +15,7 @@ namespace RaidPartyManager.Run
         public int Stage;
         public int CompletedNodes;
         public int EventsTaken;
+        public int GraveSeedStage;
         public int ElitesTaken;
         public int Investment;
         public bool InvestmentPaid;
@@ -36,6 +37,8 @@ namespace RaidPartyManager.Run
         public int Choice = -1;
         public bool FinishVisit;
         public bool HasBattleReward;
+        public bool HasFinalBossPreparation;
+        public string[] PayrollDepartures;
         public BattleRewardCheckpoint BattleReward;
         public bool HasShopVisit;
         public ShopVisitCheckpoint ShopVisit;
@@ -86,6 +89,7 @@ namespace RaidPartyManager.Run
     [Serializable]
     public sealed class BattleRewardCheckpoint
     {
+        public bool BloomWaitingForRoom;
         public NodeKind Kind;
         public int Event = -1;
         public bool Resolved;
@@ -164,6 +168,7 @@ namespace RaidPartyManager.Run
         public EmployeeCareer EmployeeCareer;
         public CrewContract Contract;
         public CrewContract[] Renewals;
+        public long UnpaidWages;
         public string StartingCharacter;
         public int StartingPosition;
         public int StartingHealth;
@@ -184,6 +189,8 @@ namespace RaidPartyManager.Run
     {
         public string Id;
         public string Definition;
+        public int BattlesToBloom;
+        public int BattlesWithSeed;
     }
 
     [Serializable]

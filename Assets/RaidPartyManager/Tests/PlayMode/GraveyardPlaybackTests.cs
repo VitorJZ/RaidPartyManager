@@ -99,6 +99,7 @@ namespace RaidPartyManager.Tests
         {
             var seen = new HashSet<string>();
             var roomFloors = new HashSet<Texture>();
+            var propAtlases = new HashSet<Texture>();
             foreach (var region in new[] { "BattlePrototype", "WhisperingGraveyard", "ClockworkCapital" })
             {
                 EnemyFormation[] groups = null;
@@ -113,6 +114,11 @@ namespace RaidPartyManager.Tests
                     var boss = groups[i].Members[0];
                     var atlas = Resources.Load<Texture2D>("BossEntrances/" + boss.Id);
                     Assert.That(atlas, Is.Not.Null, boss.Name);
+                    var propAtlas = Resources.Load<Texture2D>("BossEntranceProps/" + boss.Id);
+                    Assert.That(propAtlas, Is.Not.Null, boss.Name);
+                    Assert.That(propAtlases.Add(propAtlas), Is.True, boss.Name);
+                    if (boss.Id == "EnemyNamelessKing")
+                        Assert.That(Resources.Load<Texture2D>("BossEntranceProps/EnemyNamelessKing-Rim"), Is.Not.Null);
                     var ui = scene.GetComponent<UIDocument>().rootVisualElement;
                     Press(ui, "open-settings");
                     Press(ui, "open-enemy-editor");
@@ -142,14 +148,19 @@ namespace RaidPartyManager.Tests
                     var camera = Camera.main;
                     float wide = camera.projectionMatrix.m00, peak = 1, last = 1;
                     Vector2 framed = Vector2.zero;
-                    var frames = new HashSet<Rect>();
+                    var frames = new HashSet<Vector2>();
+                    var propFrames = new HashSet<Rect>();
                     void Measure(Camera cam)
                     {
                         if (cam != camera) return;
                         last = cam.projectionMatrix.m00 / wide;
                         var pose = ui.Q("battle-entrance-layer")?.Query<Image>().ToList().Find(v => v.image == atlas);
                         if (pose == null) return;
-                        frames.Add(pose.sourceRect);
+                        frames.Add(pose.sourceRect.position);
+                        var prop = ui.Q("entrance-prop-" + pose.name.Substring("entrance-".Length)) as Image;
+                        if (prop?.image == propAtlas && prop.resolvedStyle.opacity > .2f &&
+                            stage.Find(prop.name)?.GetComponent<MeshRenderer>() is { enabled: true })
+                            propFrames.Add(prop.sourceRect);
                         if (last <= peak) return;
                         var mesh = scene.transform.Find("Paper Theatre/" + pose.name)?.GetComponent<MeshRenderer>();
                         if (mesh == null || !mesh.enabled) return;
@@ -180,6 +191,9 @@ namespace RaidPartyManager.Tests
                         Assert.That(framed.x, Is.InRange(.26f,.74f), boss.Name);
                         Assert.That(framed.y, Is.InRange(.22f,.78f), boss.Name);
                         Assert.That(frames.Count, Is.GreaterThan(3), boss.Name);
+                        Assert.That(propFrames.Count, Is.GreaterThan(2), boss.Name);
+                        Assert.That(ui.Q("battle-entrance-layer")?.Query<Image>().ToList().Any(v => v.image == propAtlas),
+                            Is.Not.True, boss.Name);
                         Assert.That(last, Is.EqualTo(1).Within(.01f), boss.Name);
                         Assert.That(ui.Q("enemy-position-1").Q("health-bar").resolvedStyle.opacity, Is.EqualTo(1));
                         seen.Add(boss.Id);
@@ -257,7 +271,7 @@ namespace RaidPartyManager.Tests
             Assert.That(sawGraveyardAction, Is.True, "An actual authored attack or special atlas must reach the action layer.");
             Assert.That(worldPoses.Count, Is.GreaterThan(1), "The camera must receive different printed attack frames.");
             Assert.That(displayedFrames.Count, Is.GreaterThan(1), "Playback must advance beyond a single pose frame.");
-            Assert.That(root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList().Count, Is.GreaterThan(0));
+            Assert.That(root.Q("commentator-bubble"), Is.Not.Null);
         }
 
         private static string[] ReadPreparedEnemies(VisualElement root)

@@ -99,6 +99,7 @@ namespace RaidPartyManager.Presentation
             empty.pickingMode = PickingMode.Ignore;
             profile = PrototypeStyle.Text("", 15, PrototypeStyle.Ink);
             profile.name = "market-candidate-profile";
+            profile.enableRichText = true;
             profile.style.position = Position.Absolute;
             profile.style.paddingLeft = profile.style.paddingRight = 12;
             profile.style.paddingTop = profile.style.paddingBottom = 8;
@@ -120,7 +121,10 @@ namespace RaidPartyManager.Presentation
                     ? $"已训练 {training.Sessions}/{CampTraining.Limit} 次 · {training.Describe()}\n" : "";
                 string info = $"{c.Name}　{AdventureFlow.ProfessionName(c.Profession)}　{c.Stage} 阶　" +
                     $"攻击 {stats.Attack}　防御 {stats.Defense}　特防 {stats.SpecialDefense}　生命 {stats.Health}\n" + trainingInfo +
-                    $"期望日薪 {expectedWage} 金币\n" + (string.IsNullOrEmpty(c.TraitText) ? "" : "被动 · " + c.TraitText + "\n") + PlayerMarket.Describe(trait) + "\n性格 · " + EmployeeVoice.For(c.Personality).Name;
+                    $"期望日薪 {expectedWage} 金币\n" +
+                    (string.IsNullOrEmpty(c.TraitText) ? "" : ProfileLine("被动：" + c.TraitText, PrototypeStyle.Passive) + "\n") +
+                    ProfileLine(PlayerMarket.Describe(trait), PrototypeStyle.Trait) + "\n" +
+                    ProfileLine("性格：" + EmployeeVoice.For(c.Personality).Name, PrototypeStyle.Personality);
                 var entry = PrototypeStyle.Button("", "town-recruit-" + c.Id, () => {
                     if (run.Party.Members.Count >= PartyRun.RosterLimit)
                     {
@@ -214,6 +218,9 @@ namespace RaidPartyManager.Presentation
             brokerBubble.text = run.BrokerOpen ? "要做比交易吗？" : "今天收摊啦。";
             brokerBubble.SetEnabled(run.BrokerOpen);
         }
+
+        private static string ProfileLine(string text, Color color) =>
+            $"<color=#{ColorUtility.ToHtmlStringRGB(color)}>{text}</color>";
 
         private void ShowProfile(Button anchor, string info)
         {

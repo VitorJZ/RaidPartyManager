@@ -21,6 +21,7 @@ namespace RaidPartyManager.Presentation
         private readonly Func<int> readGold;
         private readonly Label gold;
         private readonly Label calendar;
+        private readonly Label payrollDeadline;
         private readonly VisualElement coin;
         private readonly VisualElement bag;
         private readonly VisualElement rewardLayer;
@@ -78,6 +79,17 @@ namespace RaidPartyManager.Presentation
             gold.style.whiteSpace = WhiteSpace.NoWrap;
             wallet.Add(gold);
             Add(wallet);
+
+            payrollDeadline = PrototypeStyle.Text("", 14, PrototypeStyle.Muted);
+            payrollDeadline.name = "run-payroll-deadline";
+            payrollDeadline.style.whiteSpace = WhiteSpace.NoWrap;
+            payrollDeadline.style.flexShrink = 0;
+            payrollDeadline.style.marginRight = 10;
+            payrollDeadline.style.paddingLeft = payrollDeadline.style.paddingRight = 7;
+            payrollDeadline.style.paddingTop = payrollDeadline.style.paddingBottom = 3;
+            payrollDeadline.style.backgroundColor = PrototypeStyle.Inset;
+            PrototypeStyle.Outline(payrollDeadline, PrototypeStyle.Edge, 4);
+            Add(payrollDeadline);
 
             if (openEditor != null)
             {
@@ -383,6 +395,15 @@ namespace RaidPartyManager.Presentation
             gold.text = $"金币  {Mathf.Max(0, readGold() - flyingGold)}" +
                 (party.PayrollDebt > 0 ? $"　欠薪 {party.PayrollDebt}" : "");
             calendar.tooltip = "进入新节点推进 1 天。工资按合同约定的日期扣款，点击金币可查看账单。";
+            var adventure = AdventureFlow.Active;
+            int? remaining = adventure?.Party == party ? adventure.DaysUntilFinalPayroll : null;
+            payrollDeadline.style.display = remaining.HasValue ? DisplayStyle.Flex : DisplayStyle.None;
+            if (remaining is int days)
+            {
+                payrollDeadline.text = days == 0 ? "今日结薪" : $"结薪剩 {days} 天";
+                payrollDeadline.style.color = days <= 3 ? PrototypeStyle.Enemy : PrototypeStyle.Ink;
+                payrollDeadline.tooltip = $"第 {party.Day + (long)days} 天，机巧遗都最终首领战开打前须结清队员薪资。";
+            }
             if (teamButton == null || party.Day == 0) return;
             bool due = party.NeedsRenewal;
             teamButton.style.backgroundColor = due ? new Color(.35f, .065f, .065f) : PrototypeStyle.Inset;
@@ -392,7 +413,6 @@ namespace RaidPartyManager.Presentation
             teamButton.tooltip = due ? "右击队员续约 · " + string.Join("、", party.Members
                 .Where(m => m.ContractEndDay - party.Day <= 3)
                 .Select(m => $"{m.Character.Name}剩 {m.ContractEndDay - party.Day} 天")) : "编队 · 右击队员查看合约";
-            var adventure = AdventureFlow.Active;
             if (due && AdventureFlow.OnRoute && adventure.Party == party &&
                 (adventure.Current is { Resolved: true, Kind: NodeKind.Event or NodeKind.TreasureChest } ||
                  adventure.Current == null && adventure.LastClosedEventDay == party.Day))

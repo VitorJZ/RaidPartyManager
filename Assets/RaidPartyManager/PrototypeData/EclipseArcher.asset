@@ -24,10 +24,10 @@ MonoBehaviour:
   stage: 2
   reach: 2
   fixedTrait: 5
-  traitPower: 2
-  traitText: "攻击造成伤害时，对目标施加2层中毒"
+  traitPower: 3
+  traitText: "攻击造成伤害时，对目标施加3层中毒"
   personality: 9
-  attack: 6
+  attack: 4
   defense: 3
   specialDefense: 2
   health: 10

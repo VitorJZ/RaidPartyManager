@@ -34,7 +34,7 @@ namespace RaidPartyManager.Run
         private static CharacterDefinition[] CreateSlots(PartyRun party, IEnumerable<CharacterDefinition> characters, Random random)
         {
             var owned = party.Members.Select(member => member.Character.Id).ToHashSet();
-            var eligible = characters.Where(character => character.RosterNumber > 0 && character.Id != AdventureRun.TideSingerId && !owned.Contains(character.Id))
+            var eligible = characters.Where(character => character.RosterNumber > 0 && character.Id != AdventureRun.TideSingerId && !AdventureRun.IsGardenerForm(character.Id) && !owned.Contains(character.Id))
                 .GroupBy(character => character.Id).Select(group => group.First()).ToArray();
             var featured = eligible.Where(character => character.Stage == 2).OrderBy(_ => random.Next()).FirstOrDefault();
             var slots = eligible.Where(character => character.Stage == 1).OrderBy(_ => random.Next())

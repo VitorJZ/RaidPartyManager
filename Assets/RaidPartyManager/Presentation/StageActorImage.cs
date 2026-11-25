@@ -12,10 +12,12 @@ namespace RaidPartyManager.Presentation
         internal float RideHeight { get; set; }
         internal DockSet.Player Performer { get; set; }
         public bool InMotion { get; }
+        internal int? SceneryOrder { get; }
 
-        public StageActorImage(BattleStage stage, bool inMotion = false)
+        public StageActorImage(BattleStage stage, bool inMotion = false, int? sceneryOrder = null)
         {
             InMotion = inMotion;
+            SceneryOrder = sceneryOrder;
             if (stage == null)
                 return;
             drawnOnStage = true;

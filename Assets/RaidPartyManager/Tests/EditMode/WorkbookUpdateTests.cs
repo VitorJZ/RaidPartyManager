@@ -11,17 +11,17 @@ namespace RaidPartyManager.Tests
     public sealed class WorkbookUpdateTests
     {
         [Test]
-        public void SkillCatalogLoadsTheExcelRowsAndTransparentSquareArt()
+        public void SkillCatalogLoadsAllAuthoredSkillsAndTheirSquareIcons()
         {
             var catalog = AssetDatabase.LoadAssetAtPath<SkillCatalogAsset>(
                 "Assets/RaidPartyManager/PrototypeData/SkillCatalog.asset");
             Assert.That(catalog, Is.Not.Null);
-            Assert.That(catalog.Skills.Select(skill => skill.Number), Is.EqualTo(Enumerable.Range(1, 37)));
-            Assert.That(catalog.Skills.Select(skill => skill.DisplayName).Distinct().Count(), Is.EqualTo(37));
+            Assert.That(catalog.Skills.Select(skill => skill.Number), Is.EqualTo(Enumerable.Range(1, 38)));
+            Assert.That(catalog.Skills.Select(skill => skill.DisplayName).Distinct().Count(), Is.EqualTo(38));
             Assert.That(catalog.Skills.All(skill => skill.Cost is >= 1 and <= 8 && skill.Description.Length > 0 &&
                 skill.ToBook().SkillEffect != SkillEffect.None && skill.Icon != null && skill.Icon.width == skill.Icon.height), Is.True);
-            Assert.That(catalog.Skills.Select(s => s.Icon).Distinct().Count(), Is.EqualTo(37));
-            Assert.That(catalog.Skills.Skip(20).Select(s => s.Cost), Is.EqualTo(new[] { 3, 3, 3, 4, 4, 4, 6, 6, 7, 8, 1, 1, 2, 2, 2, 3, 2 }));
+            Assert.That(catalog.Skills.Select(s => s.Icon).Distinct().Count(), Is.EqualTo(38));
+            Assert.That(catalog.Skills.Skip(20).Select(s => s.Cost), Is.EqualTo(new[] { 3, 3, 3, 4, 4, 4, 6, 6, 7, 8, 1, 1, 2, 2, 2, 3, 2, 1 }));
             Assert.That(catalog.Skills.Single(skill => skill.DisplayName == "熊熊烈火")
                 .CanLearn(Fighter("guard", Side.Party, 1, Personality.Stoic).Character), Is.False);
         }
@@ -30,17 +30,64 @@ namespace RaidPartyManager.Tests
         public void EveryLearnedSkillHasAUniqueImportedEffectStrip()
         {
             var effects = LoadSkills().Skills.Select(skill => skill.BattleEffect).ToArray();
-            Assert.That(effects, Has.Length.EqualTo(37));
-            Assert.That(effects.Distinct().Count(), Is.EqualTo(37));
+            Assert.That(effects, Has.Length.EqualTo(38));
+            Assert.That(effects.Distinct().Count(), Is.EqualTo(38));
             foreach (var sheet in effects)
             {
                 Assert.That(sheet, Is.Not.Null);
-                Assert.That(sheet.height, Is.EqualTo(96));
+                Assert.That(sheet.height, Is.EqualTo(96).Or.EqualTo(128), "Both the original and repainted battle effects use square cels.");
                 Assert.That(sheet.width, Is.EqualTo(16 * sheet.height));
                 var importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(sheet));
                 Assert.That(importer.DoesSourceTextureHaveAlpha(), Is.True);
                 Assert.That(importer.mipmapEnabled, Is.False);
             }
+        }
+
+        [TestCase(0, PlayerTrait.None, 2)]
+        [TestCase(2, PlayerTrait.Distracted, 3)]
+        public void VenomSurgeUsesRemainingEnergyAndCanFuelTheWearersDoll(int bonusEnergy, PlayerTrait talent, int spent)
+        {
+            var book = LoadSkills().Skills.Single(skill => skill.ToBook().SpendsAllEnergy).ToBook();
+            var doll = new EquipmentDefinition("doll", "巫医玩偶", default, effect: EquipmentEffect.WitchDoctorDoll);
+            var model = Fighter("caster", Side.Party, 1, Personality.Stoic, health: 15);
+            var caster = new Combatant(model.Id, model.Character, model.Side, model.Position, model.Stats, model.Health,
+                new[] { doll }, learnedSkills: new[] { book }, talent: talent, bonusEnergy: bonusEnergy);
+            var front = Fighter("front", Side.Enemy, 1, Personality.Frank);
+            var rear = Fighter("rear", Side.Enemy, 2, Personality.Frank);
+            var battle = new BattleSimulator().Start(new BattleRequest("venom-surge", new[] { caster, front, rear }, 2));
+            var round = battle.AdvanceRound();
+
+            var cast = round.Single(entry => entry.SkillBookId == book.Id && entry.ActorEnergy.HasValue);
+            Assert.That(cast.Detail, Is.EqualTo($"消耗 {spent} 点能量"));
+            Assert.That(cast.ActorEnergy.Value.Remaining, Is.Zero);
+            Assert.That(round.Where(entry => entry.SkillBookId == book.Id && !entry.ActorEnergy.HasValue)
+                .Select(entry => (entry.TargetId, entry.TargetStatuses)), Is.EqualTo(new[]
+                {
+                    (front.Id, $"中毒 {3 * spent}"), (rear.Id, $"中毒 {3 * spent}"), (caster.Id, $"中毒 {spent}")
+                }));
+            Assert.That(round.Single(entry => entry.ActorId == caster.Id && entry.ActionName == "巫医玩偶").Amount,
+                Is.EqualTo(spent));
+            Assert.That(battle.AdvanceRound().Any(entry => entry.SkillBookId == book.Id), Is.False);
+        }
+
+        [TestCase(true, .29, "caster")]
+        [TestCase(false, .29, "ally")]
+        [TestCase(false, .30, "enemy")]
+        public void ToxicMistCanRedirectToACompatibleDollWearerIncludingItself(bool wearIt, double roll, string expected)
+        {
+            var book = LoadSkills().Skills.Single(skill => skill.ToBook().SkillEffect == SkillEffect.ToxicMist).ToBook();
+            var doll = new[] { new EquipmentDefinition("doll", "巫医玩偶", default, effect: EquipmentEffect.WitchDoctorDoll) };
+            var caster = Fighter("caster", Side.Party, 1, Personality.Stoic, 15, book, wearIt ? doll : null);
+            var ally = Fighter("ally", Side.Party, 2, Personality.Stoic, 15, gear: wearIt ? null : doll);
+            var foe = Fighter("enemy", Side.Enemy, 1, Personality.Frank);
+            var result = new BattleSimulator(random: new FixedSkillRoll(roll))
+                .Simulate(new BattleRequest("doll-support", new[] { caster, ally, foe }, 1));
+
+            var poison = result.Events.Single(entry => entry.SkillBookId == book.Id && !entry.ActorEnergy.HasValue);
+            Assert.That(poison.TargetId, Is.EqualTo(expected));
+            Assert.That(poison.TargetStatuses, Does.Contain("中毒 2"));
+            if (expected != foe.Id)
+                Assert.That(result.Events.Single(entry => entry.ActionName == "巫医玩偶").TargetId, Is.EqualTo(expected));
         }
 
         [TestCase(5, true)]
@@ -268,6 +315,13 @@ namespace RaidPartyManager.Tests
             var definition = new CharacterDefinition(id, id, Profession.Warrior, personality, new Stats(2, 0, 0, 30), 1, basic);
             return new Combatant(id, definition, side, position, definition.BaseStats, health, gear,
                 learnedSkills: book == null ? null : new[] { book });
+        }
+
+        private sealed class FixedSkillRoll : System.Random
+        {
+            private readonly double roll;
+            public FixedSkillRoll(double roll) => this.roll = roll;
+            public override double NextDouble() => roll;
         }
 
         private sealed class PreferBooks : IDecisionPolicy

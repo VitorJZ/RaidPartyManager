@@ -21,6 +21,7 @@ namespace RaidPartyManager.Presentation
         // The first twenty numbered books have dedicated recordings in the audio catalogue.
         private static SoundCue Book(string id)
         {
+            if (id == "skill-book-38") return SkillToxicCloud;
             const string prefix = "skill-book-";
             if (id?.StartsWith(prefix, StringComparison.Ordinal) != true ||
                 !int.TryParse(id.Substring(prefix.Length), out int number) || number < 1 || number > 20) return None;
@@ -106,7 +107,7 @@ namespace RaidPartyManager.Presentation
                 {
                     StatusKind.Chill or StatusKind.Frozen => FreezeForm,
                     StatusKind.Exposed or StatusKind.Weakened or StatusKind.Poison or StatusKind.Cursed or
-                        StatusKind.Stunned or StatusKind.Injured or StatusKind.Wet or StatusKind.Evaporation => DebuffApply,
+                        StatusKind.Stunned or StatusKind.Injured or StatusKind.Wet or StatusKind.Evaporation or StatusKind.ForestMark => DebuffApply,
                     _ => BuffApply
                 };
                 GameAudio.Play(cue, .31f);

@@ -29,11 +29,11 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(this, PrototypeStyle.Accent, 6);
 
             Add(Field("name", $"{character.Name} · {position} 号位", 16, PrototypeStyle.Accent));
-            Add(Field("personality", $"性格  {EmployeeVoice.For(personality).Name}", 12, PrototypeStyle.Muted));
+            Add(Field("personality", $"性格：{EmployeeVoice.For(personality).Name}", 12, PrototypeStyle.Personality));
             if (!string.IsNullOrWhiteSpace(character.TraitText))
-                Add(Field("trait", $"被动 · {character.TraitText}", 12, PrototypeStyle.Muted));
+                Add(Field("trait", $"被动：{character.TraitText}", 12, PrototypeStyle.Passive));
 
-            if (talent != PlayerTrait.None) Add(Field("random-trait", PlayerMarket.Describe(talent), 12, PrototypeStyle.Accent));
+            if (talent != PlayerTrait.None) Add(Field("random-trait", PlayerMarket.Describe(talent), 12, PrototypeStyle.Trait));
             health = Field("health", "", 15, PrototypeStyle.Ally);
             health.style.marginTop = 7;
             Add(health);
@@ -68,7 +68,8 @@ namespace RaidPartyManager.Presentation
                 icon.style.flexShrink = 0;
                 icon.style.marginRight = 5;
                 row.Add(icon);
-                row.Add(Field($"skill-{i + 1}", $"{skill.Name} · {skill.Cost} 能量"));
+                string cost = skill.SpendsAllEnergy ? "全部剩余能量" : $"{skill.Cost} 能量";
+                row.Add(Field($"skill-{i + 1}", $"{skill.Name} · {cost}"));
                 Add(row);
                 var description = Field($"skill-effect-{i + 1}", skill.Description, 11, PrototypeStyle.Muted);
                 description.style.paddingLeft = 30;
@@ -99,7 +100,7 @@ namespace RaidPartyManager.Presentation
         internal void ShowCopiedTrait(CharacterDefinition source)
         {
             var label = this.Q<Label>("battle-detail-trait");
-            if (label != null) label.text = $"本场被动 · {source.Name}　{source.TraitText}";
+            if (label != null) label.text = $"本场被动：{source.Name}　{source.TraitText}";
         }
 
         public void Refresh(Stats stats, int currentHealth, int shield, IReadOnlyList<StatusStack> statuses,

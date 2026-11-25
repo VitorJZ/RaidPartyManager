@@ -31,7 +31,7 @@ namespace RaidPartyManager.Presentation
         internal Mesh FloorPattern { get; private set; }
         internal Mesh PanoramaPattern { get; private set; }
         private VisualElement panel, inputShield;
-        private Label finale;
+        private VisualElement finale;
         private StyleFloat previousOpacity;
         private MaterialPropertyBlock folds;
         private Cue cue;
@@ -301,19 +301,31 @@ namespace RaidPartyManager.Presentation
             current.CloseCurtain(next);
         }
 
-        internal void ShowFinalCurtain(Action returnToMenu)
+        internal void ShowFinalCurtain(int gold, long payrollDebt, Action returnToMenu)
         {
             performance.EndFirstEntrance();
             cueSpeed = 1;
             CloseCurtain(() =>
             {
-                finale = PrototypeStyle.Text("恭喜通关，感谢游玩", 36, PrototypeStyle.Accent);
-                finale.name = "campaign-finale";
+                finale = new VisualElement { pickingMode = PickingMode.Ignore };
                 PrototypeStyle.Fill(finale);
-                PrototypeStyle.Middle(finale);
+                finale.style.justifyContent = Justify.Center;
                 finale.style.unityFontDefinition = panel.resolvedStyle.unityFontDefinition;
-                finale.style.unityFontStyleAndWeight = FontStyle.Bold;
-                // The gameplay document has faded out. Print the title above the closed travellers.
+
+                var title = PrototypeStyle.Text("恭喜通关，感谢游玩", 36, PrototypeStyle.Accent);
+                title.name = "campaign-finale";
+                title.style.unityFontStyleAndWeight = FontStyle.Bold;
+                PrototypeStyle.Middle(title);
+                finale.Add(title);
+
+                string wages = payrollDebt > 0 ? $"仍欠工资 {payrollDebt} 金币" : "工资已结清";
+                var accounts = PrototypeStyle.Text($"剩余 {gold} 金币  ·  {wages}", 20, PrototypeStyle.Accent);
+                accounts.name = "campaign-payroll-summary";
+                accounts.style.marginTop = 10;
+                PrototypeStyle.Middle(accounts);
+                finale.Add(accounts);
+
+                // The gameplay document has faded out. Display the summary above the closed curtains.
                 panel.parent.Add(finale);
                 finale.schedule.Execute(returnToMenu).StartingIn(5000);
             });

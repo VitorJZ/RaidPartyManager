@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3e69d6322f0d4dd7a160fe2c6ff12661, type: 3}
+  m_Name: ZuixianGourd
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.EquipmentAsset
+  id: zuixian-gourd
+  displayName: "醉仙葫芦"
+  effect: 58
+  icon: {fileID: 2800000, guid: 538d29daf84a5afcb6c1a4ac3b87395a, type: 3}
+  description: "任意友方单位（包括自身）每触发一次药水效果，装备者本场攻击力+2，最多+6。每名角色只享受一份葫芦效果。"
+  attackBonus: 0
+  defenseBonus: 0
+  specialDefenseBonus: 0
+  healthBonus: 0
+  shopTier: 1
+  shopPrice: 22

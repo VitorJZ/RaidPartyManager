@@ -50,7 +50,8 @@ namespace RaidPartyManager.Presentation
                     SkillRequirement.Archer => "射手", SkillRequirement.Melee => "近战",
                     SkillRequirement.Warrior => "战士", _ => "不限职业"
                 };
-                var rules = PrototypeStyle.Text($"{requirement} · 消耗 {book.Cost} 点能量", 12, PrototypeStyle.Muted);
+                string cost = book.SpendsAllEnergy ? "消耗全部剩余能量" : $"消耗 {book.Cost} 点能量";
+                var rules = PrototypeStyle.Text($"{requirement} · {cost}", 12, PrototypeStyle.Muted);
                 rules.name = "skill-book-requirements";
                 rules.style.marginTop = 6;
                 Add(rules);

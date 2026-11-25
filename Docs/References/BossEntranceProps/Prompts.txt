@@ -1,0 +1,22 @@
+Use case: stylized-concept. Paint a production animation sprite sheet for a dark fantasy paper theatre game. Square canvas on genuine transparent alpha. A precisely aligned 2 by 2 grid of FOUR sequential key frames; each cell contains the entire individual subject (including every wisp and tip), centered, same relative scale. Keep 8% clear transparent padding on all four edges of EVERY cell. No grid lines, text, labels, drop shadow, background color, ground plane or frame borders. Hand-painted gouache, etched ink edges, antique theatrical scenic painting; high contrast, clearly readable silhouettes at small size, selective bright accents on dark material.
+
+BlockadeAdmiral
+A single squat naval signal cannon pointing LEFT, seen side-on. Brass muzzle, black timber carriage, two iron wheels, rusty gold trim. Four equal frames in reading order: primed cannon with smouldering fuse; the same cannon fires a bright compact flame jet to the left; jet expands into curling shell-white gunsmoke; smoke separates above the recoiling barrel. Carriage and wheels maintain position and size.
+
+DrownedLanternRay
+An isolated V-shaped crescent of midnight sea surf viewed at a shallow angle, pale bioluminescent teal tips and flying droplets. Splash effect only, no animals. Four frames: a small rippling luminous wake, twin wingtips of water lift in a V, wake crests high to either side leaving center hollow, foam breaks into trailing luminous spray.
+
+NamelessKing
+A low, wide black basalt sarcophagus seen slightly from above in three-quarter view with brass death-mask carving and heavy iron chains around its front. Four frames: sealed heavy coffin; a crack of pale spectral light under its lid; lid lifted and tilted backward and chain links snapped; open hollow coffin mouth with its lid lying behind. The coffin stays fixed in place, sculpted sides always noticeable. No body, no person, no figure. This coffin will be used to appear to disgorge a royal revenant.
+
+SepulchralMatron
+A single long silver censer used in a funeral procession, hanging from three chains meeting at a ring at the top, cathedral tracery, lilac spectral incense and a ghostly blue flame within. An ornate and readable long narrow teardrop profile. Four frames show the same hanging object fixed in place with smoke initially coiling at the lid, then pouring left, then splitting into curls, then falling away. No hand, no people.
+
+RoyalEngine
+An isolated long, low horizontal burst of sparks from steel train brakes skidding against rail. Four successive side-view exposures: dark steel rail and a first orange pinprick; short golden needles spraying RIGHT along the rail; several long sweeping white-orange scratches with a cloud of charcoal steam; a few dying staccato red sparks. No train or wheels or vehicle, no room, effect only.
+
+AstralGovernor
+A large, thin antique orrery sight reticle seen front on, built from two overlapping engraved warm-gold brass celestial ellipses and five lapis-blue stars. Open empty center, airy gold filigree silhouette through which the game's character will show. Four frames as the nested ellipses rotate from opposing inclinations to aligned in an eclipse then lock with a blue star at twelve o'clock. No base or stand. No characters.
+
+CrucibleRegent
+A massive circular black-iron blast furnace iris with a scalloped heavy riveted rim in front elevation, glowing vermilion inside, slag and orange heat spilling through the metal. Four frames: heavy shutter closed apart from a few ember slits; a fine orange crack opens; plates retract revealing a broad white-hot hearth with flame; flame surges up out of the open mouth. Outer rim holds the same size and center in each frame. Isolated machine part, no room, no person.

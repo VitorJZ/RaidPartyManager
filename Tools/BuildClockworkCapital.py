@@ -28,9 +28,13 @@ def save(p, im):
 
 
 def isolated(sheet, cols, rows):
-    cells = anim.split(Image.open(SOURCE / (sheet + ".png")).convert("RGBA"), cols, rows)
+    master = Image.open(SOURCE / (sheet + ".png")).convert("RGBA")
+    cells = anim.split(master, cols, rows)
     result = []
-    for cel in cells:
+    for index, cel in enumerate(cells):
+        if sheet == "council" and index == 4:
+            result.append(governor_figure(master))
+            continue
         a = np.array(cel)
         alpha = a[:, :, 3]
         alpha[alpha < 25] = 0
@@ -46,6 +50,23 @@ def isolated(sheet, cols, rows):
     return result
 
 
+def governor_figure(council):
+    # The crown and upper orbits cross the nominal row divider on the painted master.
+    pixels = np.array(council)
+    alpha = pixels[:, :, 3]
+    _, labels, _, _ = cv2.connectedComponentsWithStats((alpha > 170).astype(np.uint8))
+    body = labels[council.height * 3 // 4, council.width // 2]
+    if not body:
+        raise ValueError("Could not locate the governor in the council painting")
+    # Keep the antialiased edge around this figure, without the translucent plate or its neighbours.
+    edge = cv2.dilate((labels == body).astype(np.uint8),
+                      cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
+    pixels[:, :, 3] = edge * np.clip((alpha.astype(float) - 80) * (255 / 170), 0, 255).astype(np.uint8)
+    pixels[pixels[:, :, 3] == 0] = 0
+    image = Image.fromarray(pixels)
+    return image.crop(image.getbbox())
+
+
 def fit(im, size, padding=.08, foot=False):
     copy = im.copy()
     copy.thumbnail((round(size[0]*(1-2*padding)), round(size[1]*(1-2*padding))), Image.Resampling.LANCZOS)
@@ -54,12 +75,15 @@ def fit(im, size, padding=.08, foot=False):
     return frame
 
 
-def poses(key, move, index):
+def poses(key, move, index, ground_fall=False):
     base = anim.premultiplied(key)
     h,w = base.shape[:2]
     xy = anim.grid(w,h)
     u,v = xy[:,:,0]/w, xy[:,:,1]/h
     frames = []
+    if ground_fall:
+        ys, xs = np.nonzero(base[:, :, 3])
+        floor = ys.max()
     for i in range(N):
         t=i/(N-1) if move=="death" else i/N; a=2*np.pi*i/N; pulse=math.sin(math.pi*t)
         field=xy.copy(); rotation=0; dx=dy=0; scale=1
@@ -87,6 +111,9 @@ def poses(key, move, index):
         remap=cv2.remap(base,field,None,cv2.INTER_LINEAR)
         mat=cv2.getRotationMatrix2D(((w-1)*.5,(h-1)*(.50 if move=="death" else .76)),rotation,scale)
         mat[:,2]+=(dx,dy)
+        if ground_fall:
+            # Land the turning hem on the same boards as the idle pose, inside its own cel.
+            mat[1,2] = floor - np.max(mat[1,0] * xs + mat[1,1] * ys)
         p=cv2.warpAffine(remap,mat,(w,h))
         if move in ("special","hit"):
             p[:,:,:3] += p[:,:,3:] * np.array([.13,.073,.027])*pulse
@@ -94,9 +121,10 @@ def poses(key, move, index):
     return frames
 
 
-def actor(entry, im):
+def actor_sheets(entry, im):
+    governor = entry["id"] == "AstralGovernor"
     key=fit(im,(192,192),.12,True)
-    rows={m:poses(key,m,entry["number"]) for m in ("idle","walk","attack","special","hit","death")}
+    rows={m:poses(key,m,entry["number"],ground_fall=governor and m=="death") for m in ("idle","walk","attack","special","hit","death")}
     prefix=entry["id"]
     def out(name,im): save(ENEMIES / (prefix+"-"+name+".png"),im)
     out("Portrait",fit(im,(256,384),.055,True))
@@ -104,7 +132,54 @@ def actor(entry, im):
     out("Walk",anim.pack(rows["walk"],4))
     for name in ("Attack","Special"):
         out(name,unity.pack(rows[name.lower()],4,4,wide=True))
-    out("SpecialFX",unity.special_fx(entry))
+    if governor:
+        governor_entrance(rows["idle"][0])
+
+
+def governor_entrance(idle):
+    size = 320
+    idle = idle.resize((size, size), Image.Resampling.LANCZOS)
+    left, top, right, floor = idle.getchannel("A").point(lambda a: 255 if a > 10 else 0).getbbox()
+    with Image.open(SOURCE / "AstralGovernor-EntranceKeys.png") as master:
+        raw = anim.split(master.convert("RGBA"), 2, 2)
+    keys = []
+    for cel in raw:
+        alpha = cel.getchannel("A").point(lambda a: 0 if a < 9 else a)
+        cel.putalpha(alpha)
+        keys.append(cel.crop(alpha.getbbox()))
+    scale = min((floor - top) / np.median([key.height for key in keys]),
+                (size - 8) / max(key.width for key in keys), (floor - 3) / max(key.height for key in keys))
+    fitted = []
+    for key in keys:
+        ink = key.resize((round(key.width * scale), round(key.height * scale)), Image.Resampling.LANCZOS)
+        tile = Image.new("RGBA", idle.size)
+        tile.alpha_composite(ink, (round((left + right - ink.width) / 2), floor - ink.height))
+        fitted.append(tile)
+    fitted.append(idle)
+
+    # Reproject one key at a time: two superimposed armillary rings look like a second instrument.
+    cels = []
+    xy = anim.grid(size, size)
+    prev = None
+    for i in range(N):
+        at = i * (len(fitted) - 1) / (N - 1)
+        index = int(at)
+        fraction = at - index
+        if fraction == 0:
+            cels.append(fitted[index])
+            continue
+        if index != prev:
+            prev = index
+            a, b = (anim.premultiplied(frame) for frame in fitted[index:index + 2])
+            forward, backward = anim.motion(a, b)
+        source, displacement = (a, forward * fraction) if fraction <= .5 else (b, backward * (1 - fraction))
+        cels.append(anim.straight(cv2.remap(source, xy - displacement, None, cv2.INTER_LINEAR)))
+    save(ART / "Enemies/Resources/BossEntrances/EnemyAstralGovernor.png", anim.pack(cels, 4))
+
+
+def actor(entry, im):
+    actor_sheets(entry, im)
+    save(ENEMIES / (entry["id"] + "-SpecialFX.png"), unity.special_fx(entry))
     unity.make_definition(entry)
 
 

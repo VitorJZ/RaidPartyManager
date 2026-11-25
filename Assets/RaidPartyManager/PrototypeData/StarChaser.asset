@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 4
   traitPower: 0
-  traitText: "每有1名存活的其他友方射手，额外攻击1次。连射途中也按当前存活人数结算。"
+  traitText: "队伍名单中每有1名存活的其他射手，额外攻击1次，后备成员也计入。出战队友倒下时立即减少连射次数。"
   personality: 4
   attack: 6
   defense: 1

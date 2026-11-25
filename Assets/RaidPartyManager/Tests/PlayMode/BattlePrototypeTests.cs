@@ -138,6 +138,40 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator PotionArtworkAnimatesOverItsOwnerAfterTheBottleIsConsumed()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+            var content = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
+            var front = party.Members.First(member => member.Position == 1);
+            var item = party.AddEquipment(content.StartingEquipment.First(gear => gear.Effect == EquipmentEffect.VigorPotion));
+            Assert.That(party.TryEquip(front.Id, 0, item.Id), Is.True);
+            Press(root, "start");
+
+            var cels = new HashSet<Rect>();
+            float deadline = Time.realtimeSinceStartup + 15;
+            while (Time.realtimeSinceStartup < deadline)
+            {
+                var effect = root.Q<Image>("battle-equipment-effect", "equipment-VigorPotion");
+                if (effect == null && cels.Count > 0) break;
+                if (effect != null && effect.worldBound.width > 0)
+                {
+                    var owner = root.Q("party-position-1").Q<Image>("battle-sprite");
+                    Assert.That(effect.image.name, Is.EqualTo("VigorTonic"));
+                    Assert.That(effect.worldBound.center.x, Is.EqualTo(owner.worldBound.center.x).Within(3f));
+                    Assert.That(effect.Q<Image>("triggered-equipment-icon").image, Is.SameAs(content.IconFor(item.Definition.Id)));
+                    cels.Add(effect.sourceRect);
+                }
+                yield return null;
+            }
+            Assert.That(cels.Count, Is.GreaterThan(2));
+            Assert.That(party.Inventory.Any(e => e.Id == item.Id), Is.False);
+        }
+
+        [UnityTest]
         public IEnumerator DefaultDraftsAndManualSelectionsReachTheAnimatedBattle()
         {
             useAuthoredFixture = false;
@@ -272,8 +306,10 @@ namespace RaidPartyManager.Tests
             Press(root, "close-character-details");
             Press(root, "back-party-editor");
             Press(root, "start");
-            float entranceDeadline = Time.realtimeSinceStartup + 2f;
-            while (root.Q<Label>("battle-phase").text == "入场" && Time.realtimeSinceStartup < entranceDeadline)
+            yield return WaitForRound(root, 1);
+            float potionDeadline = Time.realtimeSinceStartup + 2f;
+            while (root.Q("equipment-position-1").Q("equipment-slot-1").Q<Image>() != null &&
+                Time.realtimeSinceStartup < potionDeadline)
                 yield return null;
             Assert.That(root.Q("equipment-position-1").Q("equipment-slot-1").Q<Image>(), Is.Null);
             yield return null;
@@ -322,10 +358,9 @@ namespace RaidPartyManager.Tests
             Press(root, "open-settings");
             Assert.That(root.Q("run-settings").Q<Button>("return-main-menu"), Is.Not.Null);
             Assert.That(root.Q("prototype").enabledInHierarchy, Is.False);
-            int logCount = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList().Count;
+            string phaseBefore = root.Q<Label>("battle-phase").text;
             yield return new WaitForSecondsRealtime(0.35f);
-            Assert.That(root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList().Count,
-                Is.EqualTo(logCount));
+            Assert.That(root.Q<Label>("battle-phase").text, Is.EqualTo(phaseBefore));
             Press(root, "close-settings");
             Assert.That(root.Q("run-settings"), Is.Null);
             Assert.That(root.Q("prototype").enabledInHierarchy, Is.True);
@@ -393,7 +428,7 @@ namespace RaidPartyManager.Tests
             Assert.That(footer.parent, Is.SameAs(root.Q("battle-screen")));
             Assert.That(footer.parent.worldBound, Is.EqualTo(root.worldBound));
             var rosterBounds = footer.Q("roster-equipment").worldBound;
-            var logBounds = footer.Q("battle-log-paper").worldBound;
+            Assert.That(root.Q("battle-log"), Is.Null);
             var clearance = root.Q("audience-clearance").worldBound;
             Assert.That(clearance.height / root.worldBound.height, Is.InRange(.061f, .067f));
             Assert.That(clearance.yMin - rosterBounds.yMax, Is.EqualTo(10f).Within(1f));
@@ -401,8 +436,7 @@ namespace RaidPartyManager.Tests
                 stage.Find("Audience/Front stalls").GetComponent<MeshRenderer>();
             float crest = Camera.main.WorldToViewportPoint(seats.bounds.max).y;
             Assert.That(crest, Is.InRange(.035f, .11f));
-            Assert.That(logBounds.yMax, Is.EqualTo(rosterBounds.yMax).Within(1f));
-            Assert.That(logBounds.xMin - rosterBounds.xMax, Is.EqualTo(32f).Within(1f));
+            Assert.That(rosterBounds.center.x, Is.EqualTo(footer.worldBound.center.x).Within(1f));
             Assert.That(((Texture2D[])typeof(BattlePrototype).GetField("battleBackgrounds", PrivateInstance)
                 .GetValue(scene)).Distinct().Count(), Is.EqualTo(13));
 
@@ -463,7 +497,7 @@ namespace RaidPartyManager.Tests
             var art = magePortrait.Q<Image>("profession-portrait-art");
             Assert.That(art.scaleMode, Is.EqualTo(ScaleMode.ScaleToFit));
             Assert.That(art.worldBound.width / art.worldBound.height, Is.EqualTo((float)art.image.width / art.image.height).Within(0.03f));
-            Assert.That(root.Q("battle-log-paper").resolvedStyle.backgroundImage.texture.name, Is.EqualTo("Event-Parchment"));
+            Assert.That(root.Q("status-row-guard").layout.height, Is.EqualTo(60).Within(1));
             Assert.That(root.Query<Label>().ToList().Any(label => label.text == "讨伐队经理"), Is.False);
             Assert.That(slots[0].worldBound.xMax, Is.LessThanOrEqualTo(magePortrait.worldBound.xMin));
             Assert.That(startingMageEquipment.Q("equipment-energy").worldBound.xMin, Is.GreaterThanOrEqualTo(magePortrait.worldBound.xMax));
@@ -476,7 +510,9 @@ namespace RaidPartyManager.Tests
             Assert.That(caption.Q<Label>("combatant-name").text, Is.EqualTo("篝火守夜人"));
             var bar = guard.Q("health-bar");
             var body = guard.Q("combatant-portrait");
-            Assert.That(caption.worldBound.yMax, Is.LessThanOrEqualTo(body.worldBound.yMin));
+            var guardFigure = body.Q<Image>("battle-sprite");
+            float head = guardFigure.worldBound.yMin + guardFigure.layout.height * (1f - .82143f - .0625f);
+            Assert.That(caption.worldBound.yMax, Is.EqualTo(head).Within(4));
             Assert.That(bar.worldBound.yMin, Is.GreaterThanOrEqualTo(body.worldBound.yMax));
             Assert.That(bar.Q("health-fill").resolvedStyle.backgroundColor.r,
                 Is.GreaterThan(bar.Q("health-fill").resolvedStyle.backgroundColor.g));
@@ -501,9 +537,9 @@ namespace RaidPartyManager.Tests
             yield return null; // Let the rebuilt round UI complete layout before pointer hit-testing.
             Assert.That(scene.transform.Find("Paper Theatre/Cyclorama").GetComponent<MeshRenderer>(), Is.SameAs(backcloth));
             AssertBattleEquipmentIsReadOnly(root);
-            var initialLog = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
-            Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 普攻")), Is.True);
-            Assert.That(initialLog.Any(label => label.text.Contains("篝火守夜人 · 举盾")), Is.False);
+            Assert.That(round.Any(e => e.ActorId == "guard" && e.ActionName == "普攻"), Is.True);
+            Assert.That(round.Any(e => e.ActorId == "guard" && e.ActionName == "举盾"), Is.False);
+            Assert.That(root.Q<Label>("commentator-line"), Is.Not.Null);
             var archer = ((PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene)).Members.Single(m => m.Position == 4);
             int healthAfterRound = round.Where(e => e.TargetId == archer.Id && e.Kind is BattleEventKind.Action or BattleEventKind.Effect)
                 .Select(e => e.TargetHealth).DefaultIfEmpty(archer.Health).Last();
@@ -514,8 +550,8 @@ namespace RaidPartyManager.Tests
             Assert.That(mageDetails.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  6"));
             yield return ResolveBattle(root);
             Assert.That(scene.transform.Find("Paper Theatre/Cyclorama").GetComponent<MeshRenderer>(), Is.SameAs(backcloth));
-            var first = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
-            Assert.That(first.First(label => label.text.Contains("突袭队尾")).text, Does.Contain("银叶射手"));
+            var first = (BattleResult)typeof(BattlePrototype).GetField("result", PrivateInstance).GetValue(scene);
+            Assert.That(first.Events.First(hit => hit.ActionName == "突袭队尾").TargetId, Is.EqualTo("archer"));
             var rewards = root.Q("victory-rewards");
             Assert.That(rewards.Q<Button>("claim-loot-0").Q<Label>().text, Is.EqualTo("狂战士之印"));
             Assert.That(rewards.Q<Button>("claim-gold").Q("reward-gold-icon"), Is.Not.Null);
@@ -580,8 +616,8 @@ namespace RaidPartyManager.Tests
 
             Press(root, "start");
             yield return ResolveBattle(root);
-            var second = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
-            Assert.That(second.First(label => label.text.Contains("突袭队尾")).text, Does.Contain("篝火守夜人"));
+            var second = (BattleResult)typeof(BattlePrototype).GetField("result", PrivateInstance).GetValue(scene);
+            Assert.That(second.Events.First(hit => hit.ActionName == "突袭队尾").TargetId, Is.EqualTo("guard"));
             Press(root, "claim-loot-0");
             Assert.That(root.Q("claim-loot-0"), Is.Null);
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("BattlePrototype"));
@@ -704,7 +740,7 @@ namespace RaidPartyManager.Tests
             Assert.That(entrance.Q("entrance-brute"), Is.Not.Null);
             Assert.That(entrance.Q<Image>("entrance-brute").image.name, Is.EqualTo("AshLanternAdept-Walk"));
             Assert.That(entrance.Q<Image>("entrance-flanker").image.name, Is.EqualTo("RearHunter-Walk"));
-            Assert.That(root.Q("battle-action"), Is.Null);
+            Assert.That(typeof(BattlePrototype).GetField("actionPlayback", PrivateInstance).GetValue(scene), Is.Null);
             yield return WaitForRound(root, 2);
             Assert.That(root.Q("battle-entrance-layer").childCount, Is.Zero);
         }
@@ -720,7 +756,7 @@ namespace RaidPartyManager.Tests
             var content = (EncounterData)type.GetField("content", PrivateInstance).GetValue(scene);
             var template = content.CharacterCatalog.Single(c => c.Id == "TianGong");
             var archer = new CharacterDefinition(template.Id, template.Name, template.Profession, template.Personality,
-                new Stats(32, 2, 0, 50), 1, template.BasicAttack, reach: template.Reach, trait: template.Trait);
+                new Stats(16, 2, 0, 50), 1, template.BasicAttack, reach: template.Reach, trait: template.Trait);
             var ray = content.EnemyRoster.Single(c => c.Id == "EnemyDrownedLanternRay");
             var crab = content.EnemyRoster.Single(c => c.Id == "EnemySaltCrab");
             var party = new PartyRun(new[] { new PartyMemberStart("archer", archer, 1, 50) }, System.Array.Empty<EquipmentDefinition>());
@@ -736,6 +772,7 @@ namespace RaidPartyManager.Tests
             var round = (IReadOnlyList<BattleEvent>)type.GetField("roundEvents", PrivateInstance).GetValue(scene);
             yield return WaitForRound(root, 2);
             Assert.That(round.Count(e => e.ActionName == "沉灯翻涌"), Is.EqualTo(1));
+            Assert.That(round.Count(e => e.TargetId == "ray" && e.VisualCue == BattleVisualCue.PiercingArrow), Is.EqualTo(3));
             foreach (var slot in new[] { ("party-position-1", "archer"), ("enemy-position-1", "ray"), ("enemy-position-4", "crab") })
             {
                 var state = round.Last(e => e.TargetId == slot.Item2 &&
@@ -842,9 +879,10 @@ namespace RaidPartyManager.Tests
             UseFastAttacks(scene);
             Press(root, "start");
 
+            yield return WaitForRound(root, 1);
+            var firstRound = (IReadOnlyList<BattleEvent>)typeof(BattlePrototype).GetField("roundEvents", PrivateInstance).GetValue(scene);
             yield return WaitForRound(root, 2);
-            Assert.That(root.Q<ScrollView>("battle-log").Query<Label>().ToList()
-                .Any(line => line.text.Contains("万箭齐发") && line.text.Contains("消耗")), Is.True);
+            Assert.That(firstRound.Any(e => e.ActionName == "万箭齐发" && e.ActorEnergy.HasValue), Is.True);
 
             SetAttackAnimationTimeScale(scene, 0.55f);
 
@@ -930,6 +968,31 @@ namespace RaidPartyManager.Tests
             Assert.That(fragments[0].sourceRect, Is.Not.EqualTo(brokenCel));
             yield return WaitForRound(root, 3);
             Assert.That(root.Q("battle-meteor-effect"), Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator VenomSurgeShowsItsPaintedEffectOnTheCasterAndEnemyLine()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var (_, book) = PrepareGroupSkillBattle(scene, "mage", "skill-book-38");
+            SetAttackAnimationTimeScale(scene, 0.7f);
+            Press(root, "start");
+
+            List<Image> effects;
+            float deadline = Time.realtimeSinceStartup + 8;
+            do
+            {
+                yield return null;
+                effects = root.Query<Image>("battle-skill-effect", book.Id).ToList();
+            }
+            while (effects.Count != 4 && Time.realtimeSinceStartup < deadline);
+
+            Assert.That(effects, Has.Count.EqualTo(4));
+            Assert.That(effects.Select(effect => effect.image.name), Is.All.EqualTo("38-VenomSurge"));
+            Assert.That(effects.Select(effect => effect.image.width / effect.image.height), Is.All.EqualTo(16));
         }
 
         private static (CharacterDefinition Caster, SkillBookDefinition Book) PrepareGroupSkillBattle(
@@ -1129,7 +1192,8 @@ namespace RaidPartyManager.Tests
                 warCry = root.Q<Image>("battle-skill-effect", "skill-book-01");
             }
             Assert.That(warCry, Is.Not.Null, "War Cry should display its own effect on the battlefield.");
-            Assert.That(warCry.sourceRect.width, Is.EqualTo(96f));
+            Assert.That(warCry.image.name, Is.EqualTo("01-WarCry"));
+            Assert.That(warCry.sourceRect.size, Is.EqualTo(new Vector2(128f, 128f)));
             float firstFrame = warCry.sourceRect.x;
             while (warCry.panel != null && warCry.sourceRect.x == firstFrame &&
                 Time.realtimeSinceStartup < effectDeadline)
@@ -1143,10 +1207,7 @@ namespace RaidPartyManager.Tests
             bar = root.Q("equipment-position-1").Q("equipment-energy");
             Assert.That(bar.Q("energy-cell-1").resolvedStyle.backgroundColor, Is.EqualTo(full));
             Assert.That(bar.Q("energy-cell-2").resolvedStyle.backgroundColor, Is.EqualTo(Color.white));
-            var lines = root.Q<ScrollView>("battle-log").contentContainer.Query<Label>().ToList();
-            Assert.That(lines.Any(line => line.text.Contains("战争咆哮") && line.text.Contains("消耗 1 点能量")), Is.True);
-            var firstRound = lines.TakeWhile(line => line.text != "第 2 回合");
-            Assert.That(firstRound.Any(line => line.text.Contains("篝火守夜人 · 普攻")), Is.False);
+            Assert.That(root.Q<Label>("commentator-line"), Is.Not.Null);
             var details = HoverCharacter(root, root.Q("equipment-portrait-1"));
             Assert.That(details.Q<Label>("battle-detail-skill-1").text, Is.EqualTo("战争咆哮 · 1 能量"));
             Assert.That(details.Q<Label>("battle-detail-skill-effect-1").text, Does.Contain("翻倍"));
@@ -1177,6 +1238,13 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Button>("start").enabledInHierarchy, Is.False);
             Assert.That(root.Q("editor-positions").Children().Select(card => card.name),
                 Is.EqualTo(new[] { "edit-position-4", "edit-position-3", "edit-position-2", "edit-position-1" }));
+            var reserveRow = root.Q("reserve-positions");
+            Assert.That(reserveRow.childCount, Is.EqualTo(2));
+            var overview = root.Q("party-editor-overview");
+            Assert.That(overview.Q<ScrollView>(), Is.Null);
+            Assert.That(reserveRow.Children().Max(card => card.worldBound.yMax), Is.LessThanOrEqualTo(overview.worldBound.yMax));
+            Assert.That(reserveRow.Children().Average(card => card.worldBound.center.x),
+                Is.EqualTo(root.Q("editor-positions").worldBound.center.x).Within(2f));
             Assert.That(root.Q("edit-position-4").Q("profession-frame-archer"), Is.Not.Null);
             Assert.That(root.Q("edit-position-3").Q("profession-frame-support"), Is.Not.Null);
             Assert.That(root.Q("edit-position-2").Q("profession-frame-mage"), Is.Not.Null);
@@ -1197,8 +1265,20 @@ namespace RaidPartyManager.Tests
             Assert.That(guardCard.Q<Label>("character-name").text, Is.EqualTo("篝火守夜人"));
             Assert.That(guardCard.Q("character-health").Q<Label>().text, Does.Contain("10/10"));
 
+            var editor = root.Q("party-editor");
+            var guardPortrait = guardCard.Q("character-portrait");
+            float fullHeight = guardPortrait.worldBound.height;
+            editor.style.bottom = 140;
+            yield return null;
+            yield return null;
+            Assert.That(guardPortrait.worldBound.height, Is.LessThan(fullHeight));
+            Assert.That(reserveRow.Children().Max(card => card.worldBound.yMax), Is.LessThanOrEqualTo(overview.worldBound.yMax));
+            editor.style.bottom = 0;
+            yield return null;
+
             Press(root, "edit-member-mage");
             yield return null;
+            Assert.That(root.Q("loadout-member-bookmarks").childCount, Is.EqualTo(6));
             var characterName = root.Q<Label>("details-character-name");
             Assert.That(characterName.text, Is.EqualTo("星辉术师"));
             var loadoutTab = root.Q<Button>("open-character-loadout").worldBound;
@@ -1312,8 +1392,13 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q(rewardCellName).Q(rewardName), Is.Not.Null);
             Assert.That(root.Q(rewardCellName).Q("equipped-item-border"), Is.Not.Null);
             yield return null;
-            var emptyCell = root.Q("bag-cell-" + (int.Parse(rewardCellName.Substring("bag-cell-".Length)) + 1));
-            Assert.That(emptyCell, Is.Not.Null);
+            VisualElement emptyCell;
+            while ((emptyCell = root.Q("backpack-grid").Children().SelectMany(row => row.Children())
+                .FirstOrDefault(cell => cell.childCount == 0)) == null)
+            {
+                Press(root, "bag-next");
+                yield return null;
+            }
             yield return Drag(root, root.Q("edit-slot-1"), emptyCell);
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("装备槽 2"));
             Assert.That(root.Q(emptyCell.name).Q(rewardName), Is.Not.Null);
@@ -1381,7 +1466,7 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator IntelligenceOfficerRevealsEnemiesAndCelestialFormsUpdateTheBattleSprite()
+        public IEnumerator WhiteFeatherAndTianGongKeepTheirOwnBattleSprites()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
@@ -1396,38 +1481,35 @@ namespace RaidPartyManager.Tests
             var starters = (object[])type.GetField("party", fields).GetValue(encounter);
             var character = starters[0].GetType().GetField("character", fields);
             character.SetValue(starters[0], recruits.Single(asset => asset.name == "TianGong"));
-            character.SetValue(starters[1], recruits.Single(asset => asset.name == "IntelligenceOfficer"));
+            character.SetValue(starters[1], recruits.Single(asset => asset.name == "WhiteFeatherArcher"));
+            character.SetValue(starters[2], recruits.Single(asset => asset.name == "IntelligenceOfficer"));
             scene.enabled = false;
             ResetRun();
             encounterField.SetValue(scene, encounter);
             scene.enabled = true;
 
+            var battleType = typeof(BattlePrototype);
+            var content = (EncounterData)battleType.GetField("content", fields).GetValue(scene);
+            var foe = content.Enemies[0].Character;
+            var practice = new CharacterDefinition(foe.Id, foe.Name, Profession.Warrior, Personality.Frank,
+                new Stats(0, 0, 0, 100), 1, foe.BasicAttack, reach: AttackReach.Melee);
+            var enemies = new PartyRun(new[] { new PartyMemberStart("target", practice, 1, 100) },
+                System.Array.Empty<EquipmentDefinition>());
+            battleType.GetField("enemyRun", fields).SetValue(scene, enemies);
+            battleType.GetMethod("ResetDemo", fields).Invoke(scene, new object[] { false });
+
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
-            var enemy = root.Q("enemy-position-1");
-            Assert.That(enemy.Q("profession-frame-warrior"), Is.Not.Null);
+            Assert.That(root.Q("enemy-position-1").Q("profession-frame-warrior"), Is.Not.Null);
             Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Is.EqualTo("TianGong-Combat"));
-            Assert.That(root.Q("party-position-2").Q<Image>("battle-sprite").image.name, Is.EqualTo("IntelligenceOfficer-Combat"));
+            Assert.That(root.Q("party-position-2").Q<Image>("battle-sprite").image.name, Is.EqualTo("WhiteFeatherArcher-Combat"));
             Press(root, "start");
 
+            yield return WaitForRound(root, 1);
+            var round = (IReadOnlyList<BattleEvent>)battleType.GetField("roundEvents", fields).GetValue(scene);
+            Assert.That(round.Count(entry => entry.ActionName == "白羽追射"), Is.EqualTo(1));
             yield return WaitForRound(root, 2);
-            Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Does.StartWith("DiSha-"));
-            Assert.That(root.Q("party-position-1").Query<Label>().ToList().Any(label => label.text == "地煞"), Is.True);
-
-
-            var meleeSheets = new HashSet<string>();
-            float deadline = Time.realtimeSinceStartup + 5f;
-            while (root.Q<Label>("battle-phase")?.text != "第 3 回合" && Time.realtimeSinceStartup < deadline)
-            {
-                var moving = root.Q<Image>("battle-moving-character");
-                if (moving?.image != null)
-                    meleeSheets.Add(moving.image.name);
-                yield return null;
-            }
-            Assert.That(meleeSheets, Does.Contain("DiSha-Walk"));
-            Assert.That(meleeSheets, Does.Contain("DiSha-Attack"));
-            yield return WaitForRound(root, 3);
             Assert.That(root.Q("party-position-1").Q<Image>("battle-sprite").image.name, Does.StartWith("TianGong-"));
-            Assert.That(root.Q("party-position-1").Query<Label>().ToList().Any(label => label.text == "天弓"), Is.True);
+            Assert.That(root.Q("party-position-2").Q<Image>("battle-sprite").image.name, Does.StartWith("WhiteFeatherArcher-"));
             Object.Destroy(encounter);
         }
 
@@ -2085,6 +2167,7 @@ namespace RaidPartyManager.Tests
             var guardBody = root.Q("party-position-1").Q<Image>("battle-sprite");
             float home = guardBody.worldBound.center.x;
             var seenProjectiles = new HashSet<string>();
+            var seenImpacts = new HashSet<string>();
             var visibleWindups = new HashSet<string>();
             var walkOut = new HashSet<int>();
             var walkBack = new HashSet<int>();
@@ -2098,7 +2181,7 @@ namespace RaidPartyManager.Tests
             bool returned = false;
             Press(root, "start");
             float deadline = Time.realtimeSinceStartup + 9f;
-            while ((seenProjectiles.Count < 2 || !returned) && Time.realtimeSinceStartup < deadline)
+            while ((seenProjectiles.Count < 2 || seenImpacts.Count < 3 || !returned) && Time.realtimeSinceStartup < deadline)
             {
                 string healthText = root.Q("enemy-position-1").Q<Label>("health-value").text;
                 int enemyHealth = int.Parse(healthText.Split('/')[0].Trim());
@@ -2118,6 +2201,8 @@ namespace RaidPartyManager.Tests
                     if (flying == null)
                     {
                         flying = projectile.image.name;
+                        Assert.That(flying, Is.EqualTo("StarMage").Or.EqualTo("SilverArcher"));
+                        Assert.That(projectile.sourceRect.size, Is.EqualTo(new Vector2(128, 128)));
                         healthBeforeFlight = enemyHealth;
                         flightStart = flightEnd;
                         flightStartedAt = Time.unscaledTimeAsDouble;
@@ -2128,11 +2213,15 @@ namespace RaidPartyManager.Tests
                 {
                     Assert.That(flightEnd, Is.GreaterThan(flightStart + 30f));
                     Assert.That(enemyHealth, Is.LessThan(healthBeforeFlight));
-                    double minimumFlight = flying == "Arrow" ? 0.36d : 0.46d;
+                    double minimumFlight = flying == "SilverArcher" ? 0.36d : 0.46d;
                     Assert.That(Time.unscaledTimeAsDouble - flightStartedAt, Is.GreaterThan(minimumFlight));
                     seenProjectiles.Add(flying);
                     flying = null;
                 }
+
+                var impact = root.Q<Image>("battle-signature-impact");
+                if (impact != null)
+                    seenImpacts.Add(impact.image.name);
 
                 var moving = root.Q<Image>("battle-moving-character");
                 if (moving != null)
@@ -2166,7 +2255,8 @@ namespace RaidPartyManager.Tests
                 }
                 yield return null;
             }
-            Assert.That(seenProjectiles, Is.EquivalentTo(new[] { "Arrow", "MagicOrb" }));
+            Assert.That(seenProjectiles, Is.EquivalentTo(new[] { "SilverArcher", "StarMage" }));
+            Assert.That(seenImpacts, Is.EquivalentTo(new[] { "CampGuard", "StarMage", "SilverArcher" }));
             Assert.That(visibleWindups, Is.EquivalentTo(new[] { "StarMage-Attack", "SilverArcher-Attack" }));
             Assert.That(walkOut, Is.EquivalentTo(Enumerable.Range(0, 16)));
             Assert.That(walkBack, Is.EquivalentTo(Enumerable.Range(0, 16)));
@@ -2177,6 +2267,76 @@ namespace RaidPartyManager.Tests
             Object.Destroy(encounter);
         }
 
+        [TestCase(true, "Warn")]
+        [TestCase(false, "Cheer")]
+        public void CommentaryDistinguishesWhoseShieldBrokeAndDiscardsOutdatedHits(bool partyTarget, string reaction)
+        {
+            var type = typeof(BattlePrototype).Assembly.GetType("RaidPartyManager.Presentation.BattleCommentary");
+            var voice = System.Activator.CreateInstance(type, true);
+            var observe = type.GetMethod("Observe");
+            var advance = type.GetMethod("Advance");
+            var text = type.GetProperty("Text");
+            var mood = type.GetProperty("Mood");
+            var hit = new BattleEvent(12, BattleEventKind.Action, "actor", "target", "普攻", ActionKind.Attack,
+                amount: 1, targetHealth: 9, targetShield: 0, maximumHealth: 10, shieldAbsorbed: 4);
+            observe.Invoke(voice, new object[] { hit, "攻击者", "守卫", partyTarget, 10, 4, null, 0d, SkillEffect.None });
+            advance.Invoke(voice, new object[] { 0d });
+            Assert.That(text.GetValue(voice).ToString(), Does.Contain("守卫").And.Contain("盾"));
+            Assert.That(mood.GetValue(voice).ToString(), Is.EqualTo(reaction));
+            var lightHit = new BattleEvent(13, BattleEventKind.Action, "actor", "target", "普攻", amount: 1, targetHealth: 8);
+            observe.Invoke(voice, new object[] { lightHit, "攻击者", "守卫", partyTarget, 9, 0, null, .2d, SkillEffect.None });
+            advance.Invoke(voice, new object[] { 5d });
+            Assert.That(text.GetValue(voice), Is.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator CommentatorSpeaksFromUpstageAndBothTeamsReserveTwoStatusRows()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var stage = scene.transform.Find("Paper Theatre");
+            foreach (string mood in new[] { "Watch", "Explain", "Cheer", "Surprise", "Warn", "Wince", "Relief", "Rally" })
+                Assert.That(Resources.Load<Texture2D>("BattleCommentator/" + mood), Is.Not.Null, mood);
+            Press(root, "start");
+            yield return WaitForRound(root, 1);
+            yield return null;
+            var line = root.Q<Label>("commentator-line");
+            var bubble = root.Q("commentator-bubble");
+            Assert.That(root.Q("battle-log"), Is.Null);
+            Assert.That(line.text, Does.Contain("讨伐队"));
+            var teller = stage.Find("Battle commentator").GetComponent<MeshRenderer>();
+            var fighter = stage.GetComponentsInChildren<MeshRenderer>().First(r => r.enabled && r.name == "battle-sprite");
+            Assert.That(teller.transform.position.z, Is.GreaterThan(fighter.transform.position.z));
+            Assert.That(teller.sortingOrder, Is.LessThan(fighter.sortingOrder));
+            var allyHeights = root.Q("party-positions").Query<Image>("battle-sprite").ToList()
+                .Select(sprite => sprite.worldBound.height * .83f).ToArray();
+            var lens = Camera.main;
+            float tellerPixels = (lens.WorldToViewportPoint(teller.bounds.max).y - lens.WorldToViewportPoint(teller.bounds.min).y)
+                * root.worldBound.height * (240f / 252f);
+            Assert.That(tellerPixels, Is.EqualTo(allyHeights.Average()).Within(3f));
+            Assert.That(bubble.resolvedStyle.visibility, Is.EqualTo(Visibility.Visible));
+            foreach (var card in root.Q("battlefield").Query<Label>("combatant-name").ToList())
+                Assert.That(card.parent.parent.Children().Last().worldBound.height, Is.EqualTo(60).Within(1));
+            var spoken = new HashSet<string>();
+            var moods = new HashSet<Texture>();
+            var cels = new HashSet<Vector4>();
+            var block = new MaterialPropertyBlock();
+            double deadline = Time.unscaledTimeAsDouble + 11;
+            while (Time.unscaledTimeAsDouble < deadline && (spoken.Count < 2 || moods.Count < 2 || cels.Count < 4))
+            {
+                if (!string.IsNullOrEmpty(line.text)) spoken.Add(line.text);
+                teller.GetPropertyBlock(block);
+                moods.Add(block.GetTexture("_MainTex"));
+                cels.Add(block.GetVector("_MainTex_ST"));
+                yield return null;
+            }
+            Assert.That(spoken.Count, Is.GreaterThanOrEqualTo(2));
+            Assert.That(moods.Count, Is.GreaterThanOrEqualTo(2));
+            Assert.That(cels.Count, Is.GreaterThanOrEqualTo(4));
+        }
+
         [UnityTest]
         public IEnumerator NextCharacterActsAsSoonAsThePreviousAnimationFinishes()
         {
@@ -2185,18 +2345,16 @@ namespace RaidPartyManager.Tests
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "start");
-            float entranceDeadline = Time.realtimeSinceStartup + 2f;
-            while (root.Q("battle-action") == null && Time.realtimeSinceStartup < entranceDeadline)
+            var playback = typeof(BattlePrototype).GetField("actionPlayback", PrivateInstance);
+            float entranceDeadline = Time.realtimeSinceStartup + 3f;
+            while (playback.GetValue(scene) == null && Time.realtimeSinceStartup < entranceDeadline)
                 yield return null;
-            Assert.That(root.Query<Label>("battle-action").ToList(), Has.Count.EqualTo(1));
-            var first = typeof(BattlePrototype).GetField("actionPlayback", BindingFlags.NonPublic | BindingFlags.Instance)
-                .GetValue(scene);
+            var first = playback.GetValue(scene);
             Assert.That(first, Is.Not.Null);
             double finishAt = (double)first.GetType().GetProperty("FinishAt").GetValue(first);
-            while (root.Query<Label>("battle-action").ToList().Count == 1 && Time.unscaledTimeAsDouble < finishAt + 1d)
+            while ((playback.GetValue(scene) == null || playback.GetValue(scene) == first) && Time.unscaledTimeAsDouble < finishAt + 1d)
                 yield return null;
-
-            Assert.That(root.Query<Label>("battle-action").ToList(), Has.Count.EqualTo(2));
+            Assert.That(playback.GetValue(scene), Is.Not.Null.And.Not.SameAs(first));
             Assert.That(Time.unscaledTimeAsDouble - finishAt, Is.InRange(0d, 0.18d));
         }
 
@@ -2212,7 +2370,7 @@ namespace RaidPartyManager.Tests
             Down(guard);
             Up(root.Q("editor-roster"), guard.worldBound.center);
             Assert.That(root.Q("character-details"), Is.Not.Null);
-            Assert.That(root.Q<Label>("equipment-page").text, Is.EqualTo("1/13"));
+            Assert.That(root.Q<Label>("equipment-page").text, Does.StartWith("1/"));
             Press(root, "close-character-details");
 
             yield return DragFormation(root, "edit-member-guard", "edit-position-4");

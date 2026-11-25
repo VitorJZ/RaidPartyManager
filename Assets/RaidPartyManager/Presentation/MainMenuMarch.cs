@@ -9,6 +9,7 @@ namespace RaidPartyManager.Presentation
     internal sealed class MainMenuMarch : VisualElement
     {
         private const float RoadLevel = .824f;
+        private const double MarchSpeed = .70;
         private readonly Texture2D backdrop;
         private readonly VisualElement strip = new() { name = "menu-promenade-strip", pickingMode = PickingMode.Ignore };
         private readonly List<Image> tiles = new();
@@ -128,7 +129,7 @@ namespace RaidPartyManager.Presentation
 
         private void Animate()
         {
-            double elapsed = Time.unscaledTimeAsDouble - started;
+            double elapsed = (Time.unscaledTimeAsDouble - started) * MarchSpeed;
             if (tileWidth > 0)
             {
                 float offset = (float)((tileWidth * .10 + elapsed * layout.height * .046) % tileWidth);
@@ -141,7 +142,10 @@ namespace RaidPartyManager.Presentation
                 if (frame == actor.Frame) continue;
                 actor.Frame = frame;
                 if (actor.WalkSheet != null)
+                {
                     actor.Sprite.sourceRect = AnimationCels.RectFor(actor.WalkSheet, frame);
+                    actor.Sprite.MarkDirtyRepaint();
+                }
                 else if (actor.Pose != null)
                     actor.Pose.ShowFrame(frame);
                 else

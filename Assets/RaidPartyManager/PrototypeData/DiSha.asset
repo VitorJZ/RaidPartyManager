@@ -21,16 +21,15 @@ MonoBehaviour:
   battleWalkSheet: {fileID: 2800000, guid: ff399068664a4fd6beed0bcc2f2c0ba5, type: 3}
   profession: 0
   rosterNumber: 35
-  stage: 1
+  stage: 2
   reach: 1
   fixedTrait: 19
   traitPower: 0
-  traitText: "额外获取后方队友的攻击力，并使其在本回合无法行动；回合结束时，切换为天弓。"
-  battleForm: {fileID: 11400000, guid: dac678d7eeb14344a6e1c949c2424d14, type: 2}
+  traitText: "每回合开始时，额外获得最近的后方存活队友的攻击力。武器攻击造成的伤害翻倍。"
   personality: 0
   attack: 5
-  defense: 2
-  specialDefense: 1
+  defense: 3
+  specialDefense: 2
   health: 11
   actionInterval: 10
   basicAttack:

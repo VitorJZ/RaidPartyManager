@@ -9,7 +9,7 @@ namespace RaidPartyManager.Domain
     public enum AttackReach { Unspecified, Melee, Ranged }
     public enum CharacterTrait
     {
-        None, DamageLimit, GainEmberWhenHit, RepeatTargetDamage, ArcherVolley, PoisonOnHit,
+        None, DamageLimit, GainEmberWhenHit, ForestMarkOnAttack, ArcherVolley, PoisonOnHit,
         MissingHealthDamage, EscalatingAttack, PermanentAttackOnKill, IgnoreMagicDefense, LightningChant,
         Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, ChorusArmory, RevealEnemies,
         PiercingArrow, BorrowAllyAttack, HealAlly, FirstDamageToTarget, HealOnDamage, DrawAttacks,
@@ -17,7 +17,8 @@ namespace RaidPartyManager.Domain
         EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack,
         EnemyTideFollower, EnemyWreckScavenger, EnemyDeckSailor,
         EnemyMudEel, EnemySaltCrab, EnemyLanternMoth, EnemyFogSignalGunner, EnemyShipCaulker,
-        EnemyAnchorHermit, EnemyFogAngler, EnemyMooringWarden, EnemyBlockadeAdmiral, EnemyDrownedLanternRay, SoakEnemyEachRound
+        EnemyAnchorHermit, EnemyFogAngler, EnemyMooringWarden, EnemyBlockadeAdmiral, EnemyDrownedLanternRay, SoakEnemyEachRound,
+        DoubleShot, GravePollen, RottenBloom
     }
     public enum Personality
     {
@@ -29,7 +30,7 @@ namespace RaidPartyManager.Domain
     public enum TargetRule { AnyEnemy, FrontEnemy, RearEnemy, WoundedAlly, Self }
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
     public enum DecisionReason { Default, HighestDamage = 1, SelfProtection = 2, WoundedAlly = 4, UseSkill = 10 }
-    public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual, Retreated, EnemyVisual, RoundStarted, Countdown }
+    public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual, Retreated, EnemyVisual, RoundStarted, Countdown, EquipmentVisual }
     public enum BattleCountdownKind { CalamityChant, ScavengerEscape, AdmiralBroadside, GoldenBell, EnemyCharge }
 
     public readonly struct BattleCountdown
@@ -236,7 +237,7 @@ namespace RaidPartyManager.Domain
         public bool CanDropInBattle { get; }
         public string RewardBossId { get; }
         public bool BossExclusive => !string.IsNullOrEmpty(RewardBossId);
-        public bool AvailableInRegularPool => !BossExclusive && Effect != EquipmentEffect.CoinDevourer;
+        public bool AvailableInRegularPool => !BossExclusive && Effect is not (EquipmentEffect.CoinDevourer or EquipmentEffect.StrangeSeed);
         public bool IsPotion => Effect is EquipmentEffect.VigorPotion or EquipmentEffect.SwiftPotion or
             EquipmentEffect.ResolvePotion or EquipmentEffect.GreedPotion or EquipmentEffect.ThornsPotion or
             EquipmentEffect.PurityPotion;
@@ -266,7 +267,8 @@ namespace RaidPartyManager.Domain
         LightningWhip, ToxicMist, FleshFeast, Sidestep, GoldenBell, FieryEyes, CrimsonReap,
         HeroicAnthem, Intimidate, Earthquake, CloudPiercer,
         HookArrow, TwinCover, FieldMedic, ColdTide, BronzeMirror, NightWatch, SiegeBolt, Intercept, BackPay, ThunderVerdict,
-        BlockadeSalvo, DeepwaterSurge, BurialEdict, LongNightPrayer, ExpressClearance, MeridianTransit, AnnealingOrder
+        BlockadeSalvo, DeepwaterSurge, BurialEdict, LongNightPrayer, ExpressClearance, MeridianTransit, AnnealingOrder,
+        VenomSurge
     }
 
     public sealed class SkillBookDefinition : EquipmentDefinition
@@ -274,6 +276,9 @@ namespace RaidPartyManager.Domain
         public SkillRequirement Requirement { get; }
         public int Cost { get; }
         public SkillEffect SkillEffect { get; }
+        public bool SpendsAllEnergy => SkillEffect == SkillEffect.VenomSurge;
+
+        public int EnergyCost(int remaining) => SpendsAllEnergy ? Math.Max(Cost, remaining) : Cost;
 
         public SkillBookDefinition(string id, string name, string description, SkillRequirement requirement, int cost, int tier,
             SkillEffect skillEffect = SkillEffect.None, string rewardBossId = null)
@@ -359,6 +364,7 @@ namespace RaidPartyManager.Domain
         public IReadOnlyDictionary<string, CharacterDefinition> CharacterCatalog { get; }
         public int PartyGold { get; }
         public int RecruitLimit { get; }
+        public int ReserveArcherCount { get; }
         public bool HardFight { get; }
         public bool CapitalField { get; }
 
@@ -367,7 +373,8 @@ namespace RaidPartyManager.Domain
 
         public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit,
             IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null,
-            int partyGold = 0, int recruitLimit = Rules.Positions, bool hardFight = false, string pallbearerId = null, int graveBell = 0, bool capitalField = false)
+            int partyGold = 0, int recruitLimit = Rules.Positions, bool hardFight = false, string pallbearerId = null, int graveBell = 0,
+            bool capitalField = false, int reserveArcherCount = 0)
         {
             if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0 || partyGold < 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
@@ -384,6 +391,9 @@ namespace RaidPartyManager.Domain
             TickLimit = tickLimit;
             PartyGold = partyGold;
             RecruitLimit = recruitLimit;
+            if (reserveArcherCount < 0)
+                throw new ArgumentOutOfRangeException(nameof(reserveArcherCount));
+            ReserveArcherCount = reserveArcherCount;
             PallbearerId = pallbearerId;
             GraveBell = graveBell;
             CapitalField = capitalField;
@@ -444,6 +454,7 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<(DamageType Type, int Amount)> DamageTaken => damageTaken.Parts;
         public bool PoisonDamage { get; }
         public bool CharmTriggered { get; }
+        public EquipmentEffect Equipment { get; }
         public int ShieldAbsorbed { get; }
         public BattleCountdown? Countdown { get; }
 
@@ -456,7 +467,7 @@ namespace RaidPartyManager.Domain
             BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
             BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
             bool poisonDamage = false, BattleCountdown? countdown = null, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null,
-            bool charmTriggered = false)
+            bool charmTriggered = false, EquipmentEffect equipment = EquipmentEffect.None)
         {
             Tick = tick;
             Kind = kind;
@@ -484,6 +495,7 @@ namespace RaidPartyManager.Domain
             PoisonDamage = poisonDamage;
             ShieldAbsorbed = shieldAbsorbed;
             CharmTriggered = charmTriggered;
+            Equipment = equipment;
             Countdown = countdown;
             CopiedTraitSource = copiedTraitSource;
         }

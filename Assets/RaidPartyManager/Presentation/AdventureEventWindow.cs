@@ -175,7 +175,7 @@ namespace RaidPartyManager.Presentation
             leaving = true;
             stage.LeaveTable(() => DockPlayhouse.ChangeSet(() =>
             {
-                if (run.Current.Resolved) run.CloseVisit(); else run.Leave();
+                if (run.Leave()) AdventureFlow.AutoSave(run);
                 close();
             }, toSigns: true));
         }
@@ -204,12 +204,13 @@ namespace RaidPartyManager.Presentation
             PopulateChoices();
             var visit = run.Current;
             if (!run.IsInspection && visit.Kind == NodeKind.Event && !visit.Resolved && visit.Battle == null &&
-                !GraveStories.Contains(visit.Event) && visit.Event != AdventureEventKind.LockedChest && visit.PendingRecruit == null)
+                !GraveStories.Contains(visit.Event) && visit.Event is not (AdventureEventKind.LockedChest or AdventureEventKind.GraveSeed) && visit.PendingRecruit == null)
                 choices.Choice("向对方告辞", "decline-event", Decline);
             choices.Arrange();
             if ((!run.IsInspection || visit.Event.HasValue && !StagedStory(visit.Event)) && visit.Resolved && !awaitingSigns)
             {
                 awaitingSigns = true;
+                AdventureFlow.AutoSaveResolvedVisit(run);
                 topBar.WhenRewardsArrive(() => schedule.Execute(() =>
                 {
                     if (stage.GraveCueFinished && enabledInHierarchy && !leaving && run.Current == visit && (visit.Event is not (AdventureEventKind.HatTrick or AdventureEventKind.Alchemist) || leftTable || stage.RevealFinished))
@@ -314,6 +315,12 @@ namespace RaidPartyManager.Presentation
                         () => Collect("event-invest", () => run.Donate(amount.value)), run.Party.Gold > 0);
                     AdventureWidgets.Action(choices, "投入全部金币", "event-invest-all",
                         () => Collect("event-invest-all", () => run.Donate(run.Party.Gold)), run.Party.Gold > 0);
+                    break;
+                case AdventureEventKind.GraveSeed:
+                    choices.Choice("拿走 50 金币", "grave-seed-gold",
+                        () => Collect("grave-seed-gold", () => run.TakeGraveSeedReward(false)));
+                    choices.Choice("拿走奇怪的种子", "grave-seed-item",
+                        () => Collect("grave-seed-item", () => run.TakeGraveSeedReward(true)));
                     break;
                 case AdventureEventKind.TidePact:
                     ShowTidePact();

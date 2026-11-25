@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "净化药水"
   effect: 24
   icon: {fileID: 2800000, guid: 1397d0bee27a4aee94038d1650757108, type: 3}
-  description: "战斗开始时，获得2层纯净。触发后消耗。"
+  description: "获得 2 层纯净。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

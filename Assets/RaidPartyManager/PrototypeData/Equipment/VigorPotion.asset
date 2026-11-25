@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "盛气药水"
   effect: 10
   icon: {fileID: 2800000, guid: 4b2d1b47b4094cc5bb0ed3b9ede6d4e2, type: 3}
-  description: "战斗开始时，获得3层盛气。触发后消耗。"
+  description: "获得 3 层盛气。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

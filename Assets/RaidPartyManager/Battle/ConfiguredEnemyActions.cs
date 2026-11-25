@@ -120,11 +120,14 @@ namespace RaidPartyManager.Battle
                         int modifier = action.Power + phase;
                         var attack = new ActionDefinition("enemy-configured", action.Name, ActionKind.Attack,
                             TargetRule.AnyEnemy, Math.Max(0, modifier), damageType: action.DamageType);
-                        if (Hit(actor, target, attack, kind, DecisionReason.Default, visual: cue,
-                                falloff: Math.Max(0, -modifier), firstTarget: first, reactions: reactions, singleTarget: targets.Length == 1) &&
-                            actor.Health > 0 && target.Health > 0 && action.Status.HasValue)
-                            GrantStatus(actor, target, action.Status.Value, action.Layers, kind: BattleEventKind.Effect,
-                                delayDecay: action.DelayDecay);
+                        Hit(actor, target, attack, kind, DecisionReason.Default, visual: cue,
+                            falloff: Math.Max(0, -modifier), firstTarget: first, reactions: reactions, singleTarget: targets.Length == 1,
+                            onHit: defender =>
+                            {
+                                if (actor.Health > 0 && defender.Health > 0 && action.Status.HasValue)
+                                    GrantStatus(actor, defender, action.Status.Value, action.Layers, kind: BattleEventKind.Effect,
+                                        delayDecay: action.DelayDecay);
+                            });
                         break;
                     case EnemyActionKind.Status:
                         GrantStatus(actor, target, action.Status.Value, action.Layers, action.Name, cue, kind,

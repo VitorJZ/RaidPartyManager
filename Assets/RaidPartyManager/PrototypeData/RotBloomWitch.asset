@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: RotBloomWitch
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: RotBloomWitch
+  displayName: "腐花魔女"
+  portrait: {fileID: 2800000, guid: 9c251ad2ad2e5c65be6c78d0149e7f8f, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 14ad5ca7d3035e06bb2b64a796cbd11f, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 6878e78c3f545732bc782354bc5d428c, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 017334080ea2565ab2ff65164492d0dc, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: dc7a66cd3f1b55ee835216d4e4df4062, type: 3}
+  profession: 1
+  rosterNumber: 39
+  stage: 2
+  reach: 2
+  fixedTrait: 51
+  traitPower: 0
+  traitText: "敌方单位发动攻击后，获得2层中毒。中毒的单位死亡时，将其剩余中毒转移给最近的存活敌人；距离相同则随机。"
+  personality: 1
+  attack: 7
+  defense: 0
+  specialDefense: 0
+  health: 13
+  actionInterval: 11
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

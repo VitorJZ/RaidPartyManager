@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "贪婪药水"
   effect: 13
   icon: {fileID: 2800000, guid: 5c50edcc14e0407c91f7c049897db6e9, type: 3}
-  description: "战斗开始时，获得1层贪婪。触发后消耗。"
+  description: "获得 1 层贪婪。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

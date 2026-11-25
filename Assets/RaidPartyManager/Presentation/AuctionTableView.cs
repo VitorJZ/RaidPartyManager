@@ -89,6 +89,7 @@ namespace RaidPartyManager.Presentation
                 speech.text = $"这只要 {run.AuctionPriceAt(slot)} 金币，您手上的钱还差一些。可以看看别的匣子，或点空白处退后。";
                 return;
             }
+            AdventureFlow.AutoSaveResolvedVisit(run);
             GameAudio.Play(SoundCue.ShopCheckout);
             stage.TakeCase(slot);
             targets[slot].style.display = DisplayStyle.None;
