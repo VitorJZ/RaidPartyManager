@@ -20,6 +20,7 @@ namespace RaidPartyManager.Presentation
         {
             if (wave == null || !wave.water.enabled) return;
             wave.water.enabled = false;
+            GameAudio.Play(SoundCue.ActorDeepSeaWhisperWaveLand, .42f);
             wave.riderInk.GetPropertyBlock(wave.block);
             wave.block.SetFloat("_RideFoam", 0);
             wave.riderInk.SetPropertyBlock(wave.block);
@@ -45,6 +46,7 @@ namespace RaidPartyManager.Presentation
                 wave = sheet.AddComponent<RidingWave>();
                 wave.block = new MaterialPropertyBlock();
                 wave.water = sheet.GetComponent<MeshRenderer>();
+                wave.water.enabled = false;
                 wave.riderInk = rider;
                 var ink = rider.sharedMaterial;
                 if (ink.HasProperty("_DepthWrite"))
@@ -84,6 +86,7 @@ namespace RaidPartyManager.Presentation
             tint.a *= foam;
             wave.block.SetColor("_Color", tint);
             wave.water.SetPropertyBlock(wave.block);
+            if (!wave.water.enabled) GameAudio.Play(SoundCue.ActorDeepSeaWhisperWave, .42f);
             wave.water.enabled = true;
         }
 

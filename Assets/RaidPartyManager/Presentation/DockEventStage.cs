@@ -253,12 +253,18 @@ namespace RaidPartyManager.Presentation
         private float gravePhaseStarted;
         private int gravePhase;
         private bool graveCuePlaying;
+        private SoundCue graveSound;
+        private int graveSoundsLeft;
+        private float nextGraveSound;
         internal bool GraveCueFinished => !graveCuePlaying && !PatientsMoving;
-        internal void CueGraveAction()
+        internal void CueGraveAction(SoundCue sound, int strikes = 1)
         {
             if (graveProp == null) return;
             gravePhase = 0;
             gravePhaseStarted = -1;
+            graveSound = sound;
+            graveSoundsLeft = sound == SoundCue.None ? 0 : strikes;
+            nextGraveSound = 0;
             SetFrame(graveProp, propArt, AnimationCels.Count, 0);
             SetFrame(resident, tellerStrip, AnimationCels.Count, 0);
             graveCuePlaying = true;
@@ -270,6 +276,12 @@ namespace RaidPartyManager.Presentation
             var cue = CapitalStories.Contains(graveKind) ? (lead: .32f, action: .56f, hold: .36f) : GraveStories.Timing(graveKind);
             float now = Time.unscaledTime;
             if (gravePhaseStarted < 0) gravePhaseStarted = now;
+            if (gravePhase == 1 && graveSoundsLeft > 0 && now - gravePhaseStarted >= nextGraveSound)
+            {
+                GameAudio.Play(graveSound, .54f);
+                graveSoundsLeft--;
+                nextGraveSound += .18f;
+            }
             float duration = gravePhase == 0 ? cue.lead : gravePhase == 1 ? cue.action : cue.hold;
             int first = gravePhase == 0 ? 0 : gravePhase == 1 ? 5 : 12;
             int end = gravePhase == 0 ? 5 : gravePhase == 1 ? 12 : AnimationCels.Count;
@@ -374,7 +386,7 @@ namespace RaidPartyManager.Presentation
                 graveProp = prop;
                 graveKind = kind.Value;
                 SetFrame(prop, propArt, AnimationCels.Count, 0);
-                CueGraveAction();
+                CueGraveAction(StorySounds.Opening(graveKind));
             }
             if (coins) { gull = prop; SetFrame(gull,propArt,AnimationCels.Count,0); }
             if (!atTable) return;
@@ -415,6 +427,7 @@ namespace RaidPartyManager.Presentation
         private readonly MeshRenderer[] caseShadows = new MeshRenderer[3];
         private readonly Texture2D[] caseStrips = new Texture2D[3];
         private readonly float[] caseOpening = { -1, -1, -1 };
+        private readonly bool[] caseLidPlayed = new bool[3];
         internal Rect AuctionTarget(int slot) => ProjectBounds(cases[slot].bounds);
         internal bool HitCase(int slot, Vector2 viewport)
         {
@@ -431,7 +444,11 @@ namespace RaidPartyManager.Presentation
             return caseStrips[slot].GetPixelBilinear(u * uv.x + uv.z, v * uv.y + uv.w).a > .15f;
         }
 
-        internal void OpenCase(int slot) => caseOpening[slot] = Time.unscaledTime;
+        internal void OpenCase(int slot)
+        {
+            caseOpening[slot] = Time.unscaledTime;
+            caseLidPlayed[slot] = false;
+        }
 
         private void AnimateCases()
         {
@@ -439,6 +456,11 @@ namespace RaidPartyManager.Presentation
             {
                 if (caseOpening[i] < 0 || !cases[i].enabled) continue;
                 int frame = AnimationCels.At((Time.unscaledTime - caseOpening[i]) / .45f);
+                if (frame >= 4 && !caseLidPlayed[i])
+                {
+                    GameAudio.Play(SoundCue.EventGraveAuctionLid, .54f);
+                    caseLidPlayed[i] = true;
+                }
                 SetFrame(cases[i], caseStrips[i], AnimationCels.Count, frame);
                 if (frame == AnimationCels.Count - 1) caseOpening[i] = -1;
             }

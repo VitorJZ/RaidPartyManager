@@ -115,7 +115,7 @@ namespace RaidPartyManager.Presentation
                     {
                         set.RoadstonesLanded = true;
                         house.LandRoadstone();
-                        GameAudio.Play(SoundCue.HitPhysical, .55f);
+                        GameAudio.Play(SoundCue.StageStoneSignLand, .55f);
                     }
                     foreach (var board in boards) board.button.SetEnabled(true);
                 }

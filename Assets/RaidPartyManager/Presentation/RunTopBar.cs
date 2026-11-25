@@ -425,7 +425,7 @@ namespace RaidPartyManager.Presentation
             var reminder = reminders.GetValue(party, _ => new RenewalReminder());
             if (reminder.Day == party.Day) return;
             reminder.Day = party.Day;
-            GameAudio.Play(SoundCue.UiTurnAdvance);
+            GameAudio.Play(SoundCue.UiContractExpiryWarning);
         }
 
         private void UpdateRenewalPulse(VisualElement icon, bool due)

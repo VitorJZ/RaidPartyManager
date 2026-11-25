@@ -303,8 +303,10 @@ namespace RaidPartyManager.Presentation
 
         internal void ShowFinalCurtain(int gold, long payrollDebt, Action returnToMenu)
         {
+            if (cue is Cue.Closing or Cue.Closed) return;
             performance.EndFirstEntrance();
             cueSpeed = 1;
+            GameAudio.Play(SoundCue.StageCurtainClose, .58f);
             CloseCurtain(() =>
             {
                 finale = new VisualElement { pickingMode = PickingMode.Ignore };
@@ -362,7 +364,13 @@ namespace RaidPartyManager.Presentation
                 return;
             }
             if (hold > 0) hold -= dt;
-            else travel = Mathf.MoveTowards(travel, cue == Cue.Opening ? 1 : 0, dt / (cue == Cue.Opening ? .84f : .68f));
+            else
+            {
+                if (cue == Cue.Opening && travel == 0 && owner.gameObject.scene.name == "EventSelect" &&
+                    AdventureFlow.OnRoute && AdventureFlow.Active is { Floor: 1, Stage: 1, Current: null })
+                    GameAudio.Play(SoundCue.StageCurtainOpen, .54f);
+                travel = Mathf.MoveTowards(travel, cue == Cue.Opening ? 1 : 0, dt / (cue == Cue.Opening ? .84f : .68f));
+            }
             if (cue == Cue.Opening && travel >= 1) cue = Cue.Playing;
             if (cue == Cue.Closing && travel <= 0) cue = Cue.Closed;
             ApplyCue();

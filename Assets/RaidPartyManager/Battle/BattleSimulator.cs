@@ -646,7 +646,7 @@ namespace RaidPartyManager.Battle
             BattleVisualCue visual = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
             BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
             bool poisonDamage = false, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null,
-            bool charmTriggered = false, EquipmentEffect equipment = EquipmentEffect.None)
+            bool charmTriggered = false, EquipmentEffect equipment = EquipmentEffect.None, bool intercepted = false)
         {
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
@@ -655,7 +655,9 @@ namespace RaidPartyManager.Battle
                 ? UsesShortbow(actor) ? AttackReach.Melee : actor.Input.Character.Reach : AttackReach.Unspecified;
             events.Add(new BattleEvent(Tick, kind, actor?.Input.Id, target.Input.Id, name, action, reason, amount,
                 target.Health, target.Shield, StatusText(target), detail, form, target.Stats.Health, statuses,
-                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage, shieldAbsorbed: shieldAbsorbed, copiedTraitSource: copiedTraitSource, charmTriggered: charmTriggered, equipment: equipment));
+                loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage,
+                shieldAbsorbed: shieldAbsorbed, copiedTraitSource: copiedTraitSource, charmTriggered: charmTriggered,
+                equipment: equipment, intercepted: intercepted));
             if (kind == BattleEventKind.Action && action == ActionKind.Attack && actor != null)
                 ApplyGravePollen(actor, target);
             if (kind == BattleEventKind.Defeated)

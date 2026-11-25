@@ -84,20 +84,28 @@ namespace RaidPartyManager.Presentation
         internal static void SetScene(string scene, AdventureRun run)
         {
             if (instance == null) return;
-            bool cemetery = run?.InCapital == true || CapitalStories.Contains(run?.Current?.Event) || run?.InGraveyard == true || GraveStories.Contains(run?.Current?.Event);
-            instance.environment = scene switch
-            {
-                "Camp" => SoundCue.AmbCampfire,
-                "EventSelect" or "BattlePrototype" when !cemetery => SoundCue.AmbMistboundDocks,
-                "Town" or "TalentMarket" when !cemetery => SoundCue.AmbDocksideTown,
-                "DockShop" when !cemetery => SoundCue.AmbShopInterior,
-                _ => SoundCue.None
-            };
+            bool capital = run?.InCapital == true || CapitalStories.Contains(run?.Current?.Event);
+            bool cemetery = run?.InGraveyard == true || GraveStories.Contains(run?.Current?.Event);
+            instance.environment = SceneCue(scene, capital, cemetery);
         }
+
+        private static SoundCue SceneCue(string scene, bool capital, bool cemetery) => scene switch
+        {
+            "MainMenu" => SoundCue.AmbMainMenuMarch,
+            "Camp" => SoundCue.AmbCampfire,
+            "WhisperingGraveyard" => SoundCue.AmbGraveyardExterior,
+            "ClockworkCapital" => SoundCue.AmbCapitalExterior,
+            "EventSelect" or "BattlePrototype" => capital
+                ? SoundCue.AmbCapitalExterior : cemetery ? SoundCue.AmbGraveyardExterior : SoundCue.AmbMistboundDocks,
+            "Town" => capital ? SoundCue.AmbCapitalTown : cemetery ? SoundCue.AmbGraveyardTown : SoundCue.AmbDocksideTown,
+            "TalentMarket" => capital ? SoundCue.AmbCapitalMarket : cemetery ? SoundCue.AmbGraveyardMarket : SoundCue.AmbDocksideTown,
+            "DockShop" => capital ? SoundCue.AmbCapitalShop : cemetery ? SoundCue.AmbGraveyardShop : SoundCue.AmbShopInterior,
+            _ => SoundCue.None
+        };
 
         private void Update()
         {
-            var next = bank.Clip(environment);
+            var next = bank != null ? bank.Clip(environment) : null;
             if (atmosphere.clip != next)
             {
                 ambienceFade = Mathf.MoveTowards(ambienceFade, 0, Time.unscaledDeltaTime * .9f);
@@ -115,13 +123,15 @@ namespace RaidPartyManager.Presentation
 
         internal static void Play(SoundCue cue, float gain = .64f)
         {
-            if (instance == null || cue == SoundCue.None) return;
+            if (instance == null || instance.bank == null || cue == SoundCue.None) return;
+            var clip = instance.bank.Clip(cue);
+            if (clip == null) return;
             double now = Time.unscaledTimeAsDouble;
             // Simultaneous hits, group statuses and overlapping UI events share one transient.
             double interval = cue == SoundCue.UiHover ? .12 : .065;
             if (instance.lastPlayed.TryGetValue(cue, out double previous) && now - previous < interval) return;
             instance.lastPlayed[cue] = now;
-            instance.effects.PlayOneShot(instance.bank.Clip(cue), gain);
+            instance.effects.PlayOneShot(clip, gain);
         }
     }
 }

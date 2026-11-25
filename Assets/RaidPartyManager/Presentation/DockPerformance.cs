@@ -150,6 +150,7 @@ namespace RaidPartyManager.Presentation
                     SetLive(false);
                     newSet.HideCast(); newSet.Fly(1); newSet.Fold(1); newSet.ShowPieces(false);
                     SetUpTurn();
+                    GameAudio.Play(SoundCue.StageMechanicalTurn, .50f);
                     SetCue(Cue.Turn);
                     break;
                 case Cue.Turn:

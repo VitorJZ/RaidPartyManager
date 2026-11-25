@@ -571,7 +571,7 @@ namespace RaidPartyManager.Battle
             if (missed)
             {
                 Report(kind, actor, target, name, ActionKind.Attack, reason: reason, detail: "未命中", weaponAttack: true,
-                    visual: visual, skillBookId: skillBookId, equipment: equipment);
+                    visual: visual, skillBookId: skillBookId, equipment: equipment, intercepted: intercepted);
                 AfterPassives(target, 0, 0, 0, Array.Empty<Unit>());
             }
             else
@@ -679,7 +679,10 @@ namespace RaidPartyManager.Battle
                                     var next = targets.Contains(defender) ? defender :
                                         action.Target == TargetRule.RearEnemy ? targets.LastOrDefault() : targets.FirstOrDefault();
                                     if (next != null)
+                                    {
+                                        events.Add(EquipmentVisual(actor, next, WindGlove));
                                         Hit(actor, next, action, BattleEventKind.Effect, reason, "疾风手套", falloff, canCounter, equipment: WindGlove);
+                                    }
                                 }
                                 break;
                         }
@@ -877,7 +880,7 @@ namespace RaidPartyManager.Battle
             string detail = protection ?? DamageDetail(resolved);
             Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack,
                 loadout: loadout, visual: visual, skillBookId: skillBookId, damageTaken: lifeLost, poisonDamage: poisonDamage, shieldAbsorbed: absorbed,
-                charmTriggered: charmTriggered, equipment: equipment);
+                charmTriggered: charmTriggered, equipment: equipment, intercepted: intercepted);
             if (transmuted) events.Add(EquipmentVisual(actor, target, ElementalQuartz));
             if (insulated) events.Add(EquipmentVisual(actor, target, InsulatingOrb));
             if (evaporates && target.Health > 0)

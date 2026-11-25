@@ -283,8 +283,14 @@ namespace RaidPartyManager.Presentation
                     choices.Choice(option.text, (city ? "capital-" : "grave-") + option.key, () =>
                     {
                         if (!(city ? run.ChooseCapital(int.Parse(option.key)) : run.ChooseGrave(option.key))) return;
-                        if (visit.Event == AdventureEventKind.SoulWard) stage.SyncPatients(run, content, true);
-                        else stage.CueGraveAction();
+                        var kind = visit.Event.Value;
+                        var sound = StorySounds.Choice(kind, option.key, visit.Resolved);
+                        if (kind == AdventureEventKind.SoulWard)
+                        {
+                            stage.SyncPatients(run, content, true);
+                            GameAudio.Play(sound, .51f);
+                        }
+                        else stage.CueGraveAction(sound, kind == AdventureEventKind.BellRope && option.key == "three" ? 3 : 1);
                         choices.Reset(false);
                         choices.SetEnabled(false);
                         schedule.Execute(() =>

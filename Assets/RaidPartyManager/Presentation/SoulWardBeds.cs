@@ -17,7 +17,7 @@ namespace RaidPartyManager.Presentation
             internal Texture2D Walk, Reclining;
             internal Vector3 Start;
             internal float Elapsed, Approach;
-            internal bool InBed;
+            internal bool InBed, PlayBedCue;
         }
         private readonly Patient[] patients = new Patient[2];
         private bool PatientsMoving => patients.Any(p => p != null && !p.InBed);
@@ -75,7 +75,7 @@ namespace RaidPartyManager.Presentation
                 var figure = Flat("Ward patient " + id, start, CompanySpriteSize, CompanySpriteSize, walk);
                 float approach = Mathf.Max(.56f, Vector3.Distance(start, BedCentres[i]) / 3.8f);
                 patients[i] = new Patient { Id = id, Figure = figure, Walk = walk, Reclining = reclining,
-                    Start = start, Approach = approach, Elapsed = walkIn ? 0 : approach + .48f };
+                    Start = start, Approach = approach, Elapsed = walkIn ? 0 : approach + .48f, PlayBedCue = walkIn };
             }
             ShowEventCompany(run, content);
             AnimatePatients();
@@ -99,6 +99,11 @@ namespace RaidPartyManager.Presentation
                     continue;
                 }
                 RidingWave.Hide(p.Wave);
+                if (p.PlayBedCue)
+                {
+                    GameAudio.Play(SoundCue.EventGraveTwinBedsLieDown, .48f);
+                    p.PlayBedCue = false;
+                }
                 float settle = Mathf.SmoothStep(0,1,(p.Elapsed-p.Approach)/.45f);
                 float width = 2.29f, height = width * p.Reclining.height / p.Reclining.width;
                 var rest = bed + new Vector3(0,MattressTop + height*.48f+.06f,-.07f);

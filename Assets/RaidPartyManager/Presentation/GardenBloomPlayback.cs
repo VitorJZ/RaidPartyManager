@@ -15,7 +15,7 @@ namespace RaidPartyManager.Presentation
         private readonly Label caption;
         private readonly Rect wearer;
         private readonly double started;
-        private bool greeted;
+        private bool seedPlayed, bloomPlayed, pluckPlayed, greeted;
 
         public GardenBloomPlayback(BattleStage stage, Texture2D seedArt, Texture2D walk, Rect wearer, double started)
         {
@@ -54,6 +54,22 @@ namespace RaidPartyManager.Presentation
             float ground = wearer.yMax + actorSize * .16f;
             float flowerX = Mathf.Clamp(wearer.center.x + actorSize * .67f, actorSize * 1.15f, width * .81f);
             const float touchdown = .59f, fullyOpen = 1.54f, arrive = 2.32f, pluck = 2.72f;
+
+            if (!seedPlayed)
+            {
+                GameAudio.Play(SoundCue.EventSeedBounce, .52f);
+                seedPlayed = true;
+            }
+            if (!bloomPlayed && time >= touchdown)
+            {
+                GameAudio.Play(SoundCue.EventSeedBloom, .52f);
+                bloomPlayed = true;
+            }
+            if (!pluckPlayed && time >= pluck)
+            {
+                GameAudio.Play(SoundCue.EventGardenerPluck, .52f);
+                pluckPlayed = true;
+            }
 
             seed.visible = time < touchdown;
             if (seed.visible)

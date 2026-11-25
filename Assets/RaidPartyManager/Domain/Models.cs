@@ -454,6 +454,7 @@ namespace RaidPartyManager.Domain
         public IReadOnlyList<(DamageType Type, int Amount)> DamageTaken => damageTaken.Parts;
         public bool PoisonDamage { get; }
         public bool CharmTriggered { get; }
+        public bool Intercepted { get; }
         public EquipmentEffect Equipment { get; }
         public int ShieldAbsorbed { get; }
         public BattleCountdown? Countdown { get; }
@@ -467,7 +468,7 @@ namespace RaidPartyManager.Domain
             BattleVisualCue visualCue = BattleVisualCue.None, BattleEnergy? actorEnergy = null, string skillBookId = null,
             BattleEnergy? targetEnergy = null, IReadOnlyList<(DamageType Type, int Amount)> damageTaken = null,
             bool poisonDamage = false, BattleCountdown? countdown = null, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null,
-            bool charmTriggered = false, EquipmentEffect equipment = EquipmentEffect.None)
+            bool charmTriggered = false, EquipmentEffect equipment = EquipmentEffect.None, bool intercepted = false)
         {
             Tick = tick;
             Kind = kind;
@@ -495,6 +496,7 @@ namespace RaidPartyManager.Domain
             PoisonDamage = poisonDamage;
             ShieldAbsorbed = shieldAbsorbed;
             CharmTriggered = charmTriggered;
+            Intercepted = intercepted;
             Equipment = equipment;
             Countdown = countdown;
             CopiedTraitSource = copiedTraitSource;

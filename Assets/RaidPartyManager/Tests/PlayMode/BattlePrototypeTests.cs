@@ -42,6 +42,27 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator MainMenuAndStandaloneRegionsPlayTheirOwnAmbience()
+        {
+            var scenes = new[]
+            {
+                ("MainMenu", "amb_main_menu_march"),
+                ("WhisperingGraveyard", "amb_graveyard_exterior"),
+                ("ClockworkCapital", "amb_capital_exterior")
+            };
+            foreach (var (sceneName, clipName) in scenes)
+            {
+                yield return SceneManager.LoadSceneAsync(sceneName);
+                var player = GameObject.Find("Game audio");
+                Assert.That(player, Is.Not.Null);
+                var ambience = player.GetComponents<AudioSource>().Single(source => source.loop);
+                float deadline = Time.realtimeSinceStartup + 5;
+                while (ambience.clip?.name != clipName && Time.realtimeSinceStartup < deadline) yield return null;
+                Assert.That(ambience.clip?.name, Is.EqualTo(clipName), sceneName);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator ApocalypseShowsTheCopiedCharactersActualTraitOnHover()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");

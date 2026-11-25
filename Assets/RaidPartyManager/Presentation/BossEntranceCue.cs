@@ -23,11 +23,11 @@ namespace RaidPartyManager.Presentation
         {
             "EnemyBlockadeAdmiral" => new(Role.Admiral, 2.22f, .14f, SoundCue.BossAdmiralWarning, .55f, SoundCue.BossAdmiralCannon),
             "EnemyDrownedLanternRay" => new(Role.Ray, 2.30f, .12f, SoundCue.BossMantarayColdMist, .49f, SoundCue.BossMantarayPhaseShift),
-            "EnemyNamelessKing" => new(Role.King, 2.45f, .16f, SoundCue.ChestLatchRelease, .58f, SoundCue.SwingHeavy),
-            "EnemySepulchralMatron" => new(Role.Matron, 2.50f, .12f, SoundCue.EnemyJudgeBell, .60f, SoundCue.BuffApply),
-            "EnemyRoyalEngine" => new(Role.Engine, 2.05f, .13f, SoundCue.BossAdmiralWarning, .48f, SoundCue.EnemyAnchorArmorBreak),
-            "EnemyAstralGovernor" => new(Role.Governor, 2.32f, .16f, SoundCue.OrbCast, .52f, SoundCue.HitMagic),
-            "EnemyCrucibleRegent" => new(Role.Regent, 2.34f, .24f, SoundCue.HitFire, .63f, SoundCue.SkillEarthquake),
+            "EnemyNamelessKing" => new(Role.King, 2.45f, .16f, SoundCue.BossKingCoffinUnlock, .58f, SoundCue.BossKingCoffinRise),
+            "EnemySepulchralMatron" => new(Role.Matron, 2.50f, .12f, SoundCue.BossMatronCenser, .60f, SoundCue.BossMatronAppear),
+            "EnemyRoyalEngine" => new(Role.Engine, 2.05f, .13f, SoundCue.BossEngineArrivalWhistle, .48f, SoundCue.BossEngineBrakeSkid),
+            "EnemyAstralGovernor" => new(Role.Governor, 2.32f, .16f, SoundCue.BossGovernorArmillarySpin, .52f, SoundCue.BossGovernorAppearLock),
+            "EnemyCrucibleRegent" => new(Role.Regent, 2.34f, .24f, SoundCue.BossRegentFurnaceOpen, .63f, SoundCue.BossRegentLanding),
             _ => null
         };
 

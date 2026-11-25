@@ -1,0 +1,1286 @@
+{
+  "workbook": "待补音效与ElevenLabs提示词.xlsx",
+  "sheet": "待补音效",
+  "effects": [
+    {
+      "row": 7,
+      "category": "场景环境",
+      "name": "主菜单行旅环境",
+      "cue": "主菜单讨伐队循环向右行走时，作为背景声",
+      "duration_seconds": 20,
+      "loop": true,
+      "text": "Subtle outdoor travel ambience in a fantasy world: a light crosswind, soft grass brush and distant wind through weathered roadside timber. Keep it airy and understated, with no close footsteps. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_main_menu_march.wav"
+    },
+    {
+      "row": 8,
+      "category": "场景环境",
+      "name": "低语墓园·室外",
+      "cue": "墓园选路、战斗和室外事件",
+      "duration_seconds": 24,
+      "loop": true,
+      "text": "Quiet fogbound cemetery at dusk, cold air threading through old stone arches, damp dead leaves shifting in soft gusts and a very distant low wind through cypress trees. Leave space for combat and keep all sounds distant. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_graveyard_exterior.wav"
+    },
+    {
+      "row": 9,
+      "category": "场景环境",
+      "name": "低语墓园·城镇",
+      "cue": "墓园层城镇主页",
+      "duration_seconds": 20,
+      "loop": true,
+      "text": "A quiet settlement built between cemetery walls: weathered wooden shutters stirring in the breeze, soft canvas rubbing and a distant handcart wheel on wet cobbles. Sparse, muted and sheltered. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_graveyard_town.wav"
+    },
+    {
+      "row": 10,
+      "category": "场景环境",
+      "name": "低语墓园·商店",
+      "cue": "墓园层商店柜台与推镜",
+      "duration_seconds": 18,
+      "loop": true,
+      "text": "Inside an old cemetery curio shop, a quiet enclosed room with faint timber settling and a low wick flutter, with the outside wind muffled through shutter gaps. Intimate, still and very low intensity. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_graveyard_shop.wav"
+    },
+    {
+      "row": 11,
+      "category": "场景环境",
+      "name": "低语墓园·人才市场",
+      "cue": "墓园层人才市场角色展示",
+      "duration_seconds": 20,
+      "loop": true,
+      "text": "Under a cloth canopy at a cemetery recruitment yard, occasional soft leather tack creaks and fabric flutters against a distant cool courtyard wind. Spacious but subdued, with no voices or footsteps. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_graveyard_market.wav"
+    },
+    {
+      "row": 12,
+      "category": "场景环境",
+      "name": "机巧遗都·室外",
+      "cue": "遗都选路、战斗和室外事件",
+      "duration_seconds": 24,
+      "loop": true,
+      "text": "Abandoned steampunk city, broad cold wind through iron trusses, a distant hollow pipe resonance and intermittent soft steam leaking far below. Wide urban depth with no foreground clanks. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_capital_exterior.wav"
+    },
+    {
+      "row": 13,
+      "category": "场景环境",
+      "name": "机巧遗都·城镇",
+      "cue": "遗都层城镇主页",
+      "duration_seconds": 20,
+      "loop": true,
+      "text": "A small inhabited shelter inside a derelict brass railway concourse, distant belt drive, wood canopy flutter and gentle pipe ticks in a large space. Warmer and calmer than an industrial exterior. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_capital_town.wav"
+    },
+    {
+      "row": 14,
+      "category": "场景环境",
+      "name": "机巧遗都·商店",
+      "cue": "遗都层商店柜台与推镜",
+      "duration_seconds": 18,
+      "loop": true,
+      "text": "A cramped antique machinery shop with a low clockwork escapement, faint brass temperature ticks and a steady quiet indoor air tone. Keep the mechanism soft, irregular and unobtrusive. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_capital_shop.wav"
+    },
+    {
+      "row": 15,
+      "category": "场景环境",
+      "name": "机巧遗都·人才市场",
+      "cue": "遗都层人才市场角色展示",
+      "duration_seconds": 20,
+      "loop": true,
+      "text": "A converted maintenance platform with airy iron roof resonance, soft canvas flaps and a distant idle hydraulic pump. Keep the middle range clear for close interface cues. Seamless loop with a consistent noise floor, no obvious start or end. No music or dialogue.",
+      "filename": "amb_capital_market.wav"
+    },
+    {
+      "row": 16,
+      "category": "舞台与角色",
+      "name": "舞台转盘·启动到归位",
+      "cue": "切换城镇设施或进入下一节点，舞台翻转",
+      "duration_seconds": 1.5,
+      "loop": false,
+      "text": "A stage turntable releases a latch, rolls briefly on wooden and iron bearings, then seats with a firm soft stop. Balanced movement in either direction, no huge machinery rumble. Isolated game sound effect, no music or dialogue.",
+      "filename": "stage_mechanical_turn.wav"
+    },
+    {
+      "row": 17,
+      "category": "舞台与角色",
+      "name": "石质路牌·坠地",
+      "cue": "事件结束后，每块石路牌砸地并触发画面震动",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A stone sign drops onto wooden stage boards: one dense granite floor thunk, a tiny surface bounce, then dry grit and low board vibration. One impact, medium distance. Isolated game sound effect, no music or dialogue.",
+      "filename": "stage_stone_sign_land.wav"
+    },
+    {
+      "row": 18,
+      "category": "舞台与角色",
+      "name": "开幕·拉开舞台帘",
+      "cue": "开始新讨伐时舞台帘向两侧拉开",
+      "duration_seconds": 1.4,
+      "loop": false,
+      "text": "Heavy theater velvet sweeps open smoothly on rings, soft rapid track ticks followed by a broad fabric swish and a pair of padded end stops. Warm and tactile. Isolated game sound effect, no music or dialogue.",
+      "filename": "stage_curtain_open.wav"
+    },
+    {
+      "row": 19,
+      "category": "舞台与角色",
+      "name": "终幕·合上舞台帘",
+      "cue": "通过机巧遗都后合帘，随后停留在通关字幕",
+      "duration_seconds": 1.5,
+      "loop": false,
+      "text": "Two thick velvet theater curtains slide inward and meet with a soft weighted cloth brush, track rings settling into silence. Quiet and conclusive. Isolated game sound effect, no music or dialogue.",
+      "filename": "stage_curtain_close.wav"
+    },
+    {
+      "row": 20,
+      "category": "舞台与角色",
+      "name": "合同即将到期·队伍提醒",
+      "cue": "事件结束且有人剩余合同不超过 3 天时",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "Two short muted brass desk-bell taps, first firm and second lighter, like a discreet administrative alert. Readable at low volume, no tune. Isolated game sound effect, no music or dialogue.",
+      "filename": "ui_contract_expiry_warning.wav"
+    },
+    {
+      "row": 21,
+      "category": "舞台与角色",
+      "name": "深海轻语·乘浪滑行",
+      "cue": "在战斗或演出中随浪移动，可按移动实际时长裁切",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "A small rolling water crest glides forward under a rider, soft foamy spray and a close upward splash that resolves without crashing. No footsteps. Isolated game sound effect, no music or dialogue.",
+      "filename": "actor_deep_sea_whisper_wave.wav"
+    },
+    {
+      "row": 22,
+      "category": "舞台与角色",
+      "name": "深海轻语·落回舞台",
+      "cue": "移动结束时浪花下降，角色落地",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A small raised wave releases into a low wet splash and drains off wooden boards with a few soft droplets. Gentle landing, no body impact or footsteps. Isolated game sound effect, no music or dialogue.",
+      "filename": "actor_deep_sea_whisper_wave_land.wav"
+    },
+    {
+      "row": 23,
+      "category": "舞台与角色",
+      "name": "深海轻语·水刃发射",
+      "cue": "攻击释放时播放，先于命中",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A thin curved blade of water slices the air with a sharp liquid swish and a fine spray trail. One quick projectile, no metal and no impact. Isolated game sound effect, no music or dialogue.",
+      "filename": "actor_deep_sea_whisper_water_blade.wav"
+    },
+    {
+      "row": 24,
+      "category": "舞台与角色",
+      "name": "奇怪的种子·跳到地上",
+      "cue": "战斗结算时，种子从装备者处落到舞台",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A tiny hard seed pops free, taps a wooden floor once and makes one softer second bounce. Small and dry, no rattle or coins. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_seed_bounce.wav"
+    },
+    {
+      "row": 25,
+      "category": "舞台与角色",
+      "name": "奇怪的种子·发芽开花",
+      "cue": "种子落地后破壳，幼芽长大并开花",
+      "duration_seconds": 1.2,
+      "loop": false,
+      "text": "A little seed shell cracks, fine roots unfold with a wet fibrous rustle, and a small flower opens with a soft petal puff. Close fantasy nature foley. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_seed_bloom.wav"
+    },
+    {
+      "row": 26,
+      "category": "舞台与角色",
+      "name": "墓园花匠·摘花",
+      "cue": "花匠走到种子旁摘下花朵，再入队",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A gentle fingertip pinch snaps a delicate plant stem once, followed by a soft small petal brush. Intimate close-up, very quiet. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_gardener_pluck.wav"
+    },
+    {
+      "row": 27,
+      "category": "首领进场",
+      "name": "无名葬王·石棺解锁",
+      "cue": "入场约 0.39 秒，镜头对准石棺",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "An ancient stone sarcophagus seal loosens with one deep internal latch thunk and grinding shale dust. Weighty, low and close. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_king_coffin_unlock.wav"
+    },
+    {
+      "row": 28,
+      "category": "首领进场",
+      "name": "无名葬王·破棺出场",
+      "cue": "入场约 1.42 秒，葬王从棺中现身",
+      "duration_seconds": 1.1,
+      "loop": false,
+      "text": "A heavy stone coffin lid drags and drops a little as a large armored figure rises. Deep granite weight, short dry grit spill, no sword swing. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_king_coffin_rise.wav"
+    },
+    {
+      "row": 29,
+      "category": "首领进场",
+      "name": "守墓圣母·摇香炉",
+      "cue": "入场约 0.30 秒，香炉走在角色前方",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "A hanging silver censer sways once on a little chain, with a delicate double link chink and warm ember fizz. Slow ceremonial motion. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_matron_censer.wav"
+    },
+    {
+      "row": 30,
+      "category": "首领进场",
+      "name": "守墓圣母·哀光显形",
+      "cue": "入场约 1.50 秒，圣母从礼拜堂后方走近",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "A soft spread of chapel air carried by a thin silver sheen and a subtle fabric sweep. Solemn and close, no choir and no bell. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_matron_appear.wav"
+    },
+    {
+      "row": 31,
+      "category": "首领进场",
+      "name": "末班皇车·远处汽笛",
+      "cue": "入场约 0.27 秒，皇车驶入前",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A distant short vintage steam locomotive whistle, with a little boiler pressure rush and a clear stop. One railway signal, not a ship horn. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_engine_arrival_whistle.wav"
+    },
+    {
+      "row": 32,
+      "category": "首领进场",
+      "name": "末班皇车·上台制动",
+      "cue": "入场约 0.98 秒，皇车到位并急刹",
+      "duration_seconds": 1.1,
+      "loop": false,
+      "text": "A heavy locomotive skids onto a mark with low steel wheel friction, a rapid short rail squeal, and one abrupt air brake discharge. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_engine_brake_skid.wav"
+    },
+    {
+      "row": 33,
+      "category": "首领进场",
+      "name": "天球摄政·星仪转动",
+      "cue": "入场约 0.37 秒，星仪先转动",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "Close clockwork brass armillary rings spin through fine teeth; begin with three small ticks and end in a smooth glassy rotational whirr. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_governor_armillary_spin.wav"
+    },
+    {
+      "row": 34,
+      "category": "首领进场",
+      "name": "天球摄政·星仪合位",
+      "cue": "入场约 1.21 秒，天球摄政在星仪内成形",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "Three brass sight rings converge on a glass center with one crisp locking click and a brief focused refraction swell. No explosive hit. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_governor_appear_lock.wav"
+    },
+    {
+      "row": 35,
+      "category": "首领进场",
+      "name": "熔心执政官·炉口开启",
+      "cue": "入场约 0.56 秒，炉口亮起",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A heavy foundry valve cracks open, releasing a low contained rumble and a short hiss of dry furnace air. Anticipatory, not an explosion. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_regent_furnace_open.wav"
+    },
+    {
+      "row": 36,
+      "category": "首领进场",
+      "name": "熔心执政官·熔炉落锤",
+      "cue": "入场约 1.47 秒，执政官落下重拍",
+      "duration_seconds": 1.1,
+      "loop": false,
+      "text": "A giant heated iron foot lands against foundry grating. One massive dense clang with a little falling hot slag and very short deck vibration. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_regent_landing.wav"
+    },
+    {
+      "row": 37,
+      "category": "首领机制",
+      "name": "葬王点名",
+      "cue": "葬王标记下一次接受审判的队员",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A single emphatic strike of a blunt iron seal on a stone tablet, with a thin ominous air draw trailing behind. Strong warning, no speech. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_king_sentence_mark.wav"
+    },
+    {
+      "row": 38,
+      "category": "首领机制",
+      "name": "王命葬列",
+      "cue": "标记未解除，葬王执行判罚",
+      "duration_seconds": 1.1,
+      "loop": false,
+      "text": "A huge funeral slab drops with a dry stone slam and a short focused bronze sword cut through its dust. One decisive execution cue. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_king_burial_sentence.wav"
+    },
+    {
+      "row": 39,
+      "category": "首领机制",
+      "name": "葬王赦免",
+      "cue": "队员生命过半或有护盾，葬王取消判罚",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A large old sword slides back into its scabbard, the dry metallic intake ending in an unmistakable soft lock. Quiet release after a warning. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_king_sentence_cancel.wav"
+    },
+    {
+      "row": 40,
+      "category": "首领机制",
+      "name": "守柩祈祷·护柩回生",
+      "cue": "圣母保护在场随从并回复自己的生命",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "A warm censer flare sends a soft silver barrier outward, then the light draws back as a short restorative breath. Two connected beats, no choir. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_matron_guard_prayer.wav"
+    },
+    {
+      "row": 41,
+      "category": "首领机制",
+      "name": "空柩哀悼",
+      "cue": "没有可护持随从时，圣母露出破绽",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A fine chain slackens and gently taps an empty wooden bier, followed by an abrupt soft inward hush. Sad through material, with no mournful voice. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_matron_empty_bier.wav"
+    },
+    {
+      "row": 42,
+      "category": "首领机制",
+      "name": "汽笛鸣响",
+      "cue": "皇车预告冲击前两位角色",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "One short double-burst steam whistle at close railway range over a faint valve pressure build. Flat assertive signal, no movement or impact. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_engine_charge_warning.wav"
+    },
+    {
+      "row": 43,
+      "category": "首领机制",
+      "name": "终点清场",
+      "cue": "皇车未被打断，冲击讨伐队前排",
+      "duration_seconds": 1.1,
+      "loop": false,
+      "text": "A close heavy rail carriage accelerates in a short grind and makes two front-loaded rail thuds, second slightly fainter. No warning whistle. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_engine_charge.wav"
+    },
+    {
+      "row": 44,
+      "category": "首领机制",
+      "name": "制动熄火",
+      "cue": "皇车蓄力被打断",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A pressurized flywheel chokes once, stutters twice and loses air in a small downward hiss. Conclude abruptly so the canceled charge is clear. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_engine_stall.wav"
+    },
+    {
+      "row": 45,
+      "category": "首领机制",
+      "name": "星轨定位",
+      "cue": "天球摄政锁定崭新的队员站位",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "Three tiny brass indexing ticks accelerate and end at one high glass click. A precise optical target lock, no electronics or musical notes. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_governor_target_lock.wav"
+    },
+    {
+      "row": 46,
+      "category": "首领机制",
+      "name": "群星合相",
+      "cue": "天球摄政兑现已锁定的攻击",
+      "duration_seconds": 1.1,
+      "loop": false,
+      "text": "Several narrow glass light beams converge into one crisp pressurized focal snap, with a short ceramic-and-air tail. Single decisive arcane impact. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_governor_alignment.wav"
+    },
+    {
+      "row": 47,
+      "category": "首领机制",
+      "name": "星光折返",
+      "cue": "目标仍有护盾，引发星光折返",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A focused high glass sweep hits a thin barrier tick, then bounces away in the reverse direction, fading quickly. No explosive hit or heal. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_governor_refract.wav"
+    },
+    {
+      "row": 48,
+      "category": "首领机制",
+      "name": "炉温上升",
+      "cue": "炉温累积至 1 或 2 层",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A compact furnace pressure ratchet steps up one notch as heated air tightens. Short metallic buildup cue with no payoff explosion. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_regent_heat_buildup.wav"
+    },
+    {
+      "row": 49,
+      "category": "首领机制",
+      "name": "全城开炉",
+      "cue": "炉温到阈值，首领灼烧前两位",
+      "duration_seconds": 1.2,
+      "loop": false,
+      "text": "A massive foundry gate bangs open and twin forced blasts of low hot air roll out, followed by short fiery grit. Dry pressure and iron, not a long explosion. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_regent_furnace_burst.wav"
+    },
+    {
+      "row": 50,
+      "category": "首领机制",
+      "name": "冷却泄压",
+      "cue": "寒冷使执政官炉温归零",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A hot iron chamber quenches with a wet hiss and a valve rattles down to rest. One clean falling pressure release, ending in a small stop. Isolated game sound effect, no music or dialogue.",
+      "filename": "boss_regent_pressure_release.wav"
+    },
+    {
+      "row": 51,
+      "category": "装备触发",
+      "name": "蓝祭祀面具·回合末回响",
+      "cue": "回合结束效果开始额外结算",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "Two hollow wooden mask knocks, the second a closer rhythmic echo with a very soft dark breath between them. A compact double trigger, no ominous drone. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_ritual_mask_echo.wav"
+    },
+    {
+      "row": 52,
+      "category": "装备触发",
+      "name": "疾风手套·追加攻击",
+      "cue": "触发额外攻击，出手前",
+      "duration_seconds": 0.5,
+      "loop": false,
+      "text": "An extremely short sharp wind double-flick, like a gloved wrist snapping forward twice. Light air only, no blade hit or footstep. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_wind_glove_followup.wav"
+    },
+    {
+      "row": 53,
+      "category": "装备触发",
+      "name": "盛气药水·药效",
+      "cue": "药水效果结算，角色获得盛气",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A quick vial glug that blossoms into a low warm upward flare. The bottle itself is barely audible; feature the surge of vigor. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_vigor_potion.wav"
+    },
+    {
+      "row": 54,
+      "category": "装备触发",
+      "name": "迅捷药水·药效",
+      "cue": "角色获得迅捷",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A tiny liquid sip followed by a nimble high air flick and fine clean sparkle. Crisp motion with no sustained tone. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_swift_potion.wav"
+    },
+    {
+      "row": 55,
+      "category": "装备触发",
+      "name": "坚毅药水·药效",
+      "cue": "角色获得坚毅",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A dense liquid swallow sets into a firm quiet mineral knock, like a small stone firmly bracing into place. Solid and restrained. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_resolve_potion.wav"
+    },
+    {
+      "row": 56,
+      "category": "装备触发",
+      "name": "贪婪药水·药效",
+      "cue": "角色获得贪婪",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A sticky syrup sip and two tiny offbeat gold coin ticks in a glass vial. Dry and sly rather than a big payout jingle. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_greed_potion.wav"
+    },
+    {
+      "row": 57,
+      "category": "装备触发",
+      "name": "荆棘药水·药效",
+      "cue": "角色获得荆棘",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A little vial sip releases an abrupt bramble unfurl with several close dry thorn clicks. Organic, scratchy and quick. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_thorns_potion.wav"
+    },
+    {
+      "row": 58,
+      "category": "装备触发",
+      "name": "净化药水·药效",
+      "cue": "角色获得纯净",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "Clear water flicks from a small vial, then a brief clean glass breath dissolves into silence. Soft and bright without a note sequence. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_purity_potion.wav"
+    },
+    {
+      "row": 59,
+      "category": "装备触发",
+      "name": "浑浊的水·双重药效",
+      "cue": "饮用的药水额外触发一次",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "Two close uneven muddy liquid blubs, with the second thicker and slightly lower. Tiny bottle scale, no pouring stream. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_murky_water_repeat.wav"
+    },
+    {
+      "row": 60,
+      "category": "装备触发",
+      "name": "万能药瓶·保留药水",
+      "cue": "成功保留本次饮用的药水",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "One empty bottle briefly gurgles as liquid refills upward, then a tiny cork ticks back into place. A crisp preservation cue. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_panacea_preserve.wav"
+    },
+    {
+      "row": 61,
+      "category": "装备触发",
+      "name": "醉仙葫芦·叠攻击",
+      "cue": "任一队员触发药水，葫芦增加攻击力",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A hollow dried gourd gives a rounded wooden clonk, a small internal slosh and one brief rising low pulse. Keep it distinct from glass potions. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_zuixian_gourd_might.wav"
+    },
+    {
+      "row": 62,
+      "category": "装备触发",
+      "name": "巫医玩偶·毒转治疗",
+      "cue": "中毒结算变成治疗",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "Dry bone beads click around a tiny tied cloth doll, a short acidic hiss collapses into warm healing air. No voice or ritual music. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_witch_doctor_doll.wav"
+    },
+    {
+      "row": 63,
+      "category": "装备触发",
+      "name": "祖传毒方·追加中毒",
+      "cue": "装备让本次施毒额外叠层",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "Two tight acidic bubbles pop against a coarse herb grind. Short, sharp and small, clearly a poison upgrade rather than a large toxic cloud. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_poison_recipe_amplify.wav"
+    },
+    {
+      "row": 64,
+      "category": "装备触发",
+      "name": "金属护持类装备·触发",
+      "cue": "末班调压阀、摄政星仪、绝缘灵珠共用一条",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A small brass mechanism catches with one neat ratchet and deploys a thin metallic pressure ring. Clean defensive texture, quick and light. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_metal_ward.wav"
+    },
+    {
+      "row": 65,
+      "category": "装备触发",
+      "name": "生命装备·恢复",
+      "cue": "生命吊坠、红水晶吊坠、圣愈戒指和余热炉心共用一条",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A gentle near-field amber pulse, like soft warm air entering a small glass locket, ending with one subdued clear tick. A quiet recurring battle heal. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_vitality_restore.wav"
+    },
+    {
+      "row": 66,
+      "category": "装备触发",
+      "name": "岩石铠甲·生甲",
+      "cue": "每回合石甲覆盖装备者",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "Two weighty dry stone plates seat against one another with a short fine grit scrape. Small armor scale, no landslide or boom. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_stone_armor.wav"
+    },
+    {
+      "row": 67,
+      "category": "装备触发",
+      "name": "无面王冠·覆盾",
+      "cue": "开战或首次低于半血获得王冠护盾",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A hollow antique crown ring blooms into a dark, stable barrier, with one grainy armor lock at the end. Noble and compact, with no voices. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_faceless_crown.wav"
+    },
+    {
+      "row": 68,
+      "category": "装备触发",
+      "name": "冷魂圣匣与沉灯霜链·寒雾",
+      "cue": "开战触发冰冷遗物时共用一条",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "Small frozen chain links and an icy lid scrape release a soft sweeping chill. Little crystal cracks, broader air movement at the end. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_frost_relic.wav"
+    },
+    {
+      "row": 69,
+      "category": "装备触发",
+      "name": "火焰类戒指与余烬·触发",
+      "cue": "火焰戒指、初始之火和永恒之火共用一条",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A tight dry ember puff with a few hot crackles and one tiny rush of flame. Close and short enough to layer with a hit cue. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_fire_ember.wav"
+    },
+    {
+      "row": 70,
+      "category": "装备触发",
+      "name": "雷电类装备·触发",
+      "cue": "雷电戒指、封港信笛、感电棱镜与古树根茎共用一条",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A small hard electric arc sputters in two crisp ticks with a short static tail. Near-field bright effect, no thunder boom. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_lightning_arc.wav"
+    },
+    {
+      "row": 71,
+      "category": "装备触发",
+      "name": "寒冰戒指·相邻扩散",
+      "cue": "攻击命中后寒冷扩散至相邻格",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A crisp little ice crystal snap at the center, with two weaker brittle ticks spreading outward left and right. Small scale and dry. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_ice_ring_spread.wav"
+    },
+    {
+      "row": 72,
+      "category": "装备触发",
+      "name": "伤害附加类装备·触发",
+      "cue": "处刑者面具、反叛者耳坠与打狗棒共用一条",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A thin abrasive slash against rough metal with a clipped dark snap. No gore, no bass explosion, and no sustained ringing. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_rending_mark.wav"
+    },
+    {
+      "row": 73,
+      "category": "装备触发",
+      "name": "反击的号角·触发",
+      "cue": "受击后接反击动作",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "One stubby natural horn bark with a small breath intake. Staccato rally signal, no melody, no echo and no marching band. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_counter_horn.wav"
+    },
+    {
+      "row": 74,
+      "category": "装备触发",
+      "name": "洞察图腾·揭出破绽",
+      "cue": "回合开始时标出目标",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "An engraved wooden totem gives a tiny knock, followed by a narrow clear glint that cuts off fast. Tactile pinpoint reveal. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_insight_totem.wav"
+    },
+    {
+      "row": 75,
+      "category": "装备触发",
+      "name": "摇钱树枝·掉币",
+      "cue": "攻击触发金币收益",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A twig shakes once and two small gold coins detach and tap onto wood. Keep it quiet for frequent repetition, no big treasure jingle. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_money_tree_coins.wav"
+    },
+    {
+      "row": 76,
+      "category": "装备触发",
+      "name": "传话筒·回合初增益",
+      "cue": "回合开始时按传递次数给当前装备者增益",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A muted air puff through a small tin speaking cone, followed by a short hollow metallic resonance. No articulated voice and no handoff foley. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_megaphone_buff.wav"
+    },
+    {
+      "row": 77,
+      "category": "装备触发",
+      "name": "红绳·共享受伤",
+      "cue": "相邻队友通过红绳共享伤害",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A tight woven cord pulls taut with a short fibrous whip and a soft second response, implying a linked tug. Close and quick. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_red_cord_link.wav"
+    },
+    {
+      "row": 78,
+      "category": "装备触发",
+      "name": "寻人启事·召来援军",
+      "cue": "开战成功召来援军，启事展开并消耗",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A rolled notice springs open with crisp parchment flutter and one small sealing cord snap. A quick physical paper reveal. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_recruitment_notice.wav"
+    },
+    {
+      "row": 79,
+      "category": "装备触发",
+      "name": "魔导水晶与元素石英·触发",
+      "cue": "魔导水晶回生与元素石英转换共用一条",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A small faceted crystal turns with an airy low crystalline sweep and a short bright cutoff. Keep the resonance clean to fit either arcane conversion or recovery. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_arcane_crystal.wav"
+    },
+    {
+      "row": 80,
+      "category": "装备触发",
+      "name": "八卦·转位效果",
+      "cue": "依站位触发寒冷或额外火焰伤害",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A flat bronze divination disc turns one notch, two small engraved metal clicks and a brief neutral energy pulse. Dry, without tonal music. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_bagua_turn.wav"
+    },
+    {
+      "row": 81,
+      "category": "装备触发",
+      "name": "精灵护符·致命伤回生",
+      "cue": "护符挡住致命伤并恢复生命，随后消耗",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "A delicate talisman rings once, briefly swells into a transparent barrier, then softly cracks and releases warm restorative air. One clear save, no weapon impact. Isolated game sound effect, no music or dialogue.",
+      "filename": "gear_elven_charm_save.wav"
+    },
+    {
+      "row": 82,
+      "category": "技能",
+      "name": "钩月箭",
+      "cue": "弯弧箭矢射向敌阵末位并施加破绽",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "Taut bowstring snap, then a slender arrow bends around in a high curved whistle, ending with a tiny dry metallic score. Keep the trail quick and readable. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_hook_moon_arrow.wav"
+    },
+    {
+      "row": 83,
+      "category": "技能",
+      "name": "双人掩护",
+      "cue": "自身与身后一名队友各获得护盾",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "Two offset shield deployments: a compact plate click for the lead guard, then a slightly wider resonant shield hum for the ally behind. Clearly two beats. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_pair_cover.wav"
+    },
+    {
+      "row": 84,
+      "category": "技能",
+      "name": "拔毒急救",
+      "cue": "清除一名队友的中毒和诅咒并治疗",
+      "duration_seconds": 1.2,
+      "loop": false,
+      "text": "Draw a tiny wet toxin hiss inward, cut it with a clean cloth snap, then release a warm soft breath of restorative magic. No aggressive impact. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_purge_poison.wav"
+    },
+    {
+      "row": 85,
+      "category": "技能",
+      "name": "冻港回潮",
+      "cue": "冷潮横扫敌阵并施加寒冷",
+      "duration_seconds": 1.4,
+      "loop": false,
+      "text": "Low water rush widening into a row of short ice crackles and a thin frosty exhale. One sweep moving across the battlefield, with a short clean finish. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_frozen_harbor_tide.wav"
+    },
+    {
+      "row": 86,
+      "category": "技能",
+      "name": "铜墙反震",
+      "cue": "厚铜护盾成形，立起反伤防护",
+      "duration_seconds": 1.1,
+      "loop": false,
+      "text": "A broad thick bronze shield locks into place with two plate clacks and a deep hollow ring that pulls inward. End on a small reflected metallic tick. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_bronze_reflect.wav"
+    },
+    {
+      "row": 87,
+      "category": "技能",
+      "name": "守夜灯火",
+      "cue": "全队立即受到灯火治疗",
+      "duration_seconds": 1.2,
+      "loop": false,
+      "text": "A single flint spark lights a sheltered lantern, followed by a warm widening fire puff and soft healing air. Gentle and sober, no chime melody. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_night_watch_lantern.wav"
+    },
+    {
+      "row": 88,
+      "category": "技能",
+      "name": "攻城矢",
+      "cue": "重矢击碎护盾并震及相邻单位",
+      "duration_seconds": 1.2,
+      "loop": false,
+      "text": "A very heavy crossbow releases with a mechanical twang, then a focused iron bolt smashes a brittle barrier; two tiny lateral debris clicks follow. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_siege_bolt.wav"
+    },
+    {
+      "row": 89,
+      "category": "技能",
+      "name": "铁壁接管",
+      "cue": "角色替队友接下单体攻击",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A short leather-and-metal rush cuts in front, ending in a planted heavy boot and a firm steel brace lock. Compact defense cue, no weapon swing. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_iron_wall_intercept.wav"
+    },
+    {
+      "row": 90,
+      "category": "技能",
+      "name": "未结工钱",
+      "cue": "一名阵亡队友复活并获得护盾",
+      "duration_seconds": 1.4,
+      "loop": false,
+      "text": "Two dry coin taps on a ledger, a sudden soft intake of air, then a small protective metal shimmer. Make the coin-to-revival timing clear and understated. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_unpaid_wages.wav"
+    },
+    {
+      "row": 91,
+      "category": "技能",
+      "name": "雷暴裁决·释放",
+      "cue": "蓄力成功后全体敌人遭雷击",
+      "duration_seconds": 1.5,
+      "loop": false,
+      "text": "A brief electrical charge ramps to a single heavy thunder crack, followed by a tight fan of lower subsidiary electrical snaps. Keep a fast readable release. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_thunder_verdict_release.wav"
+    },
+    {
+      "row": 92,
+      "category": "技能",
+      "name": "封港连炮",
+      "cue": "向敌阵最后两名单位连续发炮",
+      "duration_seconds": 1.5,
+      "loop": false,
+      "text": "Two distinct compact deck swivel-gun reports in quick succession, followed by two short distant iron hits. Punchy cannon powder, trimmed tail; exactly two shots. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_harbor_double_cannon.wav"
+    },
+    {
+      "row": 93,
+      "category": "技能",
+      "name": "深水翻涌",
+      "cue": "主目标遭遇深水冲击，寒冷向周围扩散",
+      "duration_seconds": 1.3,
+      "loop": false,
+      "text": "A compressed deep-water surge erupts at one point with a low pressure thump, then small ice bubbles crackle outward. Wet heavier center and a clear chilly tail. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_deepwater_surge.wav"
+    },
+    {
+      "row": 94,
+      "category": "技能",
+      "name": "终葬敕令",
+      "cue": "最前排受重击，诅咒铺向全体敌人",
+      "duration_seconds": 1.3,
+      "loop": false,
+      "text": "One blunt burial bronze impact, immediately followed by a gritty band of grave dust crawling sideways. Ominous curse resonance with no vocal layer. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_final_burial_edict.wav"
+    },
+    {
+      "row": 95,
+      "category": "技能",
+      "name": "长夜守祷",
+      "cue": "全队净化、治疗并获得护盾",
+      "duration_seconds": 1.5,
+      "loop": false,
+      "text": "A fine glassy hiss lifts away, warm air blooms, then a soft broad glass shield settles with a single clear tick. Three connected textures, gentle dynamics. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_long_night_prayer.wav"
+    },
+    {
+      "row": 96,
+      "category": "技能",
+      "name": "清轨通令",
+      "cue": "冲击最前两名敌人并留下破绽",
+      "duration_seconds": 1.2,
+      "loop": false,
+      "text": "An old rail signal lever snaps down, then a weighty steel-on-track surge makes two short staggered strikes. Industrial rail texture, no train whistle. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_clear_track_order.wav"
+    },
+    {
+      "row": 97,
+      "category": "技能",
+      "name": "子午过境",
+      "cue": "遗都首领技能，魔法横扫全体敌人",
+      "duration_seconds": 1.3,
+      "loop": false,
+      "text": "An observatory ring spins up and thin glass-and-brass energy sweeps swiftly across in one wide arc, ending in a crisp optical snap. Cool and mechanical. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_meridian_transit.wav"
+    },
+    {
+      "row": 98,
+      "category": "技能",
+      "name": "全员退火",
+      "cue": "蒸汽退火使友方恢复并获得护盾",
+      "duration_seconds": 1.4,
+      "loop": false,
+      "text": "A restrained pressure vent exhales, a quick metallic cooling hiss spreads and hardened plates settle in a soft, synchronized clack. Protective and warm. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_all_hands_anneal.wav"
+    },
+    {
+      "row": 99,
+      "category": "技能",
+      "name": "饮鸩强袭",
+      "cue": "耗尽能量向双方施毒",
+      "duration_seconds": 1.3,
+      "loop": false,
+      "text": "A single bitter swallow and vial tick at the caster, then a widening rush of low corrosive green bubbles bursting in tight succession. A clear self-to-field sequence. Isolated game sound effect, no music or dialogue.",
+      "filename": "skill_drink_venom_assault.wav"
+    },
+    {
+      "row": 100,
+      "category": "战斗状态",
+      "name": "潮湿·附着",
+      "cue": "单位第一次获得潮湿，水花落下",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A few close cool droplets patter onto cloth and combine into a tiny wet pat. Immediate damp onset, no large splash or footsteps. Isolated game sound effect, no music or dialogue.",
+      "filename": "status_wet_apply.wav"
+    },
+    {
+      "row": 101,
+      "category": "战斗状态",
+      "name": "蒸发·转化",
+      "cue": "潮湿受火转成蒸发",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A small amount of water touches hot metal with a tight bright hiss, rising through a brief puff of thinning steam. Quick and dry at the end. Isolated game sound effect, no music or dialogue.",
+      "filename": "status_evaporation_apply.wav"
+    },
+    {
+      "row": 102,
+      "category": "战斗状态",
+      "name": "森之印·叠加",
+      "cue": "森语巡猎的攻击留下或叠加森之印",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A tiny green leaf unfurls with dry wood fiber friction and one delicate upward twig tick. Quiet mark cue, no magical bells. Isolated game sound effect, no music or dialogue.",
+      "filename": "status_forest_mark_apply.wav"
+    },
+    {
+      "row": 103,
+      "category": "战斗状态",
+      "name": "腐花魔女·中毒转移",
+      "cue": "中毒单位死亡，层数转给最近的存活敌方单位",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A low acidic bubble pops at the origin, travels as a narrow wet air tendril and ends with one smaller landing pop. Two clear points and no large poison cloud. Isolated game sound effect, no music or dialogue.",
+      "filename": "actor_rot_bloom_poison_transfer.wav"
+    },
+    {
+      "row": 104,
+      "category": "墓园事件",
+      "name": "明日讣告·报纸落桌",
+      "cue": "报纸交到玩家面前时",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "One folded brittle old newspaper slaps onto a weathered wooden desk and springs partly open with a close papery rustle. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_obituary.wav"
+    },
+    {
+      "row": 105,
+      "category": "墓园事件",
+      "name": "棺材差一个角·抬棺",
+      "cue": "选中的队员抬起棺材一角",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A loaded wooden coffin corner scrapes stone, wood groans under shifting weight, then a small iron handle clinks as the coffin is lifted. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_coffin_lift.wav"
+    },
+    {
+      "row": 106,
+      "category": "墓园事件",
+      "name": "墓园工伤理赔处·盖章",
+      "cue": "办事员确认理赔记录时",
+      "duration_seconds": 0.6,
+      "loop": false,
+      "text": "A quick dry ledger page flick and a single firm wooden clerk's stamp landing flat on the paper. Deadpan close foley. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_comp_stamp.wav"
+    },
+    {
+      "row": 107,
+      "category": "墓园事件",
+      "name": "遗产拍卖，第零号拍品·匣盖掀开",
+      "cue": "首次查验时，解锁之后叠加匣盖动作",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A small aged auction casket lid raises on dry little hinges, ending with dusty wood rubbing. No initial lock click and no coins. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_auction_lid.wav"
+    },
+    {
+      "row": 108,
+      "category": "墓园事件",
+      "name": "墓碑接受冠名·刻名字",
+      "cue": "选择被冠名的队员后，石碑上出现铭文",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A fine hand engraving tool slowly cuts a short deliberate groove into smooth stone, one scratch and a tiny stone chip. Intimate, not hammer hits. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_sponsor_engrave.wav"
+    },
+    {
+      "row": 109,
+      "category": "墓园事件",
+      "name": "守柩獒最后一次散步·项圈",
+      "cue": "狗停在主人墓前，可用在挂起项圈时",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A worn dog collar shifts on stone, its small brass tag tapping twice, then the leather settles. No dog bark, no footsteps. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_mastiff_collar.wav"
+    },
+    {
+      "row": 110,
+      "category": "墓园事件",
+      "name": "三封投错的遗书·分拣",
+      "cue": "玩家给遗书选择收信人",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "Scatter three close rain-softened paper envelopes by hand, one quick thicker paper slide followed by two smaller slips. No writing or stamp. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_misdelivered_letters.wav"
+    },
+    {
+      "row": 111,
+      "category": "墓园事件",
+      "name": "哭墙今天休息·墙缝低鸣",
+      "cue": "玩家提交代哭人，墙体回应",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "One hollow low exhale of wind through damp stone seams, with a tiny falling water drop. Suggest an old wall lamenting without any human voice. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_weeping_wall.wav"
+    },
+    {
+      "row": 112,
+      "category": "墓园事件",
+      "name": "渡鸦只说最后一句·振翅",
+      "cue": "玩家选定渡鸦的指引",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A single raven makes a close leathery wing flick, small claws scrape a stone perch, then one clear distant flap. No speech and no loud caw. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_raven_wing.wav"
+    },
+    {
+      "row": 113,
+      "category": "墓园事件",
+      "name": "墓钟少响了一声·单击钟音",
+      "cue": "根据选项调用一次或三次",
+      "duration_seconds": 1.2,
+      "loop": false,
+      "text": "Exactly one medium-low strike of an old cemetery bronze bell, a dull wooden clapper knock followed by a short dark metallic decay. No second hit. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_bell_strike.wav"
+    },
+    {
+      "row": 114,
+      "category": "墓园事件",
+      "name": "缝魂医师的双人床位·上床",
+      "cue": "每名队员走到床边并躺下时",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A linen blanket rolls once and a wooden infirmary bed frame lightly creaks under someone lying down. Soft close fabric and timber, no voice. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_twin_beds_lie_down.wav"
+    },
+    {
+      "row": 115,
+      "category": "墓园事件",
+      "name": "缝魂医师的双人床位·移交生命",
+      "cue": "玩家同意治疗后，生命在两人间转移",
+      "duration_seconds": 1,
+      "loop": false,
+      "text": "A fine sewing thread draws through cloth once, then two quiet warm pulses cross past each other. Delicate fantastical foley to suggest life transfer. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_twin_beds_transfer.wav"
+    },
+    {
+      "row": 116,
+      "category": "墓园事件",
+      "name": "排在你前面的人·递汤",
+      "cue": "一碗汤交给玩家选中的队员",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A shallow ceramic soup bowl slides across wood, ending in a quiet bump and one small liquid slosh. No eating or voices. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_soup_handoff.wav"
+    },
+    {
+      "row": 117,
+      "category": "墓园事件",
+      "name": "生前没说完的那句话·双碑",
+      "cue": "玩家为两名队员定下约定",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "Two distant engraved stones answer with short hollow air resonances, first left then right. A tiny grit scrape, no whisper or speech. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_grave_marker_reply.wav"
+    },
+    {
+      "row": 118,
+      "category": "墓园事件",
+      "name": "给自己写墓志铭·石匠落凿",
+      "cue": "确认把队员的目标写进目标栏",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "Two distinct light chisel taps in weathered stone, followed by coarse dust brushing off. Crisp tool contact and no sustained scraping. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_epitaph_chisel.wav"
+    },
+    {
+      "row": 119,
+      "category": "墓园事件",
+      "name": "无名葬王征用姓名·封名",
+      "cue": "队员姓名被暂时封存",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "An old name plate slides into a narrow stone slot and a heavy wax seal presses flat with a dark paper thump. Brief and ceremonial, no spell voice. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_grave_sealed_name.wav"
+    },
+    {
+      "row": 120,
+      "category": "遗都事件",
+      "name": "永不下班的闸机·放行",
+      "cue": "闸机接受检修或认出票证后",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "An abandoned brass turnstile releases one latch and rolls forward one notch with three short ratchet clicks and a firm stop. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_turnstile.wav"
+    },
+    {
+      "row": 121,
+      "category": "遗都事件",
+      "name": "投递于九十年前·气邮落筒",
+      "cue": "玩家给选定的管路加压后，邮筒送出",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "Compressed air whooshes down a narrow brass pipe and a single padded mail capsule clunks into an accessible tray. Fast and physical. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_pneumatic_mail.wav"
+    },
+    {
+      "row": 122,
+      "category": "遗都事件",
+      "name": "迟到一生的考勤钟·拨针",
+      "cue": "玩家拨回考勤钟或收取零件时",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A brass mechanical clock winds backward three tiny ratchet clicks, then an old attendance punch snaps forward. No bell or ticking loop. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_time_clock.wav"
+    },
+    {
+      "row": 123,
+      "category": "遗都事件",
+      "name": "最后一份供水特许·开阀",
+      "cue": "把水塔仅剩的水放进选定管路",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A stiff gate valve rubs open with a short iron squeal, then a compact powerful rush fills a hollow pipe and cuts off cleanly. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_waterworks.wav"
+    },
+    {
+      "row": 124,
+      "category": "遗都事件",
+      "name": "无人认领的行李·磅秤",
+      "cue": "行李在旧秤上确认重量",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A heavy leather suitcase lands on a steel scale platter, its spring dips once and one brass dial needle ticks into position. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_luggage_scale.wav"
+    },
+    {
+      "row": 125,
+      "category": "遗都事件",
+      "name": "门诊叫到零号·叫号装置",
+      "cue": "铜护士发出机械叫号信号",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "An antique mechanical clinic queue machine gives two dry striker clicks and one small porcelain bell ping. No articulated speech. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_clinic_zero.wav"
+    },
+    {
+      "row": 126,
+      "category": "遗都事件",
+      "name": "道岔的少数意见·扳轨",
+      "cue": "玩家操作道岔，选定行车线路",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A weighty railway point lever snaps over with a short low metal scrape and a firm bolted rail clack. Close-up, no locomotive. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_track_switch.wav"
+    },
+    {
+      "row": 127,
+      "category": "遗都事件",
+      "name": "一盏灯的市政预算·启动灯芯",
+      "cue": "使用剩余电芯点亮街灯时",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "One old arc-lamp switch clicks, fine electrical sputter grows into a short warm glass hum and settles quietly. Small street fixture, no thunderbolt. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_street_lamp.wav"
+    },
+    {
+      "row": 128,
+      "category": "遗都事件",
+      "name": "只有一张的选票·压票",
+      "cue": "玩家选定投票对象，票据打印或落槽",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A brass hand-fed ticket machine pinches one paper ballot with a short impression click, then the stiff slip flutters down into a metal tray. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_ballot_press.wav"
+    },
+    {
+      "row": 129,
+      "category": "遗都事件",
+      "name": "锅炉要求加班费·泄压",
+      "cue": "玩家打开锅炉泄压阀时",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "An overworked boiler valve rattles open under pressure and releases a quick uneven burst of steam, then rings once as it settles. No huge explosion. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_boiler_vent.wav"
+    },
+    {
+      "row": 130,
+      "category": "遗都事件",
+      "name": "听众席上的灰尘·乐团启动",
+      "cue": "玩家留下来当观众，机械乐团苏醒",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "Several old clockwork instrument mechanisms wind up in uneven order and loose metal keys clack once. Dusty stage machines, with no actual playing. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_orchestra_windup.wav"
+    },
+    {
+      "row": 131,
+      "category": "遗都事件",
+      "name": "保质期一百年·温室抽屉",
+      "cue": "玩家打开种荚或培养床的装置",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "A gasketed greenhouse drawer slides open, releases a tiny moist vacuum and reveals faint dry pods lightly tapping against glass. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_seed_vault.wav"
+    },
+    {
+      "row": 132,
+      "category": "遗都事件",
+      "name": "借来的一双手·义肢工具头",
+      "cue": "机械臂更换模具或书写头",
+      "duration_seconds": 0.8,
+      "loop": false,
+      "text": "Two antique brass manipulators shift with delicate spring movements, then one tool head locks in with a distinct two-stage click. No motor roar. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_mechanical_hands.wav"
+    },
+    {
+      "row": 133,
+      "category": "遗都事件",
+      "name": "黄金标准差半克·校秤",
+      "cue": "银行的秤盘确认旧币重量",
+      "duration_seconds": 0.7,
+      "loop": false,
+      "text": "A single small coin lands on a precision brass pan, the beam wiggles and the needle touches a tiny metal stop. Bright, exact and quiet. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_half_gram.wav"
+    },
+    {
+      "row": 134,
+      "category": "遗都事件",
+      "name": "最后一次正午·圆顶校准",
+      "cue": "归零天文仪器，校准镜片时",
+      "duration_seconds": 0.9,
+      "loop": false,
+      "text": "A heavy observatory dome gear travels a short distance, then a glass lens mount clicks precisely into alignment. Far round room, trimmed tail. Isolated game sound effect, no music or dialogue.",
+      "filename": "event_capital_last_noon.wav"
+    }
+  ]
+}

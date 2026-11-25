@@ -29,6 +29,7 @@ namespace RaidPartyManager.Presentation
         private static PartyRun playModeRun;
         private static readonly Dictionary<EncounterAsset, PartyRun> enemySessions = new();
         private static readonly HashSet<EncounterAsset> editedEnemyEncounters = new();
+        private readonly HashSet<string> thunderReleased = new();
         private static bool partyEdited;
         private static int playbackSpeed = 1;
         private readonly System.Random draftRandom = new System.Random();
@@ -383,6 +384,7 @@ namespace RaidPartyManager.Presentation
         {
             if (battle.Round > 0) GameAudio.Play(SoundCue.UiTurnAdvance, .39f);
             roundEvents = battle.AdvanceRound();
+            thunderReleased.Clear();
             if (battle.Round == 1 && battle.OpeningLoadout != null)
                 ApplyLoadout(battle.OpeningLoadout);
             foreach (var unit in battle.Formation)
@@ -555,6 +557,7 @@ namespace RaidPartyManager.Presentation
 
                 if (entry.Kind == BattleEventKind.EquipmentVisual)
                 {
+                    GameAudio.Play(BattleSounds.Equipment(entry.Equipment), .48f);
                     QueueEquipmentEffect(entry, now);
                     eventIndex++;
                     continue;
@@ -645,6 +648,8 @@ namespace RaidPartyManager.Presentation
 
                 if (entry.TargetId != null && appearances.TryGetValue(entry.TargetId, out var subject))
                 {
+                    if (entry.Kind == BattleEventKind.Effect && entry.SkillBookId == "skill-book-30" &&
+                        thunderReleased.Add(entry.ActorId)) GameAudio.Play(SoundCue.SkillThunderVerdictRelease);
                     if (entry.Kind == BattleEventKind.Defeated && !battleSprites.ContainsKey(entry.TargetId))
                         GameAudio.Play(BattleSounds.Fall(subject.Character));
                     bool arrow = entry.AttackReach == AttackReach.Ranged && appearances.TryGetValue(entry.ActorId ?? "", out var attacker)

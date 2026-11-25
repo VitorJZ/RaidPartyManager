@@ -29,3 +29,4 @@
 | 2026-11-21 | 元素石英转换后播放实际命中元素的特效 | 保留原技能名称，命中特效、飘字与防御结算使用同一元素 | `BlazingFireUsesTheElementalQuartzDamageRulesAndImpactArt` |
 | 2026-11-21 | 每回合一名可行动的己方队员先手，其余双方混排 | 保留己方开局优势，允许敌人在其他队员之间行动 | `SeededRoundsReplayWithAnAlliedOpenerAndMixedTurns`、`AStunnedAllyDoesNotTakeTheOpeningTurn` |
 | 2026-11-21 | 正式讨伐的随机事件跨楼层去重，遭遇战可重复 | 让已出现的事件退出抽选，保留可重复的保底事件与存档续玩 | `RandomEventsAreRememberedAfterDecliningAndResumingOnAnotherFloor`、`ExhaustedEventPoolStillRollsAmbushWithoutMarkingItSeen` |
+| 2026-11-26 | ElevenLabs 的 128 条录音追加到现有音效银行，按区域、舞台动作和战斗事件播放 | 复用环境淡入淡出和音量控制，保留原素材索引。铁壁拦截用只读战斗事件标记，追加攻击沿用 `EquipmentVisual` | `ImportedClipsMatchManifestAndKeepLegacyBankSlots`、`MainMenuAndStandaloneRegionsPlayTheirOwnAmbience` |
