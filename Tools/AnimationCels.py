@@ -1,6 +1,7 @@
 """Bake 16-cel animation atlases from an immutable directory of original keyframes.
 
 Run from the Unity project with: python3 Tools/AnimationCels.py /path/to/original/Art
+Add --characters to rebake only the combat, attack, special and walk atlases of heroes and enemies.
 Requires Pillow, NumPy and OpenCV. The original directory must be separate from the output.
 """
 import argparse
@@ -8,7 +9,6 @@ import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
-from hashlib import sha256
 from pathlib import Path
 
 import cv2
@@ -78,40 +78,93 @@ def breathe(p, angle):
     return cv2.remap(p, xy, None, cv2.INTER_LINEAR)
 
 
-def sequence(keys, loop=False, secondary=False):
-    """Warp neighbouring poses in both directions, with premultiplied-alpha compositing."""
-    keys = [premultiplied(k) for k in keys]
+# A single warp may stand in for an in-between only while it reproduces the next silhouette this closely.
+TWEEN_TOLERANCE = .16
+# Foot-line corrections larger than this fraction of the cel are deliberate hops, hovers or falls.
+GROUND_TOLERANCE = .025
+
+
+def foot_line(p):
+    rows = np.nonzero(p[:, :, 3].max(1) > 40)[0]
+    return int(rows.max()) if len(rows) else None
+
+
+def shifted(p, dx, dy):
+    h, w = p.shape[:2]
+    return cv2.warpAffine(p, np.float32([[1, 0, dx], [0, 1, dy]]), (w, h), flags=cv2.INTER_LINEAR)
+
+
+def stance_offset(reference, p):
+    """Horizontal drift of the planted lower body relative to the reference key."""
+    h, w = reference.shape[:2]
+    foot = foot_line(reference)
+    if foot is None or foot_line(p) is None:
+        return 0.
+    band = slice(max(0, int(foot-h*.30)), foot+1)
+    a = np.ascontiguousarray(reference[band, :, 3])
+    b = np.ascontiguousarray(p[band, :, 3])
+    (dx, _), response = cv2.phaseCorrelate(b, a)
+    return dx if response > .08 and abs(dx) < w*.08 else 0.
+
+
+def settle(keys, align, ground):
+    """Put generated keys on one foot line, and keep an idle stance from sliding sideways."""
+    h = keys[0].shape[0]
+    base = ground if ground is not None else foot_line(keys[0])
+    feet = [foot_line(k) for k in keys]
+    planted = base is not None and None not in feet and \
+        max(abs(f-base) for f in feet) <= max(2, h*GROUND_TOLERANCE)
+    result = []
+    for i, key in enumerate(keys):
+        dy = base-feet[i] if planted else 0
+        dx = stance_offset(keys[0], key) if align and i else 0.
+        result.append(shifted(key, dx, dy) if dx or dy else key)
+    return result
+
+
+def tween(a, b):
+    """Optical flow both ways, plus how far a one-sided warp of a misses b's silhouette."""
+    forward, backward = motion(a, b)
+    h, w = a.shape[:2]
+    reached = cv2.remap(a, grid(w, h)-forward, None, cv2.INTER_LINEAR)[:, :, 3] > 60
+    target = b[:, :, 3] > 60
+    miss = np.logical_xor(reached, target).sum()/max(1, target.sum())
+    return forward, backward, miss
+
+
+def sequence(keys, loop=False, secondary=False, align=False, ground=None):
+    """Spread keys over COUNT cels without ever blending two poses into one cel.
+
+    Cel i shows key floor(i*n/COUNT), matching the runtime's per-key timing tables. The cels between
+    two keys either warp the nearer key alone, when its flow reproduces the other silhouette, or hold
+    the key so a large change of pose lands as a crisp snap instead of a cross-faded double image.
+    """
+    keys = settle([premultiplied(k) for k in keys], align, ground)
     h, w = keys[0].shape[:2]
-    prev = None
-    seen = set()
+    flows = {}
     cels = []
     for i in range(COUNT):
-        at = i*len(keys)/COUNT if loop else i*(len(keys)-1)/(COUNT-1)
+        at = i*len(keys)/COUNT
         index = int(at)
         t = at-index
-        a, b = keys[index], keys[(index+1)%len(keys)]
-        if t == 0 or np.array_equal(a, b):
+        following = (index+1) % len(keys) if loop else min(index+1, len(keys)-1)
+        a, b = keys[index], keys[following]
+        if t == 0 or following == index or np.array_equal(a, b):
             p = a.copy()
         else:
-            if prev != index:
-                forward, backward = motion(a, b)
-                prev = index
+            if index not in flows:
+                flows[index] = tween(a, b)
+            forward, backward, miss = flows[index]
             xy = grid(w, h)
-            first = cv2.remap(a, xy-forward*t, None, cv2.INTER_LINEAR)
-            second = cv2.remap(b, xy-backward*(1-t), None, cv2.INTER_LINEAR)
-            # Favour the nearer silhouette in disoccluded regions rather than a double outline.
-            weight = t*t*(3-2*t)
-            p = cv2.addWeighted(first, 1-weight, second, weight, 0)
+            if miss > TWEEN_TOLERANCE:
+                p = a.copy()
+            elif t <= .5:
+                p = cv2.remap(a, xy-forward*t, None, cv2.INTER_LINEAR)
+            else:
+                p = cv2.remap(b, xy-backward*(1-t), None, cv2.INTER_LINEAR)
         if secondary:
-            p = breathe(p, 2*np.pi*i/(COUNT if loop else COUNT-1))
-        cel = straight(p.copy())
-        fingerprint = sha256(cel.tobytes()).digest()
-        if fingerprint in seen:
-            # Ease the torso during held anticipation keys while the feet remain planted.
-            cel = straight(breathe(p, .45 + 1.4*i/(COUNT-1)))
-            fingerprint = sha256(cel.tobytes()).digest()
-        seen.add(fingerprint)
-        cels.append(cel)
+            p = breathe(p, 2*np.pi*i/COUNT)
+        cels.append(straight(p))
     return cels
 
 
@@ -147,11 +200,13 @@ def convert(path, source):
     if name.endswith(("-Combat", "-Expanded")):
         cells = split(image, 8, 4)
         poses = []
+        # Every row stands on the idle foot line; the idle stance is also held in place sideways.
+        ground = foot_line(premultiplied(cells[0]))
         for row in range(4):
             keys = cells[row*8:(row+1)*8]
             if row == 2 and not keys[-1].getchannel("A").getbbox():
                 keys = keys[:4]
-            poses.extend(sequence(keys, row == 0, row == 0))
+            poses.extend(sequence(keys, row == 0, row == 0, align=row == 0, ground=ground))
         save(pack(poses, COUNT), target)
         return
     if name.endswith(("SpecialFX", "FinaleFX", "TrueStrikeFX")):
@@ -318,6 +373,8 @@ def scenery(path, source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
+    parser.add_argument("--characters", action="store_true",
+                        help="Only rebake hero and enemy combat, attack, special and walk atlases")
     args = parser.parse_args()
     src = args.source.resolve()
     if src == ART or not (src/"CombatSprites/CampGuard-Expanded.png").exists():
@@ -328,6 +385,15 @@ def main():
     files = set()
     for folder in [src/"CombatSprites", src/"Enemies",src/"Enemies/WhisperingGraveyard"]:
         files.update(p for p in folder.glob("*.png") if p.stem.endswith(("-Combat","-Expanded","-Attack","-Special","Walk","FX")))
+    if args.characters:
+        # The cemetery cast is rebuilt from its own pose sources by Tools/BuildWhisperingGraveyard.py.
+        actors = sorted(p for p in files if not p.stem.endswith("FX") and "WhisperingGraveyard" not in p.parts
+                        and (ART/p.relative_to(src)).exists())
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            list(pool.map(lambda p: convert(p, src), actors))
+        add_missing_walks(src)
+        print(f"Rebaked {len(actors)} character atlases")
+        return
     files.update((src/"Shop/Resources/RecruitmentFront").glob("*.png"))
     files.update((src/"Camp/Seated").glob("*.png"))
     story = src/"DockPlayhouse/Resources/StoryEvents"

@@ -44,6 +44,6 @@
 
 ## 补帧与校验
 
-`Tools/AnimationCels.py` 用双向光流补全原有关键姿势，对透明像素使用预乘 Alpha。行走与呼吸会从末帧回到首帧，倒地和开箱会停在最终姿势。重制旧图集时，从项目根目录向脚本传入一份独立的旧版 Art 目录。墓园角色可从保留的原始姿势表运行 `Tools/BuildWhisperingGraveyard.py` 重建。两位首领的彩绘命中特效保存在各自的 SpecialFX PNG 中。
+`Tools/AnimationCels.py` 把原有关键姿势展开为 16 帧，对透明像素使用预乘 Alpha。第 i 帧显示第 ⌊i×n/16⌋ 个关键姿势，与运行时各职业的逐键时长表一致。两键之间只用较近的一键单向光流变形补间，且仅在变形能重现下一键轮廓时使用（误差阈值 `TWEEN_TOLERANCE`）；大幅换姿保持关键帧并在键界干脆切换。任何一帧都不叠化两个姿势，因此不会出现重影。每行关键帧先对齐到待机首键的脚底线，起伏超过 2.5% 的行（悬浮、跳跃）保持原样；待机行另按下半身相位相关消除左右滑移。行走与呼吸会从末帧回到首帧，倒地和开箱会停在最终姿势。重制旧图集时，从项目根目录向脚本传入一份独立的 8 列原始 Art 目录，加 `--characters` 只重建己方与敌人的主图集、攻击、特技和步行图集。墓园角色可从保留的原始姿势表运行 `Tools/BuildWhisperingGraveyard.py` 重建。两位首领的彩绘命中特效保存在各自的 SpecialFX PNG 中。
 
 无名葬王的原画提示为“An empty jagged obsidian crown rises out of a turquoise and violet spectral seal, fractures outward into large pale soul splinters then recedes to a last wisp.” 守墓圣母的原画提示为“A frosted silver reliquary halo unfurls in flowing ribs like a votive veil, sheds ice-blue falling tears and small amber votive lights then dissolves.” 两张原画均由内置 ImageGen 按 4×4 透明图集生成，导入时重新排列为 16×1。

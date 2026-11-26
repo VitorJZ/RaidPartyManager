@@ -14,7 +14,7 @@ import re
 import uuid
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
-from AnimationCels import COUNT, sequence
+from AnimationCels import COUNT, foot_line, premultiplied, sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 DATA = ROOT / "Docs/WhisperingGraveyard.json"
@@ -184,7 +184,9 @@ def make_art(enemy: dict) -> Image.Image:
     meta(source_path, "texture")
     with Image.open(source_path) as source:
         keys = pose_frames(source)
-    rows = [sequence(row, loop=index < 2, secondary=index < 2) for index, row in enumerate(keys)]
+    ground = foot_line(premultiplied(keys[0][0]))
+    rows = [sequence(row, loop=index < 2, secondary=index < 2, align=index == 0, ground=ground)
+            for index, row in enumerate(keys)]
     save_image(pack(rows[0] + rows[2] + rows[4] + rows[5], COUNT, 4), ART / (prefix + "-Combat.png"))
     save_image(pack(rows[2], 4, 4, wide=True), ART / (prefix + "-Attack.png"))
     save_image(pack(rows[1], 4, 4), ART / (prefix + "-Walk.png"))
