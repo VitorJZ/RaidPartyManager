@@ -13,7 +13,6 @@ namespace RaidPartyManager.Presentation
     {
         private const int Columns = 4;
         private const int PageSize = Columns * Columns;
-        private const int HoldMilliseconds = 150;
         private const float TileSize = 73;
         private const float SlotSize = 65;
         private const float BagCellMargin = 2;
@@ -64,7 +63,6 @@ namespace RaidPartyManager.Presentation
         private Cell source;
         private Cell dropTarget;
         private VisualElement ghost;
-        private IVisualElementScheduledItem hold;
         private int pointerId = -1;
         private Vector2 pointer;
 
@@ -506,11 +504,9 @@ namespace RaidPartyManager.Presentation
                 {
                     if (hovered == cell)
                         HideTooltip();
-                    if (source == cell && ghost == null)
-                        CancelInteraction();
                 });
                 if (item != null)
-                    view.RegisterCallback<PointerDownEvent>(evt => BeginHold(evt, cell));
+                    view.RegisterCallback<PointerDownEvent>(evt => PressItem(evt, cell));
             }
             if (cell.IsSlot)
             {
@@ -549,21 +545,20 @@ namespace RaidPartyManager.Presentation
             return view;
         }
 
-        private void BeginHold(PointerDownEvent evt, Cell cell)
+        private void PressItem(PointerDownEvent evt, Cell cell)
         {
             if (evt.button != 0 || source != null)
                 return;
             source = cell;
             pointerId = evt.pointerId;
             pointer = evt.position;
-            hold = schedule.Execute(StartDrag).StartingIn(HoldMilliseconds);
+            // Capture before moving so a fast first move outside the item still starts the drag.
+            this.CapturePointer(pointerId);
             evt.StopPropagation();
         }
 
         private void StartDrag()
         {
-            if (source == null || panel == null)
-                return;
             HideTooltip();
             ghost = new EquipmentIcon(source.Item.Definition, iconFor(source.Item.Definition.Id)) { name = "equipment-drag-preview" };
             ghost.style.position = Position.Absolute;
@@ -572,8 +567,6 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Outline(ghost, PrototypeStyle.Accent, 6);
             source.View.style.opacity = 0.48f;
             Add(ghost);
-            this.CapturePointer(pointerId);
-            MoveGhost();
         }
 
         private void OnPointerMove(PointerMoveEvent evt)
@@ -581,15 +574,16 @@ namespace RaidPartyManager.Presentation
             if (source == null || evt.pointerId != pointerId)
                 return;
 
-            pointer = evt.position;
-            if (ghost != null)
-            {
-                MoveGhost();
-                SetDropTarget(TargetAt(pointer));
-                evt.StopPropagation();
-            }
-            else if (!source.View.worldBound.Contains(pointer))
-                CancelInteraction();
+            Vector2 position = evt.position;
+            if (ghost == null && position == pointer)
+                return;
+
+            pointer = position;
+            if (ghost == null)
+                StartDrag();
+            MoveGhost();
+            SetDropTarget(TargetAt(pointer));
+            evt.StopPropagation();
         }
 
         private void OnPointerUp(PointerUpEvent evt)
@@ -654,8 +648,6 @@ namespace RaidPartyManager.Presentation
         {
             int captured = pointerId;
             pointerId = -1;
-            hold?.Pause();
-            hold = null;
             if (source != null)
                 source.View.style.opacity = 1f;
             source = null;

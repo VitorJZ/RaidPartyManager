@@ -12,6 +12,7 @@ namespace RaidPartyManager.Presentation
     public sealed class DockPlayhouse : MonoBehaviour
     {
         private enum Cue { Opening, Playing, Closing, Closed }
+        private const string ThanksForPlaying = "感谢游玩";
         private static DockPlayhouse current;
         internal const float CameraDistance = 16.25f;
         internal const float FieldOfView = 34f;
@@ -309,25 +310,47 @@ namespace RaidPartyManager.Presentation
             GameAudio.Play(SoundCue.StageCurtainClose, .58f);
             CloseCurtain(() =>
             {
-                finale = new VisualElement { pickingMode = PickingMode.Ignore };
+                finale = new VisualElement { name = "campaign-finale", pickingMode = PickingMode.Ignore };
                 PrototypeStyle.Fill(finale);
                 finale.style.justifyContent = Justify.Center;
+                finale.style.alignItems = Align.Center;
                 finale.style.unityFontDefinition = panel.resolvedStyle.unityFontDefinition;
 
-                var title = PrototypeStyle.Text("恭喜通关，感谢游玩", 36, PrototypeStyle.Accent);
-                title.name = "campaign-finale";
-                title.style.unityFontStyleAndWeight = FontStyle.Bold;
-                PrototypeStyle.Middle(title);
-                finale.Add(title);
+                var lettering = Resources.Load<Texture2D>("CampaignFinaleTitle");
+                if (lettering != null)
+                {
+                    var title = new Image
+                    {
+                        name = "campaign-finale-title", image = lettering, scaleMode = ScaleMode.ScaleToFit,
+                        tooltip = ThanksForPlaying, pickingMode = PickingMode.Ignore
+                    };
+                    title.style.width = Length.Percent(72);
+                    title.style.maxWidth = 760;
+                    title.style.height = Length.Percent(34);
+                    title.style.maxHeight = 240;
+                    finale.Add(title);
+                }
+                else
+                {
+                    var title = PrototypeStyle.Text(ThanksForPlaying, 64, PrototypeStyle.Accent);
+                    title.name = "campaign-finale-title";
+                    title.pickingMode = PickingMode.Ignore;
+                    title.style.unityFontStyleAndWeight = FontStyle.Bold;
+                    PrototypeStyle.Middle(title);
+                    finale.Add(title);
+                }
 
                 string wages = payrollDebt > 0 ? $"仍欠工资 {payrollDebt} 金币" : "工资已结清";
-                var accounts = PrototypeStyle.Text($"剩余 {gold} 金币  ·  {wages}", 20, PrototypeStyle.Accent);
+                var accounts = PrototypeStyle.Text($"剩余 {gold} 金币  ·  {wages}", 20);
                 accounts.name = "campaign-payroll-summary";
-                accounts.style.marginTop = 10;
+                accounts.pickingMode = PickingMode.Ignore;
+                accounts.style.marginTop = 8;
+                accounts.style.textShadow = new TextShadow { offset = new Vector2(0, 2), blurRadius = 4, color = Color.black };
                 PrototypeStyle.Middle(accounts);
                 finale.Add(accounts);
 
-                // The gameplay document has faded out. Display the summary above the closed curtains.
+                // Cast sheets stay on the stage under the curtain renderers. Put the title on the
+                // screen panel above the camera and outside the gameplay document's opacity fade.
                 panel.parent.Add(finale);
                 finale.schedule.Execute(returnToMenu).StartingIn(5000);
             });

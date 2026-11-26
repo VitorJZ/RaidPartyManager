@@ -2003,12 +2003,31 @@ namespace RaidPartyManager.Tests
             Press(root, "claim-gold");
             float deadline = Time.realtimeSinceStartup + 6;
             while (root.panel.visualTree.Q("campaign-finale") == null && Time.realtimeSinceStartup < deadline) yield return null;
-            Assert.That(root.panel.visualTree.Q<Label>("campaign-finale")?.text, Is.EqualTo("恭喜通关，感谢游玩"));
-            Assert.That(root.panel.visualTree.Q<Label>("campaign-payroll-summary")?.text,
-                Is.EqualTo("剩余 0 金币  ·  仍欠工资 55 金币"));
+            var finale = root.panel.visualTree.Q("campaign-finale");
+            Assert.That(finale, Is.Not.Null);
+            var battleScreen = root.Q("battle-screen");
+            Assert.That(finale.parent, Is.SameAs(root));
+            Assert.That(root.IndexOf(finale), Is.GreaterThan(root.IndexOf(battleScreen)));
+            Assert.That(battleScreen.style.opacity.value, Is.Zero);
+            var title = finale.Q<Image>("campaign-finale-title");
+            Assert.That(title?.image?.name, Is.EqualTo("CampaignFinaleTitle"));
+            Assert.That(title.tooltip, Is.EqualTo("感谢游玩"));
+            Assert.That(finale.Q<Label>("campaign-payroll-summary")?.text, Is.EqualTo("剩余 0 金币  ·  仍欠工资 55 金币"));
             var folds = new MaterialPropertyBlock();
-            GameObject.Find("Mist Dock Playhouse/Curtain R").GetComponent<MeshRenderer>().GetPropertyBlock(folds);
-            Assert.That(folds.GetFloat("_Travel"), Is.Zero);
+            var house = Object.FindAnyObjectByType<DockPlayhouse>();
+            var cast = Object.FindAnyObjectByType<BattlePrototype>().transform.Find("Paper Theatre")
+                .GetComponentsInChildren<MeshRenderer>().Where(renderer => renderer.enabled && renderer.name == "battle-sprite").ToArray();
+            Assert.That(cast, Is.Not.Empty, "The actors should still be drawn on stage under the closed curtains.");
+            foreach (string curtainName in new[] { "Curtain L", "Curtain R" })
+            {
+                var curtain = house.transform.Find(curtainName).GetComponent<MeshRenderer>();
+                curtain.GetPropertyBlock(folds);
+                Assert.That(folds.GetFloat("_Travel"), Is.Zero, curtainName);
+                Assert.That(cast.All(actor => actor.sharedMaterial.renderQueue < curtain.sharedMaterial.renderQueue), Is.True);
+            }
+            yield return null;
+            Assert.That(title.worldBound.width, Is.GreaterThan(0));
+            Assert.That(title.worldBound.center.x, Is.EqualTo(finale.worldBound.center.x).Within(1f));
             yield return new WaitForSecondsRealtime(4.8f);
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("ClockworkCapital"));
             yield return WaitScene("MainMenu");

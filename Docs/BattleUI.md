@@ -53,13 +53,13 @@
 演练时，在顶栏的设置中打开「敌方编辑」。站位从左往右为 1 到 4 号。可从下拉列表选择[预设敌阵](EnemyFormations.md)并点击「载入敌阵」，也可以点立绘替换单个敌人，长按立绘拖动换位。右上「返回」后，此阵容用于下一战。
 
 - 鼠标悬停物品格时显示图片、名称和描述。移出格子或开始拖拽时关闭详情。
-- 按住物品约 150 毫秒后拖动。背包和角色装备槽之间可双向拖拽。目标为空时移动，已有装备时两件物品互换，被替换装备回到原背包格。拖到其他区域松开时取消。
+- 按住装备或技能书并移动指针即可开始拖拽。原地按下再松开不会移动物品。背包和角色装备槽之间可双向拖拽。目标为空时移动，已有装备时两件物品互换，被替换装备回到原背包格。拖到其他区域松开时取消。
 - 技能书可放进空槽或已有技能的槽。覆盖会消耗新书并遗忘旧技能，旧书不会回到背包。职业限制和同一角色不能重复学习的规则仍然生效。
-- `CharacterEquipmentPopup` 记录背包格位置，并通过 `PartyRun.TryEquip`、`TryLearnSkill` 写入装备和技能。角色页和战斗界面共用同一份装备、生命与战利品。每次打开己方编辑页时，共享背包的每种装备和技能书至少提供 4 份可用副本。离开编辑页会收回未使用的测试副本，已穿戴的测试装备和已学技能会保留。
+- `CharacterEquipmentPopup` 记录背包格位置，并通过 `PartyRun.TryEquip`、`TryLearnSkill` 写入装备和技能。角色页和战斗界面共用同一份装备、生命与战利品。启用测试补给时，打开己方编辑页会把非首领专属装备和技能书补足到每种至少 4 份。离开编辑页会收回未使用的测试副本，已穿戴的测试装备和已学技能会保留。
 
 ## 数据与验证
 
 - `BattleSimulator` 在行动事件中提供目标结算后的生命、剩余护盾和状态层数。回放使用这些数值刷新 `BattleUnitCard`。出手、投射物或近战归位，以及对应的受击或倒地动画播完后，界面立即播放下一次行动。装备和状态效果随对应行动或回合边界显示。
 - 立绘通过 `CharacterAsset` 的 Portrait 字段配置。己方角色缩略图取自 Obsidian《讨伐队经理》的角色图鉴，Unity 版本存放在 `Assets/RaidPartyManager/PrototypeData/Portraits` 并由 Git LFS 管理。没有立绘的角色使用职业标记。
 - Play Mode 用例 `BuiltSceneSupportsPreparationPlaybackLootAndReset` 检查战斗站位、职业边框、生命条、护盾变化、倒下、配装、回放和重置。
-- Play Mode 用例 `PartyEditorOpensProfileAndSharedBackpackOutsideCombat` 覆盖 4×4 背包、悬停详情、短按不启动拖拽、长按移动、无效投放取消，以及已有装备互换后返回原背包格。它还验证退出弹窗后战场显示更新后的装备，结算掉落也会进入背包。
+- Play Mode 用例 `PartyEditorOpensProfileAndSharedBackpackOutsideCombat` 覆盖 4×4 背包、悬停详情、原地点按、首次移动立即拖拽、无效投放取消，以及装备互换后返回原背包格。它还验证退出弹窗后战场显示更新后的装备，结算掉落也会进入背包。`BookmarksSwitchPagesAndCompatibleBooksCanReplaceLearnedSkills` 覆盖技能书即时拖拽、槽位限制和技能覆盖。

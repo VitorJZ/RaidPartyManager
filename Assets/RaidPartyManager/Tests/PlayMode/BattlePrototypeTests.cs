@@ -1409,9 +1409,8 @@ namespace RaidPartyManager.Tests
             Assert.That(rewardCell, Is.Not.Null);
             yield return null;
             string rewardCellName = rewardCell.name;
-            Down(rewardCell);
-            yield return WaitForDrag(root);
-            Up(root.Q("character-details-layer").ElementAt(0), Vector2.one);
+            var popup = BeginItemDrag(root, rewardCell, Vector2.one);
+            Up(popup, Vector2.one);
             Assert.That(root.Q("equipment-drag-preview"), Is.Null);
             Assert.That(root.Q(rewardCellName).Q(rewardName), Is.Not.Null);
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("精钢壁垒"));
@@ -1646,7 +1645,10 @@ namespace RaidPartyManager.Tests
             var popup = root.Q("party-replacement");
             Assert.That(popup, Is.Not.Null);
             var candidates = popup.Q<ScrollView>("replacement-candidates");
-            Assert.That(candidates.Query<Button>().ToList().Count, Is.EqualTo(36));
+            var catalogue = ((EncounterData)typeof(BattlePrototype).GetField("content", fields).GetValue(scene)).CharacterCatalog;
+            Assert.That(candidates.Query<Button>().ToList().Select(button => button.name), Is.EqualTo(catalogue
+                .Where(character => character.RosterNumber > 0).OrderBy(character => character.RosterNumber)
+                .Select(character => $"replace-with-{character.Id}")));
             yield return null;
             Assert.That(candidates.verticalScroller.highValue, Is.GreaterThan(0));
             Assert.That(popup.Q<Button>("replace-with-CampGuard").enabledInHierarchy, Is.False);
@@ -2579,24 +2581,25 @@ namespace RaidPartyManager.Tests
 
         private static IEnumerator Drag(VisualElement root, VisualElement source, VisualElement target)
         {
-            Down(source);
-            yield return WaitForDrag(root);
             yield return null;
-            Assert.That(root.Q("equipment-tooltip"), Is.Null);
             Vector2 destination = target.worldBound.center;
-            using (var move = PointerMoveEvent.GetPooled(Mouse(EventType.MouseDrag, destination)))
-                Send(target, move);
+            var popup = BeginItemDrag(root, source, destination);
             yield return null;
-            Up(target, destination);
+            Up(popup, destination);
             Assert.That(root.Q("equipment-drag-preview"), Is.Null);
         }
 
-        private static IEnumerator WaitForDrag(VisualElement root)
+        private static VisualElement BeginItemDrag(VisualElement root, VisualElement source, Vector2 destination)
         {
-            float deadline = Time.realtimeSinceStartup + 3f;
-            while (root.Q("equipment-drag-preview") == null && Time.realtimeSinceStartup < deadline)
-                yield return null;
-            Assert.That(root.Q("equipment-drag-preview"), Is.Not.Null, "Holding the item should begin a drag.");
+            var popup = root.Q("character-details-layer").ElementAt(0);
+            Down(source);
+            Assert.That(popup.HasPointerCapture(PointerId.mousePointerId), Is.True);
+            Assert.That(root.Q("equipment-drag-preview"), Is.Null);
+            using (var move = PointerMoveEvent.GetPooled(Mouse(EventType.MouseDrag, destination)))
+                Send(popup, move);
+            Assert.That(root.Q("equipment-drag-preview"), Is.Not.Null, "The first move should start the drag immediately.");
+            Assert.That(root.Q("equipment-tooltip"), Is.Null);
+            return popup;
         }
 
         private static Event Mouse(EventType type, Vector2 point) =>

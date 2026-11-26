@@ -30,3 +30,5 @@
 | 2026-11-21 | 每回合一名可行动的己方队员先手，其余双方混排 | 保留己方开局优势，允许敌人在其他队员之间行动 | `SeededRoundsReplayWithAnAlliedOpenerAndMixedTurns`、`AStunnedAllyDoesNotTakeTheOpeningTurn` |
 | 2026-11-21 | 正式讨伐的随机事件跨楼层去重，遭遇战可重复 | 让已出现的事件退出抽选，保留可重复的保底事件与存档续玩 | `RandomEventsAreRememberedAfterDecliningAndResumingOnAnotherFloor`、`ExhaustedEventPoolStillRollsAmbushWithoutMarkingItSeen` |
 | 2026-11-26 | ElevenLabs 的 128 条录音追加到现有音效银行，按区域、舞台动作和战斗事件播放 | 复用环境淡入淡出和音量控制，保留原素材索引。铁壁拦截用只读战斗事件标记，追加攻击沿用 `EquipmentVisual` | `ImportedClipsMatchManifestAndKeepLegacyBankSlots`、`MainMenuAndStandaloneRegionsPlayTheirOwnAmbience` |
+| 2026-11-26 | 装备和技能书在按住后的首次指针移动时启动拖拽 | 去掉 150 毫秒等待，快速移动出原格也可开始拖拽，原地点按继续保留原物品 | `PartyEditorOpensProfileAndSharedBackpackOutsideCombat`、`BookmarksSwitchPagesAndCompatibleBooksCanReplaceLearnedSkills` |
+| 2026-11-26 | 通关终幕按舞台角色、幕布、「感谢游玩」艺术字的顺序显示 | 合拢的幕布遮住角色，艺术字位于独立界面层，保留金币及薪资摘要和 5 秒停留 | `CapitalBossRewardsLeadToFiveSecondsBehindTheClosedCurtain` |
