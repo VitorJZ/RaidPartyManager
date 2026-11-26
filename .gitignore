@@ -109,3 +109,8 @@ InitTestScene*.unity*
 # Local spreadsheet exports and bundled-runtime junctions
 /outputs/
 /Tools/__pycache__/
+
+# OS and editor files
+.DS_Store
+.vscode/
+*.slnx
