@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "冲锋前鸣笛预警，冲击前两人。预警期间削去至少6点护盾或生命即可使其熄火。"
   personality: 1
-  attack: 12
+  attack: 13
   defense: 6
   specialDefense: 3
   health: 166

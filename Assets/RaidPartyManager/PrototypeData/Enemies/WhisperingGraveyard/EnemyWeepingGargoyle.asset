@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "哭墙碎石（65%） / 寒泪落幕（35%）"
   personality: 1
-  attack: 8
+  attack: 9
   defense: 4
   specialDefense: 1
   health: 54

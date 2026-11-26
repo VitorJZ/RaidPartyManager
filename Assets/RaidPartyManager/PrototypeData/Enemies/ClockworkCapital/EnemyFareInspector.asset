@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "罚票猛击（66%） / 稽查铁幕（34%）"
   personality: 1
-  attack: 7
+  attack: 8
   defense: 5
   specialDefense: 1
   health: 35

@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "30% 概率向最前方对手施加 1 层诅咒，使其无法受疗。守夜弩骸会优先射击被诅咒者。"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 0
   specialDefense: 1
   health: 22

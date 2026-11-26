@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "34% 概率淋湿最后方对手。潮湿期间，每次中毒额外增加 1 层。"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 2
   specialDefense: 4
   health: 31

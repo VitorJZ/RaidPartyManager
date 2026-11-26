@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "守夜骨矢优先射击被诅咒者，条件相同时选物防最低者。另有 25% 概率蓄力，下次行动狙击后排。"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 1
   specialDefense: 1
   health: 17

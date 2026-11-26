@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "34% 概率向最后两名对手泼墨，各施加 1 层中毒。潮湿的目标会多得 1 层。"
   personality: 1
-  attack: 7
+  attack: 8
   defense: 2
   specialDefense: 4
   health: 29

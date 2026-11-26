@@ -852,6 +852,8 @@ namespace RaidPartyManager.Tests
             Assert.That(run.TryEquip(party.Id, 1, inventory[1].Id), Is.True);
             Assert.That(run.TryEquip(party.Id, 0, null), Is.False);
             Assert.That(run.TryEquip(ally.Id, 0, inventory[0].Id), Is.False);
+            Assert.That(run.TrySwapEquipment(inventory[0].Id, inventory[1].Id), Is.False);
+            Assert.That(run.TrySwapEquipment(inventory[1].Id, inventory[0].Id), Is.False);
             Assert.That(run.TryPlace(ally.Id, 1), Is.False);
             var enemy = Unit("enemy", Side.Enemy);
             var enemyRear = Unit("rear", Side.Enemy, 2);

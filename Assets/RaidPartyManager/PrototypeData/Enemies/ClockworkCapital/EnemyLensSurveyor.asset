@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "37% 概率标记攻击最高的对手，施加 1 层破绽。铁豕会冲向仍有破绽的目标。"
   personality: 1
-  attack: 7
+  attack: 8
   defense: 1
   specialDefense: 4
   health: 26

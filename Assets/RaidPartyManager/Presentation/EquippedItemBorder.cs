@@ -5,14 +5,16 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class EquippedItemBorder : VisualElement
     {
-        private static readonly Color Edge = new Color32(79, 159, 161, 228);
-        private static readonly Color Light = new Color32(222, 255, 238, 255);
+        private readonly Color light;
 
-        public EquippedItemBorder()
+        public EquippedItemBorder(Color color)
         {
             name = "equipped-item-border";
             pickingMode = PickingMode.Ignore;
             PrototypeStyle.Fill(this);
+            PrototypeStyle.Outline(this, color, 5);
+            style.borderTopWidth = style.borderRightWidth = style.borderBottomWidth = style.borderLeftWidth = 2;
+            light = Color.Lerp(color, Color.white, .45f);
             generateVisualContent += Paint;
             schedule.Execute(MarkDirtyRepaint).Every(33);
         }
@@ -31,22 +33,12 @@ namespace RaidPartyManager.Presentation
             float height = bottom - top;
             float perimeter = 2 * (width + height);
             var pen = context.painter2D;
-            pen.strokeColor = Edge;
-            pen.lineWidth = 1.5f;
-            pen.BeginPath();
-            pen.MoveTo(new Vector2(left, top));
-            pen.LineTo(new Vector2(right, top));
-            pen.LineTo(new Vector2(right, bottom));
-            pen.LineTo(new Vector2(left, bottom));
-            pen.ClosePath();
-            pen.Stroke();
-
             float head = (float)(Time.unscaledTimeAsDouble % 2.4 / 2.4) * perimeter;
             float segment = perimeter * 0.015f;
             for (int index = 8; index >= 0; index--)
             {
                 float at = head - index * segment;
-                var color = Light;
+                var color = light;
                 color.a *= 1 - index / 9f;
                 pen.strokeColor = color;
                 pen.lineWidth = Mathf.Lerp(2.8f, 1.25f, index / 8f);

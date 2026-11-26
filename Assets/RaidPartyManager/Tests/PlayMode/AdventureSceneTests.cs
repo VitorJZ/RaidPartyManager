@@ -415,14 +415,55 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator WhiteFeatherArcherUsesAnimatedFrontInTheTalentMarket()
+        {
+            yield return OpenMenu();
+            var hub = Object.FindAnyObjectByType<AdventureEventHub>();
+            var assets = (AdventureContentAsset)typeof(AdventureEventHub).GetField("assets", Private).GetValue(hub);
+            var archer = assets.Encounter.CharacterCatalog.Single(c => c.Id == "WhiteFeatherArcher");
+            Press(Root<AdventureEventHub>(), "inspect-node-Town");
+            yield return WaitScene("Town");
+            var town = Object.FindAnyObjectByType<DockTown>();
+            var townRun = (AdventureRun)typeof(DockTown).GetField("run", Private).GetValue(town);
+            var ownedArcher = townRun.Party.Members.FirstOrDefault(m => m.Character.Id == archer.Id);
+            if (ownedArcher != null)
+            {
+                var replacement = assets.Encounter.CharacterCatalog.First(c => c.Profession == Profession.Archer &&
+                    c.Stage == 1 && c.Id != archer.Id);
+                Assert.That(townRun.Party.TryReplaceMember(ownedArcher.Id, replacement), Is.True);
+            }
+            typeof(AdventureVisit).GetProperty(nameof(AdventureVisit.Recruits)).SetValue(townRun.Current, new[] { archer });
+            Press(Root<DockTown>(), "town-service-Recruit");
+            yield return WaitScene("TalentMarket");
+            yield return WaitForShow();
+            var theatre = Object.FindAnyObjectByType<TalentMarket>().transform.Find("Service theatre");
+            var body = theatre.Find("Market performer 0").GetComponent<MeshRenderer>();
+            var atlas = Resources.Load<Texture2D>($"RecruitmentFront/{archer.RosterNumber:00}");
+            Assert.That(atlas, Is.Not.Null);
+            var paint = new MaterialPropertyBlock();
+            body.GetPropertyBlock(paint);
+            Assert.That(paint.GetTexture("_MainTex"), Is.SameAs(atlas));
+            var first = paint.GetVector("_MainTex_ST");
+            Assert.That(first.x, Is.EqualTo(.25f));
+            yield return new WaitForSecondsRealtime(.20f);
+            body.GetPropertyBlock(paint);
+            Assert.That(paint.GetVector("_MainTex_ST"), Is.Not.EqualTo(first));
+        }
+
+        [UnityTest]
         public IEnumerator BothWardPatientsWalkToTheirOwnBedBeforeTheHealthPreview()
         {
             yield return OpenMenu();
+            var hub = Object.FindAnyObjectByType<AdventureEventHub>();
+            var assets = (AdventureContentAsset)typeof(AdventureEventHub).GetField("assets", Private).GetValue(hub);
+            var archer = assets.Encounter.CharacterCatalog.Single(c => c.Id == "WhiteFeatherArcher");
+            if (run.Party.Members.All(m => m.Character.Id != archer.Id))
+                Assert.That(run.Party.TryRecruit(archer), Is.True);
             var root = Root<AdventureEventHub>();
             Press(root, "inspect-event-SoulWard");
             yield return WaitForShow();
-            var run = CurrentRoute();
-            var members = run.Party.Members.Take(2).ToArray();
+            run = CurrentRoute();
+            var members = new[] { run.Party.Members[0], run.Party.Members.Single(m => m.Character.Id == archer.Id) };
             Assert.That(GameObject.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None).Count(r => r.name == "Linen mattress"), Is.EqualTo(2));
             foreach (var member in members)
             {
@@ -430,7 +471,9 @@ namespace RaidPartyManager.Tests
                 var patient = GameObject.Find("Service theatre/Ward patient " + member.Id).GetComponent<MeshRenderer>();
                 var start = patient.transform.position;
                 var paint = new MaterialPropertyBlock();
-                var lying = Resources.Load<Texture2D>("WardPatients/" + member.Character.RosterNumber);
+                bool animated = member.Character.Id == archer.Id;
+                string folder = animated ? "WardPatients/Animated" : "WardPatients";
+                var lying = Resources.Load<Texture2D>($"{folder}/{member.Character.RosterNumber}");
                 Assert.That(lying, Is.Not.Null);
                 float timeout = Time.realtimeSinceStartup + 6;
                 do
@@ -441,6 +484,16 @@ namespace RaidPartyManager.Tests
                 Assert.That(paint.GetTexture("_MainTex"), Is.SameAs(lying));
                 Assert.That(Vector3.Distance(start, patient.transform.position), Is.GreaterThan(1));
                 Assert.That(run.Party.Members.First(m => m.Id == member.Id).Health, Is.EqualTo(member.Health));
+                if (animated)
+                {
+                    var first = paint.GetVector("_MainTex_ST");
+                    Assert.That(first.x, Is.EqualTo(.25f));
+                    var onBed = patient.transform.position;
+                    yield return new WaitForSecondsRealtime(.31f);
+                    patient.GetPropertyBlock(paint);
+                    Assert.That(paint.GetVector("_MainTex_ST"), Is.Not.EqualTo(first));
+                    Assert.That(patient.transform.position, Is.EqualTo(onBed));
+                }
             }
             Assert.That(root.Q<Button>("grave-stitch"), Is.Not.Null);
             Press(root, "grave-stitch");

@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "34% 概率发射火焰邮包。优先投向有破绽的对手，条件相同时选最后方。"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 2
   specialDefense: 3
   health: 26

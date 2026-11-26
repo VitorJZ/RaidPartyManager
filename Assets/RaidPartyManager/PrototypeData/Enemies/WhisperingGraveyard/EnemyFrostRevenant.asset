@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "冻土碎片（65%） / 墓霜蔓延（35%）"
   personality: 1
-  attack: 5
+  attack: 6
   defense: 1
   specialDefense: 2
   health: 21

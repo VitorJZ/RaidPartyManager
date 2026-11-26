@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "秤砣敲击（60%） / 赎骨契约（40%）"
   personality: 1
-  attack: 4
+  attack: 5
   defense: 2
   specialDefense: 2
   health: 22

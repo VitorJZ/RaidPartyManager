@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "车轴扑咬（66%） / 脱轨追猎（34%）"
   personality: 1
-  attack: 8
+  attack: 9
   defense: 2
   specialDefense: 1
   health: 28

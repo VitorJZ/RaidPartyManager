@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "落模拳（63%） / 双模冲压（37%）"
   personality: 1
-  attack: 8
+  attack: 9
   defense: 4
   specialDefense: 1
   health: 32

@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "音针弹射（66%） / 复播动员令（34%）"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 3
   specialDefense: 4
   health: 31

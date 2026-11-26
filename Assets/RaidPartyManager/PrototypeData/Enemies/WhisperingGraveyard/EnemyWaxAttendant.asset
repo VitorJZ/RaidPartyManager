@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "送魂烛火（75%） / 熔蜡遮目（25%）"
   personality: 1
-  attack: 5
+  attack: 6
   defense: 0
   specialDefense: 3
   health: 18

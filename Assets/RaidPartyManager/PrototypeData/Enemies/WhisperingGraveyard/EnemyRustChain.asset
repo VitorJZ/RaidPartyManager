@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "锈链抽打（80%） / 束链缠足（20%）"
   personality: 1
-  attack: 5
+  attack: 6
   defense: 2
   specialDefense: 1
   health: 22

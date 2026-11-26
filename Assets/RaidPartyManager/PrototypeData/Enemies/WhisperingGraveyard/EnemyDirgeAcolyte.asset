@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "走调咏唱（65%） / 衰弱挽歌（35%）"
   personality: 1
-  attack: 5
+  attack: 6
   defense: 1
   specialDefense: 2
   health: 18

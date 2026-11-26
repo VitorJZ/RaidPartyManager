@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "根须鞭击（65%） / 墓孢喷吐（35%）"
   personality: 1
-  attack: 4
+  attack: 5
   defense: 1
   specialDefense: 2
   health: 21

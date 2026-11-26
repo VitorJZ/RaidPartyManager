@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "消毒针（66%） / 无菌隔离罩（34%）"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 3
   specialDefense: 5
   health: 29

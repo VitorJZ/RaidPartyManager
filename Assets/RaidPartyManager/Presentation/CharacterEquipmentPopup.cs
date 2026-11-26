@@ -18,6 +18,14 @@ namespace RaidPartyManager.Presentation
         private const float SlotSize = 65;
         private const float BagCellMargin = 2;
         private const float BackpackPadding = 9;
+        private static readonly Color[] MemberColors =
+        {
+            new Color32(135, 200, 255, 255), new Color32(129, 211, 166, 255),
+            new Color32(231, 195, 112, 255), new Color32(194, 166, 251, 255),
+            new Color32(243, 162, 144, 255), new Color32(239, 158, 197, 255),
+            new Color32(108, 213, 217, 255), new Color32(228, 165, 101, 255),
+            new Color32(181, 203, 117, 255), new Color32(188, 196, 210, 255)
+        };
 
         private enum CellKind { EquipmentBag, EquipmentSlot, BookBag, SkillSlot }
 
@@ -26,11 +34,12 @@ namespace RaidPartyManager.Presentation
             public VisualElement View;
             public EquipmentInstance Item;
             public SkillBookDefinition LearnedSkill;
-            public string EquippedBy;
+            public (string Label, Color Color) Wearer;
             public CellKind Kind;
             public int Index;
             public EquipmentDefinition Definition => Item?.Definition ?? LearnedSkill;
             public bool IsSlot => Kind is CellKind.EquipmentSlot or CellKind.SkillSlot;
+            public bool IsWornEquipment => Item != null && (Kind == CellKind.EquipmentSlot || Wearer.Label != null);
         }
 
         private readonly PartyRun run;
@@ -109,7 +118,7 @@ namespace RaidPartyManager.Presentation
         private void Render()
         {
             Clear();
-            var members = run.Members;
+            var members = run.Members.OrderBy(member => member.Position ?? int.MaxValue).ToArray();
             var selected = members.Single(member => member.Id == memberId);
             bool displayDossier = showEmployeeDossier || selected.IsAway;
 
@@ -185,7 +194,7 @@ namespace RaidPartyManager.Presentation
             profile.Add(BuildCharacter(selected));
             profile.Add(BuildSlots(selected, inventory));
             body.Add(profile);
-            body.Add(BuildBackpack(inventory, selected.EquipmentIds.Any(id => id != null)));
+            body.Add(BuildBackpack(inventory, members, selected.EquipmentIds.Any(id => id != null)));
             body.Add(BuildBookmarks());
             dialog.Add(body);
 
@@ -298,10 +307,9 @@ namespace RaidPartyManager.Presentation
             bookmarks.style.width = 44;
             bookmarks.style.flexShrink = 0;
             bookmarks.style.justifyContent = Justify.Center;
-            var ordered = members.OrderBy(member => member.Position ?? int.MaxValue).ToArray();
-            for (int i = 0; i < Math.Max(PartyRun.RosterLimit, ordered.Length); i++)
+            for (int i = 0; i < Math.Max(PartyRun.RosterLimit, members.Count); i++)
             {
-                var member = ordered.ElementAtOrDefault(i);
+                var member = members.ElementAtOrDefault(i);
                 bool selected = member?.Id == memberId;
                 string name = $"loadout-member-{i + 1}";
                 var bookmark = PrototypeStyle.Button((i + 1).ToString(), name, member == null ? null : () =>
@@ -322,10 +330,12 @@ namespace RaidPartyManager.Presentation
                 bookmark.style.marginRight = -1;
                 bookmark.style.fontSize = 16;
                 bookmark.style.unityFontStyleAndWeight = FontStyle.Bold;
-                bookmark.style.backgroundColor = selected ? PrototypeStyle.Accent :
-                    member == null ? PrototypeStyle.Inset : (Color)new Color32(166, 128, 81, 255);
+                var color = MemberColors[i % MemberColors.Length];
+                bookmark.style.backgroundColor = member == null ? PrototypeStyle.Inset : color;
                 bookmark.style.color = member == null ? PrototypeStyle.Muted : PrototypeStyle.Background;
-                PrototypeStyle.Outline(bookmark, selected ? PrototypeStyle.Accent : PrototypeStyle.Edge, 0);
+                PrototypeStyle.Outline(bookmark, selected ? PrototypeStyle.Ink : PrototypeStyle.Edge, 0);
+                if (selected)
+                    bookmark.style.borderTopWidth = bookmark.style.borderLeftWidth = bookmark.style.borderBottomWidth = 2;
                 bookmark.style.borderTopLeftRadius = bookmark.style.borderBottomLeftRadius = 5;
                 bookmarks.Add(bookmark);
             }
@@ -367,7 +377,8 @@ namespace RaidPartyManager.Presentation
             }
         }
 
-        private VisualElement BuildBackpack(IReadOnlyDictionary<string, EquipmentInstance> inventory, bool canUnequip)
+        private VisualElement BuildBackpack(IReadOnlyDictionary<string, EquipmentInstance> inventory,
+            IReadOnlyList<MemberView> members, bool canUnequip)
         {
             var backpack = PrototypeStyle.Panel();
             backpack.name = "character-backpack";
@@ -383,10 +394,10 @@ namespace RaidPartyManager.Presentation
             header.Add(PrototypeStyle.Text("共享背包", 17, PrototypeStyle.Accent));
 
             var books = showSkillBooks ? run.SkillBooks : null;
-            var wearers = showSkillBooks ? null : run.Members
-                .SelectMany(member => member.EquipmentIds.Select((id, slot) =>
-                    (Id: id, Label: $"{member.Character.Name} · 装备槽 {slot + 1}")))
-                .Where(entry => entry.Id != null).ToDictionary(entry => entry.Id, entry => entry.Label);
+            var wearers = showSkillBooks ? null : members
+                .SelectMany((member, index) => member.EquipmentIds.Select((id, slot) =>
+                    (Id: id, Label: $"{member.Character.Name} · 装备槽 {slot + 1}", Color: MemberColors[index % MemberColors.Length])))
+                .Where(entry => entry.Id != null).ToDictionary(entry => entry.Id, entry => (entry.Label, entry.Color));
             int occupiedSpan = showSkillBooks ? books.Count : bag.FindLastIndex(id => id != null) + 1;
             int pageCount = Math.Max(1, (occupiedSpan + PageSize - 1) / PageSize);
             if (!showSkillBooks && canUnequip && occupiedSpan == pageCount * PageSize && !bag.Take(occupiedSpan).Contains(null))
@@ -418,8 +429,8 @@ namespace RaidPartyManager.Presentation
                     int index = Page * PageSize + row * Columns + col;
                     var item = showSkillBooks ? (index < books.Count ? books[index] : null)
                         : (index < bag.Count && bag[index] != null ? inventory[bag[index]] : null);
-                    string wearer = item == null ? null : wearers?.GetValueOrDefault(item.Id);
-                    line.Add(BuildCell(showSkillBooks ? CellKind.BookBag : CellKind.EquipmentBag, index, item, equippedBy: wearer));
+                    var wearer = item == null || wearers == null ? default : wearers.GetValueOrDefault(item.Id);
+                    line.Add(BuildCell(showSkillBooks ? CellKind.BookBag : CellKind.EquipmentBag, index, item, wearer: wearer));
                 }
                 grid.Add(line);
             }
@@ -445,11 +456,11 @@ namespace RaidPartyManager.Presentation
         };
 
         private VisualElement BuildCell(CellKind kind, int index, EquipmentInstance item = null,
-            SkillBookDefinition learned = null, string equippedBy = null)
+            SkillBookDefinition learned = null, (string Label, Color Color) wearer = default)
         {
             bool selectable = item != null || kind is CellKind.EquipmentSlot or CellKind.SkillSlot;
             var view = new VisualElement { name = CellName(kind, index), focusable = selectable, tabIndex = selectable ? 0 : -1 };
-            var cell = new Cell { View = view, Kind = kind, Index = index, Item = item, LearnedSkill = learned, EquippedBy = equippedBy };
+            var cell = new Cell { View = view, Kind = kind, Index = index, Item = item, LearnedSkill = learned, Wearer = wearer };
             view.userData = cell;
             view.style.width = view.style.height = cell.IsSlot ? SlotSize : TileSize;
             view.style.flexShrink = cell.IsSlot ? 0 : 1;
@@ -474,8 +485,18 @@ namespace RaidPartyManager.Presentation
                     }
                 };
                 view.Add(art);
-                if (equippedBy != null)
-                    view.Add(new EquippedItemBorder());
+                if (wearer.Label != null)
+                    view.Add(new EquippedItemBorder(wearer.Color));
+                // Every character has a first skill slot. Learning may replace the skill in it.
+                if (kind == CellKind.BookBag && run.CanLearnSkill(memberId, 0, item.Id))
+                {
+                    var glow = new VisualElement { name = "learnable-skill-border", pickingMode = PickingMode.Ignore };
+                    PrototypeStyle.Fill(glow);
+                    PrototypeStyle.Outline(glow, PrototypeStyle.SkillGold, 5);
+                    glow.style.borderTopWidth = glow.style.borderRightWidth = glow.style.borderBottomWidth = glow.style.borderLeftWidth = 2;
+                    glow.schedule.Execute(() => glow.style.opacity = .2f + .8f * Mathf.PingPong(Time.unscaledTime / .62f, 1f)).Every(50);
+                    view.Add(glow);
+                }
                 view.RegisterCallback<PointerEnterEvent>(evt =>
                 {
                     if (evt.pointerType == UnityEngine.UIElements.PointerType.mouse && source == null)
@@ -646,28 +667,42 @@ namespace RaidPartyManager.Presentation
                 this.ReleasePointer(captured);
         }
 
-        private bool CanDrop(Cell from, Cell target) => (from.Kind, target.Kind) switch
+        private static bool IsEquipmentSwap(Cell from, Cell target) =>
+            from.IsWornEquipment && target.IsWornEquipment && from.Item.Id != target.Item.Id;
+
+        private bool CanDrop(Cell from, Cell target)
         {
-            (CellKind.EquipmentBag, CellKind.EquipmentSlot) or (CellKind.EquipmentSlot, CellKind.EquipmentBag) => true,
-            (CellKind.BookBag, CellKind.SkillSlot) => run.CanLearnSkill(memberId, target.Index, from.Item?.Id),
-            _ => false
-        };
+            if (IsEquipmentSwap(from, target))
+                return run.CanSwapEquipment(from.Item.Id, target.Item.Id);
+            return (from.Kind, target.Kind) switch
+            {
+                (CellKind.EquipmentBag, CellKind.EquipmentSlot) or (CellKind.EquipmentSlot, CellKind.EquipmentBag) => true,
+                (CellKind.BookBag, CellKind.SkillSlot) => run.CanLearnSkill(memberId, target.Index, from.Item?.Id),
+                _ => false
+            };
+        }
 
         private void ApplyDrop(Cell from, Cell target)
         {
-            Cell slot;
-            if (from.Kind == CellKind.BookBag)
+            Cell focus = target;
+            if (IsEquipmentSwap(from, target))
+            {
+                if (!run.TrySwapEquipment(from.Item.Id, target.Item.Id))
+                    return;
+                GameAudio.Play(SoundCue.Equip);
+            }
+            else if (from.Kind == CellKind.BookBag)
             {
                 if (!run.TryLearnSkill(memberId, target.Index, from.Item.Id))
                     return;
                 FirstRunGuide.Practiced(run, GuideStep.Learned);
                 GameAudio.Play(SoundCue.SkillLearn);
-                slot = target;
             }
             else
             {
                 var bagCell = from.Kind == CellKind.EquipmentBag ? from : target;
-                slot = from.Kind == CellKind.EquipmentSlot ? from : target;
+                var slot = from.Kind == CellKind.EquipmentSlot ? from : target;
+                focus = slot;
                 bool unequipping = from == slot && (bagCell.Item == null || bagCell.Item.Id == slot.Item.Id);
                 if (!run.TryEquip(memberId, slot.Index, unequipping ? null : bagCell.Item?.Id))
                     return;
@@ -689,7 +724,7 @@ namespace RaidPartyManager.Presentation
             HideTooltip();
             changed();
             Render();
-            this.Q(CellName(slot.Kind, slot.Index))?.Focus();
+            this.Q(CellName(focus.Kind, focus.Index))?.Focus();
         }
 
         private void ShowTooltip(Cell cell)
@@ -698,9 +733,9 @@ namespace RaidPartyManager.Presentation
             hovered = cell;
             var item = cell.Definition;
             tooltipPanel = new EquipmentTooltip(item, iconFor(item.Id), showScroll: cell.Kind != CellKind.SkillSlot);
-            if (cell.EquippedBy != null)
+            if (cell.Wearer.Label != null)
             {
-                var wearer = PrototypeStyle.Text($"已穿戴 · {cell.EquippedBy}", 12, PrototypeStyle.Ally);
+                var wearer = PrototypeStyle.Text($"已穿戴 · {cell.Wearer.Label}", 12, cell.Wearer.Color);
                 wearer.name = "equipped-item-wearer";
                 wearer.pickingMode = PickingMode.Ignore;
                 wearer.style.marginTop = 5;
@@ -712,7 +747,7 @@ namespace RaidPartyManager.Presentation
             if (x + EquipmentTooltip.Width > layout.width)
                 x = bounds.xMin - EquipmentTooltip.Width - 8;
             tooltipPanel.style.left = Mathf.Clamp(x, 4, Mathf.Max(4, layout.width - EquipmentTooltip.Width - 4));
-            tooltipPanel.style.top = Mathf.Clamp(bounds.yMin, 4, Mathf.Max(4, layout.height - (item is SkillBookDefinition ? 249 : cell.EquippedBy != null ? 220 : 195)));
+            tooltipPanel.style.top = Mathf.Clamp(bounds.yMin, 4, Mathf.Max(4, layout.height - (item is SkillBookDefinition ? 249 : cell.Wearer.Label != null ? 220 : 195)));
             Add(tooltipPanel);
         }
 

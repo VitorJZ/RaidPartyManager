@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "长刷击（66%） / 扬灰蔽目（34%）"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 2
   specialDefense: 4
   health: 31

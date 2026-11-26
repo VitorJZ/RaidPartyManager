@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "探针（63%） / 余震笔迹（37%）"
   personality: 1
-  attack: 7
+  attack: 8
   defense: 3
   specialDefense: 2
   health: 29

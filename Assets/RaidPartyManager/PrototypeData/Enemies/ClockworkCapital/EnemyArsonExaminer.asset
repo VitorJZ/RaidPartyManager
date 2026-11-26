@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "引火取证（63%） / 回溯燃点（37%）"
   personality: 1
-  attack: 10
+  attack: 11
   defense: 3
   specialDefense: 5
   health: 61

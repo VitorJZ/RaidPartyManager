@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "雾喉尖啸（75%） / 噤生诅咒（25%）"
   personality: 1
-  attack: 6
+  attack: 7
   defense: 0
   specialDefense: 3
   health: 19

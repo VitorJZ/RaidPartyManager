@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "闭塞锤（63%） / 双轨封锁（37%）"
   personality: 1
-  attack: 10
+  attack: 11
   defense: 5
   specialDefense: 3
   health: 66

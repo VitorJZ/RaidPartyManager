@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "开战自带 4 点护盾。30% 概率为己方攻击最高者增加 4 点护盾。"
   personality: 1
-  attack: 4
+  attack: 5
   defense: 4
   specialDefense: 0
   health: 24

@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "37% 概率蓄力。下次行动用火焰冲锋优先撞击有破绽者；无人有破绽时按普通近战规则选敌。"
   personality: 1
-  attack: 7
+  attack: 8
   defense: 4
   specialDefense: 1
   health: 35

@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "葬王点名生命比例最低者，下次行动审判。生命过半或有护盾可获赦免。"
   personality: 1
-  attack: 10
+  attack: 11
   defense: 3
   specialDefense: 3
   health: 128

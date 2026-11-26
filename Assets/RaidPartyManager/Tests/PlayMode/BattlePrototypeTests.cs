@@ -1299,7 +1299,14 @@ namespace RaidPartyManager.Tests
 
             Press(root, "edit-member-mage");
             yield return null;
-            Assert.That(root.Q("loadout-member-bookmarks").childCount, Is.EqualTo(6));
+            var memberBookmarks = root.Q("loadout-member-bookmarks");
+            Assert.That(memberBookmarks.childCount, Is.EqualTo(6));
+            Assert.That(memberBookmarks.worldBound.xMax, Is.LessThan(root.Q("character-details").worldBound.center.x));
+            var guardColor = root.Q("loadout-member-1").style.backgroundColor.value;
+            var mageColor = root.Q("loadout-member-2").style.backgroundColor.value;
+            Assert.That(guardColor, Is.Not.EqualTo(mageColor));
+            Assert.That(memberBookmarks.Children().Where(tab => tab.enabledInHierarchy)
+                .Select(tab => tab.style.backgroundColor.value).Distinct().Count(), Is.EqualTo(4));
             var characterName = root.Q<Label>("details-character-name");
             Assert.That(characterName.text, Is.EqualTo("星辉术师"));
             var loadoutTab = root.Q<Button>("open-character-loadout").worldBound;
@@ -1356,7 +1363,7 @@ namespace RaidPartyManager.Tests
                 Send(bagCell, enter);
             yield return Drag(root, bagCell, root.Q("edit-slot-0"));
             Assert.That(root.Q<Label>("equipped-name-0").text, Is.EqualTo("精钢壁垒"));
-            Assert.That(root.Q("edit-item-gear-1").parent.Q("equipped-item-border"), Is.Not.Null);
+            Assert.That(root.Q("edit-item-gear-1").parent.Q("equipped-item-border").style.borderLeftColor.value, Is.EqualTo(mageColor));
             Assert.That(topBar.Q("run-backpack-item-gear-1"), Is.Null);
             yield return null;
             var wornCell = root.Q("bag-cell-0");
@@ -1375,6 +1382,7 @@ namespace RaidPartyManager.Tests
             yield return null;
             yield return Drag(root, root.Q("bag-cell-0"), root.Q("edit-slot-1"));
             Assert.That(root.Q<Label>("equipped-name-1").text, Is.EqualTo("精钢壁垒"));
+            Assert.That(root.Q("edit-item-gear-1").parent.Q("equipped-item-border").style.borderLeftColor.value, Is.EqualTo(guardColor));
             Press(root, "close-character-details");
             Press(root, "back-party-editor");
 
@@ -1691,12 +1699,50 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator EquippedItemsSwapInSlotsAndBetweenBackpackWearers()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return WaitForScene("BattlePrototype");
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+            var items = party.Inventory.Where(item => item.Definition.Effect != EquipmentEffect.TreeRoot).Take(3).ToArray();
+            MemberView Guard() => party.Members.Single(member => member.Id == "guard");
+            MemberView Mage() => party.Members.Single(member => member.Id == "mage");
+            VisualElement BagCell(EquipmentInstance item) => root.Q("edit-item-" + item.Id).parent;
+            Assert.That(party.TryEquip("guard", 0, items[0].Id), Is.True);
+            Assert.That(party.TryEquip("guard", 1, items[1].Id), Is.True);
+            Assert.That(party.TryEquip("mage", 0, items[2].Id), Is.True);
+            Press(root, "open-party-editor");
+            Press(root, "edit-member-guard");
+            yield return null;
+
+            yield return Drag(root, root.Q("edit-slot-0"), root.Q("edit-slot-1"));
+            Assert.That(Guard().EquipmentIds.Take(2), Is.EqualTo(new[] { items[1].Id, items[0].Id }));
+            yield return null;
+
+            yield return Drag(root, root.Q("edit-slot-0"), BagCell(items[2]));
+            Assert.That(Guard().EquipmentIds[0], Is.EqualTo(items[2].Id));
+            Assert.That(Mage().EquipmentIds[0], Is.EqualTo(items[1].Id));
+            yield return null;
+
+            yield return Drag(root, BagCell(items[0]), BagCell(items[1]));
+            Assert.That(Guard().EquipmentIds[1], Is.EqualTo(items[1].Id));
+            Assert.That(Mage().EquipmentIds[0], Is.EqualTo(items[0].Id));
+            Assert.That(BagCell(items[0]).Q("equipped-item-border").style.borderLeftColor.value,
+                Is.EqualTo(root.Q("loadout-member-2").style.backgroundColor.value));
+            Assert.That(BagCell(items[1]).Q("equipped-item-border").style.borderLeftColor.value,
+                Is.EqualTo(root.Q("loadout-member-1").style.backgroundColor.value));
+        }
+
+        [UnityTest]
         public IEnumerator BookmarksSwitchPagesAndCompatibleBooksCanReplaceLearnedSkills()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return WaitForScene("BattlePrototype");
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
             Press(root, "open-party-editor");
             Press(root, "edit-member-guard");
             yield return null;
@@ -1710,6 +1756,22 @@ namespace RaidPartyManager.Tests
             yield return null;
             Assert.That(root.Q("bag-cell-0"), Is.Null);
             var first = root.Q("book-cell-0");
+            var glow = first.Q("learnable-skill-border");
+            Assert.That(glow, Is.Not.Null);
+            float initialOpacity = glow.resolvedStyle.opacity;
+            float deadline = Time.realtimeSinceStartup + .75f;
+            while (Mathf.Abs(glow.resolvedStyle.opacity - initialOpacity) < .1f && Time.realtimeSinceStartup < deadline)
+                yield return null;
+            Assert.That(Mathf.Abs(glow.resolvedStyle.opacity - initialOpacity), Is.GreaterThanOrEqualTo(.1f));
+            var mageBook = party.SkillBooks.Take(16).First(item =>
+                party.CanLearnSkill("mage", 0, item.Id) && !party.CanLearnSkill("guard", 0, item.Id));
+            string mageBookElement = $"edit-book-{mageBook.Id}";
+            Assert.That(root.Q(mageBookElement).parent.Q("learnable-skill-border"), Is.Null);
+            Press(root, "loadout-member-2");
+            Assert.That(root.Q(mageBookElement).parent.Q("learnable-skill-border"), Is.Not.Null);
+            Press(root, "loadout-member-1");
+            yield return null;
+            first = root.Q("book-cell-0");
             var scroll = first.Q<Image>();
             var symbol = scroll.Q<Image>("skill-scroll-symbol");
             Assert.That(scroll.image.name, Is.EqualTo("SkillBookScroll"));
@@ -1729,11 +1791,11 @@ namespace RaidPartyManager.Tests
             yield return Drag(root, first, root.Q("skill-slot-0"));
             var learned = root.Q("skill-slot-0");
             Assert.That(learned.Q<Image>().image.name, Is.EqualTo("01-WarCry"));
+            Assert.That(root.Q("book-cell-0").Q("learnable-skill-border"), Is.Null);
             yield return null;
             yield return Drag(root, root.Q("book-cell-0"), learned); // Another War Cry is still rejected.
             Assert.That(root.Q("skill-slot-0").Q<Image>().image.name, Is.EqualTo("01-WarCry"));
             var content = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
-            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
             var replacement = content.SkillBooks.Single(book => book.SkillEffect == SkillEffect.StoneGuard);
             var replacementItem = party.SkillBooks.First(book => book.Definition.Id == replacement.Id);
             var booksBefore = party.SkillBooks.Select(book => book.Id).ToArray();

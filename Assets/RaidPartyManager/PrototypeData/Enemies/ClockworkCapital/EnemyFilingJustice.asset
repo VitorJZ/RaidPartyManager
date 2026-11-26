@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "锤印（63%） / 强制归档（37%）"
   personality: 1
-  attack: 9
+  attack: 10
   defense: 4
   specialDefense: 6
   health: 64

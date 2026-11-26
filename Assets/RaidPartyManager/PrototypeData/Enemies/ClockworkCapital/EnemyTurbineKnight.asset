@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "旋翼破阵（63%） / 超速斩列（37%）"
   personality: 1
-  attack: 11
+  attack: 12
   defense: 6
   specialDefense: 2
   health: 70

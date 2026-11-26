@@ -9,6 +9,7 @@ namespace RaidPartyManager.Presentation
     {
         private static readonly Vector3[] BedCentres = { new(-1.55f, 0, -1.52f), new(1.55f, 0, -3.08f) };
         private const float MattressTop = .64f;
+        private const float SettleTime = .45f;
         private sealed class Patient
         {
             internal string Id;
@@ -17,7 +18,8 @@ namespace RaidPartyManager.Presentation
             internal Texture2D Walk, Reclining;
             internal Vector3 Start;
             internal float Elapsed, Approach;
-            internal bool InBed, PlayBedCue;
+            internal bool InBed, PlayBedCue, Breathing;
+            internal int RestCel;
         }
         private readonly Patient[] patients = new Patient[2];
         private bool PatientsMoving => patients.Any(p => p != null && !p.InBed);
@@ -71,11 +73,13 @@ namespace RaidPartyManager.Presentation
                 int slot = member.Position ?? 0;
                 var start = slot > 0 ? new Vector3(-1.83f-.86f*(slot-1),.8f,-5.3f+.42f*((slot-1)%2)) : new Vector3(-6.4f,.8f,-3.9f);
                 var walk = content.BattleWalkFor(member.Character.Id);
-                var reclining = Resources.Load<Texture2D>("WardPatients/" + member.Character.RosterNumber);
+                var restAtlas = Resources.Load<Texture2D>($"WardPatients/Animated/{member.Character.RosterNumber}");
+                var reclining = restAtlas != null ? restAtlas : Resources.Load<Texture2D>($"WardPatients/{member.Character.RosterNumber}");
                 var figure = Flat("Ward patient " + id, start, CompanySpriteSize, CompanySpriteSize, walk);
                 float approach = Mathf.Max(.56f, Vector3.Distance(start, BedCentres[i]) / 3.8f);
                 patients[i] = new Patient { Id = id, Figure = figure, Walk = walk, Reclining = reclining,
-                    Start = start, Approach = approach, Elapsed = walkIn ? 0 : approach + .48f, PlayBedCue = walkIn };
+                    Start = start, Approach = approach, Elapsed = walkIn ? 0 : approach + SettleTime, PlayBedCue = walkIn,
+                    Breathing = restAtlas != null };
             }
             ShowEventCompany(run, content);
             AnimatePatients();
@@ -86,8 +90,18 @@ namespace RaidPartyManager.Presentation
             for (int i = 0; i < patients.Length; i++)
             {
                 var p = patients[i];
-                if (p == null || p.InBed) continue;
+                if (p == null || (p.InBed && !p.Breathing)) continue;
                 p.Elapsed += Mathf.Min(Time.unscaledDeltaTime,.08f);
+                if (p.InBed)
+                {
+                    int cel = AnimationCels.Loop(p.Elapsed - p.Approach - SettleTime, 2.4f);
+                    if (cel != p.RestCel)
+                    {
+                        SetFrame(p.Figure, p.Reclining, AnimationCels.Count, cel);
+                        p.RestCel = cel;
+                    }
+                    continue;
+                }
                 var bed = BedCentres[i];
                 var bedside = bed + new Vector3(-.48f,.8f,-.55f);
                 if (p.Elapsed < p.Approach)
@@ -99,19 +113,26 @@ namespace RaidPartyManager.Presentation
                     continue;
                 }
                 RidingWave.Hide(p.Wave);
+                if (p.Reclining == null)
+                {
+                    p.Figure.transform.localPosition = bedside;
+                    SetFrame(p.Figure, p.Walk, AnimationCels.Count, 0);
+                    p.InBed = true;
+                    continue;
+                }
                 if (p.PlayBedCue)
                 {
                     GameAudio.Play(SoundCue.EventGraveTwinBedsLieDown, .48f);
                     p.PlayBedCue = false;
                 }
-                float settle = Mathf.SmoothStep(0,1,(p.Elapsed-p.Approach)/.45f);
+                float settle = Mathf.SmoothStep(0,1,(p.Elapsed-p.Approach)/SettleTime);
                 float width = 2.29f, height = width * p.Reclining.height / p.Reclining.width;
                 var rest = bed + new Vector3(0,MattressTop + height*.48f+.06f,-.07f);
                 // Keep the head against the pillow as the torso lowers onto the mattress.
                 p.Figure.transform.localPosition = Vector3.Lerp(bedside + Vector3.up*.22f,rest,settle);
                 p.Figure.transform.localRotation = Quaternion.Euler(0,0,Mathf.Lerp(-32,0,settle));
                 p.Figure.transform.localScale = new Vector3(width,height,1);
-                SetFrame(p.Figure,p.Reclining,1,0);
+                SetFrame(p.Figure,p.Reclining,p.Breathing ? AnimationCels.Count : 1,0);
                 p.InBed = settle >= 1;
             }
         }

@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "裹布抽打（65%） / 织就尸衣（35%）"
   personality: 1
-  attack: 4
+  attack: 5
   defense: 0
   specialDefense: 3
   health: 19

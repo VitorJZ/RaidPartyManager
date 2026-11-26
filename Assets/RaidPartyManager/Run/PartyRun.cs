@@ -421,10 +421,55 @@ namespace RaidPartyManager.Run
                             member.Slots[i] = null;
 
             receiver.Slots[slot] = equipmentId;
+            FinishEquipmentChange(receiver);
+            return true;
+        }
+
+        public bool CanSwapEquipment(string firstId, string secondId) =>
+            TryGetEquipmentSwap(firstId, secondId, out _, out _);
+
+        public bool TrySwapEquipment(string firstId, string secondId)
+        {
+            if (!TryGetEquipmentSwap(firstId, secondId, out var first, out var second))
+                return false;
+
+            first.Wearer.Slots[first.Slot] = secondId;
+            second.Wearer.Slots[second.Slot] = firstId;
+            FinishEquipmentChange(first.Wearer, second.Wearer);
+            return true;
+        }
+
+        private bool TryGetEquipmentSwap(string firstId, string secondId,
+            out (Member Wearer, int Slot) first, out (Member Wearer, int Slot) second)
+        {
+            first = second = default;
+            if (activeBattle != null || firstId == secondId || !IsMovable(firstId) || !IsMovable(secondId))
+                return false;
+
+            first = EquippedSlot(firstId);
+            second = EquippedSlot(secondId);
+            return first.Wearer is { IsAway: false } && second.Wearer is { IsAway: false };
+
+            bool IsMovable(string id) => id != null && inventory.TryGetValue(id, out var item) &&
+                item.Definition.Effect != EquipmentEffect.TreeRoot;
+        }
+
+        private (Member Wearer, int Slot) EquippedSlot(string id)
+        {
+            foreach (var member in members)
+            {
+                int slot = Array.IndexOf(member.Slots, id);
+                if (slot >= 0) return (member, slot);
+            }
+            return default;
+        }
+
+        private void FinishEquipmentChange(Member receiver, Member other = null)
+        {
             foreach (var member in members)
                 member.Health = Math.Min(member.Health, PersonalStats(member).Health);
             RefreshEmployeeGoals(receiver);
-            return true;
+            if (other != null && other != receiver) RefreshEmployeeGoals(other);
         }
 
         public bool CanLearnSkill(string memberId, int slot, string bookId)

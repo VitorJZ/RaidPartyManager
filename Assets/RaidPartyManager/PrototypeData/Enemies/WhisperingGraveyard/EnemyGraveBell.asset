@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "铜槌砸击（65%） / 丧钟回荡（35%）"
   personality: 1
-  attack: 8
+  attack: 9
   defense: 3
   specialDefense: 2
   health: 50

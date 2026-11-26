@@ -34,6 +34,33 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void SwappingEquippedInstancesKeepsBothWearersAndClampsOnlyFinalHealth()
+        {
+            var run = MakeRun();
+            var first = run.Inventory.Single();
+            var second = run.AddEquipment(Armor);
+            Assert.That(run.TryEquip("a", 0, first.Id), Is.True);
+            Assert.That(run.CanSwapEquipment(first.Id, second.Id), Is.False);
+            Assert.That(run.TryEquip("b", 2, second.Id), Is.True);
+            run.Rest(1);
+
+            Assert.That(run.CanSwapEquipment(first.Id, first.Id), Is.False);
+            Assert.That(run.CanSwapEquipment(first.Id, second.Id), Is.True);
+            Assert.That(run.TrySwapEquipment(first.Id, second.Id), Is.True);
+            Assert.That(run.Members[0].EquipmentIds[0], Is.EqualTo(second.Id));
+            Assert.That(run.Members[1].EquipmentIds[2], Is.EqualTo(first.Id));
+            Assert.That(run.Members.Select(member => member.Health), Is.EqualTo(new[] { 12, 12 }));
+            Assert.That(run.BackpackItems, Is.Empty);
+
+            run.BeginBattle(Enemies(), 20, null);
+            Assert.That(run.TrySwapEquipment(first.Id, second.Id), Is.False);
+            run.CancelBattle();
+            Assert.That(run.TrySendAway("b"), Is.True);
+            Assert.That(run.TrySwapEquipment(first.Id, second.Id), Is.False);
+            Assert.That(run.Members[1].EquipmentIds[2], Is.EqualTo(first.Id));
+        }
+
+        [Test]
         public void EveryPersonalityHasItsOwnFirstPersonLineForEveryThought()
         {
             var personalities = (Personality[])Enum.GetValues(typeof(Personality));

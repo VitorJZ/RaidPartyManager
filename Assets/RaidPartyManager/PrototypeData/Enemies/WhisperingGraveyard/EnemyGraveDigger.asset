@@ -31,7 +31,7 @@ MonoBehaviour:
   traitPower: 0
   traitText: "锈铲劈砍（75%） / 掘土重击（25%）"
   personality: 1
-  attack: 5
+  attack: 6
   defense: 1
   specialDefense: 1
   health: 20
