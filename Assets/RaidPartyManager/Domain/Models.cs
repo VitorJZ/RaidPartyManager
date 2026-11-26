@@ -365,6 +365,7 @@ namespace RaidPartyManager.Domain
         public int PartyGold { get; }
         public int RecruitLimit { get; }
         public int ReserveArcherCount { get; }
+        public int ReserveAccessoryHunterCount { get; }
         public bool HardFight { get; }
         public bool CapitalField { get; }
 
@@ -374,7 +375,7 @@ namespace RaidPartyManager.Domain
         public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit,
             IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null,
             int partyGold = 0, int recruitLimit = Rules.Positions, bool hardFight = false, string pallbearerId = null, int graveBell = 0,
-            bool capitalField = false, int reserveArcherCount = 0)
+            bool capitalField = false, int reserveArcherCount = 0, int reserveAccessoryHunterCount = 0)
         {
             if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0 || partyGold < 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
@@ -394,6 +395,9 @@ namespace RaidPartyManager.Domain
             if (reserveArcherCount < 0)
                 throw new ArgumentOutOfRangeException(nameof(reserveArcherCount));
             ReserveArcherCount = reserveArcherCount;
+            if (reserveAccessoryHunterCount < 0 || reserveAccessoryHunterCount > int.MaxValue - Rules.Positions)
+                throw new ArgumentOutOfRangeException(nameof(reserveAccessoryHunterCount));
+            ReserveAccessoryHunterCount = reserveAccessoryHunterCount;
             PallbearerId = pallbearerId;
             GraveBell = graveBell;
             CapitalField = capitalField;

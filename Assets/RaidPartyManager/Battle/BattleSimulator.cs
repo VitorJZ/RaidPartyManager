@@ -58,6 +58,7 @@ namespace RaidPartyManager.Battle
             public int GrowthTriggers;
             public int BorrowedAttack;
             public int BlockedRound;
+            public int AttackBlockedRound;
             public int LastAttackRound;
             public bool CrownTriggered, ReliquaryWard;
             public int LastSkillRound;
@@ -328,6 +329,8 @@ namespace RaidPartyManager.Battle
             unit.Health > 0 && !(Round == 1 && unit.Input.Id == request.PallbearerId) && unit.BlockedRound != Round &&
             unit.Layers(StatusKind.Stunned) == 0 && (ignoreFreeze || unit.Layers(StatusKind.Frozen) == 0);
 
+        private bool CanAttackThisRound(Unit unit) => unit.AttackBlockedRound != Round;
+
         private void PlayThawedTurns(List<Unit> frozenTurns)
         {
             // Check again after each recovered turn, which can thaw someone else waiting in line.
@@ -483,7 +486,7 @@ namespace RaidPartyManager.Battle
             if (options.Count == 0)
                 return;
 
-            var context = new DecisionContext(actor.Snapshot(), Tick, actor.Health, actor.Shield);
+            var context = new DecisionContext(actor.Snapshot(), Tick, actor.Health, actor.Shield, IsRanged(actor));
             var decision = policy.Choose(context, options.AsReadOnly());
             if (decision.OptionIndex < 0 || decision.OptionIndex >= options.Count)
                 throw new InvalidOperationException("The decision policy must choose a legal option.");
@@ -532,9 +535,11 @@ namespace RaidPartyManager.Battle
         {
             if (action.Kind == ActionKind.Attack)
             {
+                if (!CanAttackThisRound(actor)) return;
                 foreach (var target in AttackTargets(actor, action))
                     options.Add(new ActionOption(action, target.Snapshot(), target.Health,
-                        ProjectedDamage(actor, target, AttackComponents(actor, target, action), UsesShortbow(actor), weaponAttack: true)));
+                        ProjectedDamage(actor, target, AttackComponents(actor, target, action), UsesShortbow(actor),
+                            weaponAttack: true, multiplier: actor.DoubleNextAttack ? 2 : 1)));
                 return;
             }
 
@@ -551,6 +556,7 @@ namespace RaidPartyManager.Battle
                 return;
             if (actor.Has(EquipmentEffect.RebelEarring))
             {
+                if (!CanAttackThisRound(actor)) return;
                 int power = healing;
                 foreach (var enemy in TargetableOpponents(actor))
                     options.Add(new ActionOption(action, enemy.Snapshot(), enemy.Health,
@@ -598,7 +604,8 @@ namespace RaidPartyManager.Battle
             int gold = (int)Math.Min((long)int.MaxValue - request.PartyGold, equipmentGold + party
                 .Where(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GoldOnSurvival)
                 .Sum(unit => (long)unit.TraitPower));
-            int accessories = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.AccessoryOnSurvival);
+            int accessories = request.ReserveAccessoryHunterCount +
+                party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.AccessoryOnSurvival);
             Result = new BattleResult(request.Id, outcome, health, events, partyPositions,
                 recruits.Select(unit => unit.RecruitmentResult()), attackGains, potions, currentLoadout, gold, accessories,
                 party.Where(unit => unit.BonusMaximumHealth > 0).Select(unit =>

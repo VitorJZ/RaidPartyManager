@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using RaidPartyManager.Domain;
 
 namespace RaidPartyManager.Battle
@@ -12,9 +14,10 @@ namespace RaidPartyManager.Battle
         public int ProjectedAmount { get; }
         public SkillBookDefinition Book { get; }
         public int LastCastRound { get; }
+        public int EnergyCost { get; }
 
         public ActionOption(ActionDefinition action, Combatant target, int health, int projectedAmount, ActionKind? kind = null,
-            SkillBookDefinition book = null, int lastCastRound = 0)
+            SkillBookDefinition book = null, int lastCastRound = 0, int? energyCost = null)
         {
             Action = action;
             Kind = kind ?? action.Kind;
@@ -23,6 +26,7 @@ namespace RaidPartyManager.Battle
             ProjectedAmount = projectedAmount;
             Book = book;
             LastCastRound = lastCastRound;
+            EnergyCost = energyCost ?? book?.Cost ?? 0;
         }
     }
 
@@ -32,13 +36,15 @@ namespace RaidPartyManager.Battle
         public int Tick { get; }
         public int ActorHealth { get; }
         public int ActorShield { get; }
+        public bool RandomRangedAttack { get; }
 
-        public DecisionContext(Combatant actor, int tick, int actorHealth, int actorShield)
+        public DecisionContext(Combatant actor, int tick, int actorHealth, int actorShield, bool randomRangedAttack = false)
         {
             Actor = actor;
             Tick = tick;
             ActorHealth = actorHealth;
             ActorShield = actorShield;
+            RandomRangedAttack = randomRangedAttack;
         }
     }
 
@@ -67,27 +73,34 @@ namespace RaidPartyManager.Battle
             if (context.Actor.Side == Side.Enemy)
                 return new Decision(0, DecisionReason.Default);
 
-            int best = 0;
-            for (int i = 1; i < options.Count; i++)
+            int routine = -1, bestBook = -1;
+            for (int i = 0; i < options.Count; i++)
             {
                 var candidate = options[i];
-                var current = options[best];
-                int priority = Priority(candidate).CompareTo(Priority(current));
-                if (priority > 0 || priority == 0 && BetterTarget(candidate, current))
-                    best = i;
+                if (candidate.Book != null)
+                {
+                    if (bestBook < 0 || SkillValue(candidate) > SkillValue(options[bestBook]))
+                        bestBook = i;
+                }
+                else if (routine < 0 || Priority(candidate) > Priority(options[routine]) ||
+                    Priority(candidate) == Priority(options[routine]) && BetterTarget(candidate, options[routine]))
+                    routine = i;
             }
 
-            if (options[best].Book != null)
+            int best = routine;
+            double routineValue = routine < 0 ? double.NegativeInfinity : RoutineValue(context, options[routine], options);
+            if (bestBook >= 0 && SkillValue(options[bestBook]) > routineValue)
             {
-                int strongest = options[best].ProjectedAmount;
-                // Consider comparable spells first, then prefer the least recently cast.
-                // Using the global best as the threshold avoids order-dependent comparisons.
+                best = bestBook;
+                int strongest = SkillValue(options[bestBook]);
                 for (int i = 0; i < options.Count; i++)
                 {
                     var candidate = options[i];
-                    if (candidate.Book == null || (long)candidate.ProjectedAmount * 5 < (long)strongest * 4) continue;
+                    if (candidate.Book == null) continue;
+                    int value = SkillValue(candidate);
+                    if (value <= routineValue || 5L * value < 4L * strongest) continue;
                     if (candidate.LastCastRound < options[best].LastCastRound ||
-                        candidate.LastCastRound == options[best].LastCastRound && BetterTarget(candidate, options[best]))
+                        candidate.LastCastRound == options[best].LastCastRound && value > SkillValue(options[best]))
                         best = i;
                 }
             }
@@ -102,7 +115,7 @@ namespace RaidPartyManager.Battle
         }
 
         private static int Priority(ActionOption option) =>
-            option.Book != null ? 3 : option.Kind switch
+            option.Kind switch
             {
                 ActionKind.Heal => 2,
                 ActionKind.Shield => 1,
@@ -111,9 +124,24 @@ namespace RaidPartyManager.Battle
 
         private static bool BetterTarget(ActionOption candidate, ActionOption current)
         {
-            if (candidate.Book == null && candidate.Kind == ActionKind.Heal)
+            if (candidate.Kind == ActionKind.Heal)
                 return (long)candidate.Health * current.Target.Stats.Health < (long)current.Health * candidate.Target.Stats.Health;
             return candidate.ProjectedAmount > current.ProjectedAmount;
+        }
+
+        private static int SkillValue(ActionOption option) =>
+            option.ProjectedAmount - Math.Max(0, option.EnergyCost - 1);
+
+        private static double RoutineValue(DecisionContext context, ActionOption choice, IReadOnlyList<ActionOption> options)
+        {
+            if (choice.Kind != ActionKind.Attack) return choice.ProjectedAmount;
+            if (context.RandomRangedAttack && choice.Action == context.Actor.Character.BasicAttack &&
+                choice.Action.Target == TargetRule.AnyEnemy)
+            {
+                return options.Where(option => option.Book == null && option.Action == choice.Action)
+                    .Average(option => Math.Min(option.Health, option.ProjectedAmount));
+            }
+            return Math.Min(choice.Health, choice.ProjectedAmount);
         }
     }
 }

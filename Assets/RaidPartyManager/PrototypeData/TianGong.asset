@@ -26,7 +26,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 18
   traitPower: 0
-  traitText: "攻击会对敌方每个有单位占据的格子造成伤害，每命中一次，后续伤害降低1点。"
+  traitText: "箭矢穿过敌方所有被占据的格子，每命中一次，后续伤害降低1点。只以最前方的敌人为攻击目标，其余格子只结算穿透伤害。"
   personality: 4
   attack: 8
   defense: 2

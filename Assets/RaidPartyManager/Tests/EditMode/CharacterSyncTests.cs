@@ -439,6 +439,27 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void ReserveRelicHunterAddsAnAccessoryWithoutEnteringBattle()
+        {
+            var starters = Enumerable.Range(1, 4).Select(position => Fighter($"fighter-{position}", Side.Party, position))
+                .Select(fighter => new PartyMemberStart(fighter.Id, fighter.Character, fighter.Position, fighter.Health));
+            var accessory = new EquipmentDefinition("ring", "ring", default);
+            var party = new PartyRun(starters, new[] { accessory });
+            var relicHunter = Load("RelicHunter");
+            Assert.That(party.TryRecruit(relicHunter), Is.True);
+            Assert.That(party.Members.Single(m => m.Character.Id == relicHunter.Id).Position, Is.Null);
+            var request = party.BeginBattle(new[] { Fighter("enemy", Side.Enemy, 1) }, 10, null);
+            Assert.That(request.Combatants.Any(u => u.Character.Id == relicHunter.Id), Is.False);
+
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(request);
+
+            Assert.That(result.AccessoriesEarned, Is.EqualTo(1));
+            Assert.That(party.TryFinishBattle(result, out var loot), Is.True);
+            Assert.That(loot, Is.EqualTo(new[] { accessory }));
+            Assert.That(party.TryFinishBattle(result, out _), Is.False);
+        }
+
+        [Test]
         public void TianGongPiercesEachOccupiedEnemySlotWithoutHittingTeammates()
         {
             var archer = Unit(Load("TianGong"), "archer", 2);
@@ -456,6 +477,32 @@ namespace RaidPartyManager.Tests
             Assert.That(arrows.Select(entry => entry.Kind),
                 Is.EqualTo(new[] { BattleEventKind.Action, BattleEventKind.Effect, BattleEventKind.Effect }));
             Assert.That(first.Concat(battle.AdvanceRound()).Select(entry => entry.Kind), Has.None.EqualTo(BattleEventKind.FormChanged));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void TianGongOnlyTriggersIceRingOnTheFirstSlotOfTheFrontEnemy(bool frontDodges)
+        {
+            var definition = Load("TianGong");
+            var ring = new EquipmentDefinition("ice-ring", "寒冰戒指", default, effect: EquipmentEffect.IceRing);
+            var archer = new Combatant("archer", definition, Side.Party, 1, definition.BaseStats,
+                definition.BaseStats.Health, new[] { ring });
+            var elite = Fighter("elite", Side.Enemy, 1, attack: 0, slots: 2);
+            if (frontDodges)
+                elite = new Combatant(elite.Id, elite.Character, elite.Side, elite.Position, elite.Stats, elite.Health,
+                    startingStatuses: new Dictionary<StatusKind, int> { [StatusKind.Swift] = 1 });
+            var neighbor = Fighter("neighbor", Side.Enemy, 3, attack: 0);
+            var rear = Fighter("rear", Side.Enemy, 4, attack: 0);
+            var battle = new BattleSimulator(random: new FixedOrder()).Start(
+                new BattleRequest("piercing-ice", new[] { archer, elite, neighbor, rear }, 10));
+
+            var events = battle.AdvanceRound();
+            var chills = events.Where(entry => entry.ActorId == archer.Id && entry.Equipment == EquipmentEffect.IceRing).ToArray();
+            Assert.That(chills.Select(entry => entry.TargetId),
+                Is.EqualTo(frontDodges ? Array.Empty<string>() : new[] { elite.Id, neighbor.Id }));
+            Assert.That(chills.Select(entry => entry.TargetStatuses), Is.All.EqualTo("寒冷 1"));
+            Assert.That(events.Where(entry => entry.ActorId == archer.Id && entry.VisualCue == BattleVisualCue.PiercingArrow)
+                .Select(entry => entry.Amount), Is.EqualTo(frontDodges ? new[] { 0, 0, 8, 7 } : new[] { 8, 7, 6, 5 }));
         }
 
         [TestCase(100, "front", 2)]
@@ -477,7 +524,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void DiShaBorrowsFromTheNearestRearAllyEveryRoundAndDoublesWeaponDamage()
+        public void DiShaBorrowsFromTheNearestRearAllyAndPreventsTheirAttackEveryRound()
         {
             var diSha = Unit(Load("DiSha"), "di-sha", 1);
             var nearest = Fighter("nearest", Side.Party, 2, attack: 4);
@@ -492,10 +539,29 @@ namespace RaidPartyManager.Tests
                 var loan = round.Single(entry => entry.ActionName == "地煞借力");
                 Assert.That(loan.TargetId, Is.EqualTo(diSha.Id));
                 Assert.That(loan.Detail, Does.Contain(nearest.Character.Name));
-                Assert.That(round.Any(entry => entry.ActorId == nearest.Id && entry.Kind == BattleEventKind.Action), Is.True);
+                Assert.That(round.Any(entry => entry.ActorId == nearest.Id && entry.ActionKind == ActionKind.Attack), Is.False);
+                Assert.That(round.Any(entry => entry.ActorId == farther.Id && entry.ActionKind == ActionKind.Attack), Is.True);
                 Assert.That(round.Single(entry => entry.ActorId == diSha.Id && entry.Kind == BattleEventKind.Action).Amount,
                     Is.EqualTo(12));
             }
+        }
+
+        [Test]
+        public void DiShaBlocksOffensiveSkillsButLeavesSupportSkillsAvailable()
+        {
+            var diSha = Unit(Load("DiSha"), "di-sha", 1);
+            var fighter = Fighter("nearest", Side.Party, 2);
+            var attack = new SkillBookDefinition("attack", "穿云箭", "", SkillRequirement.None, 1, 1, SkillEffect.CloudPiercer);
+            var guard = new SkillBookDefinition("guard", "坚石守护", "", SkillRequirement.None, 1, 1, SkillEffect.StoneGuard);
+            var ally = new Combatant(fighter.Id, fighter.Character, fighter.Side, fighter.Position, fighter.Stats, fighter.Health,
+                learnedSkills: new[] { attack, guard });
+            var battle = new BattleSimulator(random: new FixedOrder()).Start(new BattleRequest("di-sha-guard",
+                new[] { diSha, ally, Fighter("enemy", Side.Enemy, 1) }, diSha.Character.ActionInterval));
+
+            var round = battle.AdvanceRound();
+
+            Assert.That(round.Single(e => e.ActorId == ally.Id && e.Kind == BattleEventKind.Action).SkillBookId, Is.EqualTo(guard.Id));
+            Assert.That(round.Any(e => e.ActorId == ally.Id && e.ActionKind == ActionKind.Attack), Is.False);
         }
 
         [Test]

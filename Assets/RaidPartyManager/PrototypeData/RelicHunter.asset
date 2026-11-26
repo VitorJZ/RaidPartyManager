@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 26
   traitPower: 1
-  traitText: "战斗结束时，若仍然存活，获得1件饰品"
+  traitText: "在队伍池中时，战斗结束可获得1件饰品。若出战，需存活到战斗结束。"
   personality: 8
   attack: 4
   defense: 1

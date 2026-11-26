@@ -74,7 +74,7 @@ namespace RaidPartyManager.Battle
                     Heal(unit, rear, 2, "搭把手", BattleEventKind.Effect);
                 if (Round == 2 && unit.Talent == PlayerTrait.Warmup)
                     GrantStatus(unit, unit, Swift, 1);
-                if (unit.ThunderRound == Round && unit.Layers(Stunned) == 0 && unit.Layers(Frozen) == 0)
+                if (unit.ThunderRound == Round && CanAttackThisRound(unit) && unit.Layers(Stunned) == 0 && unit.Layers(Frozen) == 0)
                     foreach (var enemy in Opponents(unit).ToArray())
                         Strike(unit, enemy, 2 * CurrentAttack(unit) + 6, DamageType.Lightning, "雷暴裁决", BattleEventKind.Effect, skillBookId: "skill-book-30");
             }

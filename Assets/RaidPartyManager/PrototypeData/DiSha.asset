@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 19
   traitPower: 0
-  traitText: "每回合开始时，额外获得最近的后方存活队友的攻击力。武器攻击造成的伤害翻倍。"
+  traitText: "每回合开始时，额外获得最近的后方存活队友的攻击力。该队友本回合无法攻击。地煞的武器攻击伤害翻倍。"
   personality: 0
   attack: 5
   defense: 3

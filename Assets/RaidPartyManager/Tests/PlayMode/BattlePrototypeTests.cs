@@ -1187,6 +1187,24 @@ namespace RaidPartyManager.Tests
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
             yield return null;
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var type = typeof(BattlePrototype);
+            var content = (EncounterData)type.GetField("content", PrivateInstance).GetValue(scene);
+            var guard = content.Party.Single(unit => unit.Id == "guard").Character;
+            var book = content.SkillBooks.Single(skill => skill.SkillEffect == SkillEffect.WarCry);
+            var party = new PartyRun(new[] { new PartyMemberStart("guard", guard, 1, guard.BaseStats.Health) },
+                new EquipmentDefinition[] { book });
+            var foe = content.Enemies.First().Character;
+            var behavior = new EnemyBehaviorDefinition(new[]
+            {
+                new EnemyActionDefinition("普攻", 100, EnemyActionKind.Attack, EnemyTargetRule.Front)
+            }, openingShield: guard.BaseStats.Attack);
+            var target = new CharacterDefinition(foe.Id, foe.Name, foe.Profession, foe.Personality,
+                new Stats(0, 0, 0, 18), 1, foe.BasicAttack, enemyBehavior: behavior);
+            var enemies = new PartyRun(new[] { new PartyMemberStart("target", target, 1, target.BaseStats.Health) },
+                System.Array.Empty<EquipmentDefinition>());
+            type.GetField("run", PrivateInstance).SetValue(scene, party);
+            type.GetField("enemyRun", PrivateInstance).SetValue(scene, enemies);
+            type.GetMethod("ResetDemo", PrivateInstance).Invoke(scene, new object[] { false });
             UseFastAttacks(scene);
             var root = scene.GetComponent<UIDocument>().rootVisualElement;
             Press(root, "open-party-editor");

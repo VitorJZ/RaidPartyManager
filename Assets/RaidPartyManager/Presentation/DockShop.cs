@@ -24,7 +24,8 @@ namespace RaidPartyManager.Presentation
             public EquipmentDefinition Item;
             public Texture2D Icon;
             public int Index;
-            public int Price;
+            public AdventureShopOffer Record;
+            public int Price => Record.Price;
             public VisualElement View;
             public Label PriceTag;
             public VisualElement HoldFill;
@@ -81,7 +82,7 @@ namespace RaidPartyManager.Presentation
             hovered = null;
             celebrationUntil = 0;
             var catalogue = stockPool.Where(item => item != null).Select(item => item.ToDefinition()).Concat(content.SkillBooks);
-            var stock = adventure?.Current.Stock ?? AdventureShopOffer.Draw(catalogue, random, false);
+            var stock = adventure?.Current.Stock ?? AdventureShopOffer.Draw(catalogue, random, () => party.HasShopDiscount);
             stage = new ShopStage(transform, root, stageArt, backdrop, merchantReactions, adventure?.InGraveyard == true, adventure?.InCapital == true);
             stage.ShowCompany(party, content);
             if (RecruitmentWheelVisible) PrepareRecruitment();
@@ -100,7 +101,7 @@ namespace RaidPartyManager.Presentation
             {
                 var record = stock[i];
                 var offer = new Offer { Index = i, Item = record.Item, Icon = content.IconFor(record.Item.Id),
-                    Price = record.Price, Sold = record.Sold };
+                    Record = record, Sold = record.Sold };
                 offers.Add(offer);
                 stage.SetTableItem(i, offer.Item, offer.Icon, offer.Sold);
                 var view = BuildOffer(offer);
@@ -478,7 +479,12 @@ namespace RaidPartyManager.Presentation
             feedbackUntil = Time.unscaledTimeAsDouble + 3;
         }
 
-        private void RefreshGold() => topBar.Refresh();
+        private void RefreshGold()
+        {
+            topBar.Refresh();
+            foreach (var offer in offers.Where(offer => !offer.Sold))
+                offer.PriceTag.text = $"{offer.Price} 金币";
+        }
 
         private void RefreshRecruitmentButton()
         {

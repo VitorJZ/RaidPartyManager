@@ -1600,6 +1600,27 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void HiringAReserveMerchantRepricesTheCurrentStockAndSurvivesReload()
+        {
+            var saved = Create(14, false).CheckpointForExit();
+            saved.Options = new[] { NodeKind.Town };
+            var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            Assert.That(run.EnterRoute(0), Is.True);
+            var undiscounted = run.Current.Stock.Select(o => o.Price).ToArray();
+            var merchant = content.CharacterCatalog.Single(c => c.Trait == CharacterTrait.ShopDiscount);
+
+            Assert.That(run.Party.TryRecruit(merchant), Is.True);
+            Assert.That(run.Party.Members.Single(m => m.Character.Id == merchant.Id).Position, Is.Null);
+            saved = UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(UnityEngine.JsonUtility.ToJson(run.CheckpointForExit()));
+            run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+
+            Assert.That(run.Current.Stock.Select(o => o.Price), Is.EqualTo(undiscounted.Select(price => (price + 1) / 2)));
+            int price = run.Current.Stock[0].Price;
+            Assert.That(run.Buy(0), Is.True);
+            Assert.That(run.Party.Expenses.Last(e => e.Reason.StartsWith("购买")).Amount, Is.EqualTo(price));
+        }
+
+        [Test]
         public void OnlyCampIsLimitedAndAllFourTownServicesCanBeUsed()
         {
             var run = Create(); run.Inspect(NodeKind.Town);

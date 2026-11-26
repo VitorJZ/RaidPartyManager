@@ -197,7 +197,7 @@ namespace RaidPartyManager.Tests
             var chalice = new EquipmentDefinition("chalice", "余响圣杯", default, effect: EquipmentEffect.EchoChalice);
             var party = new Combatant(baseUnit.Id, baseUnit.Character, baseUnit.Side, baseUnit.Position, baseUnit.Stats,
                 baseUnit.Health, hasChalice ? new[] { horn, chalice } : new[] { horn }, learnedSkills: new[] { book });
-            var battle = new BattleSimulator().Start(new BattleRequest("energy", new[] { party, enemy }, 9));
+            var battle = new BattleSimulator(new FixedOptionPolicy(0)).Start(new BattleRequest("energy", new[] { party, enemy }, 9));
 
             Assert.That(battle.ReadPartyEnergy().Single().Value.Remaining, Is.EqualTo(capacity));
             var casts = new System.Collections.Generic.List<int>();
@@ -218,6 +218,41 @@ namespace RaidPartyManager.Tests
             Assert.That(battle.ReadPartyEnergy().Single().Value.Remaining, Is.EqualTo(capacity));
         }
 
+        [TestCase(SkillEffect.LightningWhip, 2)]
+        [TestCase(SkillEffect.WarCry, 1)]
+        public void DefaultPolicyFinishesAWeakenedEnemyWithABasicAttackAndSavesEnergy(SkillEffect effect, int cost)
+        {
+            var actor = Unit("caster", Side.Party, 1);
+            var book = new SkillBookDefinition("book", "book", "", SkillRequirement.None, cost, 1, effect);
+            var caster = new Combatant(actor.Id, actor.Character, actor.Side, 1, actor.Stats, actor.Health,
+                learnedSkills: new[] { book });
+            var enemy = Unit("enemy", Side.Enemy, 1, hp: 3);
+
+            var battle = new BattleSimulator().Start(new BattleRequest("save-energy", new[] { caster, enemy }, 1));
+            var round = battle.AdvanceRound();
+
+            Assert.That(round.Single(e => e.ActorId == caster.Id && e.Kind == BattleEventKind.Action).ActionName, Is.EqualTo("basic"));
+            Assert.That(round.Any(e => e.ActorEnergy.HasValue), Is.False);
+            Assert.That(battle.Result.Outcome, Is.EqualTo(BattleOutcome.Victory));
+        }
+
+        [TestCase(19, false)]
+        [TestCase(3, true)]
+        public void DefaultPolicyUsesHealingForASeverelyWoundedAllyButSkipsMinorInjuries(int allyHealth, bool shouldHeal)
+        {
+            var actor = Unit("caster", Side.Party, 2);
+            var sunshine = new SkillBookDefinition("sunshine", "阳光普照", "", SkillRequirement.None, 1, 2, SkillEffect.Sunshine);
+            var caster = new Combatant(actor.Id, actor.Character, actor.Side, 2, actor.Stats, actor.Health,
+                learnedSkills: new[] { sunshine });
+            var ally = Unit("ally", Side.Party, 1, hp: allyHealth);
+            var enemy = Unit("enemy", Side.Enemy, 1, attack: 0, maxHealth: 40);
+            var result = Fight(caster, ally, enemy);
+
+            Assert.That(FirstAction(result, caster.Id).SkillBookId, Is.EqualTo(shouldHeal ? sunshine.Id : null));
+            if (shouldHeal)
+                Assert.That(result.Events.Single(e => e.SkillBookId == sunshine.Id && e.ActionKind == ActionKind.Heal).Amount, Is.EqualTo(3));
+        }
+
         [Test]
         public void TwoEnergySkillUsesFireDefenseForEveryTargetAndFallsBackToBasicAttack()
         {
@@ -226,8 +261,8 @@ namespace RaidPartyManager.Tests
             var mage = new CharacterDefinition("caster", "caster", Profession.Mage, Personality.Theatrical,
                 actor.Stats, 1, actor.Character.BasicAttack);
             var caster = new Combatant(actor.Id, mage, actor.Side, 1, actor.Stats, actor.Health, learnedSkills: new[] { book });
-            var front = Unit("front", Side.Enemy, 1, specialDefense: 2);
-            var back = Unit("back", Side.Enemy, 4, specialDefense: 4);
+            var front = Unit("front", Side.Enemy, 1, defense: 2, specialDefense: 2);
+            var back = Unit("back", Side.Enemy, 4, defense: 2, specialDefense: 4);
 
             var result = Fight(new[] { caster, front, back }, 2);
             var cast = result.Events.Single(entry => entry.ActorEnergy.HasValue);

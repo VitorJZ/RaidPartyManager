@@ -571,9 +571,11 @@ namespace RaidPartyManager.Run
                 recruitmentPool = null;
             int reserveArchers = members.Count(member => member.Health > 0 && !IsDeployed(member) &&
                 member.Character.Profession == Profession.Archer);
+            int reserveAccessoryHunters = members.Count(member => member.Health > 0 && !IsDeployed(member) &&
+                member.Character.Trait == CharacterTrait.AccessoryOnSurvival);
             var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit,
                 recruitmentPool, characterCatalog, Gold, Math.Max(0, RosterLimit - members.Count), hardFight, grave.Porter,
-                grave.Bell, capitalField, reserveArcherCount: reserveArchers);
+                grave.Bell, capitalField, reserveArcherCount: reserveArchers, reserveAccessoryHunterCount: reserveAccessoryHunters);
             nextBattleId++;
             activeBattle = request;
             activeReward = victoryReward;
@@ -668,7 +670,8 @@ namespace RaidPartyManager.Run
 
             if ((recruits.Count > 0 && positions.Count == 0) || result.PotionsEarned < 0 ||
                 result.PotionsEarned > Rules.Positions || result.GoldEarned < 0 || result.GoldEarned > int.MaxValue - Gold ||
-                result.AccessoriesEarned < 0 || result.AccessoriesEarned > Rules.Positions || result.PermanentAttackGains.Concat(result.PermanentHealthGains).Any(gain =>
+                result.AccessoriesEarned < 0 || result.AccessoriesEarned > Rules.Positions + activeBattle.ReserveAccessoryHunterCount ||
+                result.PermanentAttackGains.Concat(result.PermanentHealthGains).Any(gain =>
                     gain.Value < 0 || !allUnits.Any(unit => unit.Side == Side.Party && unit.Id == gain.Key)))
                 return false;
 
@@ -748,6 +751,7 @@ namespace RaidPartyManager.Run
         private Member FindMember(string id) => members.Find(member => member.Id == id);
 
         public int ResalePercent => 50 + 20 * members.Count(m => m.Trait == PlayerTrait.Bargaining);
+        public bool HasShopDiscount => members.Any(m => m.Character.Trait == CharacterTrait.ShopDiscount);
         public int ResalePrice(EquipmentDefinition item) => AdventureShopOffer.ResalePrice(item, ResalePercent);
 
         public bool TrySellItem(string itemId) => TrySellItems(new[] { itemId }, out _);

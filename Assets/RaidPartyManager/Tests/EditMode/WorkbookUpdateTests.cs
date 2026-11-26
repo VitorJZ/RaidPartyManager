@@ -80,6 +80,7 @@ namespace RaidPartyManager.Tests
             var caster = Fighter("caster", Side.Party, 1, Personality.Stoic, 15, book, wearIt ? doll : null);
             var ally = Fighter("ally", Side.Party, 2, Personality.Stoic, 15, gear: wearIt ? null : doll);
             var foe = Fighter("enemy", Side.Enemy, 1, Personality.Frank);
+            foe = new Combatant(foe.Id, foe.Character, foe.Side, foe.Position, new Stats(2, 1, 0, 30), foe.Health);
             var result = new BattleSimulator(random: new FixedSkillRoll(roll))
                 .Simulate(new BattleRequest("doll-support", new[] { caster, ally, foe }, 1));
 
@@ -102,8 +103,10 @@ namespace RaidPartyManager.Tests
             var mage = new CharacterDefinition("mage", "mage", Profession.Mage, Personality.Stoic, stats, 1, basic);
             var cup = new EquipmentDefinition("cup", "余响圣杯", default, effect: EquipmentEffect.EchoChalice);
             var actor = new Combatant("mage", mage, Side.Party, 1, stats, 30, new[] { cup }, learnedSkills: new[] { fire, whip });
-            var foe = Fighter("foe", Side.Enemy, 1, Personality.Frank);
-            var battle = new BattleSimulator().Start(new BattleRequest("book-choice", new[] { actor, foe }, 3));
+            var foes = new[] { Fighter("front", Side.Enemy, 1, Personality.Frank),
+                Fighter("rear", Side.Enemy, 2, Personality.Frank) }.Select(foe =>
+                    new Combatant(foe.Id, foe.Character, foe.Side, foe.Position, new Stats(2, 0, 1, 60), 60));
+            var battle = new BattleSimulator().Start(new BattleRequest("book-choice", foes.Prepend(actor), 3));
             var events = battle.AdvanceRound().ToList();
             events.AddRange(battle.AdvanceRound());
             Assert.That(events.Where(e => e.ActorId == actor.Id && e.SkillBookId != null && e.ActorEnergy.HasValue)

@@ -66,8 +66,9 @@ namespace RaidPartyManager.Battle
                         if (behind != null)
                         {
                             unit.BorrowedAttack = CurrentAttack(behind);
+                            behind.AttackBlockedRound = Round;
                             Report(BattleEventKind.Effect, unit, unit, "地煞借力", ActionKind.Shield,
-                                detail: $"借用{behind.Input.Character.Name}的攻击力，攻击 +{unit.BorrowedAttack}",
+                                detail: $"借用{behind.Input.Character.Name}的攻击力，攻击 +{unit.BorrowedAttack}。该队友本回合无法攻击。",
                                 visual: BattleVisualCue.RoundStartBonus);
                         }
                         break;

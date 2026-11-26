@@ -480,14 +480,15 @@ namespace RaidPartyManager.Battle
             {
                 int falloff = 0;
                 var kind = BattleEventKind.Action;
-                // Resolve one hit per occupied enemy slot before any retaliation.
+                // Only the first occupied slot counts as an attack. The other slots take piercing damage.
                 var reactions = new List<Action>();
                 foreach (var enemy in Opponents(actor).OrderBy(unit => unit.Input.Position).ToArray())
                 {
                     for (int slot = 0; slot < enemy.Input.Character.PositionSlots && enemy.Health > 0; slot++)
                     {
                         if (Hit(actor, enemy, action, kind, reason, falloff: falloff, visual: BattleVisualCue.PiercingArrow,
-                            evaporated: evaporated, firstTarget: kind == BattleEventKind.Action, reactions: reactions, singleTarget: false))
+                            evaporated: evaporated, firstTarget: kind == BattleEventKind.Action, reactions: reactions,
+                            singleTarget: false, countsAsAttack: kind == BattleEventKind.Action))
                             falloff++;
                         kind = BattleEventKind.Effect;
                     }
@@ -540,8 +541,9 @@ namespace RaidPartyManager.Battle
             DecisionReason reason, string equipmentName = null, int falloff = 0, bool canCounter = true,
             BattleVisualCue visual = BattleVisualCue.None, int multiplier = 1, bool firstTarget = true, string skillBookId = null,
             List<Action> reactions = null, bool singleTarget = true, bool? evaporated = null,
-            Action<Unit> onHit = null, EquipmentEffect equipment = None)
+            Action<Unit> onHit = null, EquipmentEffect equipment = None, bool countsAsAttack = true)
         {
+            if (!CanAttackThisRound(actor)) return false;
             bool halfDamage = evaporated ?? SpendEvaporation(actor);
             bool intercepted = false;
             if (singleTarget && actor.Input.Side != target.Input.Side && (reactions == null || action.Id == "enemy-configured"))
@@ -594,14 +596,14 @@ namespace RaidPartyManager.Battle
             {
                 if (!missed)
                 {
-                    onHit?.Invoke(defender);
+                    if (countsAsAttack) onHit?.Invoke(defender);
                     if (element != None) events.Add(EquipmentVisual(actor, defender, element));
                     if (execution) events.Add(EquipmentVisual(actor, defender, ExecutionMask));
                     if (fireTrigram)
                         events.Add(EquipmentVisual(actor, defender, Bagua));
                     if (chargedPrism)
                         events.Add(EquipmentVisual(actor, defender, StaticPrism));
-                    if (thorns > 0 && dealt >= 2)
+                    if (countsAsAttack && thorns > 0 && dealt >= 2)
                         React(() =>
                         {
                             if (actor.Health > 0)
@@ -625,7 +627,8 @@ namespace RaidPartyManager.Battle
             void SettleGear(Unit defender, int physical, int magic, IReadOnlyCollection<Unit> wounded)
             {
                 // The reliquary ward belongs to its recipient, including an adjacent ally without a reliquary.
-                bool ward = !missed && actor.ReliquaryWard && actor.Shield > 0;
+                bool attackConnected = countsAsAttack && !missed;
+                bool ward = attackConnected && actor.ReliquaryWard && actor.Shield > 0;
                 foreach (var unit in InEquipmentOrder(wounded.Append(actor).Append(defender).Distinct()))
                 {
                     bool crownTriggered = false;
@@ -636,7 +639,7 @@ namespace RaidPartyManager.Battle
 
                         if (item.Definition.Effect == FacelessCrown && wounded.Contains(unit))
                             TriggerCrown(unit, ref crownTriggered);
-                        if (unit == defender && !missed && canCounter && item.Definition.Effect == CounterHorn)
+                        if (unit == defender && attackConnected && canCounter && item.Definition.Effect == CounterHorn)
                             CounterHit(defender, actor);
                         if (unit != actor) continue;
                         switch (item.Definition.Effect)
@@ -662,14 +665,14 @@ namespace RaidPartyManager.Battle
                                     Report(BattleEventKind.Effect, actor, actor, "摇钱树枝", ActionKind.Shield, detail: $"金币 +{gain}", equipment: MoneyTreeBranch);
                                 }
                                 break;
-                            case IceRing when !missed:
+                            case IceRing when attackConnected:
                                 GrantStatus(actor, defender, Chill, 1, equipment: IceRing);
                                 foreach (var neighbor in units.Where(unit => unit.Input.Side == defender.Input.Side &&
                                     (unit.Input.Position + unit.Input.Character.PositionSlots == defender.Input.Position ||
                                      defender.Input.Position + defender.Input.Character.PositionSlots == unit.Input.Position)))
                                     GrantStatus(actor, neighbor, Chill, 1, equipment: IceRing);
                                 break;
-                            case Bagua when !missed && actor.Input.Position % 2 != 0:
+                            case Bagua when attackConnected && actor.Input.Position % 2 != 0:
                                 GrantStatus(actor, defender, Chill, 1, equipment: Bagua);
                                 break;
                             case WindGlove when kind == BattleEventKind.Action && actor.Layers(Frozen) == 0:
@@ -770,12 +773,12 @@ namespace RaidPartyManager.Battle
             actor?.Trait == CharacterTrait.ForestMarkOnAttack && actor.Input.Side != target.Input.Side;
 
         private int ProjectedDamage(Unit actor, Unit target, IReadOnlyList<(DamageType Type, int Power)> parts,
-            bool ignoreDefense = false, bool weaponAttack = false)
+            bool ignoreDefense = false, bool weaponAttack = false, int multiplier = 1)
         {
             int damage = SumDamage(parts.Select(part =>
                 Damage(actor, target, part.Power, FinalDamageType(actor, part.Type), ignoreDefense)));
             if (weaponAttack)
-                damage = (int)Math.Min(int.MaxValue, (long)damage * WeaponDamageMultiplier(actor));
+                damage = (int)Math.Min(int.MaxValue, (long)damage * WeaponDamageMultiplier(actor) * multiplier);
             damage = DamageAfterGuard(target, damage);
             if (weaponAttack && actor.Layers(Evaporation) > 0)
                 damage /= 2;
@@ -1098,6 +1101,7 @@ namespace RaidPartyManager.Battle
         {
             if (actor.Has(RebelEarring))
             {
+                if (!CanAttackThisRound(actor)) return;
                 var enemy = hostileTarget ?? target;
                 if (enemy.Input.Side == actor.Input.Side || enemy.Health == 0)
                     enemy = TargetableOpponents(actor).FirstOrDefault();

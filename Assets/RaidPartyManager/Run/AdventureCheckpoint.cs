@@ -84,6 +84,7 @@ namespace RaidPartyManager.Run
         public string Item;
         public int Price;
         public bool Sold;
+        public bool UsesRosterDiscount;
     }
 
     [Serializable]

@@ -98,23 +98,34 @@ namespace RaidPartyManager.Run
 
     public sealed class AdventureShopOffer
     {
+        private readonly Func<bool> shouldDiscount;
         public EquipmentDefinition Item { get; }
-        public int Price { get; }
+        internal int ListedPrice { get; }
+        internal bool UsesRosterDiscount => shouldDiscount != null;
+        public int Price => shouldDiscount?.Invoke() == true ? (int)((ListedPrice + 1L) / 2) : ListedPrice;
         public bool Sold { get; internal set; }
-        internal AdventureShopOffer(EquipmentDefinition item, int price) { Item = item; Price = price; }
+        internal AdventureShopOffer(EquipmentDefinition item, int price, Func<bool> shouldDiscount = null)
+        {
+            Item = item;
+            ListedPrice = price;
+            this.shouldDiscount = shouldDiscount;
+        }
 
         public static int BasePrice(EquipmentDefinition item) => item.Price;
 
         public static int ResalePrice(EquipmentDefinition item, int recoveryPercent = 50) =>
             item.BossExclusive ? 100 : Math.Max(1, (int)((long)BasePrice(item) * recoveryPercent / 100));
 
-        public static IReadOnlyList<AdventureShopOffer> Draw(IEnumerable<EquipmentDefinition> catalogue, Random random, bool discount)
+        public static IReadOnlyList<AdventureShopOffer> Draw(IEnumerable<EquipmentDefinition> catalogue, Random random, bool discount) =>
+            Draw(catalogue, random, discount ? () => true : null);
+
+        public static IReadOnlyList<AdventureShopOffer> Draw(IEnumerable<EquipmentDefinition> catalogue, Random random, Func<bool> shouldDiscount)
         {
             var stock = catalogue.Where(e => e.AvailableInRegularPool && BasePrice(e) > 0).GroupBy(e => e.Id).Select(g => g.First()).ToArray();
             var choices = stock.Where(e => e.Tier == 1).OrderBy(_ => random.Next()).Take(2)
                 .Concat(stock.Where(e => e.Tier is 2 or 3).OrderBy(_ => random.Next()).Take(2)).OrderBy(_ => random.Next());
-            return choices.Select(e => new AdventureShopOffer(e, (int)Math.Ceiling(
-                Math.Ceiling(BasePrice(e) * (.7 + random.NextDouble() * .6)) * (discount ? .5 : 1)))).ToArray();
+            return choices.Select(e => new AdventureShopOffer(e,
+                (int)Math.Ceiling(BasePrice(e) * (.7 + random.NextDouble() * .6)), shouldDiscount)).ToArray();
         }
     }
 
@@ -347,7 +358,7 @@ namespace RaidPartyManager.Run
                     Signed = recruitment.Signed, Slots = recruitment.Slots.Select(slot => slot?.Id).ToArray(),
                     Candidates = recruitment.Candidates.Select(candidate => candidate.Id).ToArray(),
                     Stock = Current.Stock.Select(offer => new ShopOfferCheckpoint
-                        { Item = offer.Item.Id, Price = offer.Price, Sold = offer.Sold }).ToArray(),
+                        { Item = offer.Item.Id, Price = offer.ListedPrice, Sold = offer.Sold, UsesRosterDiscount = offer.UsesRosterDiscount }).ToArray(),
                     UsedServices = Current.UsedServices.ToArray(),
                     TownRecruits = Current.Recruits.Select(candidate => candidate.Id).ToArray(),
                     BrokerRefusals = Current.BrokerRefusals, BrokerCounter = Current.BrokerCounter, BrokerMember = Current.BrokerMember,
@@ -482,7 +493,8 @@ namespace RaidPartyManager.Run
                     Commissions = TownCommission.RestoreBoard(shop.Commissions, run.random),
                     ShopRecruitment = recruitment, Rested = shop.Rested, Message = shop.Message ?? "",
                     Stock = shop.Stock.Select(offer => new AdventureShopOffer(items[offer.Item],
-                        offer.Price == 0 ? items[offer.Item].Price : offer.Price)
+                        offer.Price == 0 ? items[offer.Item].Price : offer.Price,
+                        offer.UsesRosterDiscount ? () => party.HasShopDiscount : null)
                         { Sold = offer.Sold }).ToArray(),
                     Recruits = shop.TownRecruits.Select(id => byId[id]).Where(c => party.Members.All(m => m.Character.Id != c.Id)).ToArray(),
                     PendingRecruit = string.IsNullOrEmpty(shop.PendingRecruit) ? null : byId[shop.PendingRecruit]
@@ -1263,11 +1275,8 @@ namespace RaidPartyManager.Run
             return true;
         }
 
-        private IReadOnlyList<AdventureShopOffer> CreateStock()
-        {
-            bool discount = Party.Members.Any(m => !m.IsAway && m.Health > 0 && m.Character.Trait == CharacterTrait.ShopDiscount);
-            return AdventureShopOffer.Draw(shopCatalogue, random, discount);
-        }
+        private IReadOnlyList<AdventureShopOffer> CreateStock() =>
+            AdventureShopOffer.Draw(shopCatalogue, random, () => Party.HasShopDiscount);
 
         public bool Leave()
         {

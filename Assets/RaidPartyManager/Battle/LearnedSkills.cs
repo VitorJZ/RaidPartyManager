@@ -21,6 +21,7 @@ namespace RaidPartyManager.Battle
             long reserveValue = 0;
             foreach (var book in actor.Original.LearnedSkills)
             {
+                if (!CanAttackThisRound(actor) && !CanCastWithoutAttacking(actor, book.SkillEffect)) continue;
                 bool charging = book.Cost > actor.Energy.Remaining;
                 if (book.Cost > reachableEnergy) continue;
                 var action = new ActionDefinition(book.Id, book.Name, ActionKind.Shield, TargetRule.Self, 0);
@@ -71,7 +72,14 @@ namespace RaidPartyManager.Battle
                     case ThunderVerdict when actor.ThunderRound <= Round:
                         Add(actor, enemies.Sum(e => (long)Estimate(e, 2 * attack + 6, DamageType.Lightning))); break;
                     case WarCry when !actor.DoubleNextAttack && attack > 0:
-                        Add(actor, attack);
+                        Add(actor, AttackTargets(actor, actor.Input.Character.BasicAttack).Select(target =>
+                        {
+                            var parts = AttackComponents(actor, target, actor.Input.Character.BasicAttack);
+                            bool ignoresDefense = UsesShortbow(actor);
+                            int normal = ProjectedDamage(actor, target, parts, ignoresDefense, weaponAttack: true);
+                            int doubled = ProjectedDamage(actor, target, parts, ignoresDefense, weaponAttack: true, multiplier: 2);
+                            return Math.Min(target.Health, doubled) - Math.Min(target.Health, normal);
+                        }).DefaultIfEmpty(0).Max());
                         break;
                     case BlazingFire:
                         Add(actor, enemies.Sum(enemy => (long)Estimate(enemy, attack + 1, DamageType.Fire)));
@@ -82,7 +90,7 @@ namespace RaidPartyManager.Battle
                     case Sunshine:
                         Add(actor, actor.Has(EquipmentEffect.RebelEarring)
                             ? enemies.Sum(enemy => (long)Estimate(enemy, 3, DamageType.Magic))
-                            : allies.Sum(ally => (long)HealingGain(ally, 3)));
+                            : allies.Sum(ally => HealingValue(ally, 3)));
                         break;
                     case StoneGuard when !actor.StoneGuard:
                         Add(actor, 3);
@@ -93,27 +101,28 @@ namespace RaidPartyManager.Battle
                                 Add(target, Estimate(target, 10, DamageType.Magic));
                         else
                             foreach (var target in allies)
-                                Add(target, HealingGain(target, 10));
+                                Add(target, HealingValue(target, 10));
                         break;
                     case SweepNextAttack when actor.SweepSkill == null && enemies.Length > 1 && attack > 0:
                         Add(actor, (long)(enemies.Length - 1) * attack);
                         break;
                     case LightningWhip:
                         foreach (var target in TargetableOpponents(actor))
-                            Add(target, Estimate(target, 3, DamageType.Lightning) * (long)(enemies.Length + 1));
+                            Add(target, Math.Min(target.Health, Estimate(target, 3, DamageType.Lightning) * (long)(enemies.Length + 1)));
                         break;
                     case ToxicMist:
                         var poisonTargets = TargetableOpponents(actor).Where(enemy => CanAffect(enemy, Poison)).ToArray();
                         foreach (var target in poisonTargets)
-                            Add(target, attack);
-                        if (!charging && attack > 0 && poisonTargets.Length == 0 &&
+                            Add(target, PoisonValue(target, attack));
+                        if (!charging && attack > 0 && !poisonTargets.Any(target => PoisonValue(target, attack) > 0) &&
                             ToxicMistDollTarget(actor) is { } doll && random.NextDouble() < ToxicMistDollChance)
-                            Add(doll, Math.Max(1, HealingGain(doll, attack)));
+                            Add(doll, HealingValue(doll, attack));
                         break;
                     case VenomSurge when !charging:
                         int enemyPoison = 3 * book.EnergyCost(actor.Energy.Remaining);
                         Add(actor, enemies.Where(enemy => CanAffect(enemy, Poison))
-                            .Sum(enemy => (long)Math.Min(enemy.Health, enemyPoison)));
+                            .Sum(enemy => PoisonValue(enemy, enemyPoison)) -
+                            (actor.Has(EquipmentEffect.WitchDoctorDoll) ? 0 : book.EnergyCost(actor.Energy.Remaining)));
                         break;
                     case FleshFeast:
                         foreach (var corpse in units.Where(unit => unit.Input.Side != actor.Input.Side &&
@@ -163,7 +172,8 @@ namespace RaidPartyManager.Battle
                     }
                     options.Add(new ActionOption(action, target.Snapshot(), target.Health,
                         (int)Math.Min(int.MaxValue, projected), book: book,
-                        lastCastRound: actor.LastBookCast.GetValueOrDefault(book.Id)));
+                        lastCastRound: actor.LastBookCast.GetValueOrDefault(book.Id),
+                        energyCost: book.EnergyCost(actor.Energy.Remaining)));
                 }
 
                 int Estimate(Unit target, int power, DamageType type) =>
@@ -174,11 +184,32 @@ namespace RaidPartyManager.Battle
                     reserveValue > option.ProjectedAmount);
         }
 
+        private static bool CanCastWithoutAttacking(Unit actor, SkillEffect effect) => effect switch
+        {
+            WarCry or StoneGuard or SweepNextAttack or Sidestep or GoldenBell or HeroicAnthem or
+                TwinCover or BronzeMirror or Intercept or BackPay => true,
+            Sunshine or HealingHands or FieldMedic or NightWatch or LongNightPrayer or AnnealingOrder or FleshFeast
+                => !actor.Has(EquipmentEffect.RebelEarring),
+            _ => false
+        };
+
         private static int HealingGain(Unit target, int power) => target.Layers(Cursed) > 0 ? 0 :
             Math.Min(HealingPower(target, power), target.Stats.Health - target.Health);
 
+        private static long HealingValue(Unit target, int power) =>
+            HealingGain(target, power) * (4L * target.Health <= target.Stats.Health ? 2L : 1L);
+
         private static bool CanAffect(Unit target, StatusKind status) =>
             target.Layers(Purity) == 0 && (status == Poison || target.Layers(status) == 0);
+
+        private static long PoisonValue(Unit target, int layers)
+        {
+            // Estimate the extra damage over the next two ticks after accounting for existing stacks.
+            long existing = target.Layers(Poison);
+            long total = existing + layers;
+            return Math.Min(target.Health, total + Math.Max(0, total - 1))
+                - Math.Min(target.Health, existing + Math.Max(0, existing - 1));
+        }
 
         private Unit ToxicMistDollTarget(Unit actor) => Teammates(actor)
             .Where(ally => ally.Has(EquipmentEffect.WitchDoctorDoll) && CanAffect(ally, Poison) && ally.Layers(Cursed) == 0)
