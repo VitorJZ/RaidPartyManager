@@ -248,6 +248,27 @@ namespace RaidPartyManager.Tests
             Assert.That(action.Reason, Is.EqualTo(DecisionReason.Default));
         }
 
+        [TestCase(Side.Party, false)]
+        [TestCase(Side.Enemy, false)]
+        [TestCase(Side.Enemy, true)]
+        public void RangedBasicAttacksCanHitAnyLivingOpponent(Side side, bool configured)
+        {
+            var foe = side == Side.Party ? Side.Enemy : Side.Party;
+            var behavior = configured ? new EnemyBehaviorDefinition(new[] {
+                new EnemyActionDefinition("shot", 100, EnemyActionKind.Attack, EnemyTargetRule.Front)
+            }) : null;
+            var archer = Unit("archer", side, 1, reach: AttackReach.Ranged, enemyBehavior: behavior);
+            var front = Unit("front", foe, 1, defense: 15);
+            var rear = Unit("rear", foe, 3);
+            var defeated = Unit("defeated", foe, 4, hp: 0);
+            var request = new BattleRequest("ranged-targeting", new[] { archer, front, rear, defeated }, 1);
+
+            var targets = Enumerable.Range(0, 32).Select(seed => FirstAction(
+                new BattleSimulator(random: new System.Random(seed)).Simulate(request), archer.Id).TargetId).Distinct();
+
+            Assert.That(targets, Is.EquivalentTo(new[] { front.Id, rear.Id }));
+        }
+
         private sealed class FixedOptionPolicy : IDecisionPolicy
         {
             private readonly int index;
@@ -266,11 +287,12 @@ namespace RaidPartyManager.Tests
 
         private static Combatant Unit(string id, Side side, int position, Personality personality = Personality.Frank,
             ActionDefinition basic = null, ActionDefinition skill = null, int? hp = null, int maxHealth = 20,
-            int defense = 0, int specialDefense = 0, int interval = 1, int attack = 5)
+            int defense = 0, int specialDefense = 0, int interval = 1, int attack = 5,
+            AttackReach reach = AttackReach.Unspecified, EnemyBehaviorDefinition enemyBehavior = null)
         {
             var stats = new Stats(attack, defense, specialDefense, maxHealth);
             var definition = new CharacterDefinition(id, id, Profession.Warrior, personality,
-                stats, interval, basic ?? Basic, skill);
+                stats, interval, basic ?? Basic, skill, reach: reach, enemyBehavior: enemyBehavior);
             return new Combatant(id, definition, side, position, stats, hp ?? maxHealth);
         }
 

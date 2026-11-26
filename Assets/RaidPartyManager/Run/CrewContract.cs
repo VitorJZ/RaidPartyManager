@@ -193,9 +193,9 @@ namespace RaidPartyManager.Run
 
         internal bool ValidAt(int day)
         {
-            if (TidePact) return StartDay >= 1 && Days == 99 && EndDay > day && DailyWage == 0 &&
+            if (TidePact) return StartDay >= 1 && Days == 99 && EndDay >= day && DailyWage == 0 &&
                 BasePaid && SigningFee == 0 && !Plan.Enabled && Bonuses == BonusTerms.None && Rates.Terms == BonusTerms.None;
-            if (StartDay < 1 || EndDay <= StartDay || EndDay <= day || DailyWage < 1 || !Rates.Valid || !AgreedRates.Valid) return false;
+            if (StartDay < 1 || EndDay <= StartDay || EndDay < day || DailyWage < 1 || !Rates.Valid || !AgreedRates.Valid) return false;
             if (!Plan.Enabled) return !DeferredTerms || SigningFee >= Days;
             bool validSchedule = DeferredTerms ? Plan.Fits(Days) && SigningFee >= 0 && SigningFee <= BaseTotal &&
                 InterestPercent is >= 0 and <= WageInstallments.MaximumPremiumPercent && PrincipalInArrears >= 0 && InterestInArrears >= 0 && AccruedInterest >= 0 &&
@@ -338,14 +338,18 @@ namespace RaidPartyManager.Run
             if (draft == null || draft.DueAtSigning > Gold) return false;
             PaySigningWage(m.Character.Name, draft);
             draft.RecordSigningPayment();
-            if (m.Contract == null)
-            {
-                m.Contract = draft;
-                draft.OpenInterestPeriod(Day);
-            }
+            if (draft.StartDay == Day)
+                ActivateContract(m, draft);
             else m.Renewals.Add(draft);
             RefreshEmployeeGoals(m);
             return true;
+        }
+
+        private void ActivateContract(Member member, CrewContract draft)
+        {
+            member.UnpaidWages += member.Contract?.Arrears ?? 0;
+            member.Contract = draft;
+            draft.OpenInterestPeriod(Day);
         }
 
         internal void PaySigningWage(string name, CrewContract draft) =>
@@ -473,12 +477,13 @@ namespace RaidPartyManager.Run
             return leaving.Select(member => member.Character.Name).ToArray();
         }
 
-        public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 && m.LastContract.EndDay > (long)Day + 1);
+        public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 && m.LastContract?.EndDay > Day);
 
         internal void AdvanceDay()
         {
             Day++;
             expenses.RemoveAll(e => e.Day < Day - 2);
+            members.RemoveAll(m => m.Contract.EndDay < Day);
             foreach (var member in members)
             {
                 member.Career.ServiceDays++;
@@ -498,13 +503,10 @@ namespace RaidPartyManager.Run
                     PayWages(member, contract.DailyWage, "每日工资");
                 if (contract.EndDay == Day && member.Renewals.Count > 0)
                 {
-                    member.UnpaidWages += contract.Arrears;
-                    member.Contract = member.Renewals[0];
+                    ActivateContract(member, member.Renewals[0]);
                     member.Renewals.RemoveAt(0);
-                    member.Contract.OpenInterestPeriod(Day);
                 }
             }
-            members.RemoveAll(m => m.Contract.EndDay <= Day);
             DeployReserveIfNeeded();
             foreach (var member in members) RefreshEmployeeGoals(member);
         }

@@ -380,6 +380,14 @@ namespace RaidPartyManager.Battle
 
         private bool IsMelee(Unit actor) => UsesShortbow(actor) || actor.Input.Character.Reach == AttackReach.Melee;
 
+        private static bool IsRanged(Unit actor) => actor.Input.Character.Reach == AttackReach.Ranged && !UsesShortbow(actor);
+
+        private Unit RandomTarget(IEnumerable<Unit> candidates)
+        {
+            var targets = candidates as Unit[] ?? candidates.ToArray();
+            return targets.Length > 1 ? targets[random.Next(targets.Length)] : targets.FirstOrDefault();
+        }
+
         private IEnumerable<Unit> FrontAttackTargets(Unit actor)
         {
             var targets = TargetableOpponents(actor).OrderBy(unit => unit.Input.Position).ToArray();
@@ -481,7 +489,10 @@ namespace RaidPartyManager.Battle
                 throw new InvalidOperationException("The decision policy must choose a legal option.");
 
             var choice = options[decision.OptionIndex];
-            var target = unitsById[choice.Target.Id];
+            bool randomShot = policy is DefaultBattlePolicy && IsRanged(actor) && choice.Book == null &&
+                choice.Action == actor.Input.Character.BasicAttack && choice.Kind == ActionKind.Attack &&
+                choice.Action.Target == TargetRule.AnyEnemy;
+            var target = randomShot ? RandomTarget(AttackTargets(actor, choice.Action)) : unitsById[choice.Target.Id];
             if (choice.Book != null)
             {
                 CastLearnedSkill(actor, target, choice.Book, decision.Reason);
@@ -493,7 +504,7 @@ namespace RaidPartyManager.Battle
             switch (choice.Action.Kind)
             {
                 case ActionKind.Attack:
-                    Attack(actor, target, choice.Action, decision.Reason);
+                    Attack(actor, target, choice.Action, randomShot ? DecisionReason.Default : decision.Reason);
                     break;
                 case ActionKind.Heal:
                     Heal(actor, target, BaseHealing(actor, choice.Action), choice.Action.Name, BattleEventKind.Action, decision.Reason);

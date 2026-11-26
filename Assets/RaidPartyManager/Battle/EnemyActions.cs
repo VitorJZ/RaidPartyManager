@@ -63,7 +63,8 @@ namespace RaidPartyManager.Battle
                 return;
             }
             bool critical = random.NextDouble() < 0.2;
-            EnemyHit(actor, FrontAttackTargets(actor).First(), critical ? "重弩暴击" : "普攻",
+            var target = IsRanged(actor) ? RandomTarget(TargetableOpponents(actor)) : FrontAttackTargets(actor).First();
+            EnemyHit(actor, target, critical ? "重弩暴击" : "普攻",
                 critical ? BattleVisualCue.CrossbowCritical : BattleVisualCue.None, critical ? 2 : 1);
         }
 

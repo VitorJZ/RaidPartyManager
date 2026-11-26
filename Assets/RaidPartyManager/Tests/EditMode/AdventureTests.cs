@@ -1129,7 +1129,7 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void ExpiryWarningIncludesTheThirdDayAndAnUnsignedMemberLeavesWithTheirGearInTheBag()
+        public void UnsignedMemberStaysThroughExpiryAndLeavesTheNextDayWithTheirGearInTheBag()
         {
             var checkpoint = Create(14, false).CheckpointForExit();
             checkpoint.Options = new[] { NodeKind.Town };
@@ -1140,7 +1140,8 @@ namespace RaidPartyManager.Tests
             var item = run.Party.Inventory.First();
             Assert.That(run.Party.TryEquip(leaving.Id, 0, item.Id), Is.True);
             foreach (var m in run.Party.Members.Skip(1)) Assert.That(run.Party.SetContract(m.Id, 15, BonusTerms.Appearance), Is.True);
-            for (int day = 11; day <= 13; day++)
+            int expiry = leaving.Contract.EndDay;
+            for (int day = 11; day <= expiry + 1; day++)
             {
                 Assert.That(run.EnterRoute(0), Is.True);
                 Assert.That(run.Party.Day, Is.EqualTo(day));
@@ -1148,10 +1149,36 @@ namespace RaidPartyManager.Tests
                 checkpoint = run.CheckpointForExit();
                 checkpoint.Options = new[] { NodeKind.Town };
                 run = AdventureRun.RestoreCheckpoint(checkpoint, content.CharacterCatalog, gear);
+                if (day != expiry) continue;
+                Assert.That(run.Party.NeedsRenewal, Is.True);
+                Assert.That(run.Party.CaptureFormation(Side.Party).Any(unit => unit.Id == leaving.Id), Is.True);
             }
             Assert.That(run.Party.NeedsRenewal, Is.False);
             Assert.That(run.Party.Members.Any(m => m.Id == leaving.Id), Is.False);
             Assert.That(run.Party.Inventory.Any(i => i.Id == item.Id), Is.True);
+            Assert.That(run.Party.Expenses.Any(e => e.Day == expiry + 1 && e.Reason.Contains(leaving.Character.Name)), Is.False);
+        }
+
+        [Test]
+        public void LastMemberCanRenewOnTheExpiryDayAndTheNewContractStartsImmediately()
+        {
+            var saved = Create(14, false).CheckpointForExit();
+            saved.Party.Members = saved.Party.Members.Take(1).ToArray();
+            saved.Party.Day = saved.Party.Members[0].Contract.EndDay - 1;
+            saved.Options = new[] { NodeKind.Town };
+            var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
+            var party = run.Party;
+            Assert.That(party.CanAdvanceDay, Is.True);
+            Assert.That(run.EnterRoute(0), Is.True);
+            var member = party.Members.Single();
+            Assert.That(member.Contract.EndDay, Is.EqualTo(party.Day));
+            Assert.That(party.CanAdvanceDay, Is.False);
+            long fee = 3L * party.ExpectedDailyWage(member.Id);
+            Assert.That(party.SetContract(member.Id, 3, default, fee), Is.True);
+            var renewed = party.Members.Single();
+            Assert.That(renewed.Contract.StartDay, Is.EqualTo(party.Day));
+            Assert.That(renewed.Renewals, Is.Empty);
+            Assert.That(party.CanAdvanceDay, Is.True);
         }
 
         [Test]

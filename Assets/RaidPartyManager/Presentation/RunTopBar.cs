@@ -22,6 +22,7 @@ namespace RaidPartyManager.Presentation
         private readonly Label gold;
         private readonly Label calendar;
         private readonly Label payrollDeadline;
+        private readonly Label finalBattleHint;
         private readonly VisualElement coin;
         private readonly VisualElement bag;
         private readonly VisualElement rewardLayer;
@@ -39,7 +40,7 @@ namespace RaidPartyManager.Presentation
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<PartyRun, RenewalReminder> reminders = new();
         private IVisualElementScheduledItem renewalPulse;
         private PartyEditorView editor;
-        private EquipmentTooltip itemTooltip;
+        private VisualElement activeTooltip;
 
         public RunTopBar(VisualElement root, PartyRun party, EncounterData content, Action openEditor = null,
             string editorName = "open-party-editor", Func<int> goldOverride = null, string goldName = "run-gold",
@@ -90,6 +91,33 @@ namespace RaidPartyManager.Presentation
             payrollDeadline.style.backgroundColor = PrototypeStyle.Inset;
             PrototypeStyle.Outline(payrollDeadline, PrototypeStyle.Edge, 4);
             Add(payrollDeadline);
+
+            finalBattleHint = PrototypeStyle.Text("", 14);
+            finalBattleHint.name = "run-final-battle-hint";
+            finalBattleHint.pickingMode = PickingMode.Ignore;
+            finalBattleHint.style.position = Position.Absolute;
+            finalBattleHint.style.backgroundColor = PrototypeStyle.PanelColor;
+            finalBattleHint.style.paddingLeft = finalBattleHint.style.paddingRight = 10;
+            finalBattleHint.style.paddingTop = finalBattleHint.style.paddingBottom = 8;
+            PrototypeStyle.Outline(finalBattleHint, PrototypeStyle.Edge, 4);
+            payrollDeadline.RegisterCallback<PointerEnterEvent>(evt =>
+            {
+                if (evt.pointerType != UnityEngine.UIElements.PointerType.mouse || string.IsNullOrEmpty(finalBattleHint.text))
+                    return;
+                HideTooltip();
+                const float margin = 6f;
+                float width = Mathf.Clamp(root.layout.width - 2 * margin, 0, 280f);
+                var anchor = root.WorldToLocal(payrollDeadline.worldBound);
+                finalBattleHint.style.width = width;
+                finalBattleHint.style.left = Mathf.Clamp(anchor.xMin, margin, Mathf.Max(margin, root.layout.width - width - margin));
+                finalBattleHint.style.top = anchor.yMax + margin;
+                activeTooltip = finalBattleHint;
+                root.Add(finalBattleHint);
+            });
+            payrollDeadline.RegisterCallback<PointerLeaveEvent>(_ =>
+            {
+                if (activeTooltip == finalBattleHint) HideTooltip();
+            });
 
             if (openEditor != null)
             {
@@ -400,9 +428,14 @@ namespace RaidPartyManager.Presentation
             payrollDeadline.style.display = remaining.HasValue ? DisplayStyle.Flex : DisplayStyle.None;
             if (remaining is int days)
             {
-                payrollDeadline.text = days == 0 ? "今日结薪" : $"结薪剩 {days} 天";
+                payrollDeadline.text = days == 0 ? "今日决战" : $"距离决战 {days} 天";
                 payrollDeadline.style.color = days <= 3 ? PrototypeStyle.Enemy : PrototypeStyle.Ink;
-                payrollDeadline.tooltip = $"第 {party.Day + (long)days} 天，机巧遗都最终首领战开打前须结清队员薪资。";
+                finalBattleHint.text = $"第 {party.Day + (long)days} 天决战。\n决战开打前要还清所有欠薪。";
+            }
+            else
+            {
+                finalBattleHint.text = "";
+                if (activeTooltip == finalBattleHint) HideTooltip();
             }
             if (teamButton == null || party.Day == 0) return;
             bool due = party.NeedsRenewal;
@@ -475,18 +508,22 @@ namespace RaidPartyManager.Presentation
                     if (evt.pointerType != UnityEngine.UIElements.PointerType.mouse)
                         return;
                     HideTooltip();
-                    itemTooltip = new EquipmentTooltip(item, art);
-                    itemTooltip.ShowAbove(root, tile);
+                    var tooltip = new EquipmentTooltip(item, art);
+                    activeTooltip = tooltip;
+                    tooltip.ShowAbove(root, tile);
                 });
-                tile.RegisterCallback<PointerLeaveEvent>(_ => HideTooltip());
+                tile.RegisterCallback<PointerLeaveEvent>(_ =>
+                {
+                    if (activeTooltip is EquipmentTooltip) HideTooltip();
+                });
                 items.Add(tile);
             }
         }
 
         private void HideTooltip()
         {
-            var current = itemTooltip;
-            itemTooltip = null;
+            var current = activeTooltip;
+            activeTooltip = null;
             // UI Toolkit clears the child list before sending detach and pointer-leave events.
             // During those callbacks the tooltip may still report its former parent.
             if (current?.parent is { } parent && parent.hierarchy.IndexOf(current) >= 0)

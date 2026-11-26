@@ -1928,9 +1928,15 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("battle-phase"), Is.Null);
             Assert.That(root.Q("payroll-panel"), Is.Not.Null);
             var deadline = root.Q<Label>("run-payroll-deadline");
-            Assert.That(deadline.text, Is.EqualTo("今日结薪"));
-            Assert.That(deadline.tooltip, Does.Contain($"第 {route.Party.Day} 天"));
+            Assert.That(deadline.text, Is.EqualTo("今日决战"));
             Press(root, "dismiss-paper");
+            using (var hover = PointerEnterEvent.GetPooled(new Event { type = EventType.MouseMove, mousePosition = deadline.worldBound.center }))
+                Send(deadline, hover);
+            var hint = root.Q<Label>("run-final-battle-hint");
+            Assert.That(hint?.text, Does.Contain($"第 {route.Party.Day} 天决战").And.Contain("决战开打前要还清所有欠薪"));
+            using (var leave = PointerLeaveEvent.GetPooled(new Event { type = EventType.MouseMove }))
+                Send(deadline, leave);
+            Assert.That(root.Q("run-final-battle-hint"), Is.Null);
             Press(root, "open-party-editor");
             var editor = root.Q("party-editor");
             Assert.That(editor.style.backgroundImage.value.texture.name, Is.EqualTo("PartyStatusBackdrop"));

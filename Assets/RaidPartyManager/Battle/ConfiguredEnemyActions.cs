@@ -73,6 +73,9 @@ namespace RaidPartyManager.Battle
                 : allies.AsEnumerable();
             return action.Target switch
             {
+                EnemyTargetRule.Front when action.Kind == EnemyActionKind.Attack && !action.RequiresCharge &&
+                    action == actor.Input.Character.EnemyBehavior.Actions[0] && IsRanged(actor) && opponents.Length > 0
+                    => new[] { RandomTarget(opponents) },
                 EnemyTargetRule.Front when action.Kind == EnemyActionKind.Attack => FrontAttackTargets(actor).Take(1),
                 EnemyTargetRule.Front => opponents.Take(1),
                 EnemyTargetRule.Rear => opponents.TakeLast(1),
@@ -101,7 +104,7 @@ namespace RaidPartyManager.Battle
             targets ??= ConfiguredEnemyTargets(actor, action).ToArray();
             if (targets.Length == 0)
             {
-                var target = TargetableOpponents(actor).FirstOrDefault();
+                var target = IsRanged(actor) ? RandomTarget(TargetableOpponents(actor)) : TargetableOpponents(actor).FirstOrDefault();
                 if (target != null)
                     EnemyHit(actor, target, "无合法目标·普攻", BattleVisualCue.None);
                 return;
