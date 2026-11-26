@@ -13,6 +13,8 @@ namespace RaidPartyManager.Presentation
         private readonly Texture2D grain;
         private readonly bool arrow;
         private bool mountedInScenery;
+        /// <summary>False for signs such as pagers that act in place instead of flying up to the beam.</summary>
+        internal bool FliesWhenChosen = true;
         private const string FlightLayer = "selected-sign-flight";
 
         internal HangingSign(string id, string caption, Action select, Texture2D grain = null, bool arrow = false)
@@ -58,7 +60,7 @@ namespace RaidPartyManager.Presentation
             clickable.clickedWithEventInfo += evt =>
             {
                 if (panel == null || panel.visualTree.Q(FlightLayer) != null) return;
-                if (mountedInScenery || evt is NavigationSubmitEvent) select();
+                if (mountedInScenery || !FliesWhenChosen || evt is NavigationSubmitEvent) select();
                 else FlyToBeam();
             };
         }
@@ -136,7 +138,8 @@ namespace RaidPartyManager.Presentation
             void Restore()
             {
                 while (board.childCount > 1) Add(board[1]);
-                style.opacity = 1;
+                // Clear rather than set 1, so the theme can still dim the sign while it is disabled.
+                style.opacity = StyleKeyword.Null;
                 layer.RemoveFromHierarchy();
             }
         }

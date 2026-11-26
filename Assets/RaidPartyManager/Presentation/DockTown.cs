@@ -67,7 +67,6 @@ namespace RaidPartyManager.Presentation
             var services = new VisualElement { name = "town-services", pickingMode = PickingMode.Ignore };
             PrototypeStyle.Fill(services);
             town.Insert(0,services);
-            FirstRunGuide.ShowFacility(town, run, GuideStep.Town);
             Service(services, "人才市场", TownService.Recruit, 0,
                 () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("TalentMarket", true)));
             Service(services, "商店", TownService.Shop, 1,
@@ -75,6 +74,9 @@ namespace RaidPartyManager.Presentation
             Service(services, "营地", TownService.Camp, 2,
                 () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("Camp", true)));
             Service(services, "委托", TownService.Quest, 3, OpenQuest);
+            FirstRunGuide.ShowFacility(town, run, GuideStep.Town,
+                (serviceSigns[0], "签约 · 卖人"), (serviceSigns[1], "买卖装备"),
+                (serviceSigns[2], "每次进城用一次"), (serviceSigns[3], "接活 · 回城领赏"));
             if (string.IsNullOrEmpty(run.Current.Message)) return;
             var notice = PrototypeStyle.Text(run.Current.Message, 17, PrototypeStyle.Accent);
             notice.pickingMode = PickingMode.Ignore;

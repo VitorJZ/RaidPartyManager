@@ -34,7 +34,7 @@ namespace RaidPartyManager.Presentation
 
             HangingSign Pager(string id, string glyph, int direction)
             {
-                var nav = new HangingSign(id, glyph, () => { page += direction; Arrange(); }, Timber);
+                var nav = new HangingSign(id, glyph, () => { page += direction; Arrange(); }, Timber) { FliesWhenChosen = false };
                 nav.style.width = 35; nav.style.height = 42;
                 nav.style.position = Position.Absolute;
                 if (direction < 0) nav.style.left = 0; else nav.style.right = 0;

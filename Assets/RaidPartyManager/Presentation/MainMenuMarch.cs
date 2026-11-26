@@ -13,6 +13,12 @@ namespace RaidPartyManager.Presentation
         private readonly Texture2D backdrop;
         private readonly VisualElement strip = new() { name = "menu-promenade-strip", pickingMode = PickingMode.Ignore };
         private readonly List<Image> tiles = new();
+        private readonly Texture2D fogArt = Resources.Load<Texture2D>("MainMenu/MenuFog");
+        private readonly (VisualElement band, float speed, float opacity)[] fogs =
+        {
+            (new VisualElement { name = "menu-fog-far", pickingMode = PickingMode.Ignore }, .018f, .55f),
+            (new VisualElement { name = "menu-fog-near", pickingMode = PickingMode.Ignore }, .041f, .38f)
+        };
         private readonly List<Walker> walkers = new();
         private readonly double started = Time.unscaledTimeAsDouble;
         private float tileWidth;
@@ -39,6 +45,14 @@ namespace RaidPartyManager.Presentation
             strip.style.flexDirection = FlexDirection.Row;
             strip.style.height = Length.Percent(100);
             Add(strip);
+            if (fogArt != null)
+                foreach (var fog in fogs)
+                {
+                    fog.band.style.position = Position.Absolute;
+                    fog.band.style.flexDirection = FlexDirection.Row;
+                    fog.band.style.opacity = fog.opacity;
+                    Add(fog.band);
+                }
 
             if (content != null)
                 foreach (string id in characterIds) AddWalker(content, id);
@@ -106,6 +120,26 @@ namespace RaidPartyManager.Presentation
                 }
             }
 
+            if (fogArt != null)
+                for (int layer = 0; layer < fogs.Length; layer++)
+                {
+                    var band = fogs[layer].band;
+                    float bandHeight = height * (layer == 0 ? .42f : .30f);
+                    float bandWidth = bandHeight * fogArt.width / fogArt.height;
+                    band.style.top = height * (layer == 0 ? .34f : .50f);
+                    band.style.height = bandHeight;
+                    band.userData = bandWidth;
+                    int needed = Mathf.CeilToInt(width / bandWidth) + 1;
+                    while (band.childCount < needed)
+                        band.Add(new Image { image = fogArt, scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore });
+                    foreach (var piece in band.Children())
+                    {
+                        piece.style.flexShrink = 0;
+                        piece.style.width = bandWidth;
+                        piece.style.height = bandHeight;
+                    }
+                }
+
             int count = walkers.Count;
             if (count == 0) { Animate(); return; }
             bool wide = width / height >= 1.25f;
@@ -135,6 +169,12 @@ namespace RaidPartyManager.Presentation
                 float offset = (float)((tileWidth * .10 + elapsed * layout.height * .046) % tileWidth);
                 strip.style.translate = new Translate(-offset, 0);
             }
+            foreach (var fog in fogs)
+                if (fog.band.userData is float bandWidth && bandWidth > 0)
+                {
+                    float drift = (float)((Time.unscaledTimeAsDouble - started) * layout.height * fog.speed % bandWidth);
+                    fog.band.style.translate = new Translate(-drift, 0);
+                }
             for (int index = 0; index < walkers.Count; index++)
             {
                 var actor = walkers[index];

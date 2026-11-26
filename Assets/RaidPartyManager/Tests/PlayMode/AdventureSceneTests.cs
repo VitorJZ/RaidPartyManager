@@ -1072,6 +1072,9 @@ namespace RaidPartyManager.Tests
             yield return null;
             yield return ClickBoard(root.Q<Button>("earlier-event-options"));
             yield return null;
+            var earlier = root.Q<Button>("earlier-event-options");
+            Assert.That(earlier.enabledSelf, Is.False);
+            Assert.That(earlier.resolvedStyle.opacity, Is.LessThan(1f), "A pager that was clicked must still dim when disabled.");
             var confirm = root.Q<Button>("event-forge-confirm");
             Assert.That(confirm.enabledInHierarchy, Is.True);
             Assert.That(confirm.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));

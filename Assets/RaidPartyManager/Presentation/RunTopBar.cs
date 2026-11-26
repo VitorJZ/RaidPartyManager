@@ -11,7 +11,7 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class RunTopBar : VisualElement
     {
-        public const int Height = 48;
+        public const int Height = 56;
         private const int VisibleItemLimit = 16;
         private const int ItemWidth = 33;
         private const int ItemGap = 4;
@@ -71,23 +71,24 @@ namespace RaidPartyManager.Presentation
             wallet.style.flexShrink = 0;
             wallet.style.marginRight = 13;
             coin = new GoldRewardIcon { name = "run-gold-icon" };
-            coin.style.width = coin.style.height = 31;
-            calendar = PrototypeStyle.Text("", 15, PrototypeStyle.Ink);
+            coin.style.width = coin.style.height = 36;
+            calendar = PrototypeStyle.Text("", 18, PrototypeStyle.Ink);
             calendar.name = "run-day"; wallet.Add(calendar);
             wallet.Add(coin);
-            gold = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
+            gold = PrototypeStyle.Text("", 20, PrototypeStyle.Accent);
+            gold.style.unityFontStyleAndWeight = FontStyle.Bold;
             gold.name = goldName;
             gold.style.whiteSpace = WhiteSpace.NoWrap;
             wallet.Add(gold);
             Add(wallet);
 
-            payrollDeadline = PrototypeStyle.Text("", 14, PrototypeStyle.Muted);
+            payrollDeadline = PrototypeStyle.Text("", 16, PrototypeStyle.Muted);
             payrollDeadline.name = "run-payroll-deadline";
             payrollDeadline.style.whiteSpace = WhiteSpace.NoWrap;
             payrollDeadline.style.flexShrink = 0;
-            payrollDeadline.style.marginRight = 10;
-            payrollDeadline.style.paddingLeft = payrollDeadline.style.paddingRight = 7;
-            payrollDeadline.style.paddingTop = payrollDeadline.style.paddingBottom = 3;
+            payrollDeadline.style.marginRight = 14;
+            payrollDeadline.style.paddingLeft = payrollDeadline.style.paddingRight = 9;
+            payrollDeadline.style.paddingTop = payrollDeadline.style.paddingBottom = 4;
             payrollDeadline.style.backgroundColor = PrototypeStyle.Inset;
             PrototypeStyle.Outline(payrollDeadline, PrototypeStyle.Edge, 4);
             Add(payrollDeadline);
@@ -125,18 +126,19 @@ namespace RaidPartyManager.Presentation
                 {
                     HideTooltip();
                     openEditor();
-                });
-                if (FirstRunGuide.AtDeparture(party) && !FirstRunGuide.Prepared)
-                    PrototypeStyle.Outline(teamButton, PrototypeStyle.Accent, 4);
-                teamButton.style.marginRight = 8;
+                }, "队伍");
+                teamButton.style.borderTopWidth = teamButton.style.borderBottomWidth =
+                    teamButton.style.borderLeftWidth = teamButton.style.borderRightWidth =
+                        FirstRunGuide.AtDeparture(party) && !FirstRunGuide.Prepared ? 2 : 1;
+                teamButton.style.marginRight = 12;
                 Add(teamButton);
             }
 
             bag = new Image { name = "run-backpack-icon", image = content.BackpackIcon, pickingMode = PickingMode.Ignore,
                 scaleMode = ScaleMode.ScaleToFit };
-            bag.style.width = bag.style.height = 29;
+            bag.style.width = bag.style.height = 32;
             bag.style.flexShrink = 0;
-            bag.style.marginRight = 5;
+            bag.style.marginRight = 6;
             Add(bag);
             items = PrototypeStyle.Row("run-backpack-items");
             items.style.alignItems = Align.Center;
@@ -222,7 +224,7 @@ namespace RaidPartyManager.Presentation
                     feedback.style.display = DisplayStyle.None;
                     panel.AddOption("保存并退出", "save-and-exit", () => ShowError(AdventureFlow.SaveAndExit(party)));
                     var abandon = panel.AddOption("放弃", "abandon-run", () => ShowError(AdventureFlow.Abandon(party)));
-                    abandon.style.color = PrototypeStyle.Enemy;
+                    SettingsPanel.MarkDanger(abandon);
                     abandon.tooltip = "结束当前讨伐并删除续玩进度";
                     panel.AddFeedback(feedback);
 
@@ -239,23 +241,43 @@ namespace RaidPartyManager.Presentation
             }
         }
 
+        private static readonly Color TeamButtonColor = new Color32(71, 54, 33, 255);
+
         private static Button IconButton(string iconName, string buttonName, string tooltip,
-            Action<MeshGenerationContext, Rect> draw, Action action)
+            Action<MeshGenerationContext, Rect> draw, Action action, string caption = null)
         {
             var button = PrototypeStyle.Button("", buttonName, action);
             button.tooltip = tooltip;
-            button.style.width = 37;
-            button.style.height = 34;
+            button.style.width = caption == null ? 42 : StyleKeyword.Auto;
+            button.style.height = 42;
             button.style.flexShrink = 0;
-            button.style.paddingLeft = button.style.paddingRight = 3;
+            button.style.flexDirection = FlexDirection.Row;
+            button.style.alignItems = Align.Center;
+            button.style.paddingLeft = caption == null ? 3 : 10;
+            button.style.paddingRight = caption == null ? 3 : 14;
             button.style.paddingTop = button.style.paddingBottom = 1;
             button.style.justifyContent = Justify.Center;
             var icon = new VisualElement { name = iconName, pickingMode = PickingMode.Ignore };
-            icon.style.width = icon.style.height = 26;
+            icon.style.width = icon.style.height = caption == null ? 28 : 32;
             icon.style.flexShrink = 0;
             icon.style.alignSelf = Align.Center;
             icon.generateVisualContent += context => draw(context, icon.contentRect);
             button.Add(icon);
+            if (caption != null)
+            {
+                // The party editor is the most used run action, so it reads as a named warm button.
+                button.style.backgroundColor = TeamButtonColor;
+                PrototypeStyle.Outline(button, PrototypeStyle.Accent, 6);
+                var label = PrototypeStyle.Text(caption, 18, PrototypeStyle.Accent);
+                label.name = iconName + "-caption";
+                label.pickingMode = PickingMode.Ignore;
+                label.style.marginLeft = 6;
+                label.style.unityFontStyleAndWeight = FontStyle.Bold;
+                label.style.whiteSpace = WhiteSpace.NoWrap;
+                button.Add(label);
+                button.RegisterCallback<PointerEnterEvent>(_ => label.style.color = PrototypeStyle.Ink);
+                button.RegisterCallback<PointerLeaveEvent>(_ => label.style.color = PrototypeStyle.Accent);
+            }
             return button;
         }
 
@@ -439,7 +461,7 @@ namespace RaidPartyManager.Presentation
             }
             if (teamButton == null || party.Day == 0) return;
             bool due = party.NeedsRenewal;
-            teamButton.style.backgroundColor = due ? new Color(.35f, .065f, .065f) : PrototypeStyle.Inset;
+            teamButton.style.backgroundColor = due ? new Color(.35f, .065f, .065f) : TeamButtonColor;
             var icon = teamButton.Q("team-icon");
             icon.MarkDirtyRepaint();
             UpdateRenewalPulse(icon, due);

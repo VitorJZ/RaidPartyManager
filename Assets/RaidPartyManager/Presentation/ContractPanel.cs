@@ -39,21 +39,54 @@ namespace RaidPartyManager.Presentation
             if (close == null) paper.Add(heading);
             else
             {
+                // The rule belongs to the whole row, so the close mark lines up with the title text
+                // instead of floating above the heading's bottom padding.
                 var header = PrototypeStyle.Row();
                 header.style.alignItems = Align.Center;
-                heading.style.flexGrow = 1;
                 header.style.flexShrink = 0;
+                header.style.borderBottomWidth = 1;
+                header.style.borderBottomColor = Seal;
+                header.style.paddingBottom = header.style.marginBottom = 8;
+                heading.style.flexGrow = 1;
+                heading.style.flexShrink = 1;
+                heading.style.borderBottomWidth = 0;
+                heading.style.paddingBottom = heading.style.marginBottom = 0;
                 header.Add(heading);
-                var dismiss = PrototypeStyle.Button("×", "dismiss-paper", close);
-                dismiss.tooltip = "关闭并返回上一级";
-                dismiss.style.width = dismiss.style.height = 32;
-                dismiss.style.flexShrink = 0;
-                dismiss.style.fontSize = 20;
-                header.Add(dismiss);
+                header.Add(CloseMark(close));
                 paper.hierarchy.Insert(0, header);
             }
             shade.Add(paper);
             return shade;
+        }
+
+        private static Button CloseMark(Action close)
+        {
+            var dismiss = new Button(close) { name = "dismiss-paper", tooltip = "关闭并返回上一级" };
+            dismiss.style.width = dismiss.style.height = 30;
+            dismiss.style.flexShrink = 0;
+            dismiss.style.marginLeft = 10;
+            dismiss.style.marginRight = dismiss.style.marginTop = dismiss.style.marginBottom = 0;
+            dismiss.style.paddingLeft = dismiss.style.paddingRight = dismiss.style.paddingTop = dismiss.style.paddingBottom = 0;
+            dismiss.style.backgroundColor = Color.clear;
+            PrototypeStyle.Outline(dismiss, new Color(Seal.r, Seal.g, Seal.b, .55f), 15);
+            var hover = new Color(Seal.r, Seal.g, Seal.b, .14f);
+            dismiss.RegisterCallback<PointerEnterEvent>(_ => dismiss.style.backgroundColor = hover);
+            dismiss.RegisterCallback<PointerLeaveEvent>(_ => dismiss.style.backgroundColor = Color.clear);
+            // Drawn rather than typed: the font's "×" glyph sits off-centre in the box.
+            dismiss.generateVisualContent += context =>
+            {
+                var pen = context.painter2D;
+                var centre = dismiss.contentRect.center;
+                const float arm = 6f;
+                pen.strokeColor = Seal;
+                pen.lineWidth = 2.2f;
+                pen.lineCap = LineCap.Round;
+                pen.BeginPath();
+                pen.MoveTo(centre + new Vector2(-arm, -arm)); pen.LineTo(centre + new Vector2(arm, arm));
+                pen.MoveTo(centre + new Vector2(arm, -arm)); pen.LineTo(centre + new Vector2(-arm, arm));
+                pen.Stroke();
+            };
+            return dismiss;
         }
 
         public static string Summary(CharacterDefinition c, CrewContract contract)

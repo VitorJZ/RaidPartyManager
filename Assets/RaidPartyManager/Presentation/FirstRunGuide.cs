@@ -41,11 +41,11 @@ namespace RaidPartyManager.Presentation
 
         internal static void ShowDeparture(VisualElement parent, Action skip)
         {
-            var message = Prepared ? "队伍准备好了。点击舞台前沿落下的石路牌，进入第一个节点。"
-                : "点击左上角金币旁的队伍图标，打开编队。出发前，给队员装备一件物品、学习一个技能，再查看合同。";
+            var message = Prepared ? "准备好了。点舞台前沿的石路牌出发。"
+                : "先点左上角的「队伍」。\n给队员穿件装备、学个技能，再看一眼合同。";
             var card = Card("departure-guide", message);
             if (!Prepared)
-                card.Add(PrototypeStyle.Button("跳过教学", "skip-departure-guide", () => { Remember(GuideStep.Departed); skip(); }));
+                card.Add(NoteButton("跳过教学", "skip-departure-guide", () => { Remember(GuideStep.Departed); skip(); }));
             parent.Add(card);
         }
 
@@ -82,32 +82,95 @@ namespace RaidPartyManager.Presentation
             return hint;
         }
 
-        internal static void ShowFacility(VisualElement parent, AdventureRun run, GuideStep facility)
+        /// <summary>
+        /// Shows the first-visit hint. Facility details hang as one-line slips under their own signs,
+        /// so the corner note stays short enough to read at a glance.
+        /// </summary>
+        internal static void ShowFacility(VisualElement parent, AdventureRun run, GuideStep facility,
+            params (VisualElement sign, string tip)[] tips)
         {
             if (run.IsInspection || Has(facility)) return;
             Remember(facility);
             string text = facility == GuideStep.Town
-                ? "点击挂牌进入设施。\n人才市场里，点队员谈签约，点说书人谈出售。\n商店里，点柜台靠近，按住商品购买，也可出售背包物品。\n委托可三选一，达标后回城交付。营地每次到访城镇可行动一次。\n点城镇图标返回主页，再点石路牌出发。"
-                : "本次营地可行动一次。点「休息」为全队恢复生命，或点「训练」「升阶」再选队员。查看人选后可以返回，确认行动才会用掉机会。";
+                ? "点挂牌进店，店里点城镇牌回来。\n逛完了，点石路牌出发。"
+                : "营地每次进城只能做一件事。\n休息回血，或者训练、升阶。确认后才算数。";
             var card = Card(facility == GuideStep.Town ? "town-guide" : "camp-guide", text);
-            card.Add(PrototypeStyle.Button("知道了", "dismiss-facility-guide", card.RemoveFromHierarchy));
+            var slips = new VisualElement[tips.Length];
+            for (int i = 0; i < tips.Length; i++)
+                tips[i].sign.Add(slips[i] = Slip(tips[i].tip, i));
+            card.Add(NoteButton("知道了", "dismiss-facility-guide", () =>
+            {
+                card.RemoveFromHierarchy();
+                foreach (var slip in slips) slip.RemoveFromHierarchy();
+            }));
             parent.Add(card);
+        }
+
+        private static readonly Color NoteInk = new Color32(58, 38, 22, 255);
+
+        private static void Paper(VisualElement element, int pinSide)
+        {
+            element.style.backgroundImage = MainMenuBoard.Load("MenuNoteTorn");
+            element.style.unitySliceLeft = pinSide;
+            element.style.unitySliceRight = element.style.unitySliceTop = element.style.unitySliceBottom = 34;
+            element.style.unitySliceScale = .5f;
         }
 
         private static VisualElement Card(string name, string text)
         {
-            var card = PrototypeStyle.Panel();
-            card.name = name;
-            card.pickingMode = PickingMode.Ignore;
+            var card = new VisualElement { name = name, pickingMode = PickingMode.Ignore };
+            Paper(card, 96);
             card.style.position = Position.Absolute;
-            card.style.left = 12;
+            card.style.left = 14;
             card.style.top = name == "departure-guide" ? 8 : RunTopBar.Height + 46;
-            card.style.width = Length.Percent(42);
-            card.style.maxWidth = 420;
-            var label = PrototypeStyle.Text(text, 15);
+            card.style.maxWidth = Length.Percent(46);
+            card.style.flexDirection = FlexDirection.Row;
+            card.style.alignItems = Align.Center;
+            card.style.paddingLeft = 44;
+            card.style.paddingRight = 16;
+            card.style.paddingTop = card.style.paddingBottom = 13;
+            card.style.rotate = new Rotate(-1.2f);
+            var label = PrototypeStyle.Text(text, 17, NoteInk);
             label.pickingMode = PickingMode.Ignore;
+            label.style.flexShrink = 1;
+            label.style.marginRight = 12;
             card.Add(label);
             return card;
+        }
+
+        private static Button NoteButton(string text, string name, Action click)
+        {
+            var button = PrototypeStyle.Button(text, name, click);
+            button.style.flexShrink = 0;
+            button.style.fontSize = 15;
+            button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            button.style.color = NoteInk;
+            button.style.backgroundColor = new Color(NoteInk.r, NoteInk.g, NoteInk.b, .12f);
+            PrototypeStyle.Outline(button, new Color(NoteInk.r, NoteInk.g, NoteInk.b, .55f), 4);
+            button.style.paddingLeft = button.style.paddingRight = 10;
+            button.RegisterCallback<PointerEnterEvent>(_ => button.style.backgroundColor = new Color(NoteInk.r, NoteInk.g, NoteInk.b, .24f));
+            button.RegisterCallback<PointerLeaveEvent>(_ => button.style.backgroundColor = new Color(NoteInk.r, NoteInk.g, NoteInk.b, .12f));
+            return button;
+        }
+
+        private static VisualElement Slip(string text, int index)
+        {
+            var slip = new Label(text) { name = "facility-guide-tip", pickingMode = PickingMode.Ignore };
+            Paper(slip, 34);
+            slip.style.position = Position.Absolute;
+            slip.style.top = Length.Percent(100);
+            slip.style.marginTop = 6;
+            slip.style.left = Length.Percent(50);
+            slip.style.translate = new Translate(Length.Percent(-50), 0);
+            slip.style.rotate = new Rotate(index % 2 == 0 ? -1.2f : 1f);
+            slip.style.paddingLeft = slip.style.paddingRight = 12;
+            slip.style.paddingTop = slip.style.paddingBottom = 5;
+            slip.style.fontSize = 15;
+            slip.style.unityFontStyleAndWeight = FontStyle.Bold;
+            slip.style.color = NoteInk;
+            slip.style.whiteSpace = WhiteSpace.NoWrap;
+            slip.style.unityTextAlign = TextAnchor.MiddleCenter;
+            return slip;
         }
     }
 }
