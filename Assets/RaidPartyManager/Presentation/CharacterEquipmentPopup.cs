@@ -147,6 +147,7 @@ namespace RaidPartyManager.Presentation
             name.tooltip = selected.Character.Name;
             name.style.whiteSpace = WhiteSpace.NoWrap;
             header.Add(name);
+            header.Add(ProfessionFrame.Tag(selected.Character.Profession, 14));
             var tabs = PrototypeStyle.Row("character-details-tabs");
             tabs.style.flexGrow = 1;
             tabs.style.flexShrink = 0;

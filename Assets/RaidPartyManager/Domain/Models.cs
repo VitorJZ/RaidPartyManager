@@ -31,7 +31,7 @@ namespace RaidPartyManager.Domain
     public enum BattleOutcome { Victory, PartyDefeated, MutualDefeat, Timeout }
     public enum DecisionReason { Default, HighestDamage = 1, SelfProtection = 2, WoundedAlly = 4, UseSkill = 10 }
     public enum BattleEventKind { Action, Defeated, Finished, Effect, FormChanged, SkillVisual, Retreated, EnemyVisual, RoundStarted, Countdown, EquipmentVisual }
-    public enum BattleCountdownKind { CalamityChant, ScavengerEscape, AdmiralBroadside, GoldenBell, EnemyCharge }
+    public enum BattleCountdownKind { CalamityChant, ScavengerEscape, AdmiralBroadside, GoldenBell, EnemyCharge, StoneGuard }
 
     public readonly struct BattleCountdown
     {

@@ -855,8 +855,8 @@ namespace RaidPartyManager.Battle
                 int first = Array.FindIndex(resolved, part => part.Amount > 0);
                 resolved[first].Amount -= total - guarded;
             }
-            int damage = actor != null && actor.Input.Side != target.Input.Side && Round > 0 && target.ProtectedRound == Round
-                ? 0 : guarded;
+            bool belled = actor != null && actor.Input.Side != target.Input.Side && Round > 0 && target.ProtectedRound == Round;
+            int damage = belled ? 0 : guarded;
             bool evaporates = false;
             if (damage > 0)
             {
@@ -880,10 +880,12 @@ namespace RaidPartyManager.Battle
             var lifeLost = LifeLossByType(resolved, absorbed, dealt);
             int physicalLost = lifeLost.Where(part => part.Type == DamageType.Physical).Sum(part => part.Amount);
             bool poisonDamage = visual == BattleVisualCue.RoundEndPoison;
-            string detail = protection ?? DamageDetail(resolved);
+            string detail = protection ?? (belled && guarded > 0 ? GoldenBellBlocked : DamageDetail(resolved));
             Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack,
                 loadout: loadout, visual: visual, skillBookId: skillBookId, damageTaken: lifeLost, poisonDamage: poisonDamage, shieldAbsorbed: absorbed,
                 charmTriggered: charmTriggered, equipment: equipment, intercepted: intercepted);
+            // Reported after the hit so the badge stays up until the blow it stopped has landed.
+            if (protection == StoneGuardBlocked) ReportCountdown(target, BattleCountdownKind.StoneGuard, 0);
             if (transmuted) events.Add(EquipmentVisual(actor, target, ElementalQuartz));
             if (insulated) events.Add(EquipmentVisual(actor, target, InsulatingOrb));
             if (evaporates && target.Health > 0)
@@ -932,6 +934,7 @@ namespace RaidPartyManager.Battle
                 Report(BattleEventKind.Effect, target, ally, "红绳", ActionKind.Attack, mirrored,
                     detail: allyProtection, loadout: allyLoadout, damageTaken: LifeLossByType(mirroredParts, 0, mirrored),
                     poisonDamage: poisonDamage, charmTriggered: allyCharm, equipment: RedCord);
+                if (allyProtection == StoneGuardBlocked) ReportCountdown(ally, BattleCountdownKind.StoneGuard, 0);
                 if (ally.Health == 0)
                     Report(BattleEventKind.Defeated, target, ally, "红绳", ActionKind.Attack);
                 ReactToEnemyHealthLoss(ally, mirrored, physicalOnly ? mirrored : Math.Min(mirrored, physicalLost));
@@ -1039,6 +1042,9 @@ namespace RaidPartyManager.Battle
             return linked;
         }
 
+        public const string StoneGuardBlocked = "坚如磐石抵挡了伤害";
+        public const string GoldenBellBlocked = "金钟罩挡下了攻击";
+
         private int LoseHealth(Unit target, int damage, out string protection, out BattleLoadout loadout, out bool charmTriggered)
         {
             charmTriggered = false;
@@ -1050,7 +1056,7 @@ namespace RaidPartyManager.Battle
             if (target.StoneGuard && damage > 7)
             {
                 target.StoneGuard = false;
-                protection = "坚如磐石抵挡了伤害";
+                protection = StoneGuardBlocked;
                 return 0;
             }
 

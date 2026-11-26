@@ -14,6 +14,10 @@ namespace RaidPartyManager.Presentation
         private const int AttackColumns = 4;
         private const int AttackRows = 4;
         private const float IdleLength = 1.6f;
+        // The impact key holds briefly in pose time; the recovery keys play faster so the action keeps its length.
+        private const float HitStop = 0.05f;
+        private const float HitFlash = 0.06f;
+        private static readonly Color FlashInk = new(1.85f, 1.72f, 1.58f);
         private static readonly float[] HitEnds = { 0.07f, 0.17f, 0.28f, 0.40f };
         private static readonly float[] DeathEnds = { 0.08f, 0.19f, 0.32f, 0.46f, 0.60f, 0.74f, 0.87f, 1f };
 
@@ -38,6 +42,7 @@ namespace RaidPartyManager.Presentation
         private bool pendingFall;
         private bool retreating;
         private Texture2D retreatWalk;
+        private Vector2 poseScale = Vector2.one;
 
         public Texture2D Sheet { get; }
         public bool UsesPortrait { get; }
@@ -46,6 +51,9 @@ namespace RaidPartyManager.Presentation
         public bool IsAlive => alive == true;
         public bool HasWideAttack => attackSheet != null || specialSheet != null;
         public bool FacesLeft { get; }
+        // Squash and stretch about the feet. Stand-in images that replace the body copy it with PoseTranslate.
+        public Vector2 PoseScale => poseScale;
+        public Translate PoseTranslate => figure.style.translate.value;
 
         public BattleSpriteView(Texture2D sheet, Texture2D attackSheet, Profession profession, int position, bool facesLeft,
             BattleStage stage, bool usesPortrait = false, SoundCue fallSound = SoundCue.None)
@@ -83,6 +91,7 @@ namespace RaidPartyManager.Presentation
             };
             figure.style.position = Position.Absolute;
             figure.style.bottom = 0;
+            figure.style.transformOrigin = FootOrigin;
             if (UsesPortrait)
                 figure.sourceRect = new Rect(0, 0, sheet.width, sheet.height);
             Add(figure);
@@ -199,6 +208,7 @@ namespace RaidPartyManager.Presentation
             float offset = 0f;
             float lift = 0f;
             float light = -1f;
+            float squash = 0f;
             var tint = Color.white;
             int frame;
             switch (motion)
@@ -210,33 +220,54 @@ namespace RaidPartyManager.Presentation
                         pendingFall = false;
                     }
                     frame = 3 * Columns + FrameAt(DeathEnds, elapsed);
+                    // The body flattens a little where it meets the boards, then settles.
+                    squash = 0.06f * Settle(elapsed - DeathEnds[4], 13f, 24f);
                     break;
                 case Motion.Hit:
                     frame = 2 * Columns + FrameAt(HitEnds, elapsed);
-                    offset = -Mathf.Sin(elapsed / HitEnds[^1] * Mathf.PI) * 3f;
-                    tint = Color.Lerp(new Color(1f, 0.61f, 0.48f), Color.white, Mathf.Clamp01(elapsed / 0.16f));
+                    float recoil = elapsed < HitFlash ? elapsed / HitFlash : Mathf.Exp(-(elapsed - HitFlash) * 10f);
+                    offset = -7f * recoil;
+                    squash = -0.045f * recoil;
+                    tint = elapsed < HitFlash ? FlashInk : Color.Lerp(new Color(1f, 0.61f, 0.48f), Color.white,
+                        Mathf.Clamp01((elapsed - HitFlash) / 0.16f));
                     break;
                 case Motion.Action:
                     elapsed /= actionScale;
                     bool guarding = SimpleGuard;
-                    frame = guarding ? 2 * Columns + AnimationCels.At(elapsed / actionLength)
-                        : Columns + FrameAt(actionEnds, elapsed);
-                    if (profession == Profession.Warrior && action == ActionKind.Attack)
-                        offset = Mathf.Sin(elapsed / actionLength * Mathf.PI) * 4f;
                     float contact = guarding ? 0.16f : impactTime;
-                    if (!usesExternalEffect && elapsed >= contact)
-                        light = (elapsed - contact) / (actionLength - contact);
+                    float shown = guarding ? elapsed : HoldImpact(elapsed, contact, actionLength);
+                    frame = guarding ? 2 * Columns + AnimationCels.At(shown / actionLength)
+                        : Columns + FrameAt(actionEnds, shown);
+                    // Gather into the keys before contact, then spring out of the impact key.
+                    float gather = elapsed < contact ? Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(contact * 0.45f, contact, elapsed)) : 0f;
+                    float strike = elapsed >= contact ? Settle(elapsed - contact, 9f, 20f) : 0f;
+                    squash = guarding ? 0.03f * gather : 0.035f * gather - 0.045f * strike;
+                    if (action == ActionKind.Attack)
+                        offset = profession switch
+                        {
+                            Profession.Warrior => -2.5f * gather + 7f * Lunge(elapsed - contact),
+                            Profession.Archer or Profession.Mage => -1.5f * gather - 2.5f * Lunge(elapsed - contact),
+                            _ => -1.5f * gather + 2f * Lunge(elapsed - contact)
+                        };
+                    if (!usesExternalEffect && shown >= contact)
+                        light = (shown - contact) / (actionLength - contact);
+                    elapsed = shown;
                     break;
                 default:
                     float cycle = Mathf.Repeat(elapsed, IdleLength);
                     frame = Mathf.FloorToInt(cycle * Columns / IdleLength);
-                    lift = -0.45f * (1f - Mathf.Cos(cycle / IdleLength * 2f * Mathf.PI));
+                    float breath = 0.5f - 0.5f * Mathf.Cos(cycle / IdleLength * 2f * Mathf.PI);
+                    lift = -0.6f * breath;
+                    squash = -0.007f * breath;
                     break;
             }
             ShowFrame(frame);
             if (UsesPortrait)
                 PosePortrait(elapsed, actionLength, ref offset, ref lift);
             figure.SetInk(tint);
+            // Positive squash flattens and widens; negative stretches upward. Volume stays roughly constant.
+            poseScale = new Vector2(1f + squash * 0.7f, 1f - squash);
+            figure.style.scale = new Scale(new Vector3(poseScale.x, poseScale.y, 1f));
             figure.style.translate = new Translate(FacesLeft ? -offset : offset, lift, 0f);
             if (effectProgress >= 0f || light >= 0f)
             {
@@ -306,6 +337,26 @@ namespace RaidPartyManager.Presentation
             figure.style.rotate = new Rotate(new Angle(FacesLeft ? -lean : lean));
             figure.style.opacity = opacity;
         }
+
+        internal static readonly TransformOrigin FootOrigin = new(Length.Percent(50), Length.Percent(100));
+
+        private static float HoldImpact(float elapsed, float contact, float length)
+        {
+            if (elapsed <= contact)
+                return elapsed;
+            if (elapsed <= contact + HitStop)
+                return contact;
+            float rest = length - contact;
+            return contact + (elapsed - contact - HitStop) * rest / Mathf.Max(0.01f, rest - HitStop);
+        }
+
+        // A damped spring released at t = 0: 1, a small overshoot, then rest.
+        private static float Settle(float t, float damping, float frequency) =>
+            t < 0f ? 0f : Mathf.Exp(-t * damping) * Mathf.Cos(t * frequency);
+
+        // A quick push that peaks 40 ms after contact and eases back.
+        private static float Lunge(float t) =>
+            t < 0f ? 0f : t < 0.04f ? Mathf.SmoothStep(0f, 1f, t / 0.04f) : Mathf.Exp(-(t - 0.04f) * 5f);
 
         private static int FrameAt(float[] frameEnds, float elapsed)
         {

@@ -136,6 +136,17 @@ namespace RaidPartyManager.Presentation
             Refresh(health, shield, now);
         }
 
+        // Hovering the actor on stage opens their details, so the hit area covers the figure's slot.
+        public VisualElement AddInspectionTarget(string elementName)
+        {
+            portrait.Q(elementName)?.RemoveFromHierarchy();
+            var target = new VisualElement { name = elementName, pickingMode = PickingMode.Position };
+            target.style.position = Position.Absolute;
+            target.style.left = target.style.right = target.style.top = target.style.bottom = 0;
+            portrait.Add(target);
+            return target;
+        }
+
         public void SetEntranceHudOpacity(float opacity)
         {
             caption.style.opacity = life.style.opacity = conditions.style.opacity = opacity;

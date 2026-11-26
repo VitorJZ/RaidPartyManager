@@ -16,7 +16,9 @@ namespace RaidPartyManager.Presentation
                 "次行动", new Color32(255, 135, 117, 255)),
             BattleCountdownKind.EnemyCharge => ("墓园蓄力", "下次可行动时释放重击。眩晕会推迟释放，目标按释放时的站位重新选择。",
                 "次行动", new Color32(155, 221, 207, 255)),
-            _ => ("金钟罩", "本回合抵挡敌方攻击，回合结束后解除。",
+            BattleCountdownKind.StoneGuard => ("坚如磐石", "下一次受到大于 7 点的伤害时完全抵挡，挡下后解除。",
+                "次", new Color32(196, 210, 222, 255)),
+            _ => ("金钟罩", "本回合敌方攻击造成的伤害全部挡下，回合结束后解除。",
                 "回合", new Color32(247, 218, 139, 255))
         };
 
@@ -55,6 +57,11 @@ namespace RaidPartyManager.Presentation
                             new(-.42f, .37f));
                         Path(false, new(-.47f, .57f), new(.1f, .57f), new(-.13f, .15f));
                         Path(false, new(.52f, -.38f), new(.70f, -.50f));
+                        break;
+                    case BattleCountdownKind.StoneGuard:
+                        Path(true, new(-.46f, -.58f), new(.46f, -.58f), new(.46f, .02f),
+                            new(0, .64f), new(-.46f, .02f));
+                        Path(false, new(-.06f, -.58f), new(.10f, -.20f), new(-.08f, .08f), new(.06f, .40f));
                         break;
                     default:
                         Path(true, new(-.58f, .45f), new(-.40f, .12f), new(-.35f, -.31f),

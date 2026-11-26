@@ -89,7 +89,8 @@ namespace RaidPartyManager.Presentation
                 var visit = run.Current;
                 var swap = visit.HatSwaps[visit.HatStep];
                 float t = Mathf.Clamp01((float)((Time.unscaledTimeAsDouble - began) / SwapSeconds));
-                float pose = AnimationCels.Phase(t);
+                // Props on the table move smoothly; stepped cels made the swaps read as a low frame rate.
+                float pose = t;
                 float eased = Mathf.SmoothStep(0, 1, pose);
                 float arc = .31f * Mathf.Sin(pose * Mathf.PI);
                 stage.MoveHat(visit.HatPositions[swap.First], Mathf.Lerp(swap.First,swap.Second,eased), arc, 0);
@@ -104,7 +105,7 @@ namespace RaidPartyManager.Presentation
             }
             if (run.Current.Resolved)
             {
-                float reveal = Mathf.SmoothStep(0, 1, AnimationCels.Phase((float)(Time.unscaledTimeAsDouble - revealedAt) / .32f));
+                float reveal = Mathf.SmoothStep(0, 1, Mathf.Clamp01((float)(Time.unscaledTimeAsDouble - revealedAt) / .32f));
                 for (int slot = 0; slot < hats.Length; slot++)
                 {
                     int id = run.Current.HatPositions[slot];

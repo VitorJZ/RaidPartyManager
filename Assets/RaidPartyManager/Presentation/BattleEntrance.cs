@@ -12,6 +12,7 @@ namespace RaidPartyManager.Presentation
     {
         private const double TravelTime = 0.66;
         private const double Stagger = 0.10;
+        private const float EntranceStrides = 1.5f;
 
         private sealed class Arrival
         {
@@ -185,7 +186,10 @@ namespace RaidPartyManager.Presentation
                     GameAudio.Play(BattleSounds.Step(arrival.Unit.Character), .30f);
                     arrival.LastStep = step;
                 }
-                int frame = AnimationCels.Loop(elapsed, .4);
+                // Strides follow the eased travel, ending on a contact pose as the walker reaches the mark.
+                float progress = Mathf.SmoothStep(0, 1, t);
+                float stride = Mathf.Repeat(progress * EntranceStrides, 1f);
+                int frame = AnimationCels.At(stride);
                 if (arrival.Figure is EntranceWalkPose pose)
                     pose.ShowFrame(frame);
                 else if (arrival.Figure is Image image && arrival.WalkSheet != null &&
@@ -197,8 +201,8 @@ namespace RaidPartyManager.Presentation
                 }
 
                 float startX = arrival.Unit.Side == Side.Party ? -body.width : layer.layout.width;
-                float progress = Mathf.SmoothStep(0, 1, t);
-                float lift = arrival.UsesPortrait ? Mathf.Abs(Mathf.Sin(progress * 3f * Mathf.PI) * 4f) : 0;
+                float lift = arrival.UsesPortrait ? Mathf.Abs(Mathf.Sin(progress * 3f * Mathf.PI) * 4f)
+                    : arrival.Figure is EntranceWalkPose ? 0 : Mathf.Abs(Mathf.Sin(stride * 2f * Mathf.PI)) * 1.6f;
                 arrival.Figure.style.left = Mathf.Lerp(startX, body.xMin, progress);
                 arrival.Figure.style.top = body.yMin - lift;
                 arrival.Figure.style.width = body.width;

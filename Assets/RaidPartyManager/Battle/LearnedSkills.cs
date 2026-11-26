@@ -339,6 +339,7 @@ namespace RaidPartyManager.Battle
                 case StoneGuard:
                     actor.StoneGuard = true;
                     Show(actor);
+                    ReportCountdown(actor, BattleCountdownKind.StoneGuard, 1);
                     break;
                 case HealingHands:
                     Restore(target, 10);

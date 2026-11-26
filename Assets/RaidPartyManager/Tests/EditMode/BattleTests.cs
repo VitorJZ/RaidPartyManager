@@ -170,6 +170,33 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void ProtectiveSkillsReportBadgesUntilTheyAreSpent()
+        {
+            var bell = new SkillBookDefinition("bell", "金钟罩", "", SkillRequirement.None, 2, 1, SkillEffect.GoldenBell);
+            var stone = new SkillBookDefinition("stone", "坚如磐石", "", SkillRequirement.None, 1, 3, SkillEffect.StoneGuard);
+            Combatant Learner(string id, int position, SkillBookDefinition book)
+            {
+                var unit = Unit(id, Side.Party, position, maxHealth: 40);
+                return new Combatant(unit.Id, unit.Character, unit.Side, position, unit.Stats, unit.Health, learnedSkills: new[] { book });
+            }
+            var enemy = Unit("enemy", Side.Enemy, 1, maxHealth: 200, attack: 9);
+            var battle = new BattleSimulator().Start(new BattleRequest("protect", new[] { Learner("bell", 1, bell), Learner("stone", 2, stone), enemy }, 6));
+            var events = battle.AdvanceRound().Concat(battle.AdvanceRound()).ToList();
+
+            int Index(System.Func<BattleEvent, bool> match) => events.FindIndex(entry => match(entry));
+            Assert.That(Index(e => e.Countdown is { Kind: BattleCountdownKind.StoneGuard, Remaining: 1 } && e.TargetId == "stone"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(Index(e => e.Countdown is { Kind: BattleCountdownKind.GoldenBell, Remaining: 1 } && e.TargetId == "bell"), Is.GreaterThanOrEqualTo(0));
+            Assert.That(events.Any(e => e.ActorId == "enemy" && e.Detail == BattleSession.GoldenBellBlocked), Is.True);
+
+            var alone = new BattleSimulator().Start(new BattleRequest("stone", new[] { Learner("stone", 1, stone), enemy }, 6));
+            events = alone.AdvanceRound().Concat(alone.AdvanceRound()).ToList();
+            int broken = Index(e => e.ActorId == "enemy" && e.TargetId == "stone" && e.Detail == BattleSession.StoneGuardBlocked);
+            Assert.That(broken, Is.GreaterThanOrEqualTo(0));
+            Assert.That(events[broken + 1].Countdown, Is.EqualTo(new BattleCountdown(BattleCountdownKind.StoneGuard, 0)),
+                "The stone guard badge comes off right after the hit it absorbed.");
+        }
+
+        [Test]
         public void ChaliceCapacityDoesNotChargeAgainForAnAlreadyAffordableSkill()
         {
             var baseUnit = Unit("party", Side.Party, 1, maxHealth: 100);

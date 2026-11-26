@@ -189,6 +189,8 @@ namespace RaidPartyManager.Presentation
             standingPose.SetInk(sprite.Figure.Ink);
             var size = sprite.PoseSize(source.size);
             SetBounds(standingPose, new Rect(source.center.x - size.x * 0.5f, source.yMax - size.y, size.x, size.y));
+            standingPose.style.scale = new Scale(new Vector3(sprite.PoseScale.x, sprite.PoseScale.y, 1f));
+            standingPose.style.translate = sprite.PoseTranslate;
             Attach(layer, standingPose);
             sprite.SetBodyVisible(false, keepLocalEffects: true);
         }
@@ -225,13 +227,18 @@ namespace RaidPartyManager.Presentation
             float destinationX = destination.center.x - direction * stoppingDistance;
             float approaching = Fraction(now, startedAt, poseStart);
             float retreating = Fraction(now, returnAt, FinishAt);
-            float x = Mathf.Lerp(source.center.x, destinationX, Mathf.SmoothStep(0f, 1f, approaching));
-            x = Mathf.Lerp(x, source.center.x, Mathf.SmoothStep(0f, 1f, retreating));
+            float advance = Mathf.SmoothStep(0f, 1f, approaching);
+            float withdraw = Mathf.SmoothStep(0f, 1f, retreating);
+            float x = Mathf.Lerp(source.center.x, destinationX, advance);
+            x = Mathf.Lerp(x, source.center.x, withdraw);
             var size = source.size;
             float lift = 0;
+            var scale = Vector2.one;
             if (now < poseStart || now >= returnAt)
             {
-                int index = AnimationCels.At(now < poseStart ? approaching : retreating);
+                // Step through the cycle by distance covered, so the feet slow down with the body.
+                float stride = now < poseStart ? advance : withdraw;
+                int index = AnimationCels.At(stride);
                 if (sprite.UsesPortrait && walkSheet == sprite.Sheet)
                 {
                     SetImage(movingImage, walkSheet, new Rect(0, 0, walkSheet.width, walkSheet.height));
@@ -242,6 +249,9 @@ namespace RaidPartyManager.Presentation
                 else
                 {
                     SetImage(movingImage, walkSheet, AnimationCels.RectFor(walkSheet, index));
+                    // Two footfalls per cycle; the body rises a little over each passing pose.
+                    lift = Mathf.Abs(Mathf.Sin(stride * 2f * Mathf.PI)) * 1.6f;
+                    movingImage.style.translate = new Translate(0, 0);
                 }
                 movingImage.SetInk(Color.white);
             }
@@ -250,15 +260,14 @@ namespace RaidPartyManager.Presentation
                 SetImage(movingImage, (Texture2D)sprite.Figure.image, sprite.Figure.sourceRect);
                 movingImage.SetInk(sprite.Figure.Ink);
                 size = sprite.PoseSize(source.size);
+                scale = sprite.PoseScale;
+                movingImage.style.translate = sprite.PoseTranslate;
                 if (sprite.UsesPortrait)
-                {
                     movingImage.style.rotate = sprite.Figure.style.rotate;
-                    movingImage.style.translate = sprite.Figure.style.translate;
-                }
             }
             movingImage.RideHeight = now < poseStart ? RidingWave.Envelope(approaching) : RidingWave.Envelope(retreating);
             float orientation = (now >= returnAt ? -direction : direction) * (sprite.FacesLeft ? -1f : 1f);
-            movingImage.style.scale = new Scale(new Vector3(orientation, 1f, 1f));
+            movingImage.style.scale = new Scale(new Vector3(orientation * scale.x, scale.y, 1f));
             SetBounds(movingImage, new Rect(x - size.x * 0.5f, source.yMax - size.y - lift, size.x, size.y));
         }
 
@@ -269,6 +278,7 @@ namespace RaidPartyManager.Presentation
                 name = name, pickingMode = PickingMode.Ignore, scaleMode = ScaleMode.StretchToFill
             };
             view.style.position = Position.Absolute;
+            view.style.transformOrigin = BattleSpriteView.FootOrigin;
             return view;
         }
 

@@ -44,9 +44,10 @@ namespace RaidPartyManager.Presentation
         private readonly Dictionary<string, (CharacterDefinition Character, int MaximumHealth)> appearances =
             new Dictionary<string, (CharacterDefinition, int)>();
         private readonly Dictionary<string, BattleUnitCard> unitCards = new Dictionary<string, BattleUnitCard>();
-        private static readonly Color AvailableEnergy = new Color32(194, 105, 255, 255);
         private readonly Dictionary<string, BattleEnergy> partyEnergy = new Dictionary<string, BattleEnergy>();
-        private readonly Dictionary<string, VisualElement> energyBars = new Dictionary<string, VisualElement>();
+        private readonly Dictionary<string, FootlightRow> energyBars = new Dictionary<string, FootlightRow>();
+        // Lamps last shown per member, so a rebuilt apron can relight what the settlement refilled.
+        private readonly Dictionary<string, int> litFootlights = new Dictionary<string, int>();
         private readonly Dictionary<string, BattleSpriteView> battleSprites = new Dictionary<string, BattleSpriteView>();
         private readonly BattleEntrance entrance = new BattleEntrance();
         private BattleCommentary commentary;
@@ -536,6 +537,11 @@ namespace RaidPartyManager.Presentation
                 }
                 if (entry.Countdown is { } timer)
                 {
+                    // Protective badges come off only after the blow they absorbed has finished playing,
+                    // otherwise the bell or stone guard vanishes just as the enemy swing lands.
+                    if (timer.Remaining == 0 && timer.Kind is BattleCountdownKind.GoldenBell or BattleCountdownKind.StoneGuard &&
+                        HasActiveAnimation(now))
+                        return;
                     Narrate(entry);
                     UpdateCountdown(entry.TargetId, timer, now);
                     eventIndex++;
@@ -663,14 +669,12 @@ namespace RaidPartyManager.Presentation
                 if (entry.ActorEnergy is { } energy)
                 {
                     partyEnergy[entry.ActorId] = energy;
-                    if (energyBars.TryGetValue(entry.ActorId, out var bar))
-                        PaintEnergy(bar, energy);
+                    PaintEnergy(entry.ActorId, energy);
                 }
                 if (entry.TargetEnergy is { } targetEnergy)
                 {
                     partyEnergy[entry.TargetId] = targetEnergy;
-                    if (energyBars.TryGetValue(entry.TargetId, out var bar))
-                        PaintEnergy(bar, targetEnergy);
+                    PaintEnergy(entry.TargetId, targetEnergy);
                 }
                 if (entry.PartyStatChanges != null)
                     foreach (var change in entry.PartyStatChanges)
@@ -1089,7 +1093,8 @@ namespace RaidPartyManager.Presentation
             float portraitHeight = PortraitHeight(largestEnemy);
             var opposingLines = PrototypeStyle.Row();
             opposingLines.style.alignItems = Align.Stretch;
-            opposingLines.Add(BuildLine(Side.Party, portraitHeight));
+            var partyLine = BuildLine(Side.Party, portraitHeight);
+            opposingLines.Add(partyLine);
             var divider = PrototypeStyle.Text("◆", 11, PrototypeStyle.Accent);
             divider.style.width = 24;
             divider.visible = showEnemies;
@@ -1098,6 +1103,10 @@ namespace RaidPartyManager.Presentation
             opposingLines.Add(divider);
             opposingLines.Add(BuildLine(Side.Enemy, portraitHeight, showEnemies));
             arena.Add(opposingLines);
+            var apron = BuildApron(previousInspection, partyLine);
+            battleFooter = apron;
+            apron.style.opacity = divider.style.opacity = entrance.HudOpacity;
+            arena.Add(apron);
             stageAnchor = opposingLines.Q("combatant-portrait");
             actionLayer = new VisualElement { name = "battle-action-layer", pickingMode = PickingMode.Ignore };
             PrototypeStyle.Fill(actionLayer);
@@ -1117,10 +1126,6 @@ namespace RaidPartyManager.Presentation
             meteorLayer.style.overflow = Overflow.Hidden;
             root.Add(meteorLayer);
 
-            var footer = BuildFooter(previousInspection);
-            battleFooter = footer;
-            footer.style.opacity = divider.style.opacity = entrance.HudOpacity;
-            root.Add(footer);
             if (stage != null)
             {
                 var clearance = new VisualElement { name = "audience-clearance", pickingMode = PickingMode.Ignore };
@@ -1137,7 +1142,6 @@ namespace RaidPartyManager.Presentation
             else if (phase == Phase.Settlement)
             {
                 page.SetEnabled(false);
-                footer.SetEnabled(false);
                 if (gardenBloom == null) RenderVictory();
             }
         }
@@ -1335,26 +1339,23 @@ namespace RaidPartyManager.Presentation
             return card;
         }
 
-        private VisualElement BuildFooter(Vector2? previousInspection)
+        // The party's loadout lives on the stage lip under each actor: props on a shelf, energy as footlights.
+        private VisualElement BuildApron(Vector2? previousInspection, VisualElement partyLine)
         {
-            var bottom = PrototypeStyle.Row("battle-footer");
-            bottom.style.alignItems = Align.Stretch;
-            bottom.style.justifyContent = Justify.Center;
-            bottom.style.flexShrink = 0;
-            bottom.style.paddingLeft = bottom.style.paddingRight = 22;
-            bottom.style.paddingBottom = 10;
-            var roster = PrototypeStyle.Panel();
-            roster.name = "roster-equipment";
-            roster.style.flexGrow = 7;
-            roster.style.flexBasis = 0;
-            roster.style.minWidth = 0;
-            roster.style.maxWidth = 558;
-            roster.style.paddingTop = roster.style.paddingBottom = 6;
-            roster.style.paddingLeft = roster.style.paddingRight = 7;
+            var apron = PrototypeStyle.Row("battle-apron");
+            apron.style.alignItems = Align.FlexEnd;
+            apron.style.flexShrink = 0;
+            apron.style.marginTop = 10;
+            // Room for the flickering lamp halos: anything poking below the page makes it scroll.
+            apron.style.marginBottom = 14;
 
             var members = run.Members;
             var inventory = run.Inventory;
             var cards = PrototypeStyle.Row("equipment-positions");
+            cards.style.flexGrow = 1;
+            cards.style.flexBasis = 0;
+            cards.style.minWidth = 0;
+            cards.style.alignItems = Align.FlexEnd;
             for (int position = Rules.Positions; position >= 1; position--)
             {
                 string id = battle == null
@@ -1369,47 +1370,115 @@ namespace RaidPartyManager.Presentation
                     member.LearnedSkills.Take(member.SkillSlotCount).ToArray();
                 cards.Add(EquipmentCard(position, id, character, equipment, inventory, skills, previousInspection, member?.BonusEnergy ?? 0));
             }
-            roster.Add(cards);
+            apron.Add(cards);
+            // Match the party line exactly so every lamp run stays under its actor whatever the divider measures.
+            partyLine.RegisterCallback<GeometryChangedEvent>(_ =>
+            {
+                if (!(partyLine.layout.width > 0)) return;
+                cards.style.flexGrow = 0;
+                cards.style.flexShrink = 0;
+                cards.style.flexBasis = partyLine.layout.width;
+            });
+            var aisle = new VisualElement { pickingMode = PickingMode.Ignore };
+            aisle.style.width = 24;
+            apron.Add(aisle);
+            var enemyLip = new VisualElement { pickingMode = PickingMode.Ignore };
+            enemyLip.style.flexGrow = 1;
+            enemyLip.style.flexBasis = 0;
+            apron.Add(enemyLip);
+
             if (phase == Phase.Preparation)
             {
+                var notes = new VisualElement { name = "apron-notes", pickingMode = PickingMode.Ignore };
+                notes.style.position = Position.Absolute;
+                notes.style.left = 4;
+                notes.style.bottom = 2;
                 foreach (var member in members.Where(member => !member.Position.HasValue))
-                    roster.Add(PrototypeStyle.Text($"未布阵 · {member.Character.Name}", 12, PrototypeStyle.Muted));
+                    notes.Add(ApronNote($"未布阵 · {member.Character.Name}"));
                 if (run.HasRecruitmentVacancy && members.Count == Rules.Positions)
-                    roster.Add(PrototypeStyle.Text("寻人启事成功召来援军后消耗。存活的援军会占用一个队伍名额。", 12, PrototypeStyle.Muted));
+                    notes.Add(ApronNote("寻人启事成功召来援军后消耗。存活的援军会占用一个队伍名额。"));
+                if (notes.childCount > 0)
+                    apron.Add(notes);
             }
-            bottom.Add(roster);
-            return bottom;
+            return apron;
+
+            static Label ApronNote(string text)
+            {
+                var note = PrototypeStyle.Text(text, 12, PrototypeStyle.Muted);
+                note.style.textShadow = new TextShadow { offset = new Vector2(0, 1), blurRadius = 3, color = Color.black };
+                return note;
+            }
         }
 
         private VisualElement EquipmentCard(int position, string id, CharacterDefinition character,
             IReadOnlyList<string> equipment, IReadOnlyList<EquipmentInstance> inventory,
             IReadOnlyList<SkillBookDefinition> skills, Vector2? previousInspection, int bonusEnergy)
         {
-            var card = PrototypeStyle.Row($"equipment-position-{position}");
+            var card = new VisualElement { name = $"equipment-position-{position}" };
             card.style.flexGrow = 1;
             card.style.flexBasis = 0;
             card.style.minWidth = 0;
-            card.style.height = 104;
-            card.style.marginRight = position == 1 ? 0 : 5;
+            card.style.marginLeft = card.style.marginRight = 4;
+            card.style.alignItems = Align.Center;
+            card.style.justifyContent = Justify.FlexEnd;
             if (id == null)
             {
                 card.pickingMode = PickingMode.Ignore;
                 return card;
             }
+            card.pickingMode = PickingMode.Ignore;
 
-            card.style.backgroundColor = PrototypeStyle.Inset;
-            card.style.overflow = Overflow.Hidden;
-            PrototypeStyle.Outline(card, PrototypeStyle.Edge, 3);
+            // Footlight wash: a violet beam rising toward the actor and a pool lighting the props from below.
+            var beam = new VisualElement { name = "footlight-beam", pickingMode = PickingMode.Ignore };
+            beam.style.position = Position.Absolute;
+            beam.style.left = beam.style.right = Length.Percent(-4);
+            beam.style.bottom = FootlightRow.LampHeight * .4f;
+            beam.style.height = 150;
+            beam.style.backgroundImage = ApronArt.Beam;
+            beam.style.unityBackgroundImageTintColor = (Color)new Color32(176, 104, 255, 255);
+            card.Add(beam);
+            var pool = ApronArt.Soft("footlight-pool", new Color32(205, 128, 255, 255));
+            pool.style.left = pool.style.right = Length.Percent(-6);
+            pool.style.bottom = FootlightRow.LampHeight * .5f;
+            pool.style.height = 64;
+            card.Add(pool);
 
-            var slots = new VisualElement { name = "equipment-slots" };
-            slots.style.width = 34;
-            slots.style.alignItems = Align.Center;
-            slots.style.justifyContent = Justify.SpaceBetween;
-            slots.style.flexShrink = 0;
-            slots.style.paddingTop = slots.style.paddingBottom = 3;
-            slots.style.paddingLeft = slots.style.paddingRight = 2;
+            // Props stand on a low oak riser just upstage of the lamps; the riser is drawn first so props sit on its top.
+            var stand = new VisualElement { name = "equipment-stand", pickingMode = PickingMode.Ignore };
+            stand.style.maxWidth = Length.Percent(100);
+            stand.style.paddingLeft = stand.style.paddingRight = 4;
+            var shelf = new VisualElement { name = "equipment-shelf", pickingMode = PickingMode.Ignore };
+            shelf.style.position = Position.Absolute;
+            shelf.style.left = shelf.style.right = shelf.style.bottom = 0;
+            shelf.style.height = RiserHeight;
+            if (ApronArt.Riser != null)
+            {
+                shelf.style.backgroundImage = ApronArt.Riser;
+                shelf.style.unitySliceLeft = shelf.style.unitySliceRight = RiserSlice;
+                shelf.style.unitySliceScale = RiserHeight / ApronArt.Riser.height;
+                // The painted riser carries a warm highlight; cool it toward the violet footlights.
+                shelf.style.unityBackgroundImageTintColor = new Color(.86f, .8f, .9f);
+            }
+            else
+            {
+                shelf.style.backgroundColor = (Color)new Color32(74, 49, 33, 255);
+                PrototypeStyle.Outline(shelf, new Color32(150, 112, 62, 255), 3);
+            }
+            var riserShadow = ApronArt.Soft("equipment-shelf-shadow", new Color(0, 0, 0, .6f));
+            riserShadow.style.left = riserShadow.style.right = Length.Percent(-3);
+            riserShadow.style.bottom = -5;
+            riserShadow.style.height = 12;
+            stand.Add(riserShadow);
+            stand.Add(shelf);
+            var slots = PrototypeStyle.Row("equipment-slots");
+            slots.pickingMode = PickingMode.Ignore;
+            slots.style.justifyContent = Justify.Center;
+            slots.style.alignItems = Align.FlexEnd;
+            slots.style.paddingLeft = slots.style.paddingRight = 6;
+            slots.style.marginBottom = RiserHeight - RiserTopDepth;
             var equippedItems = new EquipmentDefinition[equipment?.Count ?? Rules.EquipmentSlots];
             var disabledSlots = new bool[equippedItems.Length];
+            var tiles = new List<VisualElement>();
             for (int slot = 0; slot < equippedItems.Length; slot++)
             {
                 var held = inventory.FirstOrDefault(item => item.Id == equipment?[slot])?.Definition;
@@ -1417,94 +1486,132 @@ namespace RaidPartyManager.Presentation
                 bool disabled = phase == Phase.Playback && held != null && battleLoadout?.Disabled.Contains(equipment[slot]) == true;
                 disabledSlots[slot] = disabled;
                 var tile = EquipmentTile($"equipment-slot-{slot + 1}", held, slot + 1, disabled);
-                tile.style.width = tile.style.height = Mathf.Min(30, 92 / equippedItems.Length);
+                tiles.Add(tile);
                 slots.Add(tile);
             }
-            card.Add(slots);
+            stand.Add(slots);
+            card.Add(stand);
+            card.RegisterCallback<GeometryChangedEvent>(_ =>
+            {
+                if (!(card.layout.width > 0)) return;
+                float size = Mathf.Clamp(Mathf.Floor((card.layout.width - 20) / tiles.Count) - 4, 18, 38);
+                foreach (var tile in tiles)
+                    tile.style.width = tile.style.height = size;
+            });
 
-            var portrait = new VisualElement { name = $"equipment-portrait-{position}" };
-            portrait.style.flexGrow = 1;
-            portrait.style.flexBasis = 0;
-            portrait.style.minWidth = 0;
-            portrait.style.overflow = Overflow.Hidden;
-            var illustration = new VisualElement { name = "equipment-portrait-art", pickingMode = PickingMode.Ignore };
-            illustration.style.flexGrow = 1;
-            illustration.style.flexBasis = 0;
-            portrait.Add(illustration);
-            ProfessionFrame.AddFittedTo(illustration, character.Profession, content.PortraitFor(character.Id));
-
-            var caption = PrototypeStyle.Text(character.Name, 10);
-            caption.style.paddingBottom = caption.style.paddingTop = 2;
-            caption.style.whiteSpace = WhiteSpace.NoWrap;
-            caption.style.overflow = Overflow.Hidden;
-            caption.style.textOverflow = TextOverflow.Ellipsis;
-            caption.pickingMode = PickingMode.Ignore;
-            PrototypeStyle.Middle(caption);
-            portrait.Add(caption);
-            card.Add(portrait);
-
-            var bar = new VisualElement { name = "equipment-energy", pickingMode = PickingMode.Ignore };
-            bar.style.width = 15;
-            bar.style.flexShrink = 0;
-            bar.style.flexDirection = FlexDirection.ColumnReverse;
-            bar.style.marginTop = bar.style.marginBottom = 4;
-            bar.style.marginLeft = bar.style.marginRight = 2;
-            bar.style.paddingTop = bar.style.paddingBottom = 2;
-            bar.style.paddingLeft = bar.style.paddingRight = 2;
-            bar.style.backgroundColor = PrototypeStyle.Background;
-            PrototypeStyle.Outline(bar, new Color32(103, 77, 127, 255), 7);
             var energy = phase != Phase.Preparation && partyEnergy.TryGetValue(id, out var current)
                 ? current : BattleEnergy.Full(equippedItems.Where(item => item != null), bonusEnergy);
-            PaintEnergy(bar, energy);
-            energyBars[id] = bar;
-            card.Add(bar);
+            var lamps = new FootlightRow(energy, litFootlights.TryGetValue(id, out int lit) ? lit : -1);
+            // The lamps stand on the lip in front of the riser, overlapping its foot for depth.
+            lamps.style.marginTop = -8;
+            lamps.Illuminate(beam, pool);
+            // Footlights sit below and in front, so each prop throws a long shadow upstage that breathes with the flames
+            // and fades out entirely once every lamp in the run is dark.
+            var casts = card.Query("equipment-cast-shadow").ToList();
+            if (casts.Count > 0)
+                card.schedule.Execute(() =>
+                {
+                    float reach = 1.25f + .22f * lamps.Flicker;
+                    foreach (var cast in casts)
+                    {
+                        cast.style.opacity = .55f * lamps.Brightness;
+                        cast.style.scale = new Scale(new Vector2(1.05f + .04f * lamps.Flicker, reach));
+                    }
+                }).Every(16);
+            litFootlights[id] = energy.Remaining;
+            energyBars[id] = lamps;
+            card.Add(lamps);
 
-            if (phase == Phase.Playback)
-                RegisterCharacterInspection(portrait, position, id, character, equippedItems, disabledSlots, skills, previousInspection);
+            // The actor on stage stands in for the old roster portrait.
+            if (unitCards.TryGetValue(id, out var actor))
+            {
+                var portrait = actor.AddInspectionTarget($"equipment-portrait-{position}");
+                if (phase == Phase.Playback)
+                    RegisterCharacterInspection(portrait, position, id, character, equippedItems, disabledSlots, skills, previousInspection);
+            }
             return card;
         }
 
-        private static void PaintEnergy(VisualElement bar, BattleEnergy energy)
+        private void PaintEnergy(string id, BattleEnergy energy)
         {
-            bar.tooltip = $"能量  {energy.Remaining}/{energy.Capacity}";
-            if (bar.childCount != energy.Capacity)
-            {
-                bar.Clear();
-                for (int i = 0; i < energy.Capacity; i++)
-                {
-                    var cell = new VisualElement { name = $"energy-cell-{i + 1}", pickingMode = PickingMode.Ignore };
-                    cell.style.flexGrow = 1;
-                    cell.style.flexBasis = 0;
-                    cell.style.marginTop = cell.style.marginBottom = 1;
-                    cell.style.borderTopLeftRadius = cell.style.borderTopRightRadius = 3;
-                    cell.style.borderBottomLeftRadius = cell.style.borderBottomRightRadius = 3;
-                    bar.Add(cell);
-                }
-            }
-            for (int i = 0; i < energy.Capacity; i++)
-                bar[i].style.backgroundColor = i < energy.Remaining ? AvailableEnergy : Color.white;
+            if (id == null) return;
+            if (energyBars.TryGetValue(id, out var lamps))
+                lamps.Paint(energy);
+            litFootlights[id] = energy.Remaining;
         }
+
+        // Measured on PropRiser.png: how tall the riser draws, how deep its top surface reads, and its end-cap width.
+        private const float RiserHeight = 30, RiserTopDepth = 9;
+        private const int RiserSlice = 34;
 
         private VisualElement EquipmentTile(string name, EquipmentDefinition item, int? slot = null, bool disabled = false)
         {
             var view = new VisualElement { name = name };
             view.style.width = view.style.height = 30;
             view.style.minWidth = 0;
-            view.style.maxWidth = Length.Percent(100);
-            view.style.backgroundColor = item == null ? PrototypeStyle.Inset : PrototypeStyle.PanelColor;
-            PrototypeStyle.Outline(view, PrototypeStyle.EquipmentSilver, 4);
+            view.style.marginLeft = view.style.marginRight = 3;
+            view.style.flexShrink = 0;
             if (item == null)
             {
-                var empty = PrototypeStyle.Text(slot?.ToString() ?? "", 11, PrototypeStyle.Muted);
-                empty.pickingMode = PickingMode.Ignore;
-                empty.style.flexGrow = 1;
-                PrototypeStyle.Middle(empty);
-                view.Add(empty);
+                // An empty slot is a chalked mark waiting for its prop.
+                view.pickingMode = PickingMode.Ignore;
+                if (ApronArt.Chalk != null)
+                {
+                    // A chalk ring drawn flat on the riser top, foreshortened, marking where a prop would stand.
+                    var mark = new VisualElement { name = "equipment-empty-mark", pickingMode = PickingMode.Ignore };
+                    mark.style.position = Position.Absolute;
+                    mark.style.left = mark.style.right = Length.Percent(8);
+                    mark.style.bottom = -RiserTopDepth * .55f;
+                    mark.style.height = Length.Percent(34);
+                    mark.style.backgroundImage = ApronArt.Chalk;
+                    mark.style.backgroundSize = new BackgroundSize(Length.Percent(100), Length.Percent(100));
+                    mark.style.unityBackgroundImageTintColor = new Color(.92f, .86f, .78f, .38f);
+                    view.Add(mark);
+                }
+                else
+                {
+                    var empty = PrototypeStyle.Text(slot?.ToString() ?? "", 11, PrototypeStyle.Muted);
+                    empty.pickingMode = PickingMode.Ignore;
+                    empty.style.flexGrow = 1;
+                    PrototypeStyle.Middle(empty);
+                    view.Add(empty);
+                }
                 return view;
             }
 
             var artwork = content.IconFor(item.Id);
+            if (artwork != null)
+            {
+                var cast = new Image { name = "equipment-cast-shadow", image = artwork, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
+                cast.tintColor = new Color(.05f, .02f, .08f, 1);
+                cast.style.position = Position.Absolute;
+                cast.style.left = cast.style.right = cast.style.top = cast.style.bottom = 0;
+                cast.style.transformOrigin = new TransformOrigin(Length.Percent(50), Length.Percent(92));
+                cast.style.opacity = 0;
+                var blur = new FilterFunction(FilterFunctionType.Blur);
+                blur.AddParameter(new FilterParameter(1.6f));
+                cast.style.filter = new List<FilterFunction> { blur };
+                view.Add(cast);
+            }
+            var contact = ApronArt.Soft("equipment-shadow", new Color(0, 0, 0, .7f));
+            contact.style.left = contact.style.right = Length.Percent(14);
+            contact.style.bottom = -3;
+            contact.style.height = Length.Percent(22);
+            view.Add(contact);
             view.Add(new EquipmentIcon(item, artwork, disabled: disabled));
+            if (disabled && ApronArt.Seal != null)
+            {
+                var cloth = new VisualElement { name = "equipment-sealed", pickingMode = PickingMode.Ignore };
+                cloth.style.position = Position.Absolute;
+                // The drape covers the lower part so the sealed prop still peeks out above the chain.
+                cloth.style.left = cloth.style.right = Length.Percent(-8);
+                cloth.style.top = Length.Percent(30);
+                cloth.style.bottom = Length.Percent(-12);
+                cloth.style.backgroundImage = ApronArt.Seal;
+                cloth.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
+                cloth.style.opacity = .88f;
+                view.Add(cloth);
+            }
             RegisterEquipmentTooltip(view, item, artwork, disabled);
             return view;
         }

@@ -72,14 +72,7 @@ namespace RaidPartyManager.Presentation
             if (size.x < 20 || size.y < 24)
                 return;
 
-            var (metal, light) = profession switch
-            {
-                Profession.Warrior => (new Color32(184, 105, 76, 255), new Color32(255, 183, 133, 255)),
-                Profession.Mage => (new Color32(138, 111, 191, 255), new Color32(224, 198, 255, 255)),
-                Profession.Archer => (new Color32(91, 151, 115, 255), new Color32(192, 231, 163, 255)),
-                Profession.Support => (new Color32(188, 149, 85, 255), new Color32(255, 235, 183, 255)),
-                _ => (new Color32(109, 105, 101, 255), new Color32(195, 188, 173, 255))
-            };
+            var (metal, light) = Palette(profession);
 
             var pen = context.painter2D;
             float scale = FrameScale(size.x);
@@ -91,6 +84,37 @@ namespace RaidPartyManager.Presentation
 
             CornerMarks(pen, size, scale, profession, metal, light);
             Crest(pen, new Vector2(size.x / 2f, 10f * scale), scale, profession, metal, light);
+        }
+
+        internal static (Color Metal, Color Light) Palette(Profession profession) => profession switch
+        {
+            Profession.Warrior => (new Color32(184, 105, 76, 255), new Color32(255, 183, 133, 255)),
+            Profession.Mage => (new Color32(138, 111, 191, 255), new Color32(224, 198, 255, 255)),
+            Profession.Archer => (new Color32(91, 151, 115, 255), new Color32(192, 231, 163, 255)),
+            Profession.Support => (new Color32(188, 149, 85, 255), new Color32(255, 235, 183, 255)),
+            _ => (new Color32(109, 105, 101, 255), new Color32(195, 188, 173, 255))
+        };
+
+        /// <summary>
+        /// A small chip naming the main profession. Character names read like specialist titles
+        /// (星辉术师, 秘术学徒), so the base class needs to be spelled out beside them.
+        /// </summary>
+        internal static Label Tag(Profession profession, int size = 13)
+        {
+            var (metal, light) = Palette(profession);
+            var tag = PrototypeStyle.Text(AdventureFlow.ProfessionName(profession), size, light);
+            tag.name = "profession-tag";
+            tag.pickingMode = PickingMode.Ignore;
+            tag.style.flexShrink = 0;
+            tag.style.alignSelf = Align.Center;
+            tag.style.whiteSpace = WhiteSpace.NoWrap;
+            tag.style.unityFontStyleAndWeight = FontStyle.Bold;
+            tag.style.marginLeft = 8;
+            tag.style.paddingLeft = tag.style.paddingRight = 7;
+            tag.style.paddingTop = tag.style.paddingBottom = 1;
+            tag.style.backgroundColor = new Color(metal.r * .35f, metal.g * .35f, metal.b * .35f, 1f);
+            PrototypeStyle.Outline(tag, metal, 4);
+            return tag;
         }
 
         private static float FrameScale(float width) => Mathf.Clamp(width / 145f, 0.45f, 1.25f);

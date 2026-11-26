@@ -28,7 +28,11 @@ namespace RaidPartyManager.Presentation
             style.paddingLeft = style.paddingRight = 12;
             PrototypeStyle.Outline(this, PrototypeStyle.Accent, 6);
 
-            Add(Field("name", $"{character.Name} · {position} 号位", 16, PrototypeStyle.Accent));
+            var heading = PrototypeStyle.Row();
+            heading.style.alignItems = Align.Center;
+            heading.Add(Field("name", $"{character.Name} · {position} 号位", 16, PrototypeStyle.Accent));
+            heading.Add(ProfessionFrame.Tag(character.Profession, 12));
+            Add(heading);
             Add(Field("personality", $"性格：{EmployeeVoice.For(personality).Name}", 12, PrototypeStyle.Personality));
             if (!string.IsNullOrWhiteSpace(character.TraitText))
                 Add(Field("trait", $"被动：{character.TraitText}", 12, PrototypeStyle.Passive));
@@ -138,8 +142,13 @@ namespace RaidPartyManager.Presentation
             float width = Mathf.Clamp(root.layout.width - 2 * margin, 0, 300);
             float height = float.IsNaN(layout.height) ? 0 : layout.height;
             style.width = width;
-            style.left = Mathf.Clamp(anchor.xMin, margin, Mathf.Max(margin, root.layout.width - width - margin));
-            style.top = Mathf.Clamp(anchor.yMin - height - gap, margin, Mathf.Max(margin, root.layout.height - height - margin));
+            // Beside the actor on stage, never over them: stage-centre side first, the other side when it does not fit.
+            float right = anchor.xMax + gap, left = anchor.xMin - gap - width;
+            bool fitsRight = right + width <= root.layout.width - margin;
+            float x = fitsRight || left < margin ? right : left;
+            style.left = Mathf.Clamp(x, margin, Mathf.Max(margin, root.layout.width - width - margin));
+            float top = RunTopBar.Height + margin;
+            style.top = Mathf.Clamp(anchor.yMax - height, top, Mathf.Max(top, root.layout.height - height - margin));
         }
 
         private static Label Field(string key, string text, int size = 13, Color? color = null)

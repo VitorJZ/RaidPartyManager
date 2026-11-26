@@ -87,7 +87,7 @@ namespace RaidPartyManager.Presentation
                 special = SkillMeteor;
             GameAudio.Play(special);
 
-            if (entry.ShieldAbsorbed > 0 || entry.Detail == "坚如磐石抵挡了伤害") GameAudio.Play(HitShield);
+            if (entry.ShieldAbsorbed > 0 || entry.Detail is global::RaidPartyManager.Battle.BattleSession.StoneGuardBlocked or global::RaidPartyManager.Battle.BattleSession.GoldenBellBlocked) GameAudio.Play(HitShield);
             if (entry.ActionKind == ActionKind.Heal && entry.TargetHealth > previousHealth)
                 GameAudio.Play(Heal, .52f);
             if (entry.TargetHealth < previousHealth && entry.ActionKind == ActionKind.Attack)

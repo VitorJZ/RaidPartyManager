@@ -445,19 +445,22 @@ namespace RaidPartyManager.Tests
             var drape = house != null ? house.transform.Find("Curtain L").GetComponent<Renderer>() : stage.Find("Left drape").GetComponent<Renderer>();
             Assert.That(drape.bounds.center.z, Is.LessThan(0));
             Assert.That(Vector3.Dot(stage.Find("Stage floor").up, Vector3.forward), Is.GreaterThan(.99f));
-            var footer = root.Q("battle-footer");
-            Assert.That(footer.parent, Is.SameAs(root.Q("battle-screen")));
-            Assert.That(footer.parent.worldBound, Is.EqualTo(root.worldBound));
-            var rosterBounds = footer.Q("roster-equipment").worldBound;
+            Assert.That(root.Q("battle-footer"), Is.Null);
+            var apron = root.Q("battle-apron");
+            Assert.That(apron.parent, Is.SameAs(root.Q("battlefield")));
+            var apronBounds = apron.worldBound;
             Assert.That(root.Q("battle-log"), Is.Null);
             var clearance = root.Q("audience-clearance").worldBound;
             Assert.That(clearance.height / root.worldBound.height, Is.InRange(.061f, .067f));
-            Assert.That(clearance.yMin - rosterBounds.yMax, Is.EqualTo(10f).Within(1f));
+            Assert.That(clearance.yMin - apronBounds.yMax, Is.EqualTo(14f).Within(1f));
+            Assert.That(root.Q<ScrollView>("prototype").verticalScroller.resolvedStyle.display, Is.EqualTo(DisplayStyle.None),
+                "Lamp glows must not make the battle page scroll.");
             var seats = house != null ? house.transform.Find("Stalls/Front row/Seat L1").GetComponent<MeshRenderer>() :
                 stage.Find("Audience/Front stalls").GetComponent<MeshRenderer>();
             float crest = Camera.main.WorldToViewportPoint(seats.bounds.max).y;
             Assert.That(crest, Is.InRange(.035f, .11f));
-            Assert.That(rosterBounds.center.x, Is.EqualTo(footer.worldBound.center.x).Within(1f));
+            Assert.That(root.Q("equipment-position-1").worldBound.center.x,
+                Is.EqualTo(root.Q("party-position-1").worldBound.center.x).Within(1f), "Each lamp run sits under its own actor.");
             Assert.That(((Texture2D[])typeof(BattlePrototype).GetField("battleBackgrounds", PrivateInstance)
                 .GetValue(scene)).Distinct().Count(), Is.EqualTo(13));
 
@@ -472,7 +475,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("party-position-1").Q("profession-portrait-art"), Is.Not.Null);
             Assert.That(root.Q("party-position-1").Q("profession-frame-warrior"), Is.Null);
             Assert.That(root.Q("party-position-1").Q("combatant-portrait").resolvedStyle.borderLeftWidth, Is.Zero);
-            Assert.That(root.Q("equipment-position-2").Q("profession-frame-mage"), Is.Not.Null);
+            Assert.That(root.Q("party-position-2").Q("equipment-portrait-2"), Is.Not.Null);
             Assert.That(root.Q("equipment-positions").childCount, Is.EqualTo(4));
             var top = root.Q("run-top-bar");
             Assert.That(top.Q("open-party-editor").Q("team-icon"), Is.Not.Null);
@@ -497,7 +500,7 @@ namespace RaidPartyManager.Tests
             Assert.That(teamButton.worldBound.xMax, Is.LessThanOrEqualTo(backpackIcon.worldBound.xMin));
             Assert.That(top.Q("battle-controls").worldBound.xMax,
                 Is.LessThanOrEqualTo(top.Q("open-settings").worldBound.xMin));
-            Assert.That(root.Q("battle-footer").Q("run-backpack-items"), Is.Null);
+            Assert.That(root.Q("battle-apron").Q("run-backpack-items"), Is.Null);
             Assert.That(backpack.worldBound.yMax, Is.LessThan(root.Q("equipment-positions").worldBound.yMin));
             Assert.That(backpackIcon.worldBound.xMax, Is.LessThan(backpack.worldBound.xMin));
             var firstBackpackItem = backpack.ElementAt(0);
@@ -513,15 +516,13 @@ namespace RaidPartyManager.Tests
             var slots = startingMageEquipment.Q("equipment-slots").Children().ToArray();
             Assert.That(slots.Select(slot => slot.name),
                 Is.EqualTo(new[] { "equipment-slot-1", "equipment-slot-2", "equipment-slot-3" }));
-            Assert.That(slots.Select(slot => slot.worldBound.center.y), Is.Ordered.Ascending);
-            var magePortrait = startingMageEquipment.Q("equipment-portrait-2");
-            var art = magePortrait.Q<Image>("profession-portrait-art");
-            Assert.That(art.scaleMode, Is.EqualTo(ScaleMode.ScaleToFit));
-            Assert.That(art.worldBound.width / art.worldBound.height, Is.EqualTo((float)art.image.width / art.image.height).Within(0.03f));
+            Assert.That(slots.Select(slot => slot.worldBound.center.x), Is.Ordered.Ascending);
+            var magePortrait = root.Q("equipment-portrait-2");
+            Assert.That(root.Q("party-position-2").Contains(magePortrait), Is.True);
             Assert.That(root.Q("status-row-guard").layout.height, Is.EqualTo(60).Within(1));
             Assert.That(root.Query<Label>().ToList().Any(label => label.text == "讨伐队经理"), Is.False);
-            Assert.That(slots[0].worldBound.xMax, Is.LessThanOrEqualTo(magePortrait.worldBound.xMin));
-            Assert.That(startingMageEquipment.Q("equipment-energy").worldBound.xMin, Is.GreaterThanOrEqualTo(magePortrait.worldBound.xMax));
+            Assert.That(magePortrait.worldBound.yMax, Is.LessThan(slots[0].worldBound.yMin));
+            Assert.That(slots[0].worldBound.yMax, Is.LessThanOrEqualTo(startingMageEquipment.Q("equipment-energy").worldBound.yMin));
             AssertBattleEquipmentIsReadOnly(root);
             var guard = root.Q("party-position-1");
             var caption = guard.Q("combatant-caption");
@@ -1217,9 +1218,7 @@ namespace RaidPartyManager.Tests
             yield return null;
 
             var bar = root.Q("equipment-position-1").Q("equipment-energy");
-            Color full = bar.Q("energy-cell-1").resolvedStyle.backgroundColor;
-            Assert.That(full.b, Is.GreaterThan(full.g));
-            Assert.That(bar.Q("energy-cell-2").resolvedStyle.backgroundColor, Is.EqualTo(full));
+            Assert.That(bar.Children().Select(Lit), Is.EqualTo(new[] { true, true }));
             SetAttackAnimationTimeScale(scene, 0.30f);
             Press(root, "start");
 
@@ -1244,8 +1243,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("battle-skill-effect"), Is.Null);
 
             bar = root.Q("equipment-position-1").Q("equipment-energy");
-            Assert.That(bar.Q("energy-cell-1").resolvedStyle.backgroundColor, Is.EqualTo(full));
-            Assert.That(bar.Q("energy-cell-2").resolvedStyle.backgroundColor, Is.EqualTo(Color.white));
+            Assert.That(bar.Children().Select(Lit), Is.EqualTo(new[] { true, false }), "War Cry snuffs one footlight.");
             Assert.That(root.Q<Label>("commentator-line"), Is.Not.Null);
             var details = HoverCharacter(root, root.Q("equipment-portrait-1"));
             Assert.That(details.Q<Label>("battle-detail-skill-1").text, Is.EqualTo("战争咆哮 · 1 能量"));
@@ -1255,7 +1253,10 @@ namespace RaidPartyManager.Tests
             yield return ResolveBattle(root);
             yield return null;
             bar = root.Q("equipment-position-1").Q("equipment-energy");
-            Assert.That(bar.Children().Select(cell => cell.resolvedStyle.backgroundColor), Is.All.EqualTo(full));
+            Assert.That(bar.Children().Select(Lit), Is.All.True, "Settlement relights every footlight.");
+
+            static bool Lit(VisualElement lamp) =>
+                lamp.ClassListContains("footlight-lit") && !lamp.ClassListContains("footlight-out");
         }
 
         [UnityTest]
@@ -2531,7 +2532,7 @@ namespace RaidPartyManager.Tests
 
         private static void AssertBattleEquipmentIsReadOnly(VisualElement root)
         {
-            Assert.That(root.Q("roster-equipment").Query<Button>().ToList(), Is.Empty);
+            Assert.That(root.Q("equipment-positions").Query<Button>().ToList(), Is.Empty);
             var portrait = root.Q("equipment-portrait-1");
             var target = root.panel.Pick(portrait.worldBound.center);
             Assert.That(target == portrait || portrait.Contains(target), Is.True);
