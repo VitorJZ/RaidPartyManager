@@ -176,7 +176,8 @@ namespace RaidPartyManager.Tests
             var stone = new SkillBookDefinition("stone", "坚如磐石", "", SkillRequirement.None, 1, 3, SkillEffect.StoneGuard);
             Combatant Learner(string id, int position, SkillBookDefinition book)
             {
-                var unit = Unit(id, Side.Party, position, maxHealth: 40);
+                // No attack of their own, so the decision policy always prefers casting the protective skill.
+                var unit = Unit(id, Side.Party, position, maxHealth: 40, attack: 0);
                 return new Combatant(unit.Id, unit.Character, unit.Side, position, unit.Stats, unit.Health, learnedSkills: new[] { book });
             }
             var enemy = Unit("enemy", Side.Enemy, 1, maxHealth: 200, attack: 9);
