@@ -300,8 +300,8 @@ namespace RaidPartyManager.Tests
             var actor = Unit("party", Side.Party, health: 10, gear: Gear(LifePendant, RitualMask, HealingRing));
             var result = Fight(actor, Unit("enemy", Side.Enemy, stats: new Stats(2, 0, 0, 60)));
             var heals = result.Events.Where(entry => entry.ActionName == "生命吊坠").Select(entry => entry.Amount);
-            Assert.That(heals, Is.EqualTo(new[] { 6, 6 }));
-            Assert.That(result.HealthById["party"], Is.EqualTo(20));
+            Assert.That(heals, Is.EqualTo(new[] { 4, 4 }));
+            Assert.That(result.HealthById["party"], Is.EqualTo(16));
 
             var withEternal = Fight(3, Unit("party", Side.Party, gear: Gear(FirstFire, RitualMask, EternalFire)),
                 Unit("enemy", Side.Enemy, stats: new Stats(1, 0, 1, 100)));
@@ -446,8 +446,8 @@ namespace RaidPartyManager.Tests
             Assert.That(action.Detail, Is.EqualTo("魔法"));
         }
 
-        [TestCase("DawnHealer", 7)]
-        [TestCase("DivinePriest", 9)]
+        [TestCase("DawnHealer", 6)]
+        [TestCase("DivinePriest", 8)]
         public void HealingTraitUsesCurrentAttackEveryRoundAndRebelEarringTargetsEnemiesWithMagic(
             string assetName, int expectedHealing)
         {
@@ -862,7 +862,7 @@ namespace RaidPartyManager.Tests
             var events = battle.AdvanceRound();
 
             Assert.That(events.Where(entry => entry.ActionName == "古树根茎").Select(entry => entry.Amount),
-                Is.EqualTo(new[] { 3, 3 }));
+                Is.EqualTo(new[] { 2, 2 }));
         }
 
         [Test]

@@ -1174,12 +1174,12 @@ namespace RaidPartyManager.Tests
             Assert.That(decayShownDuringEffect, Is.True);
             Assert.That(triggers, Is.EqualTo(new[]
             {
-                "初始之火  余烬 ×1", "生命吊坠  +3 生命", "中毒  −2 生命",
-                "初始之火  余烬 ×2", "生命吊坠  +3 生命", "中毒  −2 生命"
+                "初始之火  余烬 ×1", "生命吊坠  +2 生命", "中毒  −2 生命",
+                "初始之火  余烬 ×2", "生命吊坠  +2 生命", "中毒  −2 生命"
             }));
             Assert.That(root.Q("battle-pause"), Is.Null);
             Assert.That(root.Q("round-end-effect"), Is.Null);
-            Assert.That(root.Q("party-position-1").Q<Label>("health-value").text, Is.EqualTo("11 / 24"));
+            Assert.That(root.Q("party-position-1").Q<Label>("health-value").text, Is.EqualTo("9 / 24"));
         }
 
         [UnityTest]
@@ -2253,6 +2253,8 @@ namespace RaidPartyManager.Tests
             var guard = Object.Instantiate((ScriptableObject)characterField.GetValue(party[0]));
             guard.GetType().GetField("hasSkill", fields).SetValue(guard, false);
             characterField.SetValue(party[0], guard);
+            // Keep the healer healing while the mage and archer demonstrate their projectiles.
+            party[2].GetType().GetField("startingHealth", fields).SetValue(party[2], 1);
             var enemiesField = encounter.GetType().GetField("enemies", fields);
             var enemies = (object[])enemiesField.GetValue(encounter);
             var brute = Object.Instantiate((ScriptableObject)characterField.GetValue(enemies[0]));

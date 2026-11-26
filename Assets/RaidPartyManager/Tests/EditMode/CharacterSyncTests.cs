@@ -18,7 +18,11 @@ namespace RaidPartyManager.Tests
             var scene = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
                 "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
 
-            Assert.That(scene.Party.Select(unit => unit.Stats.Health), Is.EqualTo(new[] { 10, 7, 12, 8 }));
+            Assert.That(scene.Party.Select(unit => unit.Stats.Health), Is.EqualTo(new[] { 10, 7, 9, 8 }));
+            Assert.That(scene.CharacterCatalog.Single(character => character.Id == "DawnHealer").BaseStats,
+                Is.EqualTo(new Stats(2, 1, 3, 9)));
+            Assert.That(scene.CharacterCatalog.Single(character => character.Id == "DivinePriest").BaseStats,
+                Is.EqualTo(new Stats(4, 2, 3, 12)));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0)
                 .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 39)));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0).Select(character => character.Skill),

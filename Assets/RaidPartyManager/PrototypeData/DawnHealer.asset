@@ -30,10 +30,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b3b1007214be467b8d411bcdc457319f, type: 2}
   - {fileID: 11400000, guid: 49f4ef44a0b043e78d4acf2411bdc0fa, type: 2}
   personality: 5
-  attack: 3
+  attack: 2
   defense: 1
   specialDefense: 3
-  health: 12
+  health: 9
   actionInterval: 12
   basicAttack:
     id: basic

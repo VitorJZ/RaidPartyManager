@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "生命吊坠"
   effect: 1
   icon: {fileID: 2800000, guid: 16886755109e4a4cb62b369146b436bd, type: 3}
-  description: "回合结束时，恢复3点生命值"
+  description: "回合结束时，恢复2点生命值"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

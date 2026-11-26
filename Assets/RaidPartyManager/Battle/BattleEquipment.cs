@@ -268,7 +268,7 @@ namespace RaidPartyManager.Battle
                         if (effect == CrucibleHeart)
                             Heal(unit, unit, 4, "余热炉心", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndHeal, equipment: CrucibleHeart);
                         else if (effect == LifePendant)
-                            Heal(unit, unit, 3, "生命吊坠", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndHeal, equipment: LifePendant);
+                            Heal(unit, unit, 2, "生命吊坠", BattleEventKind.Effect, visual: BattleVisualCue.RoundEndHeal, equipment: LifePendant);
                         else if (effect == FirstFire)
                             GrantStatus(unit, unit, Ember, 1, "初始之火", BattleVisualCue.RoundEndEmber, BattleEventKind.Effect, equipment: FirstFire);
                         else if (effect == WitchDoctorDoll && !poisonSettled && unit.Layers(Poison) > 0)

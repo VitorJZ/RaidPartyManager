@@ -32,3 +32,4 @@
 | 2026-11-26 | ElevenLabs 的 128 条录音追加到现有音效银行，按区域、舞台动作和战斗事件播放 | 复用环境淡入淡出和音量控制，保留原素材索引。铁壁拦截用只读战斗事件标记，追加攻击沿用 `EquipmentVisual` | `ImportedClipsMatchManifestAndKeepLegacyBankSlots`、`MainMenuAndStandaloneRegionsPlayTheirOwnAmbience` |
 | 2026-11-26 | 装备和技能书在按住后的首次指针移动时启动拖拽 | 去掉 150 毫秒等待，快速移动出原格也可开始拖拽，原地点按继续保留原物品 | `PartyEditorOpensProfileAndSharedBackpackOutsideCombat`、`BookmarksSwitchPagesAndCompatibleBooksCanReplaceLearnedSkills` |
 | 2026-11-26 | 通关终幕按舞台角色、幕布、「感谢游玩」艺术字的顺序显示 | 合拢的幕布遮住角色，艺术字位于独立界面层，保留金币及薪资摘要和 5 秒停留 | `CapitalBossRewardsLeadToFiveSecondsBehindTheClosedCurtain` |
+| 2026-11-27 | 按确认的角色表下调晨曦圣女和神恩主祭的基础属性，生命吊坠每回合基础回复由 3 降至 2 | 基础攻击的调整同步影响治疗量，回合末回复与战斗飘字使用相同结算值 | `EncounterIncludesSyncedStatsRecruitsPortraitsAndEvolutions`、`HealingTraitUsesCurrentAttackEveryRoundAndRebelEarringTargetsEnemiesWithMagic`、`RoundEndGearRepeatsHealingAndAddsEmbersRetainedByEternalFire`、`RoundEndAnimationsShowActualHealthAndEmbersBeforeContinuing` |
