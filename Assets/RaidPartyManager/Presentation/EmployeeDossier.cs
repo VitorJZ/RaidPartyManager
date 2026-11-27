@@ -56,13 +56,14 @@ namespace RaidPartyManager.Presentation
                 var last = career.LastCompleted;
                 string growth = last.Awarded == EmployeeRating.None ? "" :
                     $" · {RatingName(last.Awarded)}提高至 {last.AwardedLevel} 级";
-                var completed = PrototypeStyle.Text($"已完成 {career.GoalsCompleted} 项 · 最近完成 {GoalText(last)}{growth}",
-                    13, PrototypeStyle.Ally);
+                string details = openContract == null && last.Kind is (EmployeeGoalKind.Raise or EmployeeGoalKind.Renewal)
+                    ? "" : $" · 最近完成 {GoalText(last)}{growth}";
+                var completed = PrototypeStyle.Text($"已完成 {career.GoalsCompleted} 项{details}", 13, PrototypeStyle.Ally);
                 completed.name = "employee-last-goal";
                 completed.style.marginTop = 7;
                 goals.Add(completed);
             }
-            if (member.Contract != null)
+            if (member.Contract != null && openContract != null)
             {
                 var contract = PrototypeStyle.Button("查看合约", "employee-open-contract", openContract);
                 contract.style.alignSelf = Align.FlexStart;

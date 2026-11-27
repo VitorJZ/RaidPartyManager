@@ -82,7 +82,7 @@ namespace RaidPartyManager.Presentation
             style.bottom = 3;
             style.left = style.right = 5;
 
-            figure = new StageActorImage(stage)
+            figure = new StageActorImage(stage, keepsStageFocus: facesLeft)
             {
                 name = "battle-sprite",
                 image = sheet,

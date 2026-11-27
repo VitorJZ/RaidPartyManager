@@ -32,7 +32,14 @@ namespace RaidPartyManager.Content
         public Texture2D ChestClosed => chestClosed;
         public Texture2D ChestAjar => chestAjar;
         public Texture2D ChestOpen => chestOpen;
-        public Texture2D EventArt(AdventureEventKind kind) => kind == AdventureEventKind.TidePact ? tideSinger.Portrait : kind == AdventureEventKind.GraveSeed ? graveSeedPlaybill : (GraveStories.Contains(kind) || CapitalStories.Contains(kind)) ? Resources.Load<Texture2D>("StoryEvents/Playbills/" + kind) : (int)kind < eventArtwork.Length ? eventArtwork[(int)kind] : null;
+        public Texture2D EventArt(AdventureEventKind kind) => kind switch
+        {
+            AdventureEventKind.TidePact => tideSinger.Portrait,
+            AdventureEventKind.GraveSeed => graveSeedPlaybill,
+            _ when kind == AdventureEventKind.RecruitmentWheel || GraveStories.Contains(kind) || CapitalStories.Contains(kind)
+                => Resources.Load<Texture2D>("StoryEvents/Playbills/" + kind),
+            _ => (int)kind >= 0 && (int)kind < eventArtwork.Length ? eventArtwork[(int)kind] : null
+        };
         public Shader EventInkShader => eventInkShader;
         public Texture2D EventInkArt(AdventureEventKind kind)
         {

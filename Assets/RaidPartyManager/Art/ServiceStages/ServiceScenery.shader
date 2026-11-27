@@ -18,12 +18,7 @@ Shader "Raid Party Manager/Service Scenery"
     SubShader
     {
         Tags { "Queue"="AlphaTest" "RenderType"="TransparentCutout" }
-        Pass
-        {
-            Cull Off ZWrite [_DepthWrite] Blend SrcAlpha OneMinusSrcAlpha
-            CGPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
+        CGINCLUDE
             #include "UnityCG.cginc"
             #include "../Stagecraft/ScenicPaint.cginc"
             #include "../Stagecraft/RidingFoam.cginc"
@@ -90,6 +85,29 @@ Shader "Raid Party Manager/Service Scenery"
                 }
                 return half4(StageAir(ink.rgb, i.world), ink.a);
             }
+            half4 LensMask(fragment i) : SV_Target
+            {
+                half alpha = tex2D(_MainTex, i.uv).a * _Color.a;
+                clip(alpha - _CutoutThreshold);
+                return alpha.xxxx;
+            }
+        ENDCG
+
+        Pass
+        {
+            Cull Off ZWrite [_DepthWrite] Blend SrcAlpha OneMinusSrcAlpha
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            ENDCG
+        }
+        Pass
+        {
+            Tags { "LightMode"="StageLensMask" }
+            Cull Off ZWrite Off Blend One OneMinusSrcAlpha
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment LensMask
             ENDCG
         }
     }

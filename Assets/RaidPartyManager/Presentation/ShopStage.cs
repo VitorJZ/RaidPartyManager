@@ -1,4 +1,5 @@
 using RaidPartyManager.Domain;
+using RaidPartyManager.Run;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -30,27 +31,52 @@ namespace RaidPartyManager.Presentation
         internal bool CounterReady => CounterFocused && counterFocus >= 1f && focus <= 0;
         internal bool WideView => !CounterFocused && !RecruitmentFocused && counterFocus <= 0 && focus <= 0;
 
-        public ShopStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D interior, Texture2D reactions, bool graveyard, bool capital = false) :
-            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Interior) : StageLighting.For(graveyard, StageVenue.Interior))
+        public ShopStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D interior, Texture2D reactions,
+            AdventureRun run, StageVenue venue) : base(owner, panel, art, run?.InCapital == true
+                ? StageLighting.Clockwork(venue) : StageLighting.For(run?.InGraveyard == true, venue),
+                venue == StageVenue.Interior ? StageTiltShift.FacilityStrength : 1f)
         {
+            bool graveyard = run?.InGraveyard == true;
+            bool capital = run?.InCapital == true;
             this.reactions = reactions;
-            if (capital) DressCapital(1);
+            if (venue == StageVenue.Outdoors)
+            {
+                if (capital) DressCapital(Mathf.Clamp((run.Stage - 1) / 3, 0, 2));
+                else if (graveyard)
+                {
+                    HangBackdrop("Yew walk", art.yewPath);
+                    GraveyardFloor();
+                    FloorProp("Trail ferns", art.ferns, -3.8f, .6f, 2.55f, -8);
+                    FloorProp("Funeral urn", art.stoneUrn, 4.5f, .4f, 1.4f, 8);
+                }
+                else
+                {
+                    HangBackdrop("Distant harbour", art.townSky);
+                    Deck(art.timber, DockPlayhouse.PlankTile, new Color(.76f, .71f, .65f));
+                    FloorProp("Signal buoy rack", art.buoyRack, -3.8f, .45f, 2.25f, -6);
+                    FloorProp("Downstage mooring", art.mooring, 4.8f, -.7f, 1.5f, 8);
+                }
+            }
             else
             {
-                HangBackdrop(graveyard ? "Cemetery chandlery" : "Harbour chandlery", graveyard ? art.wakeShop : interior);
-                if (graveyard) GraveyardFloor();
-                else Deck(art.timber, DockPlayhouse.PlankTile, new Color(.76f, .77f, .79f));
+                if (capital) DressCapital(1);
+                else
+                {
+                    HangBackdrop(graveyard ? "Cemetery chandlery" : "Harbour chandlery", graveyard ? art.wakeShop : interior);
+                    if (graveyard) GraveyardFloor();
+                    else Deck(art.timber, DockPlayhouse.PlankTile, new Color(.76f, .77f, .79f));
+                }
+                FloorProp("Cloth deliveries",art.parcel,4.62f,-.95f,1.48f,-8);
+                if (!capital) FloorProp(graveyard ? "Mortuary tapers" : "Oil merchant's shelves", graveyard ? art.candleRack : art.chandlerShelf,
+                    -3.9f, .65f, 2.18f, -6);
+                if (!capital) FloorProp(graveyard ? "Funeral urn" : "Tackle by the counter", graveyard ? art.stoneUrn : art.tackleChest,
+                    3.67f, -.54f, graveyard ? 1.18f : 1.9f, 8);
+                if (!capital && !graveyard) FloorProp("Creel by the loading bay",art.creel,-3.48f,-1.6f,1.23f,9);
+                storytellerIdle = Resources.Load<Texture2D>("StoryEvents/Cast/BrokerIdle");
+                merchant = Flat("shop-merchant", merchantCentre, 2f, 1.62f, storytellerIdle);
+                Dressing.Cast[merchant] = new DockSet.Player(true);
+                SetMerchant(Expression.Idle, 0, 0);
             }
-            FloorProp("Cloth deliveries",art.parcel,4.62f,-.95f,1.48f,-8);
-            if (!capital) FloorProp(graveyard ? "Mortuary tapers" : "Oil merchant's shelves", graveyard ? art.candleRack : art.chandlerShelf,
-                -3.9f, .65f, 2.18f, -6);
-            if (!capital) FloorProp(graveyard ? "Funeral urn" : "Tackle by the counter", graveyard ? art.stoneUrn : art.tackleChest,
-                3.67f, -.54f, graveyard ? 1.18f : 1.9f, 8);
-            if (!capital && !graveyard) FloorProp("Creel by the loading bay",art.creel,-3.48f,-1.6f,1.23f,9);
-            storytellerIdle = Resources.Load<Texture2D>("StoryEvents/Cast/BrokerIdle");
-            merchant = Flat("shop-merchant", merchantCentre, 2f, 1.62f, storytellerIdle);
-            Dressing.Cast[merchant] = new DockSet.Player(true);
-            SetMerchant(Expression.Idle, 0, 0);
             var wood = new Color(.82f, .73f, .62f);
             var brass = new Color(.76f, .52f, .26f);
             Shadow(new Vector3(0, 0, -2.58f), 3.85f, 1.55f);

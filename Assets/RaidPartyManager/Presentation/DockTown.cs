@@ -75,7 +75,7 @@ namespace RaidPartyManager.Presentation
                 () => topBar.WhenRewardsArrive(() => AdventureFlow.OpenNodeScene("Camp", true)));
             Service(services, "委托", TownService.Quest, 3, OpenQuest);
             FirstRunGuide.ShowFacility(town, run, GuideStep.Town,
-                (serviceSigns[0], "签约 · 卖人"), (serviceSigns[1], "买卖装备"),
+                (serviceSigns[0], run.Party.ContractsEnabled ? "签约 · 卖人" : "招募 · 卖人"), (serviceSigns[1], "买卖装备"),
                 (serviceSigns[2], "每次进城用一次"), (serviceSigns[3], "接活 · 回城领赏"));
             if (string.IsNullOrEmpty(run.Current.Message)) return;
             var notice = PrototypeStyle.Text(run.Current.Message, 17, PrototypeStyle.Accent);

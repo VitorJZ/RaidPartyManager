@@ -581,6 +581,7 @@ namespace RaidPartyManager.Tests
             var rewards = root.Q("victory-rewards");
             var scoreboard = rewards.Q("battle-scoreboard");
             Assert.That(scoreboard, Is.Not.Null);
+            Assert.That(scoreboard.Q("battle-rating-rules"), Is.Null);
             foreach (var rating in first.Ratings)
             {
                 var unit = scoreboard.Q<Button>("battle-rating-" + rating.UnitId);
@@ -591,6 +592,7 @@ namespace RaidPartyManager.Tests
             var detail = scoreboard.Q<Label>("battle-rating-detail-guard");
             Assert.That(detail.style.display.value, Is.EqualTo(DisplayStyle.Flex));
             Assert.That(detail.text, Does.Contain("为队友挡伤"));
+            Assert.That(detail.text, Does.Not.Contain("加分"));
             Press(scoreboard, "battle-rating-guard");
             Assert.That(detail.style.display.value, Is.EqualTo(DisplayStyle.None));
             Assert.That(rewards.Q<Button>("claim-loot-0").Q<Label>().text, Is.EqualTo("狂战士之印"));

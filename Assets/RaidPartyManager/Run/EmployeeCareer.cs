@@ -93,11 +93,11 @@ namespace RaidPartyManager.Run
             var career = member.Career;
             var voice = EmployeeVoice.For(member.Start.Character.Personality);
             var thoughts = new List<(EmployeeThought Topic, string Text)>();
-            if (PayrollDebt > 0 && member.Contract != null)
+            if (ContractsEnabled && PayrollDebt > 0 && member.Contract != null)
                 Add(EmployeeThought.Arrears);
-            if (member.Contract is { } contract)
+            if (ContractsEnabled && member.Contract is { } contract)
             {
-                int remaining = member.LastContract.EndDay - Day;
+                int remaining = member.LastContract.EndDay - ContractDay;
                 if (remaining <= 3) Add(EmployeeThought.Renewal, remaining);
                 int expected = ExpectedWage(member);
                 if (Underpaid(member, expected)) Add(EmployeeThought.LowPay, contract.DailyWage, expected);
@@ -124,6 +124,7 @@ namespace RaidPartyManager.Run
             void Add(EmployeeThought topic, params object[] details) => thoughts.Add((topic, voice.Say(topic, details)));
             void Recall(EmployeeMemory memory)
             {
+                if (!ContractsEnabled && memory.Topic is (EmployeeThought.Arrears or EmployeeThought.Renewal or EmployeeThought.LowPay)) return;
                 if (memory.Topic != EmployeeThought.None && memory.Day <= Day && Day - memory.Day < 3)
                     Add(memory.Topic, memory.Detail);
             }
@@ -282,6 +283,11 @@ namespace RaidPartyManager.Run
         {
             ref var career = ref member.Career;
             career.Initialized = true;
+            if (!ContractsEnabled)
+            {
+                career.Raise = default;
+                career.Renewal = default;
+            }
             LimitActiveGoals(ref career); // Older checkpoints can contain five simultaneous goals.
             FinishGoal(member, ref career.Inscription);
             FinishGoal(member, ref career.Work);
@@ -298,11 +304,12 @@ namespace RaidPartyManager.Run
             FinishGoal(member, ref career.Renewal);
             FinishGoal(member, ref career.Relationship);
             int remaining = LimitActiveGoals(ref career);
-            if (member.Contract != null)
+            if (ContractsEnabled && member.Contract != null)
             {
-                if (remaining > 0 && career.Renewal.Kind == EmployeeGoalKind.None && member.LastContract.EndDay - Day <= 3 && Day <= int.MaxValue - 10)
+                if (remaining > 0 && career.Renewal.Kind == EmployeeGoalKind.None &&
+                    member.LastContract.EndDay - ContractDay <= 3 && ContractDay <= int.MaxValue - 10)
                 {
-                    career.Renewal = Goal(EmployeeGoalKind.Renewal, Day + 10);
+                    career.Renewal = Goal(EmployeeGoalKind.Renewal, ContractDay + 10);
                     remaining--;
                 }
                 int expected = ExpectedWage(member);

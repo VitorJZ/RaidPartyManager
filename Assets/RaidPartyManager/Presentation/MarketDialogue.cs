@@ -88,7 +88,7 @@ namespace RaidPartyManager.Presentation
         {
             Speak(words);
             var member = run.Party.Members.Single(m => m.Id == id);
-            int fee = member.Contract.CurrentReleaseFee;
+            long exitCost = run.Party.TransferExitCostFor(id);
             var field = new IntegerField { name = "broker-asking", value = suggested, isDelayed = false };
             choices.Add(PrototypeStyle.Text("我的报价（金币）", 14, PrototypeStyle.Ink));
             choices.Add(field);
@@ -106,7 +106,9 @@ namespace RaidPartyManager.Presentation
             choices.Add(presets);
             var net = PrototypeStyle.Text("", 14, PrototypeStyle.Muted);
             choices.Add(net);
-            void Preview(int price) => net.text = $"违约金 {fee}　·　待付工资 {member.Contract.Outstanding}　·　成交净收入 {price - member.Contract.ExitCost} 金币";
+            void Preview(int price) => net.text = run.Party.ContractsEnabled
+                ? $"违约金 {member.Contract.CurrentReleaseFee}　·　待付工资 {member.Contract.Outstanding}　·　成交净收入 {price - exitCost} 金币"
+                : $"成交收入 {price} 金币";
             field.RegisterValueChangedCallback(e => Preview(e.newValue));
             Preview(field.value);
             Option("按我的报价成交", "broker-offer", () => Submit(id, field.value), true);
@@ -119,7 +121,7 @@ namespace RaidPartyManager.Presentation
         {
             var member = run.Party.Members.FirstOrDefault(m => m.Id == id);
             if (member == null) { Pick("这位的手续已经办好了。"); return; }
-            long net = asking - member.Contract.ExitCost;
+            long net = asking - run.Party.TransferExitCostFor(id);
             int previous = run.Current.BrokerCounter;
             bool conceded = run.Current.BrokerLastAsk > asking;
             switch (run.OfferSale(id, asking))
@@ -127,15 +129,16 @@ namespace RaidPartyManager.Presentation
                 case MarketReply.Sold:
                     GameAudio.Play(SoundCue.RewardGold);
                     changed();
-                    Speak($"成交！{member.Character.Name}的转会费是 {asking} 金币，结清合同后是 {net} 金币。你看，我盖章盖得还挺像那么回事吧？");
+                    string terms = run.Party.ContractsEnabled ? $"，结清合同后是 {net} 金币" : "";
+                    Speak($"成交！{member.Character.Name}的转会费是 {asking} 金币{terms}。你看，我盖章盖得还挺像那么回事吧？");
                     Option("再谈一名队员。", "broker-more", () => Pick("还有谁想找新东家？"));
-                    Option("收好合同，离席。", "broker-leave", close);
+                    Option(run.Party.ContractsEnabled ? "收好合同，离席。" : "收好金币，离席。", "broker-leave", close);
                     break;
                 case MarketReply.Counteroffer:
                     int counter = run.Current.BrokerCounter;
                     string reply = conceded ? "你肯让一步，我也松松钱袋。" :
                         asking - (long)previous > 3L * (counter - previous) ? "好大的胃口！我的帽子可印不出金币。" :
-                        "这队员我确实想签。你听，钱袋又响了一声。";
+                        "这队员我确实想招。你听，钱袋又响了一声。";
                     string lastCall = run.Current.BrokerRefusals == AdventureRun.BrokerPatience - 1 ? "这回谈不拢，我可要收账本了。" : "你怎么说？";
                     Bargain(id, $"{reply}我添 {counter - previous} 金币，出到 {counter}。{lastCall}", counter);
                     break;
@@ -144,7 +147,10 @@ namespace RaidPartyManager.Presentation
                     Option("目送她合上账本", "broker-leave", close);
                     break;
                 default:
-                    Bargain(id, "这张单子没法入账。报价至少要一枚金币，违约金也得付得起。", Math.Max(1, run.Current.BrokerCounter));
+                    string error = run.Party.ContractsEnabled
+                        ? "这张单子没法入账。报价至少要一枚金币，违约金也得付得起。"
+                        : "这张单子没法入账。报价至少要一枚金币。";
+                    Bargain(id, error, Math.Max(1, run.Current.BrokerCounter));
                     break;
             }
         }

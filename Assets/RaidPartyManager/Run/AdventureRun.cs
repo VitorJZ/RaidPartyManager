@@ -6,7 +6,17 @@ using RaidPartyManager.Domain;
 namespace RaidPartyManager.Run
 {
     public enum NodeKind { Event, Camp, Shop, Town, NormalBattle, EliteBattle, Boss, TreasureChest }
-    public enum AdventureEventKind { Investor, Ambush, LostTraveler, FoundCoins, HatTrick, Forge, LockedChest, AscensionTrial, Alchemist, Obituary, Pallbearer, ClaimDesk, Auction, Sponsorship, HoundWalk, DeadLetters, WeepingWall, Ravens, BellRope, SoulWard, SoupQueue, WhisperWall, Epitaph, BorrowedName, FareGate, DeadMail, TimeOffice, WaterCharter, LostFreight, ClinicQueue, WrongSwitch, StreetCurrent, ElectionPress, BoilerUnion, SilentOrchestra, SeedArchive, SpareHands, GoldStandard, LastMeridian, TidePact, GraveSeed }
+    // Checkpoints store these numbers. Retired events leave gaps.
+    public enum AdventureEventKind
+    {
+        Investor = 0, Ambush = 1, LostTraveler = 2, FoundCoins = 3, HatTrick = 4, Forge = 5,
+        LockedChest = 6, AscensionTrial = 7, Alchemist = 8,
+        Obituary = 9, Pallbearer = 10, ClaimDesk = 11, Auction = 12, HoundWalk = 14, DeadLetters = 15,
+        Ravens = 17, BellRope = 18, SoulWard = 19, SoupQueue = 20, WhisperWall = 21, Epitaph = 22,
+        FareGate = 24, DeadMail = 25, TimeOffice = 26, WaterCharter = 27, ClinicQueue = 29, WrongSwitch = 30,
+        ElectionPress = 32, BoilerUnion = 33, SeedArchive = 35, SpareHands = 36, GoldStandard = 37, LastMeridian = 38,
+        TidePact = 39, GraveSeed = 40, RecruitmentWheel = 41
+    }
     public enum TownService { Recruit, Shop, Camp, Quest }
 
     public sealed class RouteNode
@@ -207,6 +217,7 @@ namespace RaidPartyManager.Run
         public IReadOnlyList<TownCommission> Commissions { get; internal set; } = Array.Empty<TownCommission>();
         public IReadOnlyList<AdventureShopOffer> Stock { get; internal set; } = Array.Empty<AdventureShopOffer>();
         public ShopRecruitment ShopRecruitment { get; internal set; }
+        public bool WheelLanded { get; internal set; }
         public IReadOnlyList<EquipmentDefinition> HatRewards { get; internal set; } = Array.Empty<EquipmentDefinition>();
         public IReadOnlyList<(int First, int Second)> HatSwaps { get; internal set; } = Array.Empty<(int, int)>();
         public int[] HatPositions { get; } = new[] { 0, 1, 2 };
@@ -258,7 +269,8 @@ namespace RaidPartyManager.Run
             !Failed && Current is { Kind: NodeKind.Boss, Resolved: true, Battle: { Settled: true } };
         private bool AtCampaignFinalStage => !IsInspection && InCapital && !Failed && Stage == DockRoute.Stages;
         public bool PreparingFinalBoss => AtCampaignFinalStage && Current is { Kind: NodeKind.Boss, Battle: { Settled: false } };
-        public bool NeedsFinalPayroll => PreparingFinalBoss && Party.Members.Any(member => Party.WageBalanceFor(member.Id) > 0);
+        public bool NeedsFinalPayroll => Party.ContractsEnabled && PreparingFinalBoss &&
+            Party.Members.Any(member => Party.WageBalanceFor(member.Id) > 0);
         public int? DaysUntilFinalPayroll
         {
             get
@@ -281,6 +293,7 @@ namespace RaidPartyManager.Run
         public int LastClosedEventDay { get; private set; } = -1;
         public int Investment { get; private set; }
         public bool InvestmentPaid { get; private set; }
+        public bool HasVisitedTown { get; private set; }
         public bool InvestorVisitedThisFloor => investorFloors.Contains(Floor);
         public bool FloorCleared { get; private set; }
         public bool Failed { get; private set; }
@@ -290,6 +303,7 @@ namespace RaidPartyManager.Run
         public RouteStop? RouteDestination { get; private set; }
         public int? SuspendedChoice { get; private set; }
         public AdventureVisit Current { get; private set; }
+        public bool AtRecruitmentWheel => Current?.Event == AdventureEventKind.RecruitmentWheel;
         public bool HasBattleRewardScreen => Current?.Battle?.Reward is { } reward &&
             (reward.HasUnclaimed || !Current.Resolved && Current.Rewards.Count > 0);
         public IReadOnlyList<AwayCompanion> Away => away.ToArray();
@@ -356,12 +370,18 @@ namespace RaidPartyManager.Run
             if (Current is { Resolved: false, ShopRecruitment: { } recruitment })
             {
                 var saved = CaptureCheckpoint(random.Next(), nodeCheckpoint.Choice);
+                if (AtRecruitmentWheel)
+                {
+                    saved.HasWheelVisit = true;
+                    saved.WheelLanded = Current.WheelLanded;
+                    saved.WheelVisit = new RecruitmentCheckpoint();
+                    recruitment.Capture(saved.WheelVisit);
+                    return saved;
+                }
                 saved.HasShopVisit = true;
                 saved.ShopVisit = new ShopVisitCheckpoint
                 {
                     Commissions = Current.Commissions.Select(job => job.Id).ToArray(),
-                    Signed = recruitment.Signed, Slots = recruitment.Slots.Select(slot => slot?.Id).ToArray(),
-                    Candidates = recruitment.Candidates.Select(candidate => candidate.Id).ToArray(),
                     Stock = Current.Stock.Select(offer => new ShopOfferCheckpoint
                         { Item = offer.Item.Id, Price = offer.ListedPrice, Sold = offer.Sold, UsesRosterDiscount = offer.UsesRosterDiscount }).ToArray(),
                     UsedServices = Current.UsedServices.ToArray(),
@@ -370,6 +390,7 @@ namespace RaidPartyManager.Run
                     BrokerLastAsk = Current.BrokerLastAsk,
                     PendingRecruit = Current.PendingRecruit?.Id, Rested = Current.Rested, Message = Current.Message
                 };
+                recruitment.Capture(saved.ShopVisit);
                 return saved;
             }
 
@@ -386,6 +407,7 @@ namespace RaidPartyManager.Run
                 Party = Party.CaptureCheckpoint(), Seed = seed, Floor = Floor, Stage = Stage, CompletedNodes = CompletedNodes,
                 FirstRatedStage = FirstRatedStage, FloorBattles = floorBattles.ToArray(),
                 EventsTaken = eventsTaken, GraveSeedStage = graveSeedStage, ElitesTaken = elitesTaken, Investment = Investment, InvestmentPaid = InvestmentPaid,
+                HasVisitedTown = HasVisitedTown,
                 InvestorFloors = investorFloors.ToArray(), SeenEvents = seenEvents.OrderBy(kind => kind).ToArray(),
                 FloorCleared = FloorCleared, Failed = Failed, PayrollDepartures = PayrollDepartures.ToArray(),
                 QuestActive = QuestActive, CommissionId = Commission?.Id, QuestProgress = QuestProgress, CommissionGold = commissionGold, ReturnMessage = ReturnMessage,
@@ -405,28 +427,29 @@ namespace RaidPartyManager.Run
             };
 
         public static AdventureRun RestoreCheckpoint(AdventureCheckpoint saved, IEnumerable<CharacterDefinition> characters,
-            IEnumerable<EquipmentDefinition> equipment)
+            IEnumerable<EquipmentDefinition> equipment, bool contractsEnabled = true)
         {
             if (saved == null || saved.Version != AdventureCheckpoint.CurrentVersion || saved.Nodes?.Length != DockRoute.Stages ||
                 saved.Stage is < 1 or > DockRoute.Stages || saved.Floor < 1 || saved.CompletedNodes < 0 ||
                 (saved.ShopRecruitPricePlusOne != 0 &&
                     (saved.ShopRecruitPricePlusOne is < 1 or > 96 || (saved.ShopRecruitPricePlusOne - 1) % 5 != 0)) ||
                 saved.Choice < -1 || (saved.Choice >= 0 && (saved.Options == null || saved.Choice >= saved.Options.Length)) ||
-                ((saved.FinishVisit || saved.HasBattleReward || saved.HasShopVisit || saved.HasFinalBossPreparation) && saved.Choice < 0))
+                ((saved.FinishVisit || saved.HasBattleReward || saved.HasShopVisit || saved.HasWheelVisit || saved.HasFinalBossPreparation) && saved.Choice < 0))
                 throw new ArgumentException("Invalid adventure checkpoint.");
 
             var catalog = characters.ToArray();
             var items = equipment.GroupBy(item => item.Id).ToDictionary(group => group.Key, group => group.First());
-            var party = PartyRun.RestoreCheckpoint(saved.Party, catalog.ToDictionary(character => character.Id), items);
-            bool insideNode = saved.HasShopVisit || saved.HasBattleReward || saved.FinishVisit || saved.HasFinalBossPreparation;
+            var party = PartyRun.RestoreCheckpoint(saved.Party, catalog.ToDictionary(character => character.Id), items, contractsEnabled);
+            bool insideNode = saved.HasShopVisit || saved.HasWheelVisit || saved.HasBattleReward || saved.FinishVisit || saved.HasFinalBossPreparation;
             party.StartContracts(saved.Seed, saved.CompletedNodes + (insideNode ? 2 : 1));
             var run = new AdventureRun(party, catalog, items.Values, false, new Random(saved.Seed))
             {
                 Floor = saved.Floor, Stage = saved.Stage, CompletedNodes = saved.CompletedNodes, eventsTaken = saved.EventsTaken,
                 FirstRatedStage = saved.FirstRatedStage > 0 ? saved.FirstRatedStage : saved.Stage + (saved.FinishVisit ? 1 : 0),
                 graveSeedStage = saved.GraveSeedStage, elitesTaken = saved.ElitesTaken, Investment = saved.Investment, InvestmentPaid = saved.InvestmentPaid,
+                HasVisitedTown = saved.IncludesTownVisit(),
                 FloorCleared = saved.FloorCleared, Failed = saved.Failed,
-                PayrollDepartures = saved.PayrollDepartures ?? Array.Empty<string>(),
+                PayrollDepartures = contractsEnabled ? saved.PayrollDepartures ?? Array.Empty<string>() : Array.Empty<string>(),
                 Commission = saved.QuestActive ? TownCommission.Find(string.IsNullOrEmpty(saved.CommissionId) ? "patrol" : saved.CommissionId) : null,
                 QuestProgress = string.IsNullOrEmpty(saved.CommissionId) ? saved.QuestWins : saved.QuestProgress,
                 commissionGold = saved.CommissionGold,
@@ -440,7 +463,8 @@ namespace RaidPartyManager.Run
             if (saved.FloorBattles != null)
                 run.floorBattles.AddRange(saved.FloorBattles.Where(fight => fight?.Members != null));
             run.investorFloors.UnionWith(saved.InvestorFloors ?? Array.Empty<int>());
-            run.seenEvents.UnionWith(saved.SeenEvents ?? Array.Empty<AdventureEventKind>());
+            if (saved.SeenEvents != null)
+                run.seenEvents.UnionWith(saved.SeenEvents.Where(kind => Enum.IsDefined(typeof(AdventureEventKind), kind)));
             if (run.InGraveyard && run.graveSeedStage == 0)
                 run.PlanGraveSeed(saved.Stage + (saved.Choice >= 0 ? 1 : 0));
             // Earlier saves recorded investor visits separately.
@@ -484,6 +508,20 @@ namespace RaidPartyManager.Run
                 run.nodeCheckpoint = saved;
                 run.Open(NodeKind.Boss, null);
             }
+            else if (saved.HasWheelVisit)
+            {
+                var destination = run.RouteChoice(saved.Choice);
+                if (destination.Kind != NodeKind.Event || saved.HasShopVisit)
+                    throw new ArgumentException("Invalid recruitment wheel visit.");
+                run.RouteDestination = destination;
+                run.nodeCheckpoint = saved;
+                run.RecordEvent(AdventureEventKind.RecruitmentWheel);
+                run.Current = new AdventureVisit(NodeKind.Event, AdventureEventKind.RecruitmentWheel)
+                {
+                    ShopRecruitment = ShopRecruitment.Restore(party, catalog.ToDictionary(c => c.Id), saved.WheelVisit, run.shopRecruitPrice),
+                    WheelLanded = saved.WheelLanded
+                };
+            }
             else if (saved.HasShopVisit)
             {
                 var shop = saved.ShopVisit;
@@ -495,7 +533,7 @@ namespace RaidPartyManager.Run
                     throw new ArgumentException("Invalid shop visit.");
 
                 var byId = catalog.ToDictionary(character => character.Id);
-                var recruitment = ShopRecruitment.Restore(party, byId, shop.Slots, shop.Candidates, shop.Signed, run.shopRecruitPrice);
+                var recruitment = ShopRecruitment.Restore(party, byId, shop, run.shopRecruitPrice);
                 run.RouteDestination = destination;
                 run.nodeCheckpoint = saved;
                 run.Current = new AdventureVisit(destination.Kind.Value, null)
@@ -636,7 +674,7 @@ namespace RaidPartyManager.Run
 
         public bool Inspect(NodeKind kind, AdventureEventKind? eventKind = null)
         {
-            if (!IsInspection || (kind == NodeKind.Event && !eventKind.HasValue) ||
+            if (!IsInspection || (kind == NodeKind.Event && (!eventKind.HasValue || !Enum.IsDefined(typeof(AdventureEventKind), eventKind.Value))) ||
                 Current?.Battle != null && !Current.Battle.Settled)
                 return false;
             if (Current?.Resolved == true) CloseVisit();
@@ -659,12 +697,14 @@ namespace RaidPartyManager.Run
                 visit.Rewards = treasureLoot.OrderBy(_ => random.Next()).Take(3).ToArray();
             if (kind == NodeKind.Town)
             {
+                HasVisitedTown = true;
                 visit.Commissions = TownCommission.Draw(random);
                 visit.Message = Party.DeliverWreath();
                 visit.Stock = CreateStock();
                 visit.Recruits = DrawTownRecruits();
-                visit.ShopRecruitment = new ShopRecruitment(Party, characters, random, shopRecruitPrice);
             }
+            if (kind == NodeKind.Town || eventKind == AdventureEventKind.RecruitmentWheel)
+                visit.ShopRecruitment = new ShopRecruitment(Party, characters, random, shopRecruitPrice);
             if (kind is NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss)
                 visit.Battle = new AdventureBattle(kind);
             if (eventKind == AdventureEventKind.LostTraveler)
@@ -697,15 +737,10 @@ namespace RaidPartyManager.Run
 
         public IReadOnlyList<AdventureEventKind> AvailableEvents()
         {
-            if (InCapital)
+            if (InCapital || InGraveyard)
             {
-                var fresh = CapitalStories.Kinds.Where(kind => !seenEvents.Contains(kind)).ToArray();
-                return fresh.Length > 0 ? fresh : CapitalStories.Kinds;
-            }
-            if (InGraveyard)
-            {
-                var eligible = GraveStories.Kinds.Where(GraveEligible).ToArray();
-                var fresh = eligible.Where(kind => !seenEvents.Contains(kind)).ToArray();
+                var eligible = InCapital ? CapitalStories.Kinds : GraveStories.Kinds.Where(GraveEligible).ToArray();
+                var fresh = eligible.Append(AdventureEventKind.RecruitmentWheel).Where(kind => !seenEvents.Contains(kind)).ToArray();
                 return fresh.Length > 0 ? fresh : eligible;
             }
             var list = new List<AdventureEventKind> { AdventureEventKind.Ambush };
@@ -714,7 +749,7 @@ namespace RaidPartyManager.Run
             if (Stage <= 3) list.AddRange(new[] { AdventureEventKind.LostTraveler, AdventureEventKind.FoundCoins, AdventureEventKind.HatTrick });
             else if (Stage <= 6) list.AddRange(new[] { AdventureEventKind.Forge, AdventureEventKind.LockedChest });
             else if (Stage <= 9) list.AddRange(new[] { AdventureEventKind.AscensionTrial, AdventureEventKind.Alchemist });
-            return list.Where(kind => !seenEvents.Contains(kind)).ToArray();
+            return list.Append(AdventureEventKind.RecruitmentWheel).Where(kind => !seenEvents.Contains(kind)).ToArray();
         }
 
         private void RecordEvent(AdventureEventKind? kind)
@@ -769,21 +804,26 @@ namespace RaidPartyManager.Run
 
         public bool ChooseTownRecruit(string characterId, int days = 12, PerformanceBonuses terms = default, long? signingFee = null)
         {
-            if (!CanUseTown(TownService.Recruit) || days < 1 || days > int.MaxValue - Party.Day || !terms.Valid) return false;
+            if (!CanUseTown(TownService.Recruit) ||
+                Party.ContractsEnabled && (days < 1 || days > int.MaxValue - Party.ContractDay || !terms.Valid)) return false;
             var candidate = Current.Recruits.FirstOrDefault(c => c.Id == characterId);
             if (candidate == null) return false;
             var training = Party.TownCandidateTraining(candidate);
-            var draft = Party.CandidateContract(candidate, days, terms, signingFee, training);
-            if (draft == null) return false;
+            var draft = Party.ContractsEnabled ? Party.CandidateContract(candidate, days, terms, signingFee, training) : null;
+            if (Party.ContractsEnabled && draft == null) return false;
             int price = Party.SigningPrice(candidate);
-            long total = price + draft.DueAtSigning;
+            long total = price + (draft?.DueAtSigning ?? 0);
             if (total > Party.Gold || !Party.TryRecruit(candidate, training)) return false;
             Party.TrySpendGold(price, candidate.Name + " · 人才市场转会费");
-            Party.PaySigningWage(candidate.Name, draft);
-            Party.SignNewHire(characterId, draft);
+            if (draft != null)
+            {
+                Party.PaySigningWage(candidate.Name, draft);
+                Party.SignNewHire(characterId, draft);
+            }
             Current.Recruits = Current.Recruits.Where(c => c.Id != characterId).ToArray();
             Current.UsedServices.Add(TownService.Recruit);
-            Current.Message = $"{candidate.Name}加入讨伐队。转会费 {price} 金币，签字费 {draft.DueAtSigning} 金币，折算日薪 {draft.BaseTotal / (decimal)days:0.##} 金币。";
+            Current.Message = draft == null ? $"{candidate.Name}加入讨伐队。转会费 {price} 金币。" :
+                $"{candidate.Name}加入讨伐队。转会费 {price} 金币，签字费 {draft.DueAtSigning} 金币，折算日薪 {draft.BaseTotal / (decimal)days:0.##} 金币。";
             return true;
         }
 
@@ -833,7 +873,8 @@ namespace RaidPartyManager.Run
             if (!At(AdventureEventKind.TidePact) || tideSinger == null ||
                 !Party.TrySignTidePact(tideSinger, equipmentId, bookId)) return false;
             Party.RememberRoadEvent(EmployeeThought.Traveler, tideSinger.Name, exceptCharacter: tideSinger.Id);
-            Finish("深海轻语收下装备和技能书，乘浪跟上了队伍。她已签下 99 天的零薪合同。");
+            Finish("深海轻语收下装备和技能书，乘浪跟上了队伍。" +
+                (Party.ContractsEnabled ? "她已签下 99 天的零薪合同。" : ""));
             return true;
         }
 
@@ -949,11 +990,17 @@ namespace RaidPartyManager.Run
                 NodeKind.EliteBattle => EnemyRank.Elite,
                 _ => EnemyRank.Normal
             };
-            int allies = Party.CaptureFormation(Side.Party).Count;
-            int count = rank == EnemyRank.Normal ? Math.Max(1, allies) :
-                Current.Event == AdventureEventKind.AscensionTrial ? 1 : Math.Min(3, Math.Max(1, allies - 1));
+            bool fullFormation = HasVisitedTown && Current.Event != AdventureEventKind.AscensionTrial;
+            int count = Rules.Positions;
+            if (!fullFormation)
+            {
+                int allies = Party.CaptureFormation(Side.Party).Count;
+                count = rank == EnemyRank.Normal ? Math.Max(1, allies) :
+                    Current.Event == AdventureEventKind.AscensionTrial ? 1 : Math.Clamp(allies - 1, 1, 3);
+            }
             var groups = formations?.Where(group => group.Rank == rank &&
-                (rank != EnemyRank.Normal || group.Members.Count >= count)).ToArray();
+                (fullFormation ? group.Members.Sum(member => member.PositionSlots) == Rules.Positions :
+                    rank != EnemyRank.Normal || group.Members.Count >= count)).ToArray();
             if (groups is { Length: > 0 })
             {
                 ticket.Enemies = groups[random.Next(groups.Length)].CreateLineup("route-enemy", count);
@@ -1259,24 +1306,37 @@ namespace RaidPartyManager.Run
             return characters.Where(character => !owned.Contains(character.Id)).OrderBy(_ => random.Next()).Take(8).ToArray();
         }
 
+        public void LandRecruitmentWheel()
+        {
+            if (AtRecruitmentWheel) Current.WheelLanded = true;
+        }
+
+        private bool CanUseRecruitmentWheel => CanUseTown(TownService.Shop) ||
+            (At(AdventureEventKind.RecruitmentWheel) && Current.WheelLanded);
+
         public bool DrawShopRecruit()
         {
-            if (!CanUseTown(TownService.Shop) || !Current.ShopRecruitment.TryDraw(random, price => Party.TrySpendGold(price, "招募转盘"))) return false;
+            if (!CanUseRecruitmentWheel || !Current.ShopRecruitment.TryDraw(random, price => Party.TrySpendGold(price, "招募转盘"))) return false;
             shopRecruitPrice = Current.ShopRecruitment.NextPrice;
-            Current.UsedServices.Add(TownService.Shop);
+            if (!AtRecruitmentWheel) Current.UsedServices.Add(TownService.Shop);
             return true;
         }
 
         public bool SignShopRecruit(string characterId, string replacedMemberId = null, int days = 12,
             PerformanceBonuses terms = default, long? signingFee = null)
         {
-            if (!CanUseTown(TownService.Shop)) return false;
+            if (!CanUseRecruitmentWheel) return false;
             var candidate = Current.ShopRecruitment.Candidates.FirstOrDefault(c => c.Id == characterId);
-            var draft = Party.CandidateContract(candidate, days, terms, signingFee);
-            long release = replacedMemberId == null ? 0 : Party.Members.FirstOrDefault(m => m.Id == replacedMemberId)?.Contract?.ExitCost ?? 0;
-            if (draft == null || draft.DueAtSigning + release > Party.Gold || !Current.ShopRecruitment.TrySign(characterId, replacedMemberId)) return false;
-            Party.PaySigningWage(candidate.Name, draft);
-            Party.SignNewHire(characterId, draft);
+            var draft = Party.ContractsEnabled ? Party.CandidateContract(candidate, days, terms, signingFee) : null;
+            long release = replacedMemberId == null ? 0 : Party.TransferExitCostFor(replacedMemberId);
+            if ((Party.ContractsEnabled && draft == null) || (draft?.DueAtSigning ?? 0) + release > Party.Gold ||
+                !Current.ShopRecruitment.TrySign(characterId, replacedMemberId)) return false;
+            if (draft != null)
+            {
+                Party.PaySigningWage(candidate.Name, draft);
+                Party.SignNewHire(characterId, draft);
+            }
+            if (AtRecruitmentWheel) Finish($"{candidate.Name}加入讨伐队。");
             return true;
         }
 
@@ -1351,7 +1411,6 @@ namespace RaidPartyManager.Run
         public bool NextFloor()
         {
             if (CampaignWon || !IsInspection && !FloorCleared || Current != null) return false;
-            if (Party.HasBorrowedName) return false;
             seenEvents.RemoveWhere(kind => GraveStories.Contains(kind) || CapitalStories.Contains(kind));
             Floor++; Stage = 1; FloorCleared = Failed = false; eventsTaken = elitesTaken = 0;
             floorBattles.Clear();

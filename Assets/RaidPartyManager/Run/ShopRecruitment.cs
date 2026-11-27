@@ -71,9 +71,21 @@ namespace RaidPartyManager.Run
             return true;
         }
 
-        internal static ShopRecruitment Restore(PartyRun party, IReadOnlyDictionary<string, CharacterDefinition> byId,
-            string[] slotIds, string[] drawnIds, bool signed, int price)
+        internal void Capture(RecruitmentCheckpoint saved)
         {
+            saved.Signed = Signed;
+            saved.Slots = Slots.Select(slot => slot?.Id).ToArray();
+            saved.Candidates = candidates.Select(candidate => candidate.Id).ToArray();
+        }
+
+        internal static ShopRecruitment Restore(PartyRun party, IReadOnlyDictionary<string, CharacterDefinition> byId,
+            RecruitmentCheckpoint saved, int price)
+        {
+            if (saved?.Slots == null || saved.Candidates == null)
+                throw new ArgumentException("Missing recruitment candidates.");
+            var slotIds = saved.Slots;
+            var drawnIds = saved.Candidates;
+            bool signed = saved.Signed;
             if (slotIds.Length != SlotCount || signed && drawnIds.Length == 0 ||
                 slotIds.Where(id => !string.IsNullOrEmpty(id)).GroupBy(id => id).Any(group => group.Count() > 1) ||
                 drawnIds.Distinct().Count() != drawnIds.Length || drawnIds.Any(id => string.IsNullOrEmpty(id) || !slotIds.Contains(id)))

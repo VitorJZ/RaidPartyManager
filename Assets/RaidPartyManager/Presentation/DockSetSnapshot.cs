@@ -74,6 +74,7 @@ namespace RaidPartyManager.Presentation
                 }
                 copy.GetComponent<MeshFilter>().sharedMesh = pattern;
                 copy.sharedMaterial = printing;
+                copy.renderingLayerMask = source.renderingLayerMask;
                 copy.sortingOrder = source.sortingOrder;
                 copy.SetPropertyBlock(block);
                 if (source == set.Sky) Sky = copy;

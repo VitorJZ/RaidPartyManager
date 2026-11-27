@@ -173,7 +173,8 @@ namespace RaidPartyManager.Presentation
             if (displayDossier)
             {
                 frame.style.height = Length.Percent(90);
-                dialog.Add(new EmployeeDossier(selected, run.EmployeeProfileFor(memberId), () => openContract(memberId)));
+                dialog.Add(new EmployeeDossier(selected, run.EmployeeProfileFor(memberId),
+                    run.ContractsEnabled ? () => openContract(memberId) : null));
                 return;
             }
 

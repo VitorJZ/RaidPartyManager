@@ -258,6 +258,22 @@
       "frontSpan": 0.929688,
       "frontInset": 0.019531,
       "frontBodySpan": 0.929688
+    },
+    {},
+    {},
+    {
+      "sideSpan": 0.840909,
+      "sideInset": 0.068182,
+      "frontSpan": 0.796875,
+      "frontInset": 0.023438,
+      "frontBodySpan": 0.792969
+    },
+    {
+      "sideSpan": 0.835227,
+      "sideInset": 0.068182,
+      "frontSpan": 0.921875,
+      "frontInset": 0.023438,
+      "frontBodySpan": 0.910156
     }
   ]
 }

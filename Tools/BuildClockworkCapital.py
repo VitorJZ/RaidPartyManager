@@ -210,14 +210,17 @@ def district_art():
     for i,art in enumerate(isolated("facilities",2,2)):
         save(CITY/("Facility"+str(i)+".png"),art)
     props=isolated("props",4,4)
-    for i,event in enumerate(DATA["events"]):
+    for event in DATA["events"]:
+        i=event["propSlot"]
         prop=props[i]
         board=fit(prop,(320,320))
         save(CITY/(event["id"]+".png"),prop)
         save(EVENTS/"Playbills"/(event["id"]+".png"),board)
         frames=poses(board,"special",i)
         save(EVENTS/(event["id"]+".png"),anim.pack(frames,4))
-    save(CITY/"Gate.png",props[-1])
+    # These atlas cells dress the district sets independently of playable events.
+    for i,name in ((4,"LostFreight"),(7,"StreetCurrent"),(10,"SilentOrchestra"),(15,"Gate")):
+        save(CITY/(name+".png"),props[i])
 
 
 def main():

@@ -28,6 +28,7 @@ namespace RaidPartyManager.Presentation
         internal bool Busy => FirstEntrance || cue != Cue.Live && cue != Cue.Picking;
         internal bool Crossing => cue == Cue.HoldForSigns || cue == Cue.LoadSet;
         internal bool HoldsScenery => oldSet != null;
+        internal bool ShowingOutgoingSet => oldSet != null && newSet == null;
 
         internal void Bind(DockSet set) => live = set;
 

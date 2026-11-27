@@ -9,6 +9,7 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed partial class ShopStage
     {
+        private const float StandingBodyHeight = 1.36f;
         private const float ArrivalTime = 1.16f;
         private static readonly PoseFraming DefaultFraming = new() { sideSpan = .84f, sideInset = .072f, frontSpan = .938f, frontBodySpan = .93f, frontInset = .020f };
         private static PoseFraming[] framing;
@@ -47,7 +48,7 @@ namespace RaidPartyManager.Presentation
                     JsonUtility.FromJson<FramingTable>(resource.text)?.actors ?? Array.Empty<PoseFraming>();
             }
             int index = rosterNumber - 1;
-            return index >= 0 && index < framing.Length ? framing[index] : DefaultFraming;
+            return index >= 0 && index < framing.Length && framing[index].frontBodySpan > 0 ? framing[index] : DefaultFraming;
         }
 
         internal void ShowRecruitActor(EncounterData content, CharacterDefinition character, int index, bool enter)
@@ -59,21 +60,30 @@ namespace RaidPartyManager.Presentation
             var deck = house.DeckBounds;
             var mark = RecruitMark(index);
             var pose = FramingFor(character.RosterNumber);
-            float bodyHeight = CompanySpriteSize * pose.sideSpan;
-            float frontHeight = front == null ? CompanySpriteSize : bodyHeight / pose.frontSpan;
+            // A crouching walk or a raised staff must not set the height of the standing figure.
+            float frontHeight = front == null ? CompanySpriteSize : StandingBodyHeight / pose.frontBodySpan;
             float frontWidth = front == null ? frontHeight : frontHeight * front.width / front.height;
             var actor = new RecruitActor
             {
                 Body = Flat("Recruit front " + character.Id, mark, frontWidth, frontHeight, front),
-                Shadow = Shadow(mark, bodyHeight * .76f, .36f, .62f), Front = front, Walk = walk, Battle = battle,
+                Shadow = Shadow(mark, StandingBodyHeight * .76f, .36f, .62f), Front = front, Walk = walk, Battle = battle,
                 Mark = mark, Entrance = new Vector3(7.6f, deck.max.y, deck.min.z + 1.92f), Framing = pose, Index = index,
-                VisibleHeight = bodyHeight, FrontQuadHeight = frontHeight, FrontWidth = frontWidth,
+                VisibleHeight = frontHeight * (front == null ? pose.sideSpan : pose.frontSpan),
+                FrontQuadHeight = frontHeight, FrontWidth = frontWidth,
                 Elapsed = enter ? 0 : ArrivalTime, Stride = EntranceWalkPose.MotionFor(character.Profession).Stride
             };
             if (walk == null && battle != null)
                 actor.Body.GetComponent<MeshFilter>().sharedMesh = recruitWalkMesh ??= MakeRecruitWalkMesh();
             recruitCast.Add(character, actor);
             PoseRecruit(actor, character.RosterNumber, 0);
+        }
+
+        protected override Bounds UnoccupiedMarks()
+        {
+            if (RecruitmentFocus <= 0 || wideProjection.m00 == 0) return base.UnoccupiedMarks();
+            var marks = new Bounds(RecruitMark(0) + Vector3.up * (StandingBodyHeight * .5f), Vector3.up * StandingBodyHeight);
+            marks.Encapsulate(RecruitMark(4));
+            return marks;
         }
 
         private Vector3 RecruitMark(int index)

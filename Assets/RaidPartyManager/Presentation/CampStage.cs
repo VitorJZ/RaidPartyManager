@@ -22,7 +22,8 @@ namespace RaidPartyManager.Presentation
         };
 
         public CampStage(Transform owner, VisualElement panel, ServiceStageArt art, Texture2D fire, bool graveyard, bool capital = false) :
-            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Firelight) : StageLighting.For(graveyard, StageVenue.Firelight))
+            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Firelight) : StageLighting.For(graveyard, StageVenue.Firelight),
+                StageTiltShift.FacilityStrength)
         {
             if (capital) DressCapital(1);
             else if (graveyard)
@@ -99,6 +100,13 @@ namespace RaidPartyManager.Presentation
                 Shadow(foot, 1.4f, .68f, .42f);
             }
             Animate(0);
+        }
+
+        protected override Bounds UnoccupiedMarks()
+        {
+            var marks = new Bounds();
+            foreach (var seat in seats) IncludeActor(ref marks, seat);
+            return marks.size.y > 0 ? marks : base.UnoccupiedMarks();
         }
 
         public void SeatParty(PartyRun party, EncounterData content)

@@ -38,6 +38,15 @@ namespace RaidPartyManager.Presentation
         private Cue cue;
         private DockPerformance performance;
         internal DockSet Set { get; private set; }
+        private Bounds lastFormation;
+
+        internal Bounds FocusOn(Bounds formation)
+        {
+            // Route signs can keep the outgoing set onstage after its scene has unloaded.
+            if (!performance.ShowingOutgoingSet || lastFormation.size.y <= 0) lastFormation = formation;
+            return lastFormation;
+        }
+
         internal static bool HoldingSet => current != null && current.performance.HoldsScenery;
         private Action afterClose;
         private const float TownTransitionSpeed = 1.5f;
@@ -307,7 +316,7 @@ namespace RaidPartyManager.Presentation
             current.CloseCurtain(next);
         }
 
-        internal void ShowFinalCurtain(int gold, long payrollDebt, Action returnToMenu)
+        internal void ShowFinalCurtain(int gold, long? payrollDebt, Action returnToMenu)
         {
             if (cue is Cue.Closing or Cue.Closed) return;
             performance.EndFirstEntrance();
@@ -345,8 +354,9 @@ namespace RaidPartyManager.Presentation
                     finale.Add(title);
                 }
 
-                string wages = payrollDebt > 0 ? $"仍欠工资 {payrollDebt} 金币" : "工资已结清";
-                var accounts = PrototypeStyle.Text($"剩余 {gold} 金币  ·  {wages}", 20);
+                string wages = payrollDebt > 0 ? $"  ·  仍欠工资 {payrollDebt} 金币" :
+                    payrollDebt.HasValue ? "  ·  工资已结清" : "";
+                var accounts = PrototypeStyle.Text($"剩余 {gold} 金币{wages}", 20);
                 accounts.name = "campaign-payroll-summary";
                 accounts.pickingMode = PickingMode.Ignore;
                 accounts.style.marginTop = 8;

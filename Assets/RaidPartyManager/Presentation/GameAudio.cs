@@ -86,7 +86,8 @@ namespace RaidPartyManager.Presentation
             if (instance == null) return;
             bool capital = run?.InCapital == true || CapitalStories.Contains(run?.Current?.Event);
             bool cemetery = run?.InGraveyard == true || GraveStories.Contains(run?.Current?.Event);
-            instance.environment = SceneCue(scene, capital, cemetery);
+            bool wheelEvent = scene == "DockShop" && run?.AtRecruitmentWheel == true;
+            instance.environment = SceneCue(wheelEvent ? "EventSelect" : scene, capital, cemetery);
         }
 
         private static SoundCue SceneCue(string scene, bool capital, bool cemetery) => scene switch

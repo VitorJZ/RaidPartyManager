@@ -39,7 +39,7 @@ namespace RaidPartyManager.Presentation
                 .GroupBy(m => m.UnitId).Select(group => group.Last()).ToArray();
             if (members.Length == 0)
             {
-                Add(SettlementArt.Lettering("这份存档没有可显示的本层战斗评分。", 13, SettlementArt.InkSoft));
+                Add(SettlementArt.Lettering("暂无本层评分记录", 13, SettlementArt.InkSoft));
                 return;
             }
 
@@ -95,7 +95,7 @@ namespace RaidPartyManager.Presentation
             legend = SettlementArt.Lettering("", 11, SettlementArt.InkSoft);
             Add(legend);
             if (run.FirstRatedStage > 1)
-                Add(SettlementArt.Lettering($"本层评分记录从第 {run.FirstRatedStage} 站开始，均分按已记录场次计算。", 11, SettlementArt.InkSoft));
+                Add(SettlementArt.Lettering($"记录起点 · 第 {run.FirstRatedStage} 站", 11, SettlementArt.InkSoft));
             plot.RegisterCallback<GeometryChangedEvent>(_ => PlaceCaptions());
             series.RegisterValueChangedCallback(evt => SelectSeries(evt.newValue));
             SelectSeries(string.Empty);
@@ -125,8 +125,7 @@ namespace RaidPartyManager.Presentation
             }
             average = BattleRating.AverageTenths(scores);
             averageLabel.text = "本层均分  " + (average is int mean ? Format(mean) : "—");
-            legend.text = team ? "实线为每场上阵队员的平均分，虚线为各场均分的平均值。" :
-                "实线为成员的单场评分，虚线为参战场次的平均值。未上阵的场次留空。";
+            legend.text = (team ? "实线 · 单场队伍均分" : "实线 · 单场个人评分") + "　　 虚线 · 本层均分";
             PlaceCaptions();
             plot.MarkDirtyRepaint();
         }

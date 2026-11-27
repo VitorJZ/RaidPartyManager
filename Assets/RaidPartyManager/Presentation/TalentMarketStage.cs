@@ -36,10 +36,14 @@ namespace RaidPartyManager.Presentation
             internal int WalkCel = -1;
         }
 
+        protected override Bounds UnoccupiedMarks() =>
+            new(stage.TransformPoint(new Vector3(0, .01f + StandingHeight * .5f, Depth)), new Vector3(1, StandingHeight, 0));
+
         internal bool HasDepartures => Array.Exists(departures, departure => departure != null);
 
         internal TalentMarketStage(Transform owner, VisualElement panel, ServiceStageArt art,
-            IReadOnlyList<CharacterDefinition> candidates, EncounterData content, bool graveyard, bool capital = false) : base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Interior) : StageLighting.For(graveyard, StageVenue.Interior))
+            IReadOnlyList<CharacterDefinition> candidates, EncounterData content, bool graveyard, bool capital = false) : base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Interior) : StageLighting.For(graveyard, StageVenue.Interior),
+                StageTiltShift.FacilityStrength)
         {
             if (capital) DressCapital(2);
             else if (graveyard)

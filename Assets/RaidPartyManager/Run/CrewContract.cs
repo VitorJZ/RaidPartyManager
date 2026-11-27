@@ -267,9 +267,12 @@ namespace RaidPartyManager.Run
     {
         public const int RosterLimit = 6;
         private int talentSeed;
+        private int payrollPausedDays;
         public int Day { get; private set; }
+        public int ContractDay => Day - payrollPausedDays;
+        public bool ContractsEnabled { get; }
         public long PayrollDebt { get; private set; }
-        public bool NeedsRenewal => members.Any(m => m.Contract != null && m.LastContract.EndDay - Day <= 3);
+        public bool NeedsRenewal => ContractsEnabled && members.Any(m => m.Contract != null && m.LastContract.EndDay - ContractDay <= 3);
 
         internal void StartContracts(int seed, int day = 1)
         {
@@ -296,7 +299,7 @@ namespace RaidPartyManager.Run
             if (Day > 0 && member.Contract == null)
             {
                 member.Trait = TalentFor(member.Character);
-                member.Contract = CrewContract.Offer(member.Character, Day);
+                member.Contract = CrewContract.Offer(member.Character, ContractDay);
                 if (member.Trait == PlayerTrait.Sturdy && member.Health > 0) member.Health += 2;
             }
             RefreshEmployeeGoals(member);
@@ -316,7 +319,7 @@ namespace RaidPartyManager.Run
         private CrewContract NegotiatedContract(CharacterDefinition character, EmployeeAttributes ratings, int expected,
             int days, PerformanceBonuses terms, long? fee, int? start = null)
         {
-            var draft = CrewContract.Quote(character, start ?? Day, days, expected, terms, fee ?? (terms.Installments.Enabled ? 0 : (long)expected * days));
+            var draft = CrewContract.Quote(character, start ?? ContractDay, days, expected, terms, fee ?? (terms.Installments.Enabled ? 0 : (long)expected * days));
             if (draft == null || draft.DailyWage < CrewContract.MinimumWage(expected, terms, ratings)) return null;
             return draft;
         }
@@ -325,7 +328,7 @@ namespace RaidPartyManager.Run
         {
             var member = members.Single(m => m.Character.Id == characterId);
             draft.RecordSigningPayment();
-            draft.OpenInterestPeriod(Day);
+            draft.OpenInterestPeriod(ContractDay);
             member.Contract = draft;
             RefreshEmployeeGoals(member);
         }
@@ -333,12 +336,12 @@ namespace RaidPartyManager.Run
         public bool SetContract(string id, int days, PerformanceBonuses bonuses, long? signingFee = null)
         {
             var m = FindMember(id);
-            if (m == null || activeBattle != null) return false;
+            if (!ContractsEnabled || m == null || activeBattle != null) return false;
             var draft = NegotiatedContract(m.Character, m.Attributes, ExpectedWage(m), days, bonuses, signingFee, m.LastContract?.EndDay);
             if (draft == null || draft.DueAtSigning > Gold) return false;
             PaySigningWage(m.Character.Name, draft);
             draft.RecordSigningPayment();
-            if (draft.StartDay == Day)
+            if (draft.StartDay == ContractDay)
                 ActivateContract(m, draft);
             else m.Renewals.Add(draft);
             RefreshEmployeeGoals(m);
@@ -349,7 +352,7 @@ namespace RaidPartyManager.Run
         {
             member.UnpaidWages += member.Contract?.Arrears ?? 0;
             member.Contract = draft;
-            draft.OpenInterestPeriod(Day);
+            draft.OpenInterestPeriod(ContractDay);
         }
 
         internal void PaySigningWage(string name, CrewContract draft) =>
@@ -391,7 +394,8 @@ namespace RaidPartyManager.Run
         public bool CanSellMember(string id)
         {
             var m = FindMember(id);
-            return activeBattle == null && m?.Contract != null && !m.IsAway && members.Any(x => x != m && !x.IsAway && x.Health > 0);
+            return activeBattle == null && m != null && (!ContractsEnabled || m.Contract != null) &&
+                !m.IsAway && members.Any(x => x != m && !x.IsAway && x.Health > 0);
         }
 
         public bool SellMember(string id) => SellMember(id, TransferOffer(id));
@@ -400,10 +404,10 @@ namespace RaidPartyManager.Run
         {
             if (price < 1 || !CanSellMember(id)) return false;
             var m = FindMember(id);
-            long proceeds = price - m.Contract.ExitCost;
+            long proceeds = price - TransferExitCostFor(id);
             if (proceeds > int.MaxValue - Gold || proceeds < -Gold) return false;
             if (proceeds < 0) Gold += (int)proceeds;
-            RecordExitExpenses(m);
+            if (ContractsEnabled) RecordExitExpenses(m);
             members.Remove(m);
             if (proceeds > 0) AddGold((int)proceeds);
             DeployReserveIfNeeded();
@@ -415,6 +419,20 @@ namespace RaidPartyManager.Run
             RecordExpense(member.Character.Name + " · 结清旧合同分期", member.Contract?.Outstanding ?? 0);
             RecordExpense(member.Character.Name + " · 违约金", member.Contract?.CurrentReleaseFee ?? 0);
             PayrollDebt -= member.Contract?.Arrears ?? 0;
+        }
+
+        public long TransferExitCostFor(string id) =>
+            ContractsEnabled ? FindMember(id)?.Contract?.ExitCost ?? 0 : 0;
+
+        private static bool IsPayrollExpense(string reason)
+        {
+            if (reason == "补付拖欠薪资") return true;
+            int separator = reason?.LastIndexOf(" · ", StringComparison.Ordinal) ?? -1;
+            if (separator < 0) return false;
+            string category = reason.Substring(separator + 3);
+            return category is "结清旧合同分期" or "违约金" or "签字费" or "偿还薪资" or "每日工资"
+                or "出场费" or "击杀奖" or "承伤奖" or "抗伤奖" ||
+                category.StartsWith("第 ", StringComparison.Ordinal) && category.EndsWith(" 期工资", StringComparison.Ordinal);
         }
 
         private void DeployReserveIfNeeded()
@@ -439,26 +457,26 @@ namespace RaidPartyManager.Run
         private void PayWages(Member member, long amount, string reason) =>
             member.UnpaidWages += amount - Pay(amount, member.Character.Name + " · " + reason);
 
-        private long WageBalance(Member member) => member.UnpaidWages + (member.Contract?.PayoffToday(Day) ?? 0);
+        private long WageBalance(Member member) => member.UnpaidWages + (member.Contract?.PayoffToday(ContractDay) ?? 0);
 
         public long WageBalanceFor(string memberId) =>
-            FindMember(memberId) is { } member ? WageBalance(member) : 0;
+            ContractsEnabled && FindMember(memberId) is { } member ? WageBalance(member) : 0;
 
         public bool TryRepayWages(string memberId, int amount)
         {
             var member = FindMember(memberId);
-            if (member == null || amount <= 0 || amount > WageBalance(member) ||
+            if (!ContractsEnabled || member == null || amount <= 0 || amount > WageBalance(member) ||
                 !TrySpendGold(amount, member.Character.Name + " · 偿还薪资")) return false;
 
             long repaid = RepayArrears(member, amount);
             PayrollDebt -= repaid;
-            member.Contract?.PayEarly(amount - repaid, Day);
+            member.Contract?.PayEarly(amount - repaid, ContractDay);
             return true;
         }
 
         private long RepayArrears(Member member, long amount)
         {
-            long contract = member.Contract?.RepayArrears(amount, Day) ?? 0;
+            long contract = member.Contract?.RepayArrears(amount, ContractDay) ?? 0;
             long wages = Math.Min(amount - contract, member.UnpaidWages);
             member.UnpaidWages -= wages;
             return contract + wages;
@@ -477,18 +495,21 @@ namespace RaidPartyManager.Run
             return leaving.Select(member => member.Character.Name).ToArray();
         }
 
-        public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 && m.LastContract?.EndDay > Day);
+        public bool CanAdvanceDay => members.Any(m => !m.IsAway && m.Health > 0 &&
+            (!ContractsEnabled || m.LastContract?.EndDay > ContractDay));
 
         internal void AdvanceDay()
         {
             Day++;
             expenses.RemoveAll(e => e.Day < Day - 2);
-            members.RemoveAll(m => m.Contract.EndDay < Day);
+            if (ContractsEnabled) members.RemoveAll(m => m.Contract.EndDay < ContractDay);
+            else payrollPausedDays++;
             foreach (var member in members)
             {
                 member.Career.ServiceDays++;
+                if (!ContractsEnabled) continue;
                 var contract = member.Contract;
-                if (contract.NextDueDay == Day)
+                if (contract.NextDueDay == ContractDay)
                 {
                     long principal = contract.PrincipalAt(++contract.InstallmentsPaid);
                     long interest = contract.CloseInterestPeriod(contract.InstallmentsPaid == contract.Plan.Count ||
@@ -497,11 +518,11 @@ namespace RaidPartyManager.Run
                     contract.PrincipalInArrears += Math.Max(0, principal - paid);
                     contract.InterestInArrears += interest - Math.Max(0, paid - principal);
                     contract.RecordSigningPayment();
-                    contract.OpenInterestPeriod(Day);
+                    contract.OpenInterestPeriod(ContractDay);
                 }
                 else if (!contract.BasePaid && !contract.Plan.Enabled)
                     PayWages(member, contract.DailyWage, "每日工资");
-                if (contract.EndDay == Day && member.Renewals.Count > 0)
+                if (contract.EndDay == ContractDay && member.Renewals.Count > 0)
                 {
                     ActivateContract(member, member.Renewals[0]);
                     member.Renewals.RemoveAt(0);
@@ -513,6 +534,7 @@ namespace RaidPartyManager.Run
 
         private void SettlePerformance(BattleResult result, HashSet<string> deployed)
         {
+            if (!ContractsEnabled) return;
             var enemies = activeBattle.Combatants.Where(u => u.Side == Side.Enemy).Select(u => u.Id).ToHashSet();
             foreach (var m in members.Where(m => m.Contract != null && deployed.Contains(m.Id)))
             {

@@ -13,9 +13,16 @@ namespace RaidPartyManager.Tests
 {
     public sealed class CampTests
     {
+        private static readonly PropertyInfo ContractsFeature = typeof(CampPrototype).Assembly
+            .GetType("RaidPartyManager.Presentation.AdventureFlow")
+            .GetProperty("ContractsEnabled", BindingFlags.Static | BindingFlags.NonPublic);
+
         [SetUp]
         public void ResetSession() => typeof(BattlePrototype)
             .GetMethod("ResetPlaySession", BindingFlags.Static | BindingFlags.NonPublic).Invoke(null, null);
+
+        [TearDown]
+        public void RestoreContractsVisibility() => ContractsFeature.SetValue(null, false);
 
         [UnityTest]
         public IEnumerator CampTrainingShowsTheGainsAndDisablesTheOtherActions()
@@ -41,6 +48,7 @@ namespace RaidPartyManager.Tests
         [UnityTest]
         public IEnumerator CampMirrorsTheCurrentPartyAndKeepsRenewalsWhenReturningToBattle()
         {
+            ContractsFeature.SetValue(null, true);
             yield return SceneManager.LoadSceneAsync("Camp");
             yield return null;
             var root = Object.FindAnyObjectByType<CampPrototype>().GetComponent<UIDocument>().rootVisualElement;

@@ -25,7 +25,7 @@ namespace RaidPartyManager.Presentation
             Add(SectionHeading("全场评分"));
             if (ratings == null || ratings.Count == 0)
             {
-                var empty = Lettering("这场战斗的存档中没有评分记录。", 14, InkSoft);
+                var empty = Lettering("暂无本场评分记录", 14, InkSoft);
                 empty.style.unityTextAlign = TextAnchor.MiddleCenter;
                 empty.style.marginTop = 8;
                 Add(empty);
@@ -45,7 +45,7 @@ namespace RaidPartyManager.Presentation
             header.Add(unit);
             foreach (string caption in Columns)
                 header.Add(Cell(caption, 1, InkSoft, 12));
-            var scoreHeading = Cell("评分", 1.15f, InkSoft, 12);
+            var scoreHeading = Cell("评分 / 10", 1.15f, InkSoft, 12);
             scoreHeading.style.unityTextAlign = TextAnchor.MiddleCenter;
             header.Add(scoreHeading);
             Add(header);
@@ -69,33 +69,6 @@ namespace RaidPartyManager.Presentation
                 foreach (var row in units)
                     AddUnit(row, content, side == Side.Party ? AllyInk : EnemyInk, leaders, star != null && row.UnitId == star);
             }
-
-            var rules = new Foldout { text = "评分规则 · 10 分制，点选单位查看明细", value = false, name = "battle-rating-rules" };
-            rules.style.marginTop = 6;
-            rules.AddToClassList(RevealClass);
-            var toggle = rules.Q<Toggle>();
-            toggle.style.marginLeft = 0;
-            if (toggle.Q<Label>() is { } toggleLabel)
-            {
-                toggleLabel.style.color = InkSoft;
-                toggleLabel.style.fontSize = 12;
-            }
-            if (toggle.Q(className: Toggle.checkmarkUssClassName) is { } arrow)
-                arrow.style.unityBackgroundImageTintColor = InkSoft;
-            rules.contentContainer.style.marginLeft = 16;
-            foreach (string line in new[]
-                     {
-                         "每名单位从 0 分起，按实际表现累加，满 10 分封顶。小数加分先累积，结算时显示一位小数。",
-                         "每点生命伤害 +0.20，护盾伤害 +0.10，有效治疗 +0.25，承受生命伤害 +0.08，自身护盾挡伤 +0.16，给队友的护盾挡伤 +0.20。",
-                         "每层敌方异常 +0.40，队友增益或主动净化每层 +0.20，拦截命中或技能格挡每次 +0.40，击败或救援每次 +0.60。",
-                         $"奖章：{GoldTenths / 10} 分及以上为金，{SilverTenths / 10} 分及以上为银，其余为铜；桂冠标记讨伐队本场得分最高者。"
-                     })
-            {
-                var text = Lettering(line, 12, InkSoft);
-                text.style.marginTop = 2;
-                rules.Add(text);
-            }
-            Add(rules);
         }
 
         private static long[] Amounts(BattleRating row) =>
@@ -159,8 +132,7 @@ namespace RaidPartyManager.Presentation
             var detail = Lettering(
                 $"{row.Name}（{state}）　生命伤害 {row.HealthDamage} · 护盾伤害 {row.ShieldDamage} · 其中毒伤 {row.PoisonDamage}\n" +
                 $"自身护盾挡伤 {row.ShieldAbsorbed} · 为队友挡伤 {row.AllyShielding} · 拦截 {row.Interceptions} 次 · 技能格挡 {row.SkillBlocks} 次\n" +
-                $"施加异常 {row.DebuffLayers} 层 · 给予队友增益 {row.BuffLayers} 层 · 净化异常 {row.CleansedLayers} 层 · 救援 {row.Saves} 次\n" +
-                $"加分明细　输出 +{row.DamagePoints:0.##} · 治疗 +{row.HealingPoints:0.##} · 防护 +{row.DefensePoints:0.##} · 状态 +{row.StatusPoints:0.##} · 击败与救援 +{row.KillAndSavePoints:0.##}",
+                $"施加异常 {row.DebuffLayers} 层 · 给予队友增益 {row.BuffLayers} 层 · 净化异常 {row.CleansedLayers} 层 · 救援 {row.Saves} 次",
                 12, Ink);
             detail.name = "battle-rating-detail-" + row.UnitId;
             detail.style.display = DisplayStyle.None;
@@ -185,7 +157,7 @@ namespace RaidPartyManager.Presentation
             button.style.borderBottomColor = Rule;
             button.style.borderTopLeftRadius = button.style.borderTopRightRadius =
                 button.style.borderBottomLeftRadius = button.style.borderBottomRightRadius = 3;
-            button.tooltip = $"{row.Name} · {state} · 查看贡献明细";
+            button.tooltip = $"{row.Name} · {state}";
             Animate(button, 120, "background-color");
             button.RegisterCallback<PointerEnterEvent>(_ => button.style.backgroundColor = Wash);
             button.RegisterCallback<PointerLeaveEvent>(_ => button.style.backgroundColor = Color.clear);

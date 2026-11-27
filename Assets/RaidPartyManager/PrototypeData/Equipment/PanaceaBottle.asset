@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "万能药瓶"
   effect: 42
   icon: {fileID: 2800000, guid: c50422b423dc4b0ebd87bed1732e11f7, type: 3}
-  description: "每瓶药水饮用时有50%概率保留，保住的药水下回合还能饮用。"
+  description: "每瓶药水饮用时有50%概率保留，下回合可再次饮用。两件万能药瓶叠加至100%。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

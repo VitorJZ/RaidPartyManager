@@ -14,8 +14,11 @@ namespace RaidPartyManager.Presentation
         public bool InMotion { get; }
         internal int? SceneryOrder { get; }
 
-        public StageActorImage(BattleStage stage, bool inMotion = false, int? sceneryOrder = null)
+        internal bool KeepsStageFocus { get; }
+
+        public StageActorImage(BattleStage stage, bool inMotion = false, int? sceneryOrder = null, bool keepsStageFocus = false)
         {
+            KeepsStageFocus = keepsStageFocus;
             InMotion = inMotion;
             SceneryOrder = sceneryOrder;
             if (stage == null)

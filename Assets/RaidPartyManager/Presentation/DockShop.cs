@@ -68,6 +68,7 @@ namespace RaidPartyManager.Presentation
         private Button recruitmentButton;
 
 
+        private bool isWheelEvent;
         private int Gold => adventure?.Party.Gold ?? coins;
 
         private void OnEnable()
@@ -76,18 +77,22 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.ApplySystemFont(root, out localFont, out localFontAsset);
             content = encounter.ToData();
             adventure = AdventureFlow.ForScene("DockShop");
+            isWheelEvent = adventure?.AtRecruitmentWheel == true;
             party = adventure?.Party ?? BattlePrototype.GetPlaySession(content);
             coins = 999;
             standaloneExpenses.Clear();
             hovered = null;
             celebrationUntil = 0;
-            var catalogue = stockPool.Where(item => item != null).Select(item => item.ToDefinition()).Concat(content.SkillBooks);
-            var stock = adventure?.Current.Stock ?? AdventureShopOffer.Draw(catalogue, random, () => party.HasShopDiscount);
-            stage = new ShopStage(transform, root, stageArt, backdrop, merchantReactions, adventure?.InGraveyard == true, adventure?.InCapital == true);
+            stage = new ShopStage(transform, root, stageArt, backdrop, merchantReactions, adventure,
+                isWheelEvent ? StageVenue.Outdoors : StageVenue.Interior);
             stage.ShowCompany(party, content);
-            if (RecruitmentWheelVisible) PrepareRecruitment();
+            if (isWheelEvent || RecruitmentWheelVisible) PrepareRecruitment();
             Render();
-            DisplayStock(stock);
+            if (!isWheelEvent)
+            {
+                var catalogue = stockPool.Where(item => item != null).Select(item => item.ToDefinition()).Concat(content.SkillBooks);
+                DisplayStock(adventure?.Current.Stock ?? AdventureShopOffer.Draw(catalogue, random, () => party.HasShopDiscount));
+            }
         }
 
         private void DisplayStock(IReadOnlyList<AdventureShopOffer> stock)
@@ -135,33 +140,14 @@ namespace RaidPartyManager.Presentation
             root.style.color = PrototypeStyle.Ink;
             root.focusable = true;
 
-            counterBackdrop = new VisualElement { name = "shop-counter-background" };
-            PrototypeStyle.Fill(counterBackdrop);
-            counterBackdrop.style.display = DisplayStyle.None;
-            counterBackdrop.RegisterCallback<PointerDownEvent>(OnBackgroundDown);
-            root.Add(counterBackdrop);
-
-            stockLayer = new VisualElement { name = "shop-stock", pickingMode = PickingMode.Ignore };
-            PrototypeStyle.Fill(stockLayer);
-            root.Add(stockLayer);
-
-            counterVisit = PrototypeStyle.Button("查看商品", "shop-counter", OpenCounter);
-            counterVisit.style.justifyContent = Justify.FlexEnd;
-            counterVisit.style.paddingBottom = 8;
-            counterVisit.style.marginTop = counterVisit.style.marginBottom = 0;
-            counterVisit.style.backgroundColor = Color.clear;
-            counterVisit.style.unityFontStyleAndWeight = FontStyle.Bold;
-            counterVisit.style.unityTextOutlineColor = (Color)new Color32(35, 23, 20, 255);
-            counterVisit.style.unityTextOutlineWidth = 1f;
-            PrototypeStyle.Outline(counterVisit, Color.clear, 0);
-            stage.PlaceCounterVisit(counterVisit);
-            root.Add(counterVisit);
+            if (!isWheelEvent) AddGoodsCounter();
 
             checkout = new VisualElement { name = "shop-checkout", pickingMode = PickingMode.Ignore };
             checkout.style.justifyContent = Justify.Center;
             checkout.style.alignItems = Align.Center;
             PrototypeStyle.Outline(checkout, Color.clear, 7);
-            var instruction = PrototypeStyle.Text("将候选人拖到这里签约", 17, PrototypeStyle.Accent);
+            var instruction = PrototypeStyle.Text(party.ContractsEnabled ? "将候选人拖到这里签约" : "将候选人拖到这里招募",
+                17, PrototypeStyle.Accent);
             instruction.pickingMode = PickingMode.Ignore;
             instruction.style.display = DisplayStyle.None;
             instruction.style.backgroundColor = new Color(0.05f, 0.06f, 0.065f, 0.88f);
@@ -180,24 +166,19 @@ namespace RaidPartyManager.Presentation
 
             if (recruitment != null) RenderRecruitmentEntry();
 
-            closeUpHint = PrototypeStyle.Text("长按购买 · 点击空白返回", 15, PrototypeStyle.Accent);
-            closeUpHint.name = "shop-counter-hint";
-            closeUpHint.style.position = Position.Absolute;
-            closeUpHint.style.left = Length.Percent(30);
-            closeUpHint.style.right = Length.Percent(30);
-            closeUpHint.style.top = RunTopBar.Height + 10;
-            closeUpHint.style.backgroundColor = PrototypeStyle.PanelColor;
-            closeUpHint.style.paddingTop = closeUpHint.style.paddingBottom = 6;
-            closeUpHint.style.display = DisplayStyle.None;
-            PrototypeStyle.Middle(closeUpHint);
-            closeUpHint.pickingMode = PickingMode.Ignore;
-            root.Add(closeUpHint);
-            sellEntry = PrototypeStyle.Button("出售背包物品", "shop-sell", OpenSale);
-            sellEntry.style.position = Position.Absolute;
-            sellEntry.style.right = 14;
-            sellEntry.style.top = RunTopBar.Height + 10;
-            sellEntry.style.display = DisplayStyle.None;
-            root.Add(sellEntry);
+            if (isWheelEvent)
+            {
+                var title = PrototypeStyle.Text(AdventureFlow.EventName(AdventureEventKind.RecruitmentWheel), 21, PrototypeStyle.Accent);
+                title.name = "wheel-event-title";
+                title.style.position = Position.Absolute;
+                title.style.top = RunTopBar.Height + 10;
+                title.style.left = 18;
+                title.style.unityTextOutlineColor = (Color)new Color32(35, 23, 20, 255);
+                title.style.unityTextOutlineWidth = 1f;
+                title.pickingMode = PickingMode.Ignore;
+                root.Add(title);
+            }
+            else AddGoodsControls();
 
             feedback = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
             feedback.name = "shop-feedback";
@@ -219,6 +200,53 @@ namespace RaidPartyManager.Presentation
             root.RegisterCallback<PointerLeaveEvent>(OnPointerLeave);
             root.RegisterCallback<KeyDownEvent>(OnKeyDown);
             RefreshExpression();
+        }
+
+        private void AddGoodsCounter()
+        {
+            counterBackdrop = new VisualElement { name = "shop-counter-background" };
+            PrototypeStyle.Fill(counterBackdrop);
+            counterBackdrop.style.display = DisplayStyle.None;
+            counterBackdrop.RegisterCallback<PointerDownEvent>(OnBackgroundDown);
+            root.Add(counterBackdrop);
+
+            stockLayer = new VisualElement { name = "shop-stock", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(stockLayer);
+            root.Add(stockLayer);
+
+            counterVisit = PrototypeStyle.Button("查看商品", "shop-counter", OpenCounter);
+            counterVisit.style.justifyContent = Justify.FlexEnd;
+            counterVisit.style.paddingBottom = 8;
+            counterVisit.style.marginTop = counterVisit.style.marginBottom = 0;
+            counterVisit.style.backgroundColor = Color.clear;
+            counterVisit.style.unityFontStyleAndWeight = FontStyle.Bold;
+            counterVisit.style.unityTextOutlineColor = (Color)new Color32(35, 23, 20, 255);
+            counterVisit.style.unityTextOutlineWidth = 1f;
+            PrototypeStyle.Outline(counterVisit, Color.clear, 0);
+            stage.PlaceCounterVisit(counterVisit);
+            root.Add(counterVisit);
+        }
+
+        private void AddGoodsControls()
+        {
+            closeUpHint = PrototypeStyle.Text("长按购买 · 点击空白返回", 15, PrototypeStyle.Accent);
+            closeUpHint.name = "shop-counter-hint";
+            closeUpHint.style.position = Position.Absolute;
+            closeUpHint.style.left = Length.Percent(30);
+            closeUpHint.style.right = Length.Percent(30);
+            closeUpHint.style.top = RunTopBar.Height + 10;
+            closeUpHint.style.backgroundColor = PrototypeStyle.PanelColor;
+            closeUpHint.style.paddingTop = closeUpHint.style.paddingBottom = 6;
+            closeUpHint.style.display = DisplayStyle.None;
+            PrototypeStyle.Middle(closeUpHint);
+            closeUpHint.pickingMode = PickingMode.Ignore;
+            root.Add(closeUpHint);
+            sellEntry = PrototypeStyle.Button("出售背包物品", "shop-sell", OpenSale);
+            sellEntry.style.position = Position.Absolute;
+            sellEntry.style.right = 14;
+            sellEntry.style.top = RunTopBar.Height + 10;
+            sellEntry.style.display = DisplayStyle.None;
+            root.Add(sellEntry);
         }
 
         private VisualElement BuildOffer(Offer offer)
@@ -404,6 +432,7 @@ namespace RaidPartyManager.Presentation
 
         private void RefreshExpression()
         {
+            if (isWheelEvent) return;
             var offer = heldOffer ?? hovered;
             var remaining = Mathf.Clamp01((float)((celebrationUntil - Time.unscaledTimeAsDouble) / CelebrationDuration));
             var face = remaining > 0 ? ShopStage.Expression.Laugh : offer == null ? ShopStage.Expression.Idle :
@@ -418,6 +447,9 @@ namespace RaidPartyManager.Presentation
             if (recruitment != null) UpdateRecruitment(Time.unscaledDeltaTime);
             stage.PoseShopSigns(root);
             stage.PlaceCounter(checkout);
+            if (feedback != null && Time.unscaledTimeAsDouble >= feedbackUntil)
+                feedback.style.display = DisplayStyle.None;
+            if (isWheelEvent) return;
             if (stage.WideView)
             {
                 stage.PlaceCounterVisit(counterVisit);
@@ -450,8 +482,6 @@ namespace RaidPartyManager.Presentation
                 }
             }
             RefreshExpression();
-            if (feedback != null && Time.unscaledTimeAsDouble >= feedbackUntil)
-                feedback.style.display = DisplayStyle.None;
         }
 
         private void CancelPurchaseHold()
@@ -490,7 +520,7 @@ namespace RaidPartyManager.Presentation
         {
             recruitmentButton.text = recruitment.Signed ? "本次招募已完成" : "角色招募";
             recruitmentButton.SetEnabled(!recruitment.Signed && !stage.RecruitmentSpinning);
-            recruitmentButton.style.display = recruitmentWindow == null ? DisplayStyle.Flex : DisplayStyle.None;
+            recruitmentButton.style.display = recruitmentWindow == null && !stage.RecruitmentDropping ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
         private bool SpendTestCoins(int price) => SpendTestCoins(price, "招募转盘");
@@ -511,6 +541,7 @@ namespace RaidPartyManager.Presentation
             if (!signed) return false;
             GameAudio.Play(SoundCue.CompanionJoin);
             if (adventure == null) BattlePrototype.MarkPartyEdited();
+            else if (isWheelEvent) AdventureFlow.AutoSaveResolvedVisit(adventure);
             CloseRecruitment();
             RefreshRecruitmentButton();
             RefreshGold();

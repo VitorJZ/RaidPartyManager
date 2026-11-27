@@ -19,15 +19,7 @@ Shader "RaidPartyManager/Dock Playhouse"
     SubShader
     {
         Tags { "RenderType"="Opaque" }
-        Pass
-        {
-            Cull Off
-            Stencil { Ref 16 WriteMask [_PortalMask] Comp Always Pass Replace }
-            ZTest [_DepthTest]
-            ZWrite [_DepthWrite]
-            CGPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
+        CGINCLUDE
             #include "UnityCG.cginc"
             #include "../Stagecraft/StageLighting.cginc"
             sampler2D _Grain;
@@ -114,6 +106,29 @@ Shader "RaidPartyManager/Dock Playhouse"
                     ink = StageAir(StageExposure(ink,i.world,normalize(i.n),false,0), i.world);
                 return half4(ink,1);
             }
+            half4 LensMask(Out i):SV_Target { return 1; }
+        ENDCG
+
+        Pass
+        {
+            Cull Off
+            Stencil { Ref 16 WriteMask [_PortalMask] Comp Always Pass Replace }
+            ZTest [_DepthTest]
+            ZWrite [_DepthWrite]
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            ENDCG
+        }
+        Pass
+        {
+            Tags { "LightMode"="StageLensMask" }
+            Cull Off
+            ZTest [_DepthTest]
+            ZWrite Off
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment LensMask
             ENDCG
         }
     }

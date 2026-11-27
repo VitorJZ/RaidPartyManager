@@ -11,7 +11,8 @@ namespace RaidPartyManager.Presentation
 
     internal static class FirstRunGuide
     {
-        private const GuideStep Preparation = GuideStep.Equipped | GuideStep.Learned | GuideStep.ReadContract;
+        private static GuideStep Preparation => GuideStep.Equipped | GuideStep.Learned |
+            (AdventureFlow.ContractsEnabled ? GuideStep.ReadContract : 0);
         private static GuideStep Progress => (GuideStep)PlayerPrefs.GetInt(AdventureFlow.GuideKey);
         private static bool Has(GuideStep step) => (Progress & step) == step;
         internal static bool Prepared => Has(Preparation);
@@ -42,7 +43,8 @@ namespace RaidPartyManager.Presentation
         internal static void ShowDeparture(VisualElement parent, Action skip)
         {
             var message = Prepared ? "准备好了。点舞台前沿的石路牌出发。"
-                : "先点左上角的「队伍」。\n给队员穿件装备、学个技能，再看一眼合同。";
+                : "先点左上角的「队伍」。\n给队员穿件装备、学个技能" +
+                    (AdventureFlow.ContractsEnabled ? "，再看一眼合同。" : "。");
             var card = Card("departure-guide", message);
             if (!Prepared)
                 card.Add(NoteButton("跳过教学", "skip-departure-guide", () => { Remember(GuideStep.Departed); skip(); }));

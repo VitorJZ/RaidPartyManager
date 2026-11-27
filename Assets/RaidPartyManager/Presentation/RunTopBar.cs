@@ -443,8 +443,9 @@ namespace RaidPartyManager.Presentation
         {
             calendar.text = party.Day > 0 ? $"第 {party.Day} 天　" : "";
             gold.text = $"金币  {Mathf.Max(0, readGold() - flyingGold)}" +
-                (party.PayrollDebt > 0 ? $"　欠薪 {party.PayrollDebt}" : "");
-            calendar.tooltip = "进入新节点推进 1 天。工资按合同约定的日期扣款，点击金币可查看账单。";
+                (party.ContractsEnabled && party.PayrollDebt > 0 ? $"　欠薪 {party.PayrollDebt}" : "");
+            calendar.tooltip = "进入新节点推进 1 天。" +
+                (party.ContractsEnabled ? "工资按合同约定的日期扣款。" : "") + "点击金币可查看账单。";
             var adventure = AdventureFlow.Active;
             int? remaining = adventure?.Party == party ? adventure.DaysUntilFinalPayroll : null;
             payrollDeadline.style.display = remaining.HasValue ? DisplayStyle.Flex : DisplayStyle.None;
@@ -452,7 +453,8 @@ namespace RaidPartyManager.Presentation
             {
                 payrollDeadline.text = days == 0 ? "今日决战" : $"距离决战 {days} 天";
                 payrollDeadline.style.color = days <= 3 ? PrototypeStyle.Enemy : PrototypeStyle.Ink;
-                finalBattleHint.text = $"第 {party.Day + (long)days} 天决战。\n决战开打前要还清所有欠薪。";
+                finalBattleHint.text = $"第 {party.Day + (long)days} 天决战。" +
+                    (party.ContractsEnabled ? "\n决战开打前要还清所有欠薪。" : "");
             }
             else
             {
@@ -466,13 +468,14 @@ namespace RaidPartyManager.Presentation
             icon.MarkDirtyRepaint();
             UpdateRenewalPulse(icon, due);
             teamButton.tooltip = due ? "右击队员续约 · " + string.Join("、", party.Members
-                .Where(m => m.ContractEndDay - party.Day <= 3)
-                .Select(m => $"{m.Character.Name}剩 {m.ContractEndDay - party.Day} 天")) : "编队 · 右击队员查看合约";
+                .Where(m => m.ContractEndDay - party.ContractDay <= 3)
+                .Select(m => $"{m.Character.Name}剩 {m.ContractEndDay - party.ContractDay} 天")) :
+                party.ContractsEnabled ? "编队 · 右击队员查看合约" : "编队 · 右击队员查看员工档案";
             if (due && AdventureFlow.OnRoute && adventure.Party == party &&
                 (adventure.Current is { Resolved: true, Kind: NodeKind.Event or NodeKind.TreasureChest } ||
                  adventure.Current == null && adventure.LastClosedEventDay == party.Day))
                 PlayRenewalReminder();
-            if (!party.CanAdvanceDay) gold.text += "　出发前请续约";
+            if (party.ContractsEnabled && !party.CanAdvanceDay) gold.text += "　出发前请续约";
         }
 
         private void PlayRenewalReminder()

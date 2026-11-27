@@ -97,10 +97,10 @@ namespace RaidPartyManager.Tests
             Assert.That(events.Last().TargetStatuses, Is.EqualTo(end));
         }
 
-        [TestCase(GreedPotion, VigorPotion, "盛气 10", 5, 15)]
-        [TestCase(VigorPotion, GreedPotion, "盛气 5", 11, 10)]
-        public void OnePotionPerRoundFollowsSlotOrderAndStillRepeatsWithMurkyWater(
-            EquipmentEffect first, EquipmentEffect second, string vigor, int firstDamage, int secondDamage)
+        [TestCase(GreedPotion, VigorPotion, 15, 14)]
+        [TestCase(VigorPotion, GreedPotion, 11, 10)]
+        public void AllPotionsFollowSlotOrderAndEachRepeatsWithMurkyWater(
+            EquipmentEffect first, EquipmentEffect second, int firstDamage, int secondDamage)
         {
             var party = Unit("party", Side.Party);
             var run = new PartyRun(new[] { new PartyMemberStart(party.Id, party.Character, 1, party.Health) },
@@ -112,24 +112,22 @@ namespace RaidPartyManager.Tests
             var request = run.BeginBattle(new[] { Unit("enemy", Side.Enemy) }, 2, null);
             var battle = new BattleSimulator(random: new FixedRoll(.9)).Start(request);
             var round = battle.AdvanceRound();
-            Assert.That(round.Where(e => e.VisualCue == BattleVisualCue.RoundStartBlessing).Select(e => e.ActionName),
-                Is.EqualTo(new[] { first.ToString(), first.ToString() }));
+            var effects = round.Where(e => e.VisualCue == BattleVisualCue.RoundStartBlessing).ToArray();
+            Assert.That(effects.Select(e => e.ActionName),
+                Is.EqualTo(new[] { first.ToString(), first.ToString(), second.ToString(), second.ToString() }));
             Assert.That(round.Where(e => e.Equipment != None).Select(e => e.Equipment),
-                Is.EqualTo(new[] { first, MurkyWater, first }));
+                Is.EqualTo(new[] { first, MurkyWater, first, second, MurkyWater, second }));
             Assert.That(round.ToList().FindIndex(e => e.Kind == BattleEventKind.RoundStarted),
                 Is.LessThan(round.ToList().FindIndex(e => e.VisualCue == BattleVisualCue.RoundStartBlessing)));
-            Assert.That(run.TryApplyBattleLoadout(request.Id, round.Single(e => e.Loadout != null).Loadout), Is.True);
-            Assert.That(run.Members.Single().EquipmentIds, Is.EqualTo(new[] { null, inventory[1].Id, inventory[2].Id }));
-
-            var next = battle.AdvanceRound();
-            var effects = next.Where(e => e.VisualCue == BattleVisualCue.RoundStartBlessing).ToArray();
-            Assert.That(effects.Select(e => e.ActionName), Is.EqualTo(new[] { second.ToString(), second.ToString() }));
-            Assert.That(effects.Last().TargetStatuses, Does.Contain("贪婪 2").And.Contain(vigor));
-            Assert.That(battle.Result.Events.Where(e => e.ActorId == party.Id && e.Kind == BattleEventKind.Action)
-                .Select(e => e.Amount), Is.EqualTo(new[] { firstDamage, secondDamage }));
-            Assert.That(run.TryApplyBattleLoadout(request.Id, next.Single(e => e.Loadout != null).Loadout), Is.True);
+            foreach (var entry in round.Where(e => e.Loadout != null))
+                Assert.That(run.TryApplyBattleLoadout(request.Id, entry.Loadout), Is.True);
             Assert.That(run.Members.Single().EquipmentIds, Is.EqualTo(new[] { null, null, inventory[2].Id }));
             Assert.That(run.Inventory.Single().Id, Is.EqualTo(inventory[2].Id));
+
+            var next = battle.AdvanceRound();
+            Assert.That(next.Any(e => e.VisualCue == BattleVisualCue.RoundStartBlessing), Is.False);
+            Assert.That(battle.Result.Events.Where(e => e.ActorId == party.Id && e.Kind == BattleEventKind.Action)
+                .Select(e => e.Amount), Is.EqualTo(new[] { firstDamage, secondDamage }));
         }
 
         [Test]
@@ -179,6 +177,20 @@ namespace RaidPartyManager.Tests
             var reward = run.Inventory.Single(item => item.Definition.IsPotion);
             Assert.That(reward.Id, Is.Not.EqualTo(dose.Id));
             Assert.That(run.Members.Single(member => member.Id == "mixer").EquipmentIds[1], Is.Null);
+        }
+
+        [Test]
+        public void RedCordSharesEachPotionWithoutConsumingAnyBottleTwice()
+        {
+            var front = Unit("front", Side.Party, gear: Gear(VigorPotion));
+            var rear = Unit("rear", Side.Party, 2, gear: Gear(RedCord, VigorPotion, VigorPotion));
+            var result = Fight(front, rear, Unit("foe", Side.Enemy));
+
+            var effects = result.Events.Where(e => e.Equipment == VigorPotion).ToArray();
+            Assert.That(effects.Select(e => e.TargetId), Is.EqualTo(new[] { front.Id, front.Id, front.Id, rear.Id, rear.Id }));
+            Assert.That(effects.Select(e => e.TargetStatuses), Is.EqualTo(new[] { "盛气 3", "盛气 6", "盛气 9", "盛气 3", "盛气 6" }));
+            Assert.That(result.Events.Where(e => e.ActionName == "消耗药水").Select(e => e.ActorId),
+                Is.EqualTo(new[] { front.Id, rear.Id, rear.Id }));
         }
 
         [Test]
@@ -242,6 +254,35 @@ namespace RaidPartyManager.Tests
                 Is.EqualTo(new[] { 8, 9, 10 }));
             Assert.That(result.Events.Where(e => e.ActorId == ally.Id && e.Kind == BattleEventKind.Action).Select(e => e.Amount),
                 Is.EqualTo(new[] { 5, 5, 5 }));
+        }
+
+        [Test]
+        public void FrozenTargetIgnoresChillUntilTheHitThatThawsIt()
+        {
+            var striker = Unit("striker", Side.Party, gear: Gear(SunkenFrostChain, IceRing));
+            var foe = Unit("foe", Side.Enemy, statuses: new Dictionary<StatusKind, int>
+                { [StatusKind.Frozen] = 1, [StatusKind.Chill] = 2 });
+            Assert.That(foe.StartingStatuses.Keys, Is.EqualTo(new[] { StatusKind.Frozen }));
+
+            var result = Fight(striker, foe);
+            var chain = result.Events.Single(e => e.ActionName == "沉灯霜链");
+            Assert.That(chain.TargetStatuses, Is.EqualTo("冰冻 1"));
+            Assert.That(Action(result, striker.Id).TargetStatuses, Is.Empty);
+            Assert.That(result.Events.Single(e => e.Equipment == IceRing).TargetStatuses, Is.EqualTo("寒冷 1"));
+        }
+
+        [Test]
+        public void DirectFreezeClearsExistingChill()
+        {
+            var model = Unit("caster", Side.Party);
+            var book = new SkillBookDefinition("absolute-zero", "绝对零度", "", SkillRequirement.None, 1, 1, SkillEffect.AbsoluteZero);
+            var caster = new Combatant(model.Id, model.Character, model.Side, 1, model.Stats, model.Health, learnedSkills: new[] { book });
+            var foe = Unit("foe", Side.Enemy, stats: new Stats(1, 10, 0, 30), statuses: new Dictionary<StatusKind, int> { [StatusKind.Chill] = 2 });
+
+            var result = Fight(caster, foe);
+
+            Assert.That(result.Events.Single(e => e.SkillBookId == book.Id && e.TargetId == foe.Id).TargetStatuses,
+                Is.EqualTo("冰冻 1"));
         }
 
         [Test]
@@ -776,7 +817,7 @@ namespace RaidPartyManager.Tests
             var defended = Unit("hero", Side.Party, gear: Gear(ResolvePotion, ResolvePotion));
             var result = Fight(defended, enemy);
             Assert.That(Action(result, "enemy").Amount, Is.EqualTo(4));
-            Assert.That(Action(result, "enemy").TargetStatuses, Is.EqualTo("坚毅 3"));
+            Assert.That(Action(result, "enemy").TargetStatuses, Is.EqualTo("坚毅 6"));
         }
 
         [Test]
@@ -906,6 +947,19 @@ namespace RaidPartyManager.Tests
             Assert.That(run.TrySettle(result, out _), Is.True);
             Assert.That(run.Inventory.Any(item => item.Id == items[0].Id), Is.EqualTo(saved));
             Assert.That(run.Members.Single().EquipmentIds[0], Is.EqualTo(saved ? items[0].Id : null));
+        }
+
+        [Test]
+        public void TwoPanaceasAlwaysPreserveEachPotionForTheNextRound()
+        {
+            var actor = Unit("party", Side.Party, gear: Gear(VigorPotion, VigorPotion, PanaceaBottle, PanaceaBottle));
+            var result = Fight(2, actor, Unit("enemy", Side.Enemy, stats: new Stats(1, 0, 0, 100)));
+
+            Assert.That(result.Events.Where(e => e.Equipment == VigorPotion).Select(e => e.Tick),
+                Is.EqualTo(new[] { 1, 1, 2, 2 }));
+            Assert.That(result.Events.Where(e => e.Equipment == PanaceaBottle).Select(e => e.Tick),
+                Is.EqualTo(new[] { 1, 1, 2, 2 }));
+            Assert.That(result.Events.Any(e => e.ActionName == "消耗药水"), Is.False);
         }
 
         [Test]

@@ -29,6 +29,7 @@ namespace RaidPartyManager.Presentation
         private readonly MeshRenderer haze, leftShadow, rightShadow;
         private readonly Vector3[] hazeVertices;
         private readonly Camera camera;
+        private readonly StageTiltShift tiltShift;
         private readonly BattleStageArt.Set set;
         private readonly GameObject stage;
         private readonly VisualElement panel;
@@ -56,6 +57,9 @@ namespace RaidPartyManager.Presentation
         private readonly Transform lantern;
         private readonly Light moonLamp;
         private float castDistance;
+        internal bool IsActive => !disposed;
+        internal Bounds FormationBounds { get; private set; }
+        internal float PartyViewportHeight { private get; set; }
         internal bool HasDockHouse => house != null;
         private readonly Texture2D printedSurf;
         private readonly MeshRenderer surf, derrickFooting, mooring, creel, leftDressing, rightDressing;
@@ -172,6 +176,7 @@ namespace RaidPartyManager.Presentation
                 StageLighting.Rehearsal.Apply(paper);
                 audience = new AudienceForeground(stage.transform, art.paperShader, art.seatBack, art.apronWood);
             }
+            tiltShift = new StageTiltShift(camera, () => house != null ? house.FocusOn(FormationBounds) : FormationBounds);
             if (moonlit)
             {
                 if (right != null)
@@ -238,7 +243,6 @@ namespace RaidPartyManager.Presentation
                 var ray = camera.ViewportPointToRay(new Vector3(.5f, Mathf.Clamp(baseline, .08f, .46f), 0));
                 float floorZ = ray.origin.z - ray.direction.z * ray.origin.y / ray.direction.y;
                 castDistance = CameraDistance + Mathf.Max(house.DownstageLimit, floorZ);
-                if (castOnly) { DrawActors(); return; }
             }
             else
             {
@@ -252,6 +256,15 @@ namespace RaidPartyManager.Presentation
                 camera.projectionMatrix = projection;
                 audience.Frame(camera, x);
             }
+
+            // Use the same standing marks as the battle layout, before any boss camera zoom.
+            float distance = house != null ? castDistance : CameraDistance;
+            var rankFoot = camera.ViewportToWorldPoint(new Vector3(.5f, baseline, distance));
+            float height = PartyViewportHeight > 0
+                ? camera.ViewportToWorldPoint(new Vector3(.5f, baseline + PartyViewportHeight, distance)).y - rankFoot.y
+                : 1.62f;
+            FormationBounds = new Bounds(rankFoot + Vector3.up * (height * .5f), Vector3.up * height);
+            if (castOnly) { DrawActors(); return; }
 
             var backdrop = set.backcloth != null ? set.backcloth : set.region;
             float farZ = house != null ? house.SceneryOpening.center.z : 24f;
@@ -481,6 +494,9 @@ namespace RaidPartyManager.Presentation
             if (disposed || actors.ContainsKey(image))
                 return;
             var actor = spare.Count == 0 ? new Actor { body = Sheet("Actor", 0), shadow = Sheet("Foot shadow", -10) } : spare.Pop();
+            actor.body.renderingLayerMask = image.KeepsStageFocus
+                ? actor.body.renderingLayerMask | StageTiltShift.SharpLayer
+                : actor.body.renderingLayerMask & ~StageTiltShift.SharpLayer;
             actor.body.name = image.name;
             actor.body.sortingOrder = image.SceneryOrder ?? (image.InMotion ? 5 : 1);
             var mesh = image.Walk.z != 0 ? walkMesh : quad;
@@ -654,6 +670,7 @@ namespace RaidPartyManager.Presentation
         public void Dispose()
         {
             disposed = true;
+            tiltShift?.Dispose();
             RestoreShot(camera);
             RenderPipelineManager.beginCameraRendering -= BeforeCamera;
             RenderPipelineManager.endCameraRendering -= AfterCamera;

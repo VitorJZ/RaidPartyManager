@@ -37,7 +37,7 @@ namespace RaidPartyManager.Presentation
         private void ShowRun(bool inspection)
         {
             run = AdventureFlow.Select(assets, inspection, out bool resumeMarket);
-            if (run?.Current?.Kind == NodeKind.Town || run?.PreparingFinalBoss == true ||
+            if (run?.Current?.Kind == NodeKind.Town || run?.AtRecruitmentWheel == true || run?.PreparingFinalBoss == true ||
                 run?.HasBattleRewardScreen == true && run.Current.Event == null)
             {
                 var scene = resumeMarket ? "TalentMarket" : AdventureFlow.SceneFor(run.Current.Kind);
@@ -157,9 +157,13 @@ namespace RaidPartyManager.Presentation
             var grid = PrototypeStyle.Row(); grid.style.flexWrap = Wrap.Wrap; scroll.Add(grid); screen.Add(scroll);
             foreach (AdventureEventKind kind in Enum.GetValues(typeof(AdventureEventKind)))
             {
-                var captured = kind;
-                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, (GraveStories.Contains(kind) || CapitalStories.Contains(kind) || kind is AdventureEventKind.TidePact or AdventureEventKind.GraveSeed) ? assets.EventArt(kind) : DockEventStage.EventProp(kind), () =>
-                { if (run.Inspect(NodeKind.Event, captured)) PresentVisit(); }, kind == AdventureEventKind.FoundCoins);
+                var art = GraveStories.Contains(kind) || CapitalStories.Contains(kind) ||
+                    kind is AdventureEventKind.TidePact or AdventureEventKind.GraveSeed or AdventureEventKind.RecruitmentWheel
+                    ? assets.EventArt(kind) : DockEventStage.EventProp(kind);
+                Card(grid, AdventureFlow.EventName(kind), Gate(kind), "inspect-event-" + kind, art, () =>
+                {
+                    if (run.Inspect(NodeKind.Event, kind)) PresentVisit();
+                }, kind == AdventureEventKind.FoundCoins);
             }
             foreach (var kind in new[] { NodeKind.Town, NodeKind.Camp, NodeKind.NormalBattle, NodeKind.EliteBattle, NodeKind.Boss, NodeKind.TreasureChest })
             {
@@ -195,29 +199,6 @@ namespace RaidPartyManager.Presentation
 
         private void NextFloor()
         {
-            if (!run.Party.HasBorrowedName) { AdvanceFloor(); return; }
-            if (body.Q("grave-name-register") != null) return;
-            var page = new VisualElement { name = "grave-name-register" };
-            PrototypeStyle.Fill(page);
-            page.style.backgroundColor = new Color(.08f, .07f, .09f, .95f);
-            page.style.alignItems = Align.Center;
-            page.style.justifyContent = Justify.Center;
-            var prompt = PrototypeStyle.Text("出园簿上有三个姓名。哪一个属于你的队员？", 20, PrototypeStyle.Accent);
-            page.Add(prompt);
-            string real = run.Party.BorrowedRealName;
-            var names = assets.Encounter.CharacterCatalog.Where(c => c.RosterNumber > 0).Select(c => c.Name).Where(n => !string.IsNullOrEmpty(n) && n != real)
-                .Distinct().Take(2).Append(real).OrderBy(n => n, StringComparer.Ordinal);
-            foreach (string candidate in names)
-                page.Add(PrototypeStyle.Button(candidate, "reclaim-" + candidate, () =>
-                {
-                    if (!run.Party.ReclaimName(candidate)) { prompt.text = "笔迹对不上。再仔细看一次。"; return; }
-                    AdvanceFloor();
-                }));
-            body.Add(page);
-        }
-
-        private void AdvanceFloor()
-        {
             if (!run.NextFloor()) return;
             if (run.IsInspection) Render();
             else DockPlayhouse.ChangeSet(() => PrototypeSceneMenu.OpenScene("EventSelect"), turn: StageTurn.Forward);
@@ -231,7 +212,9 @@ namespace RaidPartyManager.Presentation
                 GameAudio.Play(SoundCue.UiRestricted);
                 if ((!run.Party.CanStartBattle || !run.Party.CanAdvanceDay) && screen.Q("route-entry-message") == null)
                 {
-                    var warning = PrototypeStyle.Text(!run.Party.CanAdvanceDay ? "没有队员能履约到明天。请在编队中右击队员续约。" : "请先在队伍编辑中为在场队员安排站位。", 16, PrototypeStyle.Accent);
+                    var warning = PrototypeStyle.Text(!run.Party.CanAdvanceDay && run.Party.ContractsEnabled
+                        ? "没有队员能履约到明天。请在编队中右击队员续约。" :
+                        "请先在队伍编辑中为在场队员安排站位。", 16, PrototypeStyle.Accent);
                     warning.name = "route-entry-message";
                     screen.Add(warning);
                 }
@@ -274,6 +257,11 @@ namespace RaidPartyManager.Presentation
             if (run.Current == null) return;
             GameAudio.SetScene(gameObject.scene.name, run);
             var current = run.Current;
+            if (run.AtRecruitmentWheel)
+            {
+                AdventureFlow.OpenNodeScene(AdventureFlow.SceneFor(current.Kind));
+                return;
+            }
             if (current.Kind is NodeKind.Event or NodeKind.TreasureChest || current.Battle?.Settled == true)
             {
                 stage ??= new DockEventStage(transform, root, stageArt, current.Kind == NodeKind.TreasureChest, current.Event, run.InGraveyard && !current.Event.HasValue, run.InCapital, Mathf.Clamp((run.Stage - 1) / 3, 0, 2));
@@ -367,6 +355,7 @@ namespace RaidPartyManager.Presentation
 
         private static string Gate(AdventureEventKind kind) => CapitalStories.Contains(kind) ? "机巧遗都 · 随机事件" : GraveStories.Contains(kind) ? "低语墓园 · 随机事件" : kind switch
         {
+            AdventureEventKind.RecruitmentWheel => "所有地图 · 每趟讨伐一次",
             AdventureEventKind.Investor => "首层第 3 关之后 · 每层一次",
             AdventureEventKind.GraveSeed => "低语墓园 · 必定出现在一个分岔",
             AdventureEventKind.TidePact => "弥雾码头 · 离开城镇后必定遇见",

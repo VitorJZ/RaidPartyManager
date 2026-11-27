@@ -41,59 +41,49 @@ namespace RaidPartyManager.Run
 
     public static class CapitalStories
     {
-        private static readonly CapitalStory[] Stories =
+        private static readonly Dictionary<AdventureEventKind, CapitalStory> Stories = new()
         {
-            new("永不下班的闸机", "闸机还在等最后一位乘客。它肯收检修费，也会给持票员工补发车资。", 0,
+            [AdventureEventKind.FareGate] = new("永不下班的闸机", "闸机还在等最后一位乘客。它肯收检修费，也会给持票员工补发车资。", 0,
                 new CapitalChoice("补办检修票", 6, 100, CapitalReward.Gear, 2),
                 new CapitalChoice("领取误点赔款", 0, 100, CapitalReward.Gold, 9)),
-            new("投递于九十年前", "气邮管里卡着两件东西：寄给车站的零件包，和交给队医的急件。只能给一条管线加压。", 0,
+            [AdventureEventKind.DeadMail] = new("投递于九十年前", "气邮管里卡着两件东西：寄给车站的零件包，和交给队医的急件。只能给一条管线加压。", 0,
                 new CapitalChoice("接通货运管", 0, 100, CapitalReward.Gear, 3),
                 new CapitalChoice("接通急救管", 0, 100, CapitalReward.Potion, 1)),
-            new("迟到一生的考勤钟", "停表那天，全城都算迟到。把时间拨回去，工人名下的工资才会发出来。", 0,
+            [AdventureEventKind.TimeOffice] = new("迟到一生的考勤钟", "停表那天，全城都算迟到。把时间拨回去，工人名下的工资才会发出来。", 0,
                 new CapitalChoice("为工人补签", 0, 100, CapitalReward.Morale, 1),
                 new CapitalChoice("申领夜班津贴", 0, 100, CapitalReward.Gold, 14)),
-            new("最后一份供水特许", "水塔只够开一次阀。送进消毒池能给伤员清创，送进铸币所则能洗出沉底的小钱。", 0,
+            [AdventureEventKind.WaterCharter] = new("最后一份供水特许", "水塔只够开一次阀。送进消毒池能给伤员清创，送进铸币所则能洗出沉底的小钱。", 0,
                 new CapitalChoice("开放消毒池", 0, 100, CapitalReward.Rest, 22),
                 new CapitalChoice("冲洗铸币槽", 0, 100, CapitalReward.Gold, 12)),
-            new("无人认领的行李", "秤盘亮起黄灯。保管员留下两种结案办法：付仓租开箱，或按废铜重量出售。", 0,
-                new CapitalChoice("付仓租开箱", 13, 100, CapitalReward.Gear, 1),
-                new CapitalChoice("整箱称重", 0, 100, CapitalReward.Gold, 15)),
-            new("门诊叫到零号", "铜护士叫了一个不存在的号。付费可让全队接诊，免费床位只够伤得最重的一人。", 2,
+            [AdventureEventKind.ClinicQueue] = new("门诊叫到零号", "铜护士叫了一个不存在的号。付费可让全队接诊，免费床位只够伤得最重的一人。", 2,
                 new CapitalChoice("买团体诊票", 9, 100, CapitalReward.Rest, 35),
                 new CapitalChoice("使用免费床位", 0, 100, CapitalReward.Treat, 8)),
-            new("道岔的少数意见", "一条支线通向废料仓，另一条写着“试车自负”。废料商付现钱，试车成功能拖回军用装备。", 0,
+            [AdventureEventKind.WrongSwitch] = new("道岔的少数意见", "一条支线通向废料仓，另一条写着“试车自负”。废料商付现钱，试车成功能拖回军用装备。", 0,
                 new CapitalChoice("走废料线", 0, 100, CapitalReward.Gold, 11),
                 new CapitalChoice("试跑军用线", 0, 60, CapitalReward.Gear, 1)),
-            new("一盏灯的市政预算", "街灯还剩一匣能源。把灯点亮，值夜的队员会很高兴；也能卸下电芯换钱。", 1,
-                new CapitalChoice("点亮街区", 0, 100, CapitalReward.Morale, 1),
-                new CapitalChoice("回收备用电芯", 0, 100, CapitalReward.Gold, 16)),
-            new("只有一张的选票", "印票机还在选市长。投给图书馆可以换一本技能书；投给公共诊所，伤员能免费就诊。", 2,
+            [AdventureEventKind.ElectionPress] = new("只有一张的选票", "印票机还在选市长。投给图书馆可以换一本技能书；投给公共诊所，伤员能免费就诊。", 2,
                 new CapitalChoice("投给图书馆", 0, 100, CapitalReward.Book, 1),
                 new CapitalChoice("投给公共诊所", 0, 100, CapitalReward.Rest, 25)),
-            new("锅炉要求加班费", "锅炉把压力表指向红区。付煤钱可慢慢泄压取货；直接扳阀能省钱，失手会烫伤一名队员。", 1,
+            [AdventureEventKind.BoilerUnion] = new("锅炉要求加班费", "锅炉把压力表指向红区。付煤钱可慢慢泄压取货；直接扳阀能省钱，失手会烫伤一名队员。", 1,
                 new CapitalChoice("买煤缓慢泄压", 8, 100, CapitalReward.Gear, 2),
                 new CapitalChoice("抢开急泄阀", 0, 65, CapitalReward.Gear, 2)),
-            new("听众席上的灰尘", "机械乐团等最后一场掌声。留下来当观众可振奋队员，也可以接下乐团的拆台工作领酬。", 2,
-                new CapitalChoice("听完安可曲", 0, 100, CapitalReward.Morale, 1),
-                new CapitalChoice("拆台领工钱", 0, 100, CapitalReward.Gold, 18)),
-            new("保质期一百年", "温室的抽屉标着两种用途。药用种荚能换一瓶药；打开培养床能为全队处理伤口。", 2,
+            [AdventureEventKind.SeedArchive] = new("保质期一百年", "温室的抽屉标着两种用途。药用种荚能换一瓶药；打开培养床能为全队处理伤口。", 2,
                 new CapitalChoice("交换种荚", 0, 100, CapitalReward.Potion, 1),
                 new CapitalChoice("启动培养床", 4, 100, CapitalReward.Rest, 28)),
-            new("借来的一双手", "维修台的双手还能工作。装上精密模具可加工一件装备，改装书写头则可抄录一本技能书。", 1,
+            [AdventureEventKind.SpareHands] = new("借来的一双手", "维修台的双手还能工作。装上精密模具可加工一件装备，改装书写头则可抄录一本技能书。", 1,
                 new CapitalChoice("购买精密模具", 11, 100, CapitalReward.Gear, 1),
                 new CapitalChoice("装上书写头", 5, 100, CapitalReward.Book, 1)),
-            new("黄金标准差半克", "银行的天平差半克才肯结账。按旧币面值可稳拿赔付，申请重新称重则可能一枚也拿不到，还会被夹伤手指。", 1,
+            [AdventureEventKind.GoldStandard] = new("黄金标准差半克", "银行的天平差半克才肯结账。按旧币面值可稳拿赔付，申请重新称重则可能一枚也拿不到，还会被夹伤手指。", 1,
                 new CapitalChoice("按面值结算", 0, 100, CapitalReward.Gold, 15),
                 new CapitalChoice("要求重新称重", 0, 55, CapitalReward.Gold, 32)),
-            new("最后一次正午", "圆顶开了一条缝。归零仪器可读出星图手册；放弃校准，拆下镜片也值一笔钱。", 2,
+            [AdventureEventKind.LastMeridian] = new("最后一次正午", "圆顶开了一条缝。归零仪器可读出星图手册；放弃校准，拆下镜片也值一笔钱。", 2,
                 new CapitalChoice("支付校准费", 8, 100, CapitalReward.Book, 1),
                 new CapitalChoice("出售备用镜片", 0, 100, CapitalReward.Gold, 19)),
         };
-        public static bool Contains(AdventureEventKind? kind) => kind.HasValue &&
-            kind.Value >= AdventureEventKind.FareGate && kind.Value <= AdventureEventKind.LastMeridian;
-        public static CapitalStory For(AdventureEventKind kind) => Stories[(int)kind - (int)AdventureEventKind.FareGate];
+        public static bool Contains(AdventureEventKind? kind) => kind.HasValue && Stories.ContainsKey(kind.Value);
+        public static CapitalStory For(AdventureEventKind kind) => Stories[kind];
         public static readonly IReadOnlyList<AdventureEventKind> Kinds =
-            Enumerable.Range((int)AdventureEventKind.FareGate, Stories.Length).Select(i => (AdventureEventKind)i).ToArray();
+            Stories.Keys.OrderBy(kind => kind).ToArray();
     }
 
     public sealed partial class AdventureRun

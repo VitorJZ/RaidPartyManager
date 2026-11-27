@@ -21,6 +21,7 @@ namespace RaidPartyManager.Presentation
         private readonly Material backdropPaint, softPaint, paperPaint;
         protected readonly DockPlayhouse house;
         protected readonly MaterialPropertyBlock properties = new MaterialPropertyBlock();
+        private readonly StageTiltShift tiltShift;
         private readonly Vector3 previousEye;
         private readonly Quaternion previousRotation;
         private readonly float previousFov;
@@ -49,9 +50,7 @@ namespace RaidPartyManager.Presentation
                 if (!company.TryGetValue(place, out var actor))
                 {
                     // Leave the counter, price cards and town doorways clear behind the visitors.
-                    float z = -5.3f + .42f * ((place-1) % 2);
-                    float x = -1.83f - .86f * (place-1);
-                    actor = Flat("Company " + place, new Vector3(x,.80f,z),CompanySpriteSize,CompanySpriteSize,image);
+                    actor = Flat("Company " + place, CompanyCentre(place), CompanySpriteSize, CompanySpriteSize, image);
                     company[place] = actor;
                 }
                 actor.enabled = true;
@@ -61,6 +60,26 @@ namespace RaidPartyManager.Presentation
             idleCel = -1;
             AnimateCompany();
         }
+
+        private static Vector3 CompanyCentre(int place) =>
+            new(-1.83f - .86f * (place - 1), .80f, -5.3f + .42f * ((place - 1) % 2));
+
+        protected static void IncludeActor(ref Bounds marks, MeshRenderer actor)
+        {
+            if (!actor.enabled || !actor.gameObject.activeInHierarchy) return;
+            if (marks.size.y == 0) marks = actor.bounds;
+            else marks.Encapsulate(actor.bounds);
+        }
+
+        protected virtual Bounds FormationBounds()
+        {
+            var marks = new Bounds();
+            foreach (var actor in company.Values) IncludeActor(ref marks, actor);
+            return marks.size.y > 0 ? marks : UnoccupiedMarks();
+        }
+
+        protected virtual Bounds UnoccupiedMarks() =>
+            new(stage.TransformPoint(CompanyCentre(1) * PropScale), Vector3.up * (CompanySpriteSize * PropScale));
 
         internal void HideCompany()
         {
@@ -86,7 +105,7 @@ namespace RaidPartyManager.Presentation
         }
         protected virtual float PropScale => 1f;
 
-        protected ServiceStage(Transform owner, VisualElement panel, ServiceStageArt art, StageLighting lighting)
+        protected ServiceStage(Transform owner, VisualElement panel, ServiceStageArt art, StageLighting lighting, float tiltShiftStrength = 1f)
         {
             this.art = art;
             camera = Camera.main;
@@ -106,6 +125,7 @@ namespace RaidPartyManager.Presentation
             softPaint = new Material(paint) { renderQueue = 3000 };
             softPaint.SetFloat("_DepthWrite", 0);
             house = DockPlayhouse.Bind(stage, panel);
+            tiltShift = new StageTiltShift(camera, () => house.FocusOn(FormationBounds()), tiltShiftStrength);
             house.SetLighting(lighting);
             lighting.Apply(paint);
             // Leave one queue between solid scenery and the cast for the travelling wave.
@@ -299,6 +319,7 @@ namespace RaidPartyManager.Presentation
 
         public virtual void Dispose()
         {
+            tiltShift.Dispose();
             house.Unbind(stage);
             stage.gameObject.SetActive(false);
             UnityEngine.Object.Destroy(stage.gameObject);

@@ -108,6 +108,7 @@ namespace RaidPartyManager.Presentation
             slab.Add(Solid("Medallion ring", board, ring, centre));
             slab.Add(Solid("Medallion recess", board, disc, centre + Vector3.back * .002f));
             var inlay = Quad("Route emblem", board, centre + Vector3.back * .008f, new Vector3(.34f, .34f, 1)).GetComponent<MeshRenderer>();
+            inlay.renderingLayerMask |= StageTiltShift.SharpLayer;
             inlay.sharedMaterial = paint;
             ink.Clear();
             ink.SetTexture("_MainTex", emblem != null ? emblem : Texture2D.whiteTexture);
@@ -159,6 +160,7 @@ namespace RaidPartyManager.Presentation
             var renderer = part.AddComponent<MeshRenderer>();
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
+            renderer.renderingLayerMask |= StageTiltShift.SharpLayer;
             renderer.sharedMaterial = stone;
             return renderer;
         }

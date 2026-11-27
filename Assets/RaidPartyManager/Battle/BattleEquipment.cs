@@ -159,11 +159,9 @@ namespace RaidPartyManager.Battle
             ApplyRoundStartTraits();
             StartPlayerRound();
             var actors = InEquipmentOrder(units).Where(unit => unit.Health > 0).ToArray();
-            var potionsByOwner = actors.ToDictionary(unit => unit, unit => unit.Equipped.FirstOrDefault(item => item.Definition.IsPotion));
             var usedPotions = new HashSet<EquippedItem>();
             foreach (var actor in actors)
             {
-                bool usedPotion = false;
                 foreach (var (owner, item) in GearEntries(actor).ToArray())
                 {
                     if (actor.Health == 0) break;
@@ -184,21 +182,17 @@ namespace RaidPartyManager.Battle
                         case Megaphone when owner == actor && item.Transfers > 0 && Opponents(actor).Any():
                             ApplyMegaphoneBonus(actor, item.Transfers);
                             break;
-                        default:
-                            if (!usedPotion && potionsByOwner.GetValueOrDefault(owner) == item && Opponents(actor).Any())
-                            {
-                                usedPotion = true;
-                                usedPotions.Add(item);
-                                DrinkRoundPotion(actor, item.Definition);
-                            }
+                        case var _ when item.Definition.IsPotion && Opponents(actor).Any():
+                            usedPotions.Add(item);
+                            DrinkRoundPotion(actor, item.Definition);
                             break;
                     }
                 }
             }
 
-            // Red Cord can share this dose with the front ally. Settle the original bottle once.
+            // Red Cord can share each dose with the front ally. Settle each original bottle once.
             foreach (var owner in actors)
-                if (potionsByOwner[owner] is { } potion && usedPotions.Contains(potion))
+                foreach (var potion in owner.Equipped.Where(usedPotions.Contains).ToArray())
                     SettleRoundPotion(owner, potion);
             UpdateEquipment();
         }
@@ -229,7 +223,8 @@ namespace RaidPartyManager.Battle
         {
             int slot = Array.IndexOf(owner.Slots, potion);
             if (slot < 0) return;
-            if (Enumerable.Range(0, owner.Count(PanaceaBottle)).Any(_ => random.NextDouble() < 0.5))
+            int panacea = owner.Count(PanaceaBottle);
+            if (panacea >= 2 || (panacea == 1 && random.NextDouble() < 0.5))
             {
                 Report(BattleEventKind.Effect, owner, owner, "万能药瓶", ActionKind.Shield, detail: $"保留 {potion.Definition.Name}", equipment: PanaceaBottle);
                 return;
@@ -353,6 +348,8 @@ namespace RaidPartyManager.Battle
                 return true;
             }
 
+            if (status == Frozen)
+                RemoveLayers(target, Chill, target.Layers(Chill));
             target.Statuses[status] = total;
             ScoreStatus(actor, target, status, added);
             if (delayDecay && previous == 0)

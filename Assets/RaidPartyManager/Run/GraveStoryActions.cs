@@ -34,7 +34,6 @@ namespace RaidPartyManager.Run
             WhisperWall => Present.Any(HasRival),
             SoupQueue => Present.Any(m => Career(m).LastBattleAttended),
             SoulWard => Present.Count() >= 2,
-            BorrowedName => !Party.HasBorrowedName && Present.Any(m => m.Contract != null),
             Epitaph => Present.Any(m => Career(m).Inscription.Kind == EmployeeGoalKind.None),
             _ => true
         };
@@ -142,8 +141,7 @@ namespace RaidPartyManager.Run
                     OfferPallbearer();
                     break;
                 case ClaimDesk:
-                case Sponsorship:
-                    OfferPayment();
+                    OfferClaimPayment();
                     break;
                 case Auction:
                     OfferAuction();
@@ -153,9 +151,6 @@ namespace RaidPartyManager.Run
                     break;
                 case DeadLetters:
                     OfferDeadLetters();
-                    break;
-                case WeepingWall:
-                    OfferWeepingWall();
                     break;
                 case Ravens:
                     OfferRavens();
@@ -174,9 +169,6 @@ namespace RaidPartyManager.Run
                     break;
                 case Epitaph:
                     OfferEpitaph();
-                    break;
-                case BorrowedName:
-                    OfferBorrowedName();
                     break;
             }
 
@@ -209,25 +201,23 @@ namespace RaidPartyManager.Run
                 });
             }
 
-            void OfferPayment()
+            void OfferClaimPayment()
             {
                 if (member == null)
                 {
-                    People(present.Where(m => kind == Sponsorship || Career(m).LastBattleBlocked >= 5), m => m.Character.Name, Select);
+                    People(present.Where(m => Career(m).LastBattleBlocked >= 5), m => m.Character.Name, Select);
                     return;
                 }
 
-                int gold = kind == Sponsorship ? 15 : (int)Math.Min(10, Career(member).LastBattleBlocked / 5 * 2);
+                int gold = (int)Math.Min(10, Career(member).LastBattleBlocked / 5 * 2);
                 Add("team", $"{gold} 金币归队", () => Pay(false));
                 Add("employee", $"{gold} 金币归本人", () => Pay(true));
                 void Pay(bool personal)
                 {
                     if (!personal)
                         Party.AddGold(gold);
-                    if (kind == Sponsorship)
-                        promises.Wreath = member.Character.Name;
                     Party.GraveMemory(member.Id, personal ? "我亲手接过了那只钱袋，队长没抽成。" : "我在领款栏签了名，钱入了公账。", personal);
-                    Finish($"{member.Character.Name}签了字，{gold} 金币{(personal ? "由本人领取，满意度提高" : "计入队伍公账")}。" + (kind == Sponsorship ? "花商问清了下座城镇的地址。" : "办事员盖上了结案章。"));
+                    Finish($"{member.Character.Name}签了字，{gold} 金币{(personal ? "由本人领取，满意度提高" : "计入队伍公账")}。办事员盖上了结案章。");
                 }
             }
 
@@ -302,17 +292,6 @@ namespace RaidPartyManager.Run
                             Finish(Current.Message + $" 三封信投对了 {scene.Correct} 封。" + (scene.Correct == 3 ? Gift("邮差打开了回礼包裹。") : "邮差默默记下了退件。"));
                     });
                 }
-            }
-
-            void OfferWeepingWall()
-            {
-                People(present, m => m.Character.Name + "代哭", m =>
-                {
-                    string line = CryLine(m.Personality);
-                    Party.AddGold(8);
-                    Party.GraveMemory(m.Id, line);
-                    Finish($"{m.Character.Name}攥住手绢：“{line}” 墙那头传来轻轻一声谢谢。演出费 8 金币。");
-                });
             }
 
             void OfferRavens()
@@ -459,19 +438,6 @@ namespace RaidPartyManager.Run
                 }
             }
 
-            void OfferBorrowedName()
-            {
-                People(present.Where(m => m.Contract != null), m => m.Character.Name + "自愿借名", m =>
-                {
-                    promises.RealName = m.Character.Name;
-                    promises.Alias = m.Id;
-                    int fee = m.Contract.DailyWage * 2;
-                    Party.AddGold(fee);
-                    Party.GraveMemory(m.Id, "我把名字借出去了。到了出口，可要记得叫我一声。");
-                    Finish($"王冠点了点头。队伍收到 {fee} 金币，本层余下的点名册上只写「某位员工」。");
-                });
-            }
-
             void Add(string key, string text, Action act) => options.Add(new GraveOption(key, text, act));
             void People(IEnumerable<MemberView> who, Func<MemberView, string> label, Action<MemberView> act)
             {
@@ -484,7 +450,7 @@ namespace RaidPartyManager.Run
                 scene.Member = m.Id;
                 Current.Message = kind switch
                 {
-                    ClaimDesk or Sponsorship => $"{m.Character.Name}来签字了。选「归队」把金币放进公账，选「归本人」提高这位队员的满意度。",
+                    ClaimDesk => $"{m.Character.Name}来签字了。选「归队」把金币放进公账，选「归本人」提高这位队员的满意度。",
                     SoulWard => $"{m.Character.Name}躺上了第一张床。再选一位队员，就能预览两人的生命变化。",
                     WhisperWall => "两位都到齐了。选「下场并肩」让他们一起上阵，或选「下场错班」只派一人。",
                     Epitaph => $"轮到{m.Character.Name}了。选一件他愿意完成的事，再决定写进哪个目标栏。",
@@ -550,19 +516,6 @@ namespace RaidPartyManager.Run
             EmployeeGoalKind.Raise => "加薪",
             EmployeeGoalKind.Renewal => "续约",
             _ => "分开编队"
-        };
-        private static string CryLine(Personality p) => p switch
-        {
-            Personality.Frank => "我嗓门大，您放心歇。",
-            Personality.Deadpan => "我头一回替墙上班。它的假比我的好请。",
-            Personality.Optimist => "我先哭一阵，明天说不定就有人来这儿报喜。",
-            Personality.Worrier => "我要是哭跑了调，他们会不会以为墙病重了？",
-            Personality.Competitive => "我哭到对面那堵都得给我递手绢。",
-            Personality.Caring => "我替您哭。您歇一会儿，轮到谁都会累。",
-            Personality.Frugal => "我只领一份工钱，两行眼泪算我送的。",
-            Personality.Stoic => "我来。手绢给我。",
-            Personality.Curious => "我想试试，这面墙记得哪一种回声。",
-            _ => "我这一滴泪，献给今天终于获准休息的墙！"
         };
     }
 }

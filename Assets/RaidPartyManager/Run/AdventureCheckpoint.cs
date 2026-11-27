@@ -21,6 +21,7 @@ namespace RaidPartyManager.Run
         public int ElitesTaken;
         public int Investment;
         public bool InvestmentPaid;
+        public bool HasVisitedTown;
         public int[] InvestorFloors;
         public AdventureEventKind[] SeenEvents;
         public bool FloorCleared;
@@ -44,8 +45,24 @@ namespace RaidPartyManager.Run
         public BattleRewardCheckpoint BattleReward;
         public bool HasShopVisit;
         public ShopVisitCheckpoint ShopVisit;
+        public bool HasWheelVisit;
+        public RecruitmentCheckpoint WheelVisit;
+        public bool WheelLanded;
         public int ShopRecruitPricePlusOne;
         public CheckpointCompanion[] Away;
+
+        internal bool IncludesTownVisit()
+        {
+            // Older checkpoints tracked town visits indirectly through route stops, commissions and the dock pact.
+            static bool IsTown(NodeKind kind) => kind is NodeKind.Town or NodeKind.Shop;
+            if (HasVisitedTown || HasShopVisit || QuestActive || IsTown(Current.Kind) ||
+                (HasPrevious && IsTown(Previous.Kind)) || (FinishVisit && IsTown(Options[Choice])) ||
+                (SeenEvents != null && Array.IndexOf(SeenEvents, AdventureEventKind.TidePact) >= 0))
+                return true;
+            for (int i = 0; i < Stage - 1; i++)
+                if (!Nodes[i].Fork && IsTown(Nodes[i].Kind)) return true;
+            return false;
+        }
 
         internal NodeKind RestoreKind(int stage, NodeKind kind)
         {
@@ -63,13 +80,18 @@ namespace RaidPartyManager.Run
     }
 
     [Serializable]
-    public sealed class ShopVisitCheckpoint
+    public class RecruitmentCheckpoint
     {
-        public bool InTalentMarket;
-        public string[] Commissions;
         public bool Signed;
         public string[] Slots;
         public string[] Candidates;
+    }
+
+    [Serializable]
+    public sealed class ShopVisitCheckpoint : RecruitmentCheckpoint
+    {
+        public bool InTalentMarket;
+        public string[] Commissions;
         public ShopOfferCheckpoint[] Stock;
         public TownService[] UsedServices;
         public string[] TownRecruits;
@@ -154,6 +176,7 @@ namespace RaidPartyManager.Run
         public int Gold;
         public int Day, TalentSeed;
         public long PayrollDebt;
+        public int PayrollPausedDays;
         public GoldExpense[] Expenses;
         public int NextItemId;
         public int NextBookId;

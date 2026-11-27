@@ -31,6 +31,7 @@ namespace RaidPartyManager.Presentation
         internal static AdventureRun Active { get; private set; }
         internal static bool OnRoute => destination != null && Active is { IsInspection: false } && !InspectionMode;
         internal static bool InspectionMode { get; private set; } = true;
+        internal static bool ContractsEnabled { get; set; }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void Reset()
@@ -125,8 +126,8 @@ namespace RaidPartyManager.Presentation
                 ? gear.Where(item => item.AvailableInRegularPool && item.Price > 0 && item.Tier == 3).OrderBy(_ => random.Next()).Take(2)
                     .Concat(gear.Where(item => item.AvailableInRegularPool && item.Price > 0 && item.Tier == 2).OrderBy(_ => random.Next()).Take(2))
                 : gear.Where(item => !item.IsPotion && item.Tier is 1 or 2).OrderBy(_ => random.Next()).Take(2);
-            var party = new PartyRun(members, bag);
-            party.AddGold(inspectionMode ? 100 : 50);
+            var party = new PartyRun(members, bag, ContractsEnabled);
+            party.AddGold(100);
             return new AdventureRun(party, content.CharacterCatalog, gear.Concat(content.SkillBooks), inspectionMode, random, foundingGrant: true);
         }
 
@@ -167,7 +168,7 @@ namespace RaidPartyManager.Presentation
                 }
                 var items = content.StartingEquipment.Concat(content.SkillBooks)
                     .Append(content.VictoryReward).Where(item => item != null);
-                var restored = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, items);
+                var restored = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, items, ContractsEnabled);
                 resumeMarket = saved.HasShopVisit && saved.ShopVisit.InTalentMarket && restored.Current?.Kind == NodeKind.Town;
                 return restored;
             }
@@ -343,6 +344,7 @@ namespace RaidPartyManager.Presentation
 
         internal static void OpenNodeScene(string scene, bool fromTown = false, StageTurn turn = StageTurn.Automatic)
         {
+            if (scene == "DockShop" && Active?.AtRecruitmentWheel == true) AutoSave(Active);
             DockPlayhouse.ChangeSet(() =>
             {
                 origin = fromTown ? "Town" : "EventSelect";
@@ -354,6 +356,7 @@ namespace RaidPartyManager.Presentation
 
         internal static string SceneFor(NodeKind kind) => kind switch
         {
+            NodeKind.Event when Active?.AtRecruitmentWheel == true => "DockShop",
             NodeKind.Event or NodeKind.TreasureChest => "EventSelect",
             NodeKind.Camp => "Camp", NodeKind.Shop or NodeKind.Town => "Town",
             _ => Active?.InCapital == true ? "ClockworkCapital" : Active?.InGraveyard == true ? "WhisperingGraveyard" : "BattlePrototype"
@@ -429,7 +432,8 @@ namespace RaidPartyManager.Presentation
             if (Active?.CampaignWon != true) return;
             Active.CloseVisit();
             InvalidateCheckpoint();
-            DockPlayhouse.Current.ShowFinalCurtain(Active.Party.Gold, Active.Party.PayrollDebt, EndRouteAndOpenMenu);
+            var party = Active.Party;
+            DockPlayhouse.Current.ShowFinalCurtain(party.Gold, party.ContractsEnabled ? party.PayrollDebt : null, EndRouteAndOpenMenu);
         }
 
         internal static void ReturnFromNode()
@@ -471,6 +475,7 @@ namespace RaidPartyManager.Presentation
 
         internal static string EventName(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Title : GraveStories.Contains(kind) ? GraveStories.Title(kind) : kind switch
         {
+            AdventureEventKind.RecruitmentWheel => "天降招募转盘",
             AdventureEventKind.GraveSeed => "温室里的种子", AdventureEventKind.TidePact => "潮汐之约", AdventureEventKind.Investor => "引资的创业者", AdventureEventKind.Ambush => "随机敌人",
             AdventureEventKind.LostTraveler => "呼朋引伴", AdventureEventKind.FoundCoins => "捡到钱了",
             AdventureEventKind.HatTrick => "帽子戏法", AdventureEventKind.Forge => "锻造台",
@@ -485,8 +490,11 @@ namespace RaidPartyManager.Presentation
 
         internal static string Narrative(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Intro + "\n" + string.Join("\n", CapitalStories.For(kind).Choices.Select(c => c.Label + "：" + c.Terms)) : GraveStories.Contains(kind) ? GraveStories.Intro(kind) : kind switch
         {
+            AdventureEventKind.RecruitmentWheel => ContractsEnabled ? "长按候选人，拖到柜台签约" : "长按候选人，拖到柜台招募",
             AdventureEventKind.GraveSeed => "温室的桌上放着一个钱袋和一颗奇怪的种子。字条上写着：拿走一样。选了种子，就让一名出战队员装备它。",
-            AdventureEventKind.TidePact => "深海轻语浮出水面，指了指你的背包。她想用 99 天的同行换一件装备和一本技能书，期间不收工资。",
+            AdventureEventKind.TidePact => ContractsEnabled
+                ? "深海轻语浮出水面，指了指你的背包。她想用 99 天的同行换一件装备和一本技能书，期间不收工资。"
+                : "深海轻语浮出水面，指了指你的背包。交给她一件装备和一本技能书，她就会加入讨伐队。",
             AdventureEventKind.Investor => "船主还差钱造船。填好金额，再点击出资牌。账上凑满 50 金币，她才送两件装备，不足 50 就先记账。",
             AdventureEventKind.Ambush => "灯一灭，埋伏的人就围上来了！准备好就点击应战牌，打赢这场能拿 12～18 金币。",
             AdventureEventKind.LostTraveler => "雾里有人答应来投奔咱们。您喊一声，等人走到跟前，就知道谁应了招。",

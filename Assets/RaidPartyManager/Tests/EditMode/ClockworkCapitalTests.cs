@@ -54,8 +54,8 @@ namespace RaidPartyManager.Tests
             saved.FloorCleared = true;
             var next = AdventureRun.RestoreCheckpoint(saved, dock.CharacterCatalog, gear);
             Assert.That(next.InCapital && next.Stage == 1 && next.Party.Day == saved.Party.Day, Is.True);
-            Assert.That(next.AvailableEvents(), Is.EquivalentTo(CapitalStories.Kinds));
-            Assert.That(next.AvailableEvents().Distinct().Count(), Is.EqualTo(15));
+            Assert.That(next.AvailableEvents(), Is.EquivalentTo(CapitalStories.Kinds.Append(AdventureEventKind.RecruitmentWheel)));
+            Assert.That(next.AvailableEvents().Distinct().Count(), Is.EqualTo(13));
             var broke = Create(true);
             Assert.That(broke.Party.TrySpendGold(broke.Party.Gold, "清空零钱"), Is.True);
             Assert.That(broke.Inspect(NodeKind.Event, AdventureEventKind.SpareHands), Is.True);

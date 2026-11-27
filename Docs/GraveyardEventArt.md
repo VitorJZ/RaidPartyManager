@@ -18,16 +18,13 @@ Use case: illustration-story. Production game sprite STRIP, extra wide horizonta
 - [Pallbearer](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/Pallbearer.png) — a long closed purple coffin on three wooden trestles, horizontal / one corner dips / lid hops as someone knocks from within
 - [ClaimDesk](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/ClaimDesk.png) — a bone insurance clerk's red wooden rubber stamp over an open claims ledger, lifted / comes down / red seal visible
 - [Auction](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/Auction.png) — three distinct closed heirloom boxes clustered on a dark auction block, still / middle lid ajar glowing / lid closes
-- [Sponsorship](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/Sponsorship.png) — a gilded cemetery arch sign with the painted image of a helmet on a swaying chain, left / vertical / right
 - [HoundWalk](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/HoundWalk.png) — one gentle elderly black mastiff wearing a worn brass collar and carrying its own leash, ears down / looks up and wags / sits curled around the collar
 - [DeadLetters](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/DeadLetters.png) — three ivory envelopes with dried flowers and colored wax seals in a cemetery mail rack, folded / one unfolding / opened letter
-- [WeepingWall](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/WeepingWall.png) — a gray gothic stone face carved into a freestanding ruined wall, one tear wells / tear rolls down / falls into a small bronze bowl
 - [Ravens](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/Ravens.png) — three distinct black ravens clustered on a crooked iron road sign, wings folded / one points a wing / one flaps
 - [BellRope](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/BellRope.png) — an old green bronze graveyard bell hung on an oak stand with long rope, left swing / center / right swing
 - [SoulWard](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/SoulWard.png) — two little antique purple hospice cots linked by a luminous silver sewing thread on a spool, thread loose / becomes taut / gives off a gentle flicker
 - [SoupQueue](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/SoupQueue.png) — steaming soup tureen beside a single bread roll and a battered serving ladle, ladle raised / pours into bowl / soup steams
 - [Epitaph](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/Epitaph.png) — a scalloped slate tablet beside a mallet and mason's chisel, poised / chisel strikes / pale chips fall
-- [BorrowedName](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/BorrowedName.png) — an eerie brass royal balance with a blank vellum name tag and a tiny crown, tag on low pan / scales level / crown dips
 
 [生前没说完的那句话](../Assets/RaidPartyManager/Art/DockPlayhouse/Resources/StoryEvents/WhisperWall.png)
 

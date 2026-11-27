@@ -9,7 +9,7 @@ namespace RaidPartyManager.Run
     public sealed class GravePromises
     {
         public string PressCorrection;
-        public string Porter, Interview, Wreath, Alias, RealName, PartnerA, PartnerB;
+        public string Porter, Interview, Wreath, PartnerA, PartnerB;
         public int Bell;
         public bool Scout, Separate;
         public GravePromises Copy() => (GravePromises)MemberwiseClone();
@@ -20,19 +20,6 @@ namespace RaidPartyManager.Run
         private GravePromises grave = new();
         internal GravePromises Promises => grave;
         public bool GraveScout => grave.Scout;
-        public bool HasBorrowedName => !string.IsNullOrEmpty(grave.RealName);
-        public string BorrowedRealName => grave.RealName;
-        private CharacterDefinition DisplayCharacter(Member member) => member.Id == grave.Alias
-            ? member.Character.WithName("某位员工") : member.Character;
-
-        public bool ReclaimName(string name)
-        {
-            if (!HasBorrowedName || name != grave.RealName) return false;
-            GraveMemory(grave.Alias, "我在出园登记簿上认出了自己的名字。");
-            grave.Alias = grave.RealName = null;
-            return true;
-        }
-
         internal string CollectPressCorrection()
         {
             string notice = grave.PressCorrection;

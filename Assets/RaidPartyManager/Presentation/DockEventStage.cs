@@ -92,7 +92,7 @@ namespace RaidPartyManager.Presentation
         private static StageVenue VenueFor(AdventureEventKind? play) => play switch
         {
             AdventureEventKind.Auction or AdventureEventKind.Obituary or AdventureEventKind.ClaimDesk
-                or AdventureEventKind.DeadLetters or AdventureEventKind.Sponsorship or AdventureEventKind.BorrowedName
+                or AdventureEventKind.DeadLetters
                 or AdventureEventKind.Alchemist or AdventureEventKind.Investor or AdventureEventKind.HatTrick => StageVenue.Interior,
             AdventureEventKind.SoupQueue or AdventureEventKind.Forge => StageVenue.Firelight,
             _ => StageVenue.Outdoors
@@ -118,8 +118,6 @@ namespace RaidPartyManager.Presentation
                 case AdventureEventKind.Obituary:
                 case AdventureEventKind.ClaimDesk:
                 case AdventureEventKind.DeadLetters:
-                case AdventureEventKind.Sponsorship:
-                case AdventureEventKind.BorrowedName:
                     HangBackdrop("Mortuary records office", art.mortuaryOffice);
                     Deck(art.timber, DockPlayhouse.PlankTile, new Color(.64f,.62f,.54f));
                     FloorProp("Pigeonhole archive", art.recordPigeonholes, -3.25f, .85f, 2.55f, -5);
@@ -128,7 +126,6 @@ namespace RaidPartyManager.Presentation
                     FloorProp("Notices for the bereaved", art.contractBoard, 4.9f, .8f, 1.6f, 6);
                     break;
                 case AdventureEventKind.HoundWalk:
-                case AdventureEventKind.WeepingWall:
                 case AdventureEventKind.WhisperWall:
                 case AdventureEventKind.Epitaph:
                 case AdventureEventKind.Ravens:
@@ -225,8 +222,13 @@ namespace RaidPartyManager.Presentation
             resident.enabled = residentShadow.enabled = progress < 1;
         }
 
+        private BattleStage battleCast;
         internal BattleStage BattleCast(VisualElement panel, BattleStageArt battleArt, double now) =>
-            new BattleStage(stage,camera,panel,battleArt,null,now,house);
+            battleCast = new BattleStage(stage, camera, panel, battleArt, null, now, house);
+
+        protected override Bounds FormationBounds() =>
+            battleCast is { IsActive: true } ? battleCast.FormationBounds : base.FormationBounds();
+
         private readonly MeshRenderer[] bottles = new MeshRenderer[3];
         private readonly MeshRenderer[] hats = new MeshRenderer[3];
         private readonly MeshRenderer[] hatShadows = new MeshRenderer[3];

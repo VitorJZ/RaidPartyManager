@@ -18,6 +18,7 @@ namespace RaidPartyManager.Presentation
         private int recruitPointer = -1;
         private bool recruitDragging;
         private bool restoredCompany;
+        private bool focusWheelOnArrival;
         private Vector2 recruitPointerPosition;
 
         private void PrepareRecruitment()
@@ -30,7 +31,8 @@ namespace RaidPartyManager.Presentation
             recruitment = adventure?.Current.ShopRecruitment ??
                 new ShopRecruitment(party, content.CharacterCatalog, random, standaloneRecruitPrice);
             restoredCompany = true;
-            stage.BuildRecruitmentWheel(recruitment, content);
+            focusWheelOnArrival = isWheelEvent;
+            stage.BuildRecruitmentWheel(recruitment, content, isWheelEvent && !adventure.Current.WheelLanded);
         }
 
         private void RenderRecruitmentEntry()
@@ -50,9 +52,9 @@ namespace RaidPartyManager.Presentation
 
         private void ShowRecruitment()
         {
-            if (recruitment.Signed || recruitmentWindow != null) return;
-            CloseCounter();
-            stockLayer.SetEnabled(false);
+            if (recruitment.Signed || recruitmentWindow != null || stage.RecruitmentDropping) return;
+            if (!isWheelEvent) CloseCounter();
+            stockLayer?.SetEnabled(false);
             stage.RecruitmentFocused = true;
             stage.HideCompany();
             restoredCompany = false;
@@ -84,6 +86,23 @@ namespace RaidPartyManager.Presentation
             recruitmentControls.Add(spinButton);
             priceCounter = new ShopPriceCounter(recruitment.NextPrice);
             recruitmentControls.Add(priceCounter);
+            if (isWheelEvent)
+            {
+                var leave = PrototypeStyle.Button(adventure.IsInspection ? "返回事件检查" : "继续赶路", "leave-wheel-event",
+                    () => topBar.WhenRewardsArrive(AdventureFlow.ReturnFromNode));
+                leave.style.position = Position.Absolute;
+                leave.style.top = RunTopBar.Height + 10;
+                leave.style.right = 16;
+                recruitmentWindow.Add(leave);
+
+                var hint = PrototypeStyle.Text(AdventureFlow.Narrative(AdventureEventKind.RecruitmentWheel), 15, PrototypeStyle.Accent);
+                hint.name = "wheel-contract-hint";
+                hint.style.position = Position.Absolute;
+                hint.style.left = 18;
+                hint.style.top = RunTopBar.Height + 41;
+                hint.pickingMode = PickingMode.Ignore;
+                recruitmentWindow.Add(hint);
+            }
             RefreshSpinControl();
             SyncRecruitCast();
             spinButton.Focus();
@@ -181,9 +200,9 @@ namespace RaidPartyManager.Presentation
         private void OpenRecruitContract(CharacterDefinition candidate, string replace = null)
         {
             replacementPanel?.RemoveFromHierarchy();
-            if (adventure == null) { SignRecruit(candidate, replace); return; }
+            if (adventure == null || !party.ContractsEnabled) { SignRecruit(candidate, replace); return; }
             var talent = party.TalentFor(candidate);
-            replacementPanel = ContractPanel.Negotiate(candidate, party.Day, talent, 0, null, CrewContract.ExpectedWage(candidate, talent), EmployeeAttributes.Starting,
+            replacementPanel = ContractPanel.Negotiate(candidate, party.ContractDay, talent, 0, null, CrewContract.ExpectedWage(candidate, talent), EmployeeAttributes.Starting,
                 (days, terms, fee) => SignRecruit(candidate, replace, days, terms, fee),
                 () => { replacementPanel?.RemoveFromHierarchy(); replacementPanel = null; if (recruitmentWindow != null) RefreshSpinControl(); });
             recruitmentWindow.Add(replacementPanel);
@@ -227,6 +246,7 @@ namespace RaidPartyManager.Presentation
             bool drawn = adventure != null ? adventure.DrawShopRecruit() : recruitment.TryDraw(random, SpendTestCoins);
             if (!drawn) return;
             if (adventure == null) standaloneRecruitPrice = recruitment.NextPrice;
+            else if (isWheelEvent) AdventureFlow.AutoSave(adventure);
             RefreshGold();
             stage.SpinRecruitmentWheel(recruitment.Candidates.Last());
             RefreshRecruitmentButton();
@@ -235,6 +255,17 @@ namespace RaidPartyManager.Presentation
 
         private void UpdateRecruitment(float delta)
         {
+            if (stage.UpdateWheelDrop(delta))
+            {
+                adventure.LandRecruitmentWheel();
+                AdventureFlow.AutoSave(adventure);
+                RefreshRecruitmentButton();
+            }
+            if (focusWheelOnArrival && !stage.RecruitmentDropping && !DockPlayhouse.Moving)
+            {
+                focusWheelOnArrival = false;
+                ShowRecruitment();
+            }
             if (stage.UpdateRecruitment(delta))
             {
                 stage.RefreshWheel(recruitment);
@@ -276,7 +307,7 @@ namespace RaidPartyManager.Presentation
             recruitTargets.Clear();
             priceCounter = null;
             stage.RecruitmentFocused = false;
-            stockLayer.SetEnabled(true);
+            stockLayer?.SetEnabled(true);
             RefreshRecruitmentButton();
         }
     }

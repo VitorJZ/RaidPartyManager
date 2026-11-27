@@ -347,7 +347,9 @@ namespace RaidPartyManager.Domain
                 throw new ArgumentException("Combat equipment slots must match the supplied equipped instances.", nameof(equipmentSlots));
             var initial = startingStatuses?.Where(status => status.Value > 0).ToDictionary(status => status.Key, status => status.Value)
                 ?? new Dictionary<StatusKind, int>();
-            if (initial.ContainsKey(StatusKind.Wet) && initial.ContainsKey(StatusKind.Chill))
+            if (initial.ContainsKey(StatusKind.Frozen))
+                initial.Remove(StatusKind.Chill);
+            else if (initial.ContainsKey(StatusKind.Wet) && initial.ContainsKey(StatusKind.Chill))
             {
                 initial.Remove(StatusKind.Wet);
                 initial.Remove(StatusKind.Chill);

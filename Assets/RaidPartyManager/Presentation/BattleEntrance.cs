@@ -47,7 +47,7 @@ namespace RaidPartyManager.Presentation
                 if (EntranceSheet == null && WalkSheet == null && art != null)
                     Figure = new EntranceWalkPose(art, unit.Character.Profession, unit.Side == Side.Enemy, stage);
                 else
-                    Figure = new StageActorImage(stage, true)
+                    Figure = new StageActorImage(stage, inMotion: true, keepsStageFocus: unit.Side == Side.Enemy)
                     {
                         image = EntranceSheet ?? WalkSheet ?? content.PortraitFor(unit.Character.Id),
                         scaleMode = EntranceSheet != null || WalkSheet != null ? ScaleMode.StretchToFill : ScaleMode.ScaleToFit,

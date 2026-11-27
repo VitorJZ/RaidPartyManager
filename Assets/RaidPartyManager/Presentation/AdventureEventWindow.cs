@@ -415,7 +415,7 @@ namespace RaidPartyManager.Presentation
             }
             tideGear = Picker("装备", "tide-gear", gear, tideGear, id => tideGear = id);
             tideBook = Picker("技能书", "tide-book", books, tideBook, id => tideBook = id);
-            choices.Choice("交付两件物品并签约", "sign-tide-pact", () =>
+            choices.Choice(run.Party.ContractsEnabled ? "交付两件物品并签约" : "交付两件物品并招募", "sign-tide-pact", () =>
             {
                 if (run.OfferTidePact(tideGear, tideBook))
                 {

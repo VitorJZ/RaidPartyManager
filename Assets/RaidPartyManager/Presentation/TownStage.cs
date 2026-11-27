@@ -21,7 +21,8 @@ namespace RaidPartyManager.Presentation
         private readonly int[] frame = { -1, -1, -1, -1 };
 
         public TownStage(Transform owner, VisualElement panel, ServiceStageArt art, bool graveyard, bool capital = false) :
-            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Outdoors) : StageLighting.For(graveyard, StageVenue.Outdoors))
+            base(owner, panel, art, capital ? StageLighting.Clockwork(StageVenue.Outdoors) : StageLighting.For(graveyard, StageVenue.Outdoors),
+                StageTiltShift.FacilityStrength)
         {
             if (capital) DressCapital(0);
             else
@@ -107,7 +108,12 @@ namespace RaidPartyManager.Presentation
             var sign = signs[index] = HangingBoard("Hanging placard " + index, "Placard slab", SignFace.Plank,
                 SignWidth, SignHeight, .14f, "Sign cord", CordThickness);
             sign.Board.localPosition = signRest[index];
-            foreach (var (part, _) in sign.Painted) Dressing.Flown.Add(part);
+            foreach (var (part, _) in sign.Painted)
+            {
+                // The venue labels sit on these boards above the cast's focus band.
+                part.renderingLayerMask |= StageTiltShift.SharpLayer;
+                Dressing.Flown.Add(part);
+            }
             foreach (var cord in sign.Ropes) Dressing.Flown.Add(cord);
         }
 

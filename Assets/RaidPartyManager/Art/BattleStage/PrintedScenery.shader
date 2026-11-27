@@ -16,14 +16,7 @@ Shader "Raid Party Manager/Printed Scenery"
     SubShader
     {
         Tags { "Queue"="Transparent" "RenderType"="Transparent" "IgnoreProjector"="True" }
-        Pass
-        {
-            Stencil { Ref 16 ReadMask 16 Comp [_PortalTest] Pass Keep }
-            Cull Off ZWrite Off Blend SrcAlpha OneMinusSrcAlpha
-            CGPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-            #pragma multi_compile_local __ RPM_DOCK_MOON
+        CGINCLUDE
             #include "UnityCG.cginc"
             #include "../Stagecraft/ScenicPaint.cginc"
             #include "../Stagecraft/RidingFoam.cginc"
@@ -109,6 +102,31 @@ Shader "Raid Party Manager/Printed Scenery"
                     color.a *= 1-smoothstep(.18,1,length(i.uv*2-1));
                 return color;
             }
+            half4 LensMask(Varyings i) : SV_Target
+            {
+                half alpha = tex2D(_MainTex, i.uv).a * _Color.a;
+                return alpha.xxxx;
+            }
+        ENDCG
+
+        Pass
+        {
+            Stencil { Ref 16 ReadMask 16 Comp [_PortalTest] Pass Keep }
+            Cull Off ZWrite Off Blend SrcAlpha OneMinusSrcAlpha
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma multi_compile_local __ RPM_DOCK_MOON
+            ENDCG
+        }
+        Pass
+        {
+            Tags { "LightMode"="StageLensMask" }
+            Stencil { Ref 16 ReadMask 16 Comp [_PortalTest] Pass Keep }
+            Cull Off ZWrite Off Blend One OneMinusSrcAlpha
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment LensMask
             ENDCG
         }
     }

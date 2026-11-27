@@ -57,7 +57,7 @@ namespace RaidPartyManager.Presentation
             if (side == Side.Party)
             {
                 statusBackdrop = Resources.Load<Texture2D>("PartyStatusBackdrop");
-                contractsBackdrop = Resources.Load<Texture2D>("PartyContractsBackdrop");
+                if (run.ContractsEnabled) contractsBackdrop = Resources.Load<Texture2D>("PartyContractsBackdrop");
                 style.backgroundSize = new BackgroundSize(BackgroundSizeType.Cover);
             }
 
@@ -75,7 +75,7 @@ namespace RaidPartyManager.Presentation
             var leftSpacer = new VisualElement { pickingMode = PickingMode.Ignore };
             leftSpacer.style.width = buttonWidth;
             leftSpacer.style.flexShrink = 0;
-            if (side == Side.Party)
+            if (side == Side.Party && run.ContractsEnabled)
             {
                 var toggle = PrototypeStyle.Button("查看合约", "roster-display", null);
                 toggle.style.width = buttonWidth;
@@ -113,7 +113,7 @@ namespace RaidPartyManager.Presentation
             var backButton = PrototypeStyle.Button("返回", "back-party-editor", back);
             backButton.style.width = buttonWidth;
             backButton.style.flexShrink = 0;
-            if (side == Side.Party && run.Day > 0) backButton.style.marginLeft = buttonWidth + headerGap;
+            if (side == Side.Party && run.ContractsEnabled && run.Day > 0) backButton.style.marginLeft = buttonWidth + headerGap;
             header.Add(backButton);
             overview.Add(header);
             if (side == Side.Enemy && content.EnemyFormations.Count > 0)
@@ -224,7 +224,9 @@ namespace RaidPartyManager.Presentation
             if (side == Side.Party)
             {
                 string controls = showContracts ? "点击查看合约，长按换位。" :
-                    run.Day > 0 ? "点击查看装备，长按换位，右击查看合约。" : "点击查看装备，长按换位，右击替换队员。";
+                    run.Day == 0 ? "点击查看装备，长按换位，右击替换队员。" :
+                    run.ContractsEnabled ? "点击查看装备，长按换位，右击查看合约。" :
+                        "点击查看装备，长按换位，右击查看员工档案。";
                 instructions = $"队员 {members.Count}/{PartyRun.RosterLimit}　·　{controls}";
             }
             var hint = PrototypeStyle.Text(instructions, 13, PrototypeStyle.Muted);
@@ -401,7 +403,7 @@ namespace RaidPartyManager.Presentation
                 hp.text = member == null ? "—" : "无合约";
                 if (member?.Contract != null)
                 {
-                    int days = Math.Max(0, member.ContractEndDay - run.Day);
+                    int days = Math.Max(0, member.ContractEndDay - run.ContractDay);
                     hp.text = $"合约剩余 {days} 天";
                     if (days <= 3) hp.style.color = (Color)new Color32(255, 115, 103, 255);
                 }
@@ -464,20 +466,23 @@ namespace RaidPartyManager.Presentation
 
         private void RegisterReplacement(VisualElement target, MemberView member)
         {
-            if (side == Side.Party && member.Contract != null) target.tooltip = "右击查看合约";
+            if (side == Side.Party && run.Day > 0)
+                target.tooltip = run.ContractsEnabled ? "右击查看合约" : "右击查看员工档案";
             target.RegisterCallback<PointerUpEvent>(evt =>
             {
                 if (evt.button != 1 || memberId != null)
                     return;
-                if (side == Side.Party && member.Contract != null) OpenContract(member);
-                else OpenReplacement(member);
+                if (side != Side.Party || run.Day == 0) OpenReplacement(member);
+                else if (run.ContractsEnabled && member.Contract != null) OpenContract(member);
+                else OpenDetails(member.Id, dossier: true);
                 evt.StopPropagation();
             });
         }
 
         private void OpenContract(MemberView member, Action closed = null)
         {
-            var popup = ContractPanel.Negotiate(member.Character, run.Day, member.Trait, 0, member.Contract,
+            if (!run.ContractsEnabled) return;
+            var popup = ContractPanel.Negotiate(member.Character, run.ContractDay, member.Trait, 0, member.Contract,
                 run.ExpectedDailyWage(member.Id), member.EmployeeAttributes,
                 (days, terms, fee) => run.SetContract(member.Id, days, terms, fee),
                 () => { CloseModal(); RenderEditedRoster(); closed?.Invoke(); }, member.Renewals);

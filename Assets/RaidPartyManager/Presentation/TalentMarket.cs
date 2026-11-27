@@ -115,13 +115,13 @@ namespace RaidPartyManager.Presentation
                 var training = run.Party.TownCandidateTraining(c);
                 var stats = c.BaseStats + training.Bonus;
                 int signingPrice = run.Party.SigningPrice(c);
-                int expectedWage = CrewContract.ExpectedWage(c, trait, trainingSessions: training.Sessions);
-                var ratings = EmployeeAttributes.Starting;
                 string trainingInfo = training.Sessions > 0
                     ? $"已训练 {training.Sessions}/{CampTraining.Limit} 次 · {training.Describe()}\n" : "";
+                int expectedWage = run.Party.ContractsEnabled
+                    ? CrewContract.ExpectedWage(c, trait, trainingSessions: training.Sessions) : 0;
                 string info = $"{c.Name}　{AdventureFlow.ProfessionName(c.Profession)}　{c.Stage} 阶　" +
                     $"攻击 {stats.Attack}　防御 {stats.Defense}　特防 {stats.SpecialDefense}　生命 {stats.Health}\n" + trainingInfo +
-                    $"期望日薪 {expectedWage} 金币\n" +
+                    (run.Party.ContractsEnabled ? $"期望日薪 {expectedWage} 金币\n" : "") +
                     (string.IsNullOrEmpty(c.TraitText) ? "" : ProfileLine("被动：" + c.TraitText, PrototypeStyle.Passive) + "\n") +
                     ProfileLine(PlayerMarket.Describe(trait), PrototypeStyle.Trait) + "\n" +
                     ProfileLine("性格：" + EmployeeVoice.For(c.Personality).Name, PrototypeStyle.Personality);
@@ -132,23 +132,37 @@ namespace RaidPartyManager.Presentation
                         return;
                     }
                     HideProfile();
-                    VisualElement contract = null;
-                    contract = ContractPanel.Negotiate(c, run.Party.Day, trait, signingPrice, null, expectedWage, ratings,
-                        (days, terms, fee) =>
+                    VisualElement panel = null;
+                    void Close() => panel.RemoveFromHierarchy();
+                    if (run.Party.ContractsEnabled)
+                        panel = ContractPanel.Negotiate(c, run.Party.ContractDay, trait, signingPrice, null, expectedWage,
+                            EmployeeAttributes.Starting, (days, terms, fee) => Recruit(days, terms, fee), Close);
+                    else
+                    {
+                        panel = ContractPanel.Sheet("招募队员", out var paper, Close);
+                        panel.name = "market-recruit-confirmation";
+                        paper.Add(ContractPanel.Text($"花费 {signingPrice} 金币招募{c.Name}。", 17));
+                        var confirm = PrototypeStyle.Button("确认招募", "confirm-market-recruit", () =>
                         {
-                            if (!run.ChooseTownRecruit(c.Id, days, terms, fee)) return false;
-                            GameAudio.Play(SoundCue.CompanionJoin);
+                            if (Recruit(0, default, null)) Close();
+                        }, true);
+                        confirm.SetEnabled(run.Party.Gold >= signingPrice);
+                        paper.Add(confirm);
+                    }
+                    overlay.Add(panel);
 
-                            stage.BeginDeparture(index, Time.unscaledTime);
-                            marketTargets[index].Entry.RemoveFromHierarchy();
-                            marketTargets[index].Price.RemoveFromHierarchy();
-                            marketTargets[index] = default;
-                            topBar.Refresh();
-                            if (marketTargets.All(target => target.Entry == null)) empty.style.display = DisplayStyle.Flex;
-                            return true;
-                        },
-                        () => contract.RemoveFromHierarchy());
-                    overlay.Add(contract);
+                    bool Recruit(int days, PerformanceBonuses terms, long? fee)
+                    {
+                        if (!run.ChooseTownRecruit(c.Id, days, terms, fee)) return false;
+                        GameAudio.Play(SoundCue.CompanionJoin);
+                        stage.BeginDeparture(index, Time.unscaledTime);
+                        marketTargets[index].Entry.RemoveFromHierarchy();
+                        marketTargets[index].Price.RemoveFromHierarchy();
+                        marketTargets[index] = default;
+                        topBar.Refresh();
+                        if (marketTargets.All(target => target.Entry == null)) empty.style.display = DisplayStyle.Flex;
+                        return true;
+                    }
                 });
                 entry.style.backgroundColor = Color.clear;
                 PrototypeStyle.Outline(entry, Color.clear, 0);

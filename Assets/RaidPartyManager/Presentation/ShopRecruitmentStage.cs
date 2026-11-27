@@ -18,7 +18,13 @@ namespace RaidPartyManager.Presentation
         private readonly MeshRenderer[] wheelSegments = new MeshRenderer[ShopRecruitment.SlotCount];
         private readonly MeshRenderer[] wheelPortraits = new MeshRenderer[ShopRecruitment.SlotCount];
         private IReadOnlyList<CharacterDefinition> wheelSlots;
+        private const float DropHeight = 8.5f;
+        private const float FallDuration = .72f;
+        private const float BounceDuration = .28f;
+        private Transform wheelFixture;
         private Transform wheel;
+        private float dropElapsed;
+        internal bool RecruitmentDropping { get; private set; }
         private Mesh segmentMesh, portraitMesh;
         private float focus;
         private float wheelAngle;
@@ -30,12 +36,13 @@ namespace RaidPartyManager.Presentation
         internal float RecruitmentFocus => focus;
         private Vector3 RecruitmentEye => new(1.24f, 1.25f, house.DeckBounds.min.z - 4.67f);
 
-        internal void BuildRecruitmentWheel(ShopRecruitment recruitment, EncounterData content)
+        internal void BuildRecruitmentWheel(ShopRecruitment recruitment, EncounterData content, bool dropFromSky)
         {
             wheelSlots = recruitment.Slots;
-            var fixture = new GameObject("Recruitment wheel fixture").transform;
+            var fixture = wheelFixture = new GameObject("Recruitment wheel fixture").transform;
             fixture.SetParent(stage, false);
-            fixture.localPosition = RecruitmentCentre;
+            RecruitmentDropping = dropFromSky;
+            fixture.localPosition = RecruitmentCentre + Vector3.up * (dropFromSky ? DropHeight : 0);
             wheel = new GameObject("Recruitment wheel rotor").transform;
             wheel.SetParent(fixture, false);
 
@@ -68,7 +75,17 @@ namespace RaidPartyManager.Presentation
 
                 var slot = wheelSlots[i];
                 if (slot == null) continue;
-                var face = Flat("Recruitment portrait " + i, Vector3.zero, 1, 1, content.PortraitFor(slot.Id));
+                var artwork = content.PortraitFor(slot.Id);
+                var face = Flat("Recruitment portrait " + i, Vector3.zero, 1, 1, artwork);
+                if (artwork != null)
+                {
+                    // Fill the sector with a top-centred crop of the original portrait.
+                    float aspect = (float)artwork.width / artwork.height;
+                    float u = Mathf.Min(1, 1 / aspect), v = Mathf.Min(1, aspect);
+                    face.GetPropertyBlock(properties);
+                    properties.SetVector("_MainTex_ST", new Vector4(u, v, (1 - u) * .5f, 1 - v));
+                    face.SetPropertyBlock(properties);
+                }
                 face.GetComponent<MeshFilter>().sharedMesh = portraitMesh;
                 wheelPortraits[i] = Part(face, segment.transform, Vector3.zero);
             }
@@ -91,6 +108,24 @@ namespace RaidPartyManager.Presentation
             if (recruitment.Candidates.LastOrDefault() is { } previous)
                 SetWheelAngle(SlotAngle(previous));
             RefreshWheel(recruitment);
+        }
+
+        internal bool UpdateWheelDrop(float delta)
+        {
+            if (!RecruitmentDropping || DockPlayhouse.Moving) return false;
+            float previous = dropElapsed;
+            dropElapsed += delta;
+            float fall = Mathf.Clamp01(dropElapsed / FallDuration);
+            float bounce = Mathf.Clamp01((dropElapsed - FallDuration) / BounceDuration);
+            float height = DropHeight * (1 - fall * fall) + .8f * bounce * (1 - bounce);
+            wheelFixture.localPosition = RecruitmentCentre + Vector3.up * height;
+            if (previous < FallDuration && dropElapsed >= FallDuration)
+            {
+                house.LandRoadstone();
+                GameAudio.Play(SoundCue.StageStoneSignLand, .65f);
+            }
+            RecruitmentDropping = bounce < 1;
+            return !RecruitmentDropping;
         }
 
         private static MeshRenderer Part(MeshRenderer part, Transform parent, Vector3 position)
@@ -228,7 +263,7 @@ namespace RaidPartyManager.Presentation
             }
 
             void AddPortraitUv(Vector3 point) => uv.Add(new Vector2(.5f + point.x / .74f,
-                Mathf.Lerp(.17f, .99f, Mathf.InverseLerp(.22f, .96f, point.y))));
+                1f + (point.y - outer) / .74f));
         }
     }
 }

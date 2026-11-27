@@ -136,7 +136,8 @@ namespace RaidPartyManager.Presentation
                 var formation = content.Draft(Side.Party, new System.Random());
                 playModeRun = new PartyRun(formation.Select(unit => new PartyMemberStart(
                     unit.Id, unit.Character, unit.Position, unit.Health, unit.StartingStatuses)),
-                    content.StartingEquipment.Concat(content.SkillBooks).Where(item => !item.BossExclusive && item.Effect != EquipmentEffect.StrangeSeed));
+                    content.StartingEquipment.Concat(content.SkillBooks).Where(item => !item.BossExclusive && item.Effect != EquipmentEffect.StrangeSeed),
+                    AdventureFlow.ContractsEnabled);
             }
             return playModeRun;
         }
@@ -173,7 +174,8 @@ namespace RaidPartyManager.Presentation
             content = encounter.ToData();
             adventure = AdventureFlow.ForScene(SceneManager.GetActiveScene().name);
             run = adventure?.Party ?? (playModeRun ??= new PartyRun(RosterStart(Side.Party),
-                content.StartingEquipment.Concat(content.SkillBooks).Where(item => !item.BossExclusive && item.Effect != EquipmentEffect.StrangeSeed)));
+                content.StartingEquipment.Concat(content.SkillBooks).Where(item => !item.BossExclusive && item.Effect != EquipmentEffect.StrangeSeed),
+                AdventureFlow.ContractsEnabled));
             if (!enemySessions.TryGetValue(encounter, out enemyRun))
                 enemySessions.Add(encounter, enemyRun = new PartyRun(RosterStart(Side.Enemy), Array.Empty<EquipmentDefinition>()));
             ResetDemo();
@@ -503,19 +505,24 @@ namespace RaidPartyManager.Presentation
             float baseline = foot.height > 0 ? 1 - (foot.yMax - 3 - root.worldBound.yMin) / root.layout.height : .3f;
             float focus = actionPlayback != null && visualAction.ActorId != null && unitCards.TryGetValue(visualAction.ActorId, out var actor)
                 ? (actor.BodyBounds.center.x - root.worldBound.center.x) / (root.layout.width * .5f) : 0;
-            stage?.Update(PlaybackNow, baseline, focus, Time.unscaledDeltaTime * playbackSpeed);
-            if (tellerView?.panel == null || DockPlayhouse.Moving) return;
-            double now = Time.unscaledTimeAsDouble;
-            commentary.Advance(now);
-            float totalHeight = 0;
+            float totalHeight = 0, tallest = 0;
             int count = 0;
             foreach (var card in unitCards.Values)
             {
                 float h = card.PartyBodyHeight;
                 if (!(h > 0)) continue;
                 totalHeight += h;
+                tallest = Mathf.Max(tallest, h);
                 count++;
             }
+            if (stage != null)
+            {
+                stage.PartyViewportHeight = tallest / root.layout.height;
+                stage.Update(PlaybackNow, baseline, focus, Time.unscaledDeltaTime * playbackSpeed);
+            }
+            if (tellerView?.panel == null || DockPlayhouse.Moving) return;
+            double now = Time.unscaledTimeAsDouble;
+            commentary.Advance(now);
             if (count > 0) tellerView.Draw(commentary, now, foot, totalHeight / count, unitCards.Values);
         }
 

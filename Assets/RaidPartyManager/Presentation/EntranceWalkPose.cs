@@ -26,7 +26,7 @@ namespace RaidPartyManager.Presentation
                 generateVisualContent += Draw;
             else
             {
-                paper = new StageActorImage(stage, true)
+                paper = new StageActorImage(stage, inMotion: true, keepsStageFocus: facesLeft)
                 {
                     name = "walking-paper",
                     image = sheet,

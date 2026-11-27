@@ -273,7 +273,7 @@ namespace RaidPartyManager.Presentation
 
         private StageActorImage MakeActor(string name)
         {
-            var view = new StageActorImage(sprite.Stage, true)
+            var view = new StageActorImage(sprite.Stage, inMotion: true, keepsStageFocus: sprite.Figure.KeepsStageFocus)
             {
                 name = name, pickingMode = PickingMode.Ignore, scaleMode = ScaleMode.StretchToFill
             };
