@@ -22,15 +22,16 @@ namespace RaidPartyManager.Presentation
             name = "floor-rating-chart";
             battles = run.FloorBattles.ToArray();
             style.flexShrink = 0;
-            style.backgroundColor = PrototypeStyle.Inset;
+            style.backgroundColor = SettlementArt.Wash;
             style.paddingLeft = style.paddingRight = 9;
             style.paddingTop = style.paddingBottom = 7;
             style.marginBottom = 8;
-            PrototypeStyle.Outline(this, PrototypeStyle.Edge, 4);
+            PrototypeStyle.Outline(this, SettlementArt.Rule, 4);
+            AddToClassList(SettlementArt.RevealClass);
 
             var header = PrototypeStyle.Row();
             header.style.alignItems = Align.Center;
-            var title = PrototypeStyle.Text($"第 {run.Floor} 层 · 战斗评分", 18);
+            var title = SettlementArt.Lettering($"第 {run.Floor} 层 · 战斗评分", 17, SettlementArt.Ink, bold: true);
             title.style.flexGrow = 1;
             header.Add(title);
             Add(header);
@@ -38,7 +39,7 @@ namespace RaidPartyManager.Presentation
                 .GroupBy(m => m.UnitId).Select(group => group.Last()).ToArray();
             if (members.Length == 0)
             {
-                Add(PrototypeStyle.Text("这份存档没有可显示的本层战斗评分。", 13, PrototypeStyle.Muted));
+                Add(SettlementArt.Lettering("这份存档没有可显示的本层战斗评分。", 13, SettlementArt.InkSoft));
                 return;
             }
 
@@ -56,7 +57,7 @@ namespace RaidPartyManager.Presentation
             if (series.Q<TextElement>(className: "unity-base-popup-field__text") is { } selection)
                 selection.style.color = PrototypeStyle.Background;
             header.Add(series);
-            averageLabel = PrototypeStyle.Text("", 17, PrototypeStyle.Accent);
+            averageLabel = SettlementArt.Lettering("", 16, SettlementArt.Ochre, bold: true);
             averageLabel.name = "floor-rating-average";
             header.Add(averageLabel);
 
@@ -73,7 +74,7 @@ namespace RaidPartyManager.Presentation
             }
             else Add(plot);
             for (int i = 0; i < ticks.Length; i++)
-                ticks[i] = Caption((i * 5).ToString(), 11, PrototypeStyle.Muted);
+                ticks[i] = Caption((i * 5).ToString(), 11, SettlementArt.InkSoft);
 
             scores = new int?[battles.Count];
             values = new Label[battles.Count];
@@ -86,14 +87,15 @@ namespace RaidPartyManager.Presentation
                     NodeKind.Boss => "首领战", NodeKind.Event => "事件战", _ => AdventureFlow.NodeName(battle.Kind)
                 };
                 string stop = run.IsInspection ? $"第{i + 1}战" : $"第{battle.Stage}站";
-                stages[i] = Caption(stop + "\n" + kind, 11, battle.Kind == NodeKind.Boss ? PrototypeStyle.Accent : PrototypeStyle.Muted);
-                values[i] = Caption("", 12, PrototypeStyle.Ink);
+                stages[i] = Caption(stop + "\n" + kind, 11, battle.Kind == NodeKind.Boss ? SettlementArt.EnemyInk : SettlementArt.InkSoft);
+                values[i] = Caption("", 12, SettlementArt.Ink);
+                values[i].style.unityFontStyleAndWeight = FontStyle.Bold;
                 values[i].name = "floor-rating-point-" + i;
             }
-            legend = PrototypeStyle.Text("", 12, PrototypeStyle.Muted);
+            legend = SettlementArt.Lettering("", 11, SettlementArt.InkSoft);
             Add(legend);
             if (run.FirstRatedStage > 1)
-                Add(PrototypeStyle.Text($"本层评分记录从第 {run.FirstRatedStage} 站开始，均分按已记录场次计算。", 12, PrototypeStyle.Muted));
+                Add(SettlementArt.Lettering($"本层评分记录从第 {run.FirstRatedStage} 站开始，均分按已记录场次计算。", 11, SettlementArt.InkSoft));
             plot.RegisterCallback<GeometryChangedEvent>(_ => PlaceCaptions());
             series.RegisterValueChangedCallback(evt => SelectSeries(evt.newValue));
             SelectSeries(string.Empty);
@@ -101,7 +103,8 @@ namespace RaidPartyManager.Presentation
 
         private Label Caption(string text, int size, Color color)
         {
-            var label = PrototypeStyle.Text(text, size, color);
+            var label = SettlementArt.Lettering(text, size, color);
+            label.pickingMode = PickingMode.Position; // point captions carry tooltips
             label.style.position = Position.Absolute;
             label.style.whiteSpace = WhiteSpace.NoWrap;
             label.style.marginLeft = label.style.marginRight = 0;
@@ -163,7 +166,7 @@ namespace RaidPartyManager.Presentation
             if (!(graph.width > 0 && graph.height > 0)) return;
             var pen = context.painter2D;
             pen.lineWidth = 1;
-            pen.strokeColor = PrototypeStyle.Edge;
+            pen.strokeColor = SettlementArt.Rule;
             pen.BeginPath();
             for (int level = 0; level <= 100; level += 50)
             {
@@ -175,7 +178,7 @@ namespace RaidPartyManager.Presentation
             if (average is int mean)
             {
                 float y = Y(graph, mean);
-                pen.strokeColor = PrototypeStyle.Accent;
+                pen.strokeColor = SettlementArt.Ochre;
                 pen.BeginPath();
                 for (float x = graph.xMin; x < graph.xMax; x += 10)
                 {
@@ -185,7 +188,7 @@ namespace RaidPartyManager.Presentation
                 pen.Stroke();
             }
 
-            pen.strokeColor = PrototypeStyle.Ally;
+            pen.strokeColor = SettlementArt.AllyInk;
             pen.lineWidth = 2.5f;
             pen.BeginPath();
             for (int i = 0; i < scores.Length; i++)
@@ -196,7 +199,7 @@ namespace RaidPartyManager.Presentation
                 else pen.LineTo(point);
             }
             pen.Stroke();
-            pen.fillColor = PrototypeStyle.Ally;
+            pen.fillColor = SettlementArt.AllyInk;
             for (int i = 0; i < scores.Length; i++)
             {
                 if (scores[i] is not int score) continue;

@@ -1745,31 +1745,29 @@ namespace RaidPartyManager.Presentation
             else AdventureFlow.ReturnFromNode();
         }
 
-        private VisualElement SettlementPanel(string overlayId, string panelId, string title)
+        private bool settlementEntering;
+
+        private VisualElement SettlementPanel(string overlayId, string panelId, string title, bool victory)
         {
             HideEquipmentTooltip();
-            root.Q(overlayId)?.RemoveFromHierarchy();
+            var previous = root.Q(overlayId);
+            settlementEntering = previous == null;
+            previous?.RemoveFromHierarchy();
             var overlay = new VisualElement { name = overlayId };
             PrototypeStyle.Fill(overlay);
             overlay.style.top = RunTopBar.Height;
-            overlay.style.alignItems = Align.Center;
-            overlay.style.justifyContent = Justify.Center;
-            overlay.style.backgroundColor = new Color(0.03f, 0.026f, 0.033f, 0.76f);
-            var panel = PrototypeStyle.Panel();
-            panel.name = panelId;
-            panel.style.width = Length.Percent(94);
-            panel.style.maxWidth = 840;
-            panel.style.maxHeight = Length.Percent(94);
-            panel.style.paddingTop = panel.style.paddingBottom = 10;
-            panel.style.paddingLeft = panel.style.paddingRight = 14;
-            panel.style.marginTop = 0;
-            PrototypeStyle.Outline(panel, PrototypeStyle.Accent, 6);
-            var heading = PrototypeStyle.Text(title, 24, PrototypeStyle.Accent);
-            PrototypeStyle.Middle(heading);
-            panel.Add(heading);
-            overlay.Add(panel);
+            int split = title.IndexOf(" · ", StringComparison.Ordinal);
+            string heading = split < 0 ? title : title.Substring(0, split);
+            string subtitle = split < 0 ? null : title.Substring(split + 3);
+            var panel = SettlementArt.Stage(overlay, panelId, heading, subtitle, victory, settlementEntering);
             root.Add(overlay);
             return panel;
+        }
+
+        private void FinishSettlementPanel(VisualElement panel)
+        {
+            if (settlementEntering)
+                SettlementArt.Reveal(panel);
         }
 
         private void AddBattleRatings(VisualElement parent)
@@ -1781,16 +1779,9 @@ namespace RaidPartyManager.Presentation
 
         private void RenderVictory()
         {
-            var panel = SettlementPanel("victory-rewards", "victory-panel", "胜利");
-            var rewards = new ScrollView(ScrollViewMode.Vertical);
-            rewards.style.flexShrink = 1;
-            panel.Add(rewards);
-            AddBattleRatings(rewards);
-            if (adventure?.Current?.Battle?.Kind == NodeKind.Boss)
-                rewards.Add(PrototypeStyle.Text("首领已击败，全队恢复 50% 最大生命值。", 15, PrototypeStyle.Ink));
-
-            if (adventure?.Current?.Battle?.BloomWaitingForRoom == true)
-                rewards.Add(PrototypeStyle.Text("种子已经成熟。腾出一个队伍空位，再装备它赢一场即可招募花匠。", 15, PrototypeStyle.Ink));
+            var panel = SettlementPanel("victory-rewards", "victory-panel", OutcomeText(BattleOutcome.Victory), victory: true);
+            var (cast, rewards) = SettlementArt.Columns(panel, "战利品");
+            AddBattleRatings(cast);
 
             var row = RewardRow();
             for (int i = 0; i < victoryRewards.Items.Count; i++)
@@ -1802,7 +1793,7 @@ namespace RaidPartyManager.Presentation
                     () => victoryRewards.ClaimItem(run, index));
             }
             if (victoryRewards.Gold > 0)
-                row.Add(RewardButton($"{victoryRewards.Gold} 金币", "claim-gold", new GoldRewardIcon(),
+                row.Add(RewardButton($"{victoryRewards.Gold} 金币", null, "claim-gold", new GoldRewardIcon(),
                     button => Claim(button, () => victoryRewards.ClaimGold(run))));
             var choices = LootChoices;
             var choiceRow = choices.Count > 1 ? RewardRow() : row;
@@ -1818,24 +1809,35 @@ namespace RaidPartyManager.Presentation
                         return true;
                     });
             }
+            if (row.childCount == 0 && choices.Count == 0)
+                rewards.Add(SettlementArt.Note("战利品已全部收下", SettlementArt.InkSoft, 13));
             if (row.childCount > 0)
-            {
-                var lootHeading = PrototypeStyle.Text("战利品", 16, PrototypeStyle.Accent);
-                lootHeading.style.marginTop = 6;
-                rewards.Add(lootHeading);
                 rewards.Add(row);
-            }
             if (choices.Count > 1)
             {
-                var label = PrototypeStyle.Text(choices.All(item => item.BossExclusive) ? "首领专属战利品 · 2 选 1" : $"战利品 · {choices.Count} 选 1", 14, PrototypeStyle.Muted);
+                var label = SettlementArt.Note(choices.All(item => item.BossExclusive) ? "首领专属战利品 · 2 选 1" : $"任选其一 · {choices.Count} 选 1",
+                    SettlementArt.Ochre, 13);
                 label.name = "loot-choice-count";
-                PrototypeStyle.Middle(label);
+                label.style.unityFontStyleAndWeight = FontStyle.Bold;
+                label.style.letterSpacing = 2;
                 rewards.Add(label);
                 rewards.Add(choiceRow);
             }
+            if (victoryRewards.HasUnclaimed || choices.Count > 0)
+            {
+                var hint = SettlementArt.Note("点选战利品，收入背包", SettlementArt.InkSoft, 12);
+                hint.name = "claim-hint";
+                hint.style.marginTop = 2;
+                rewards.Add(hint);
+            }
+            if (adventure?.Current?.Battle?.Kind == NodeKind.Boss)
+                rewards.Add(SettlementArt.Note("首领已击败，全队恢复 50% 最大生命值。", SettlementArt.AllyInk, 13));
+            if (adventure?.Current?.Battle?.BloomWaitingForRoom == true)
+                rewards.Add(SettlementArt.Note("种子已经成熟。腾出一个队伍空位，再装备它赢一场即可招募花匠。", SettlementArt.Ink, 13));
 
             if (!victoryRewards.HasUnclaimed && choices.Count == 0)
-                panel.Add(PrototypeStyle.Button("继续", "continue-after-ratings", ContinueVictory, true));
+                panel.Add(SettlementArt.Ribbon("继续", "continue-after-ratings", ContinueVictory));
+            FinishSettlementPanel(panel);
             topBar.BringRewardFlightsToFront();
 
             void Claim(Button source, Func<bool> grant)
@@ -1847,8 +1849,8 @@ namespace RaidPartyManager.Presentation
             void ItemButton(VisualElement parent, EquipmentDefinition item, string id, Func<bool> grant)
             {
                 var texture = content.IconFor(item.Id);
-                string caption = item is SkillBookDefinition ? $"技能书 · {item.Name}" : item.Name;
-                var button = RewardButton(caption, id, new EquipmentIcon(item, texture), source => Claim(source, grant));
+                string kicker = item is SkillBookDefinition ? "技能书" : item.BossExclusive ? "首领专属" : null;
+                var button = RewardButton(item.Name, kicker, id, new EquipmentIcon(item, texture), source => Claim(source, grant));
                 RegisterEquipmentTooltip(button, item, texture);
                 parent.Add(button);
             }
@@ -1859,54 +1861,40 @@ namespace RaidPartyManager.Presentation
             var row = PrototypeStyle.Row();
             row.style.justifyContent = Justify.Center;
             row.style.flexWrap = Wrap.Wrap;
+            row.style.flexShrink = 0;
             row.style.marginTop = 8;
             return row;
         }
 
-        private static Button RewardButton(string caption, string id, VisualElement icon, Action<Button> claim)
-        {
-            var button = PrototypeStyle.Button("", id, null);
-            button.clicked += () => claim(button);
-            button.style.backgroundColor = Color.clear;
-            button.style.borderTopWidth = button.style.borderBottomWidth = 0;
-            button.style.borderLeftWidth = button.style.borderRightWidth = 0;
-            button.style.width = 110;
-            button.style.minHeight = 106;
-            button.style.marginLeft = button.style.marginRight = 4;
-            button.style.marginBottom = 6;
-            button.style.paddingLeft = button.style.paddingRight = 6;
-            icon.style.alignSelf = Align.Center;
-            icon.style.width = icon.style.height = 70;
-            icon.style.flexGrow = 0;
-            button.Add(icon);
-            var label = PrototypeStyle.Text(caption, 13, PrototypeStyle.Accent);
-            label.pickingMode = PickingMode.Ignore;
-            PrototypeStyle.Middle(label);
-            button.Add(label);
-            return button;
-        }
+        private static Button RewardButton(string caption, string kicker, string id, VisualElement icon, Action<Button> claim) =>
+            SettlementArt.Spoil(caption, kicker, id, icon, claim);
 
         private void RenderDefeat()
         {
-            var panel = SettlementPanel("defeat-ratings", "defeat-summary", OutcomeText(result.Outcome));
-            var summary = new ScrollView(ScrollViewMode.Vertical);
-            summary.style.flexShrink = 1;
-            panel.Add(summary);
-            AddBattleRatings(summary);
-            summary.Add(PrototypeStyle.Text("剩余生命  " + string.Join("  ·  ", run.Members.Select(member =>
-                $"{member.Character.Name} {HealthText(member.Health, member.EffectiveStats.Health)}")), 14));
+            var panel = SettlementPanel("defeat-ratings", "defeat-summary", OutcomeText(result.Outcome), result.Outcome == BattleOutcome.Victory);
+            var (cast, summary) = SettlementArt.Columns(panel, "战况");
+            AddBattleRatings(cast);
+            var survivors = SettlementArt.Lettering("剩余生命", 12, SettlementArt.InkSoft, bold: true);
+            survivors.style.marginTop = 6;
+            survivors.style.letterSpacing = 2;
+            survivors.AddToClassList(SettlementArt.RevealClass);
+            summary.Add(survivors);
+            foreach (var member in run.Members)
+                summary.Add(SettlementArt.Entry(member.Character.Name, HealthText(member.Health, member.EffectiveStats.Health),
+                    member.Health > 0 ? SettlementArt.Ink : SettlementArt.EnemyInk));
             if (result.GoldEarned > 0)
-                summary.Add(PrototypeStyle.Text($"获得 {result.GoldEarned} 金币 · 当前 {run.Gold} 金币", 13, PrototypeStyle.Accent));
+                summary.Add(SettlementArt.Note($"获得 {result.GoldEarned} 金币 · 当前 {run.Gold} 金币", SettlementArt.Ochre, 13));
             if (result.AccessoriesEarned > 0)
-                summary.Add(PrototypeStyle.Text($"获得 {result.AccessoriesEarned} 件饰品，已放入共享背包", 13, PrototypeStyle.Accent));
+                summary.Add(SettlementArt.Note($"获得 {result.AccessoriesEarned} 件饰品，已放入共享背包", SettlementArt.Ochre, 13));
             if (adventure?.Current is { } visit)
-                summary.Add(PrototypeStyle.Text(visit.Message, 15, PrototypeStyle.Accent));
+                summary.Add(SettlementArt.Note(visit.Message, SettlementArt.EnemyInk, 14));
             if (TeamWiped)
-                panel.Add(PrototypeStyle.Button("返回主菜单", "leave-battle-ratings", () => PrototypeSceneMenu.OpenStandalone("MainMenu"), true));
+                panel.Add(SettlementArt.Ribbon("返回主菜单", "leave-battle-ratings", () => PrototypeSceneMenu.OpenStandalone("MainMenu")));
             else if (adventure == null)
-                panel.Add(PrototypeStyle.Button("重置演练", "leave-battle-ratings", () => ResetDemo(reroll: true), true));
+                panel.Add(SettlementArt.Ribbon("重置演练", "leave-battle-ratings", () => ResetDemo(reroll: true)));
             else
-                panel.Add(PrototypeStyle.Button("返回事件选择", "leave-battle-ratings", AdventureFlow.ReturnFromNode, true));
+                panel.Add(SettlementArt.Ribbon("返回事件选择", "leave-battle-ratings", AdventureFlow.ReturnFromNode));
+            FinishSettlementPanel(panel);
         }
 
         private static string OutcomeText(BattleOutcome outcome) => outcome switch
