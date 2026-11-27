@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UIElements;
 
@@ -11,8 +12,10 @@ namespace RaidPartyManager.Presentation
         private static readonly float[] Depths = { .18f, .69f, .72f, .20f };
         private static readonly float[] Tempo = { 2.5f, 3.6f, 2.1f, 3.1f };
         private readonly MeshRenderer[] cast = new MeshRenderer[4];
-        private const float PegY = SignY + SignHeight * .32f;
-        private readonly Transform[,] cords = new Transform[4, 2];
+        private const float CordThickness = .042f;
+        private readonly FlownSign[] signs = new FlownSign[4];
+        private readonly Vector3[] signRest = new Vector3[4];
+        private float beamUnderside;
         private readonly Transform flyBeam;
         private float rigAspect;
         private readonly int[] frame = { -1, -1, -1, -1 };
@@ -80,6 +83,7 @@ namespace RaidPartyManager.Presentation
                 rigAspect = camera.aspect;
                 FitFlyBeam();
             }
+            PoseSigns();
             for (int i = 0; i < cast.Length; i++)
             {
                 int next = i == ShopSlot ? AnimationCels.Loop(time, 1.2) :
@@ -99,33 +103,35 @@ namespace RaidPartyManager.Presentation
 
         private void HangVenueSign(int index, float x, float facadeZ)
         {
-            float z = facadeZ - SignDepth;
-            var brass = new Color(.90f, .68f, .34f);
-            var cord = new Color(.60f, .44f, .25f);
-            Fly(Box("Hanging placard " + index, new Vector3(x, SignY, z),
-                new Vector3(SignWidth, SignHeight, .14f), art.timber, new Color(.55f, .39f, .26f)));
-            for (int side = 0; side < 2; side++)
-            {
-                float eye = x + (side == 0 ? -.35f : .35f) * SignWidth;
-                cords[index, side] = Fly(Box("Sign cord", new Vector3(eye, PegY, z - .084f),
-                    new Vector3(.034f, 1, .034f), art.timber, cord));
-                Fly(Shape("Sign stud", PrimitiveType.Sphere, new Vector3(eye, PegY, z - .095f),
-                    new Vector3(.075f, .075f, .048f), Texture2D.whiteTexture, brass, Surface.Solid));
-            }
+            signRest[index] = new Vector3(x, SignY, facadeZ - SignDepth);
+            var sign = signs[index] = HangingBoard("Hanging placard " + index, "Placard slab", SignFace.Plank,
+                SignWidth, SignHeight, .14f, "Sign cord", CordThickness);
+            sign.Board.localPosition = signRest[index];
+            foreach (var (part, _) in sign.Painted) Dressing.Flown.Add(part);
+            foreach (var cord in sign.Ropes) Dressing.Flown.Add(cord);
+        }
+
+        /// <summary>The panel sign becomes the lettering of its board, which mirrors its hover, sway and rise.</summary>
+        public void MountService(HangingSign target, int i)
+        {
+            signs[i].Target = target;
+            target.MountInScenery();
+            target.RetractInScenery = chosen => signs[i].Retract(chosen);
+        }
+
+        private void PoseSigns()
+        {
+            for (int i = 0; i < signs.Length; i++)
+                signs[i].Pose(this, stage.TransformPoint(signRest[i]), stage.rotation, beamUnderside);
         }
 
         private void FitFlyBeam()
         {
             var beam = flyBeam.GetComponent<MeshRenderer>().bounds;
             float depth = camera.WorldToViewportPoint(beam.max).z;
-            float underside = camera.ViewportToWorldPoint(new Vector3(.5f, 1.08f, depth)).y;
-            flyBeam.position = new Vector3(beam.center.x, underside + beam.extents.y, beam.center.z);
-            foreach (var rope in cords)
-            {
-                var position = rope.position;
-                rope.position = new Vector3(position.x, (underside + PegY) / 2, position.z);
-                rope.localScale = new Vector3(.034f, underside - PegY, .034f);
-            }
+            beamUnderside = camera.ViewportToWorldPoint(new Vector3(.5f, 1.08f, depth)).y;
+            flyBeam.position = new Vector3(beam.center.x, beamUnderside + beam.extents.y, beam.center.z);
+            PoseSigns();
         }
 
         public void PlaceService(VisualElement button, int i)

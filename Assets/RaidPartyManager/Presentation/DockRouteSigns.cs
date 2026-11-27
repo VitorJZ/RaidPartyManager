@@ -14,8 +14,8 @@ namespace RaidPartyManager.Presentation
         private readonly List<DockRoadpost> stones = new();
         private bool landed, committed;
 
-        internal DockRouteSigns(AdventureRun run, AdventureContentAsset art, Texture2D stone,
-            Func<int,StageTurn,bool> enter, Action nextFloor, bool following = false) : this(stone, following)
+        internal DockRouteSigns(AdventureRun run, AdventureContentAsset art,
+            Func<int,StageTurn,bool> enter, Action nextFloor, bool following = false) : this(following)
         {
             name = "dock-route-signs";
             if (!following && (run.InGraveyard || run.InCapital) && run.Stage == 1 && !run.Failed)
@@ -65,7 +65,7 @@ namespace RaidPartyManager.Presentation
             int index = boards.Count;
             void Highlight(bool on)
             {
-                if (index < arrows.Count && !stones[index].Travelling) stones[index].Highlight(arrows[index], on);
+                if (index < arrows.Count && !stones[index].Travelling) stones[index].Highlight(on);
             }
             button.RegisterCallback<PointerEnterEvent>(_ => Highlight(true));
             button.RegisterCallback<PointerLeaveEvent>(_ => Highlight(false));
@@ -75,7 +75,7 @@ namespace RaidPartyManager.Presentation
             Add(button);
         }
 
-        private DockRouteSigns(Texture2D stone, bool fill)
+        private DockRouteSigns(bool fill)
         {
             GameAudio.Play(SoundCue.UiMapReveal, .40f);
             pickingMode = PickingMode.Ignore;
@@ -96,7 +96,7 @@ namespace RaidPartyManager.Presentation
                     set = house.Set;
                     foreach (var board in boards)
                     {
-                        var stonePost = new DockRoadpost(board.direction, stone, set.Lighting);
+                        var stonePost = new DockRoadpost(board.direction, set.Lighting);
                         stones.Add(stonePost);
                         set.Roadposts.Add(stonePost);
                         arrows.Add(stonePost.AddArrow(board.icon));

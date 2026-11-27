@@ -11,8 +11,6 @@ namespace RaidPartyManager.Presentation
         internal bool Cemetery { get; }
         internal bool Capital { get; }
 
-        internal Texture2D RouteStone => art.graveyardStone;
-
         public DockEventStage(Transform owner, VisualElement panel, ServiceStageArt art, bool treasure,
             AdventureEventKind? play = null, bool graveyard = false, bool capital = false, int cityDistrict = 0)
             : base(owner, panel, art, capital || CapitalStories.Contains(play) ? StageLighting.Clockwork(VenueFor(play)) : StageLighting.For(graveyard || GraveStories.Contains(play) || play == AdventureEventKind.GraveSeed, VenueFor(play)))

@@ -33,7 +33,7 @@ namespace RaidPartyManager.Presentation
         private readonly TreasureChestView treasureChest;
         private bool awaitingSigns, leftTable, leaving;
 
-        internal AdventureEventWindow(AdventureRun run, AdventureContentAsset art, Texture2D timber, DockEventStage stage, Action close, RunTopBar topBar, Action refreshCast, Action startEncounter)
+        internal AdventureEventWindow(AdventureRun run, AdventureContentAsset art, DockEventStage stage, Action close, RunTopBar topBar, Action refreshCast, Action startEncounter)
         {
             this.run = run; this.art = art; this.close = close; content = art.Encounter;
             this.topBar = topBar;
@@ -112,7 +112,7 @@ namespace RaidPartyManager.Presentation
                 topBar.Refresh();
                 return;
             }
-            choices = new EventChoiceRack(timber, notes);
+            choices = new EventChoiceRack(notes);
             if (eventKind.HasValue)
             {
                 choices.style.left = Length.Percent(8);
@@ -216,7 +216,7 @@ namespace RaidPartyManager.Presentation
                     if (stage.GraveCueFinished && enabledInHierarchy && !leaving && run.Current == visit && (visit.Event is not (AdventureEventKind.HatTrick or AdventureEventKind.Alchemist) || leftTable || stage.RevealFinished))
                     {
                         if (run.IsInspection) Leave();
-                        else AdventureFlow.AddFollowingSigns(this, stage.RouteStone, topBar);
+                        else AdventureFlow.AddFollowingSigns(this, topBar);
                     }
                 }).Every(25).Until(() => leaving || run.Current != visit || this.Q<DockRouteSigns>() != null));
             }

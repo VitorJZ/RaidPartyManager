@@ -841,11 +841,8 @@ namespace RaidPartyManager.Tests
             Press(facilities, "town-service-Quest");
             yield return null;
             var parchment = facilities.Q<ScrollView>("contract-paper");
-            var back = facilities.Q<Button>("close-town-quest");
             Assert.That(parchment.resolvedStyle.backgroundImage.texture, Is.Not.Null);
-            Assert.That(back.worldBound.center.x, Is.EqualTo(parchment.worldBound.center.x).Within(2));
-            Assert.That(back.worldBound.yMax, Is.LessThan(parchment.worldBound.yMin));
-            Assert.That(back.panel.Pick(back.worldBound.center), Is.SameAs(back));
+            Assert.That(facilities.Q("close-town-quest"), Is.Null, "The board's close ring is the only way back.");
             var dismiss = parchment.Q<Button>("dismiss-paper");
             Assert.That(dismiss.worldBound.center.x, Is.GreaterThan(parchment.worldBound.center.x));
             Assert.That(dismiss.panel.Pick(dismiss.worldBound.center), Is.SameAs(dismiss));
@@ -857,7 +854,7 @@ namespace RaidPartyManager.Tests
             Assert.That(run.QuestActive, Is.True);
             Assert.That(facilities.Q<Button>("town-quest-act").enabledInHierarchy, Is.False);
             yield return null;
-            Press(facilities, "close-town-quest");
+            Press(facilities, "dismiss-paper");
             Assert.That(facilities.Q<Button>("town-service-Recruit").enabledInHierarchy, Is.True);
             var townStock = run.Current.Stock;
             for (int visit = 0; visit < 2; visit++)
@@ -879,7 +876,7 @@ namespace RaidPartyManager.Tests
             Assert.That(party.Gold, Is.EqualTo(beforeReward + contractReward));
             Assert.That(town.Q("reward-flight").Q("reward-gold-icon"), Is.Not.Null);
             Assert.That(town.Q<Label>("run-gold").text, Is.EqualTo($"金币  {beforeReward}"));
-            Press(town, "close-town-quest");
+            Press(town, "dismiss-paper");
             yield return new WaitUntil(() => town.Q<Button>("return-event-select") != null);
             Press(town, "return-event-select");
             Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("Town"));
@@ -2208,8 +2205,10 @@ namespace RaidPartyManager.Tests
             Assert.That(townRoot.Q("town-guide"), Is.Null);
             Press(townRoot, "town-service-Quest");
             yield return null;
-            var boardExit = townRoot.Q<Button>("close-town-quest");
-            ClickTownSign(townRoot, boardExit);
+            var boardExit = townRoot.Q<Button>("dismiss-paper");
+            Assert.That(townRoot.panel.Pick(boardExit.worldBound.center), Is.SameAs(boardExit));
+            Down(boardExit);
+            Up(boardExit, boardExit.worldBound.center);
             yield return WaitForRoadstone(townRoot);
             Assert.That(route.Current, Is.SameAs(visit));
             Assert.That(route.Party.Day, Is.EqualTo(townDay));

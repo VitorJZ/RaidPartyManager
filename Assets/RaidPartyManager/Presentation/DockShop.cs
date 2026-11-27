@@ -173,7 +173,7 @@ namespace RaidPartyManager.Presentation
 
             topBar = new RunTopBar(root, party, content, OpenEditor, "open-shop-editor",
                 () => Gold, "shop-gold", expenseOverride: adventure == null ? standaloneExpenses : null);
-            if (adventure != null) AdventureFlow.AddServiceNavigation(root, stageArt.graveyardStone, topBar, () => stage.WideView);
+            if (adventure != null) AdventureFlow.AddServiceNavigation(root, topBar, () => stage.WideView);
             else root.Add(new StageSignMask(HangingSign.Exit("leave-shop", () => PrototypeSceneMenu.OpenStandalone("MainMenu"))));
             RunTopBar.PlaceAtTop(root, topBar);
             stage.MountShopSigns(root);

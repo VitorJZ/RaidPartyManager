@@ -7,15 +7,13 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed class EventChoiceRack : VisualElement
     {
-        internal readonly Texture2D Timber;
         private readonly VisualElement notes, row;
         private readonly HangingSign previous, next;
         private readonly List<HangingSign> signs = new();
         private int page;
 
-        internal EventChoiceRack(Texture2D timber, VisualElement notes)
+        internal EventChoiceRack(VisualElement notes)
         {
-            Timber = timber;
             this.notes = notes;
             name = "event-options";
             pickingMode = PickingMode.Ignore;
@@ -34,8 +32,9 @@ namespace RaidPartyManager.Presentation
 
             HangingSign Pager(string id, string glyph, int direction)
             {
-                var nav = new HangingSign(id, glyph, () => { page += direction; Arrange(); }, Timber) { FliesWhenChosen = false };
+                var nav = new HangingSign(id, glyph, () => { page += direction; Arrange(); }, SignFace.Square) { FliesWhenChosen = false };
                 nav.style.width = 35; nav.style.height = 42;
+                nav.style.fontSize = 24;
                 nav.style.position = Position.Absolute;
                 if (direction < 0) nav.style.left = 0; else nav.style.right = 0;
                 nav.style.display = DisplayStyle.None;
@@ -59,7 +58,7 @@ namespace RaidPartyManager.Presentation
 
         internal HangingSign Choice(string text, string id, Action select, bool enabled = true)
         {
-            var sign = new HangingSign(id, text, select, Timber);
+            var sign = new HangingSign(id, text, select);
             sign.style.height = 61;
             sign.style.marginLeft = sign.style.marginRight = 4;
             sign.SetEnabled(enabled);

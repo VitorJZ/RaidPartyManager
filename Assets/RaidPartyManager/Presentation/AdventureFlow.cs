@@ -359,12 +359,12 @@ namespace RaidPartyManager.Presentation
             _ => Active?.InCapital == true ? "ClockworkCapital" : Active?.InGraveyard == true ? "WhisperingGraveyard" : "BattlePrototype"
         };
 
-        internal static void AddFollowingSigns(VisualElement parent, Texture2D stone, RunTopBar bar)
+        internal static void AddFollowingSigns(VisualElement parent, RunTopBar bar)
         {
             var run = Active;
             var visit = run.Current;
             DockRouteSigns signs = null;
-            signs = new DockRouteSigns(run, routeArt, stone, Choose, null, following: true);
+            signs = new DockRouteSigns(run, routeArt, Choose, null, following: true);
             parent.Add(new StageSignMask(signs));
             AutoSaveResolvedVisit(run);
 
@@ -409,12 +409,12 @@ namespace RaidPartyManager.Presentation
                 sign.schedule.Execute(() => sign.style.display = visible() ? DisplayStyle.Flex : DisplayStyle.None).Every(16);
         }
 
-        internal static void AddServiceNavigation(VisualElement parent, Texture2D stone, RunTopBar bar, Func<bool> visible = null)
+        internal static void AddServiceNavigation(VisualElement parent, RunTopBar bar, Func<bool> visible = null)
         {
             if (FromTownFacility)
                 AddTownReturnSign(parent, "return-event-select", () => bar.WhenRewardsArrive(ReturnFromNode), visible);
             else if (OnRoute && Active.CanChooseFollowing)
-                AddFollowingSigns(parent, stone, bar);
+                AddFollowingSigns(parent, bar);
             else
                 parent.Add(new StageSignMask(ReturnButton(() => bar.WhenRewardsArrive(ReturnFromNode))));
         }

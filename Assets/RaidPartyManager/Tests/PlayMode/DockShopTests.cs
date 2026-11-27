@@ -104,9 +104,10 @@ namespace RaidPartyManager.Tests
             Assert.That(stage.Find("Shop roof beam"), Is.Null);
             Assert.That(stage.Find("Shop roof beam lower edge"), Is.Null);
             Assert.That(stage.Find("Roof knee brace"), Is.Null);
-            var rope = stage.Find("Shop sign braided line");
-            Assert.That(rope, Is.Not.Null);
-            Assert.That(Camera.main.WorldToViewportPoint(rope.TransformPoint(Vector3.up)).y, Is.GreaterThan(1f));
+            // The standalone exit is the same panel hanging sign as the camp's, on its own rope from the beam.
+            Assert.That(stage.Find("Shop sign braided line"), Is.Null);
+            var exit = root.Q<Button>("leave-shop");
+            Assert.That(exit.Q("sign-rope").resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
 
             ConfigureLowerTierStock(shop);
             root = shop.GetComponent<UIDocument>().rootVisualElement;

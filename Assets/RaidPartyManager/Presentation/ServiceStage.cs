@@ -10,7 +10,7 @@ using UnityEngine.UIElements;
 namespace RaidPartyManager.Presentation
 {
     // Geometry is authored in metres. Interaction rectangles are projected back onto the UI panel.
-    internal abstract class ServiceStage : IDisposable
+    internal abstract partial class ServiceStage : IDisposable
     {
         protected const float CompanySpriteSize = 1.62f;
         protected enum Surface { Backdrop, Solid, Paper, Shadow, Flame, Embers, ForestGround, Decking, ScenicFlat }

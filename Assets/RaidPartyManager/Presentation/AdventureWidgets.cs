@@ -35,9 +35,11 @@ namespace RaidPartyManager.Presentation
             var button = rack.Choice("", name, click);
             if (selected) PrototypeStyle.Outline(button, PrototypeStyle.Accent, 4);
             var image = EquipmentIcon.CreateArtwork(item, icon);
-            image.style.height = image.style.width = 36;
+            image.style.height = image.style.width = 34;
+            image.style.flexShrink = 0;
             button.Add(image);
             var label = PrototypeStyle.Text(caption?.Name ?? item.Name, 14);
+            label.style.paddingTop = label.style.paddingBottom = 0;
             label.pickingMode = PickingMode.Ignore;
             PrototypeStyle.Middle(label);
             button.Add(label);

@@ -190,7 +190,7 @@ namespace RaidPartyManager.Presentation
                 FirstRunGuide.ShowDeparture(screen, Render);
                 if (!FirstRunGuide.Prepared) return;
             }
-            screen.Add(new StageSignMask(new DockRouteSigns(run, assets, stageArt.graveyardStone, EnterRoute, NextFloor)));
+            screen.Add(new StageSignMask(new DockRouteSigns(run, assets, EnterRoute, NextFloor)));
         }
 
         private void NextFloor()
@@ -287,7 +287,7 @@ namespace RaidPartyManager.Presentation
                     BeginEventBattle();
                     return;
                 }
-                eventWindow = new AdventureEventWindow(run, assets, stageArt.timber, stage, () =>
+                eventWindow = new AdventureEventWindow(run, assets, stage, () =>
                 {
                     if (run.IsInspection)
                     {

@@ -13,7 +13,7 @@ namespace RaidPartyManager.Presentation
         [SerializeField] private AdventureContentAsset assets;
         [SerializeField] private ServiceStageArt stageArt;
         private TownStage stage;
-        private readonly Button[] serviceSigns = new Button[4];
+        private readonly HangingSign[] serviceSigns = new HangingSign[4];
         private AdventureRun run;
         private VisualElement root;
         private VisualElement town;
@@ -63,7 +63,7 @@ namespace RaidPartyManager.Presentation
             var title = PrototypeStyle.Text($"{run.RegionName} · 城镇", 26, PrototypeStyle.Accent);
             title.style.marginLeft = 16; title.style.flexGrow = 1; header.Add(title);
             town.Add(header);
-            AdventureFlow.AddServiceNavigation(town, stageArt.graveyardStone, topBar);
+            AdventureFlow.AddServiceNavigation(town, topBar);
             var services = new VisualElement { name = "town-services", pickingMode = PickingMode.Ignore };
             PrototypeStyle.Fill(services);
             town.Insert(0,services);
@@ -95,58 +95,37 @@ namespace RaidPartyManager.Presentation
                 Render();
                 serviceSigns[(int)TownService.Quest].Focus();
             });
-            var board = ContractPanel.Sheet($"{run.RegionName}委托", out var paper, ReturnToTown);
-            var back = HangingSign.Exit("close-town-quest", ReturnToTown, belowTopBar: true, icon: assets.NodeIcon(NodeKind.Town));
-            back.tooltip = "点击返回城镇";
-            board.style.paddingTop = HangingSign.ExitTopGap + HangingSign.TownSignHeight + 8;
-            board.Add(new StageSignMask(back));
-            board.name = "town-quest-board";
+            // The board's own close ring returns to town, so no exit sign hangs above it.
+            var board = new QuestBoard($"{run.RegionName} · 委托", ReturnToTown);
+            board.style.paddingTop = 18;
+            board.style.paddingBottom = 10;
             board.style.top = RunTopBar.Height;
-            paper.Add(ContractPanel.Text("战斗胜利时记录进度。完成后可在任意城镇交付。", 14));
             if (run.QuestActive)
             {
-                var job = run.Commission;
-                paper.Add(ContractPanel.Text($"{job.Rank} · {job.Title}", 19));
-                paper.Add(ContractPanel.Text($"{job.Objective}　{run.QuestProgress}/{job.Target}", 16));
-                var claim = PrototypeStyle.Button($"领取报酬 · {run.TownQuestGold} 金币", "town-quest-act", () => {
-                    if (topBar.CollectReward(board.Q<Button>("town-quest-act"), run.ClaimCommission)) OpenQuest();
-                }, true);
-                claim.SetEnabled(run.QuestProgress >= job.Target);
-                paper.Add(claim);
+                board.Accepted(run.Commission, run.QuestProgress, run.TownQuestGold, () => {
+                    if (topBar.CollectReward(board.Q("quest-payout"), run.ClaimCommission)) OpenQuest();
+                });
             }
             else
             {
+                int order = 0;
                 foreach (var job in run.Current.Commissions)
-                {
-                    var accept = PrototypeStyle.Button("", "town-quest-offer-" + job.Difficulty, () => {
+                    board.Offer(job, run.CommissionReward(job), order++, () => {
                         if (run.AcceptCommission(job.Id)) OpenQuest();
                     });
-                    accept.style.alignItems = Align.FlexStart;
-                    accept.Add(PrototypeStyle.Text($"{job.Rank} · {job.Title}　{run.CommissionReward(job)} 金币", 16, PrototypeStyle.Accent));
-                    accept.Add(PrototypeStyle.Text(job.Objective, 14));
-                    paper.Add(accept);
-                }
             }
             town.Add(board);
         }
 
         private void Service(VisualElement parent, string title, TownService service, int index, System.Action click)
         {
-            var button = PrototypeStyle.Button(title, "town-service-" + service, click);
+            // The same hanging sign as everywhere else; its board hangs in the scenery and mirrors it.
+            var button = new HangingSign("town-service-" + service, title, click);
             serviceSigns[index] = button;
-            button.style.backgroundColor = Color.clear;
-            PrototypeStyle.Outline(button, Color.clear, 0);
-            button.style.marginTop = button.style.marginBottom = button.style.marginLeft = button.style.marginRight = 0;
-            button.style.paddingTop = button.style.paddingBottom = button.style.paddingLeft = button.style.paddingRight = 0;
-            button.style.minHeight = 0;
+            stage.MountService(button, index);
             button.style.whiteSpace = WhiteSpace.NoWrap;
-            button.style.unityFontStyleAndWeight = FontStyle.Bold;
-            Color lettering = new Color32(255, 229, 171, 255);
-            button.style.color = lettering;
             button.RegisterCallback<GeometryChangedEvent>(evt =>
                 button.style.fontSize = Mathf.Clamp(evt.newRect.height * .52f, 9, 26));
-            button.RegisterCallback<PointerEnterEvent>(_ => button.style.color = Color.white);
-            button.RegisterCallback<PointerLeaveEvent>(_ => button.style.color = lettering);
             stage.PlaceService(button, index);
             button.SetEnabled(run.CanUseTown(service));
             parent.Add(button);

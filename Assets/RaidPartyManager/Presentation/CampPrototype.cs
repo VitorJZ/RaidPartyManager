@@ -66,41 +66,40 @@ namespace RaidPartyManager.Presentation
             root.Add(header);
             var bar = new RunTopBar(root, run, content, OpenEditor, "open-camp-editor");
             if (standalone) root.Add(new StageSignMask(HangingSign.Exit("leave-camp", () => PrototypeSceneMenu.OpenStandalone("MainMenu"))));
-            else AdventureFlow.AddServiceNavigation(root, stageArt.graveyardStone, bar);
+            else AdventureFlow.AddServiceNavigation(root, bar);
             RunTopBar.PlaceAtTop(root, bar);
             var actions = new VisualElement { name = "camp-actions" };
             actions.style.position = Position.Absolute;
             actions.style.bottom = Length.Percent(AudienceForeground.ClearancePercent);
-            actions.style.left = Length.Percent(21);
-            actions.style.right = Length.Percent(21);
-            var buttons = PrototypeStyle.Row();
-            actions.Add(buttons);
-            AddChoice("升阶", "camp-evolve", () => AdventureWidgets.EvolutionChoices(OpenChoice("升阶"), adventure, content,
-                adventure.EvolveAtCamp, CompleteChoice), adventure.EvolutionCandidates.Count > 0);
-            AddChoice("休息", "camp-rest", () => { if (adventure.Rest()) { GameAudio.Play(SoundCue.CampRest); Render(); } });
-            AddChoice("训练", "camp-train", OpenTraining, adventure.TrainingCandidates.Count > 0);
-            var message = PrototypeStyle.Text(string.IsNullOrEmpty(adventure.Current.Message)
-                ? "任选一项。休息恢复 30% 最大生命，训练永久提升一名队员的一项随机属性。" : adventure.Current.Message,
-                14, PrototypeStyle.Ink);
-            message.name = "camp-message";
-            message.style.backgroundColor = new Color(0, 0, 0, 0.65f);
-            PrototypeStyle.Middle(message);
-            actions.Add(message);
+            actions.style.left = Length.Percent(20);
+            actions.style.right = Length.Percent(20);
+            actions.pickingMode = PickingMode.Ignore;
+            var plaques = PrototypeStyle.Row();
+            plaques.pickingMode = PickingMode.Ignore;
+            actions.Add(plaques);
+            int ascending = adventure.EvolutionCandidates.Count, training = adventure.TrainingCandidates.Count;
+            AddChoice("升阶", "camp-evolve", "EmblemAscend", () => AdventureWidgets.EvolutionChoices(OpenChoice("升阶"), adventure, content,
+                adventure.EvolveAtCamp, CompleteChoice), ascending > 0, ascending > 0 ? $"{ascending} 名队员可以升阶" : "暂无可升阶的队员");
+            AddChoice("休息", "camp-rest", "EmblemRest", () => { if (adventure.Rest()) { GameAudio.Play(SoundCue.CampRest); Render(); } },
+                true, "全队恢复 30% 最大生命");
+            AddChoice("训练", "camp-train", "EmblemTrain", OpenTraining, training > 0,
+                training > 0 ? "一名队员随机属性永久提升" : "队员的训练次数已用完");
+            actions.Add(new CampNote("camp-message", string.IsNullOrEmpty(adventure.Current.Message)
+                ? "篝火旁只能做一件事：休息、训练或升阶，任选其一。" : adventure.Current.Message));
             root.Add(actions);
             FirstRunGuide.ShowFacility(root, adventure, GuideStep.Camp);
 
-            void AddChoice(string title, string id, System.Action action, bool available = true)
+            void AddChoice(string title, string id, string emblem, System.Action action, bool available, string note)
             {
-                var button = PrototypeStyle.Button(title, id, () => {
+                var plaque = new CampPlaque(id, title, Resources.Load<Texture2D>("Camp/" + emblem), () => {
                     root.Q("camp-guide")?.RemoveFromHierarchy();
                     action();
                 });
-                button.style.minHeight = 42;
-                button.style.flexGrow = 1;
-                button.style.flexBasis = 0;
-                button.style.marginLeft = button.style.marginRight = 4;
-                button.SetEnabled(adventure.CanUseCamp && available);
-                buttons.Add(button);
+                plaque.style.height = 70;
+                plaque.style.flexGrow = 1;
+                plaque.style.flexBasis = 0;
+                plaque.Offer(adventure.CanUseCamp && available, note);
+                plaques.Add(plaque);
             }
         }
 

@@ -177,7 +177,6 @@ namespace RaidPartyManager.Presentation
         {
             if (segmentMesh != null) Object.Destroy(segmentMesh);
             if (portraitMesh != null) Object.Destroy(portraitMesh);
-            if (signArrow != null) Object.Destroy(signArrow);
             if (recruitWalkMesh != null) Object.Destroy(recruitWalkMesh);
             base.Dispose();
         }

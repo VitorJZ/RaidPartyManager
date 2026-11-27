@@ -11,6 +11,8 @@ Shader "RaidPartyManager/Dock Playhouse"
         _Cloth ("Curtain", Float) = 0
         _PortalMask ("Proscenium stencil write mask", Float) = 0
         _Travel ("Curtain opening", Range(0,1)) = 1
+        [HideInInspector] _Hem ("Hem opening", Float) = 1
+        [HideInInspector] _Flutter ("Cloth flutter", Float) = 0
         [Enum(UnityEngine.Rendering.CompareFunction)] _DepthTest ("Depth test", Float) = 4
         [Toggle] _DepthWrite ("Depth write", Float) = 1
     }
@@ -29,16 +31,30 @@ Shader "RaidPartyManager/Dock Playhouse"
             #include "UnityCG.cginc"
             #include "../Stagecraft/StageLighting.cginc"
             sampler2D _Grain;
-            float _Cloth, _Travel, _HouseLight;
+            float _Cloth, _Travel, _Hem, _Flutter, _HouseLight;
             struct In { float4 p:POSITION; float3 n:NORMAL; float4 c:COLOR; float2 uv:TEXCOORD0; };
-            struct Out { float4 p:SV_POSITION; float3 n:TEXCOORD0; float2 uv:TEXCOORD1; float4 c:COLOR; float3 local:TEXCOORD2; float3 world:TEXCOORD3; };
+            struct Out { float4 p:SV_POSITION; float3 n:TEXCOORD0; float2 uv:TEXCOORD1; float4 c:COLOR; float3 local:TEXCOORD2; float3 world:TEXCOORD3; float gather:TEXCOORD4; };
             Out vert(In v)
             {
                 Out o;
+                o.gather = 0;
                 if (_Cloth > .5)
                 {
-                    v.p.x = 4.21 + (v.p.x - 4.21) * lerp(1,.112,_Travel);
-                    v.p.y += .12 * _Travel * (1-v.uv.y) * v.uv.x;
+                    float d = max(v.uv.x, 1e-4);
+                    float drop = 1 - v.uv.y;
+                    // The track pulls the heading. The hem trails it and swings on past when the track stops.
+                    float t = clamp(lerp(_Travel, _Hem, pow(drop, 1.6)), 0, 1.06);
+                    float lead = lerp(1, .112, t);
+                    // Mid-travel the folds pile up against the anchored edge while the leading panel still hangs loose.
+                    float k = min(1 / lead, 1 + .85 * sin(3.14159 * saturate(t)));
+                    float reach = pow(d, k - 1);
+                    v.p.x = 4.21 + (v.p.x - 4.21) * lead * reach;
+                    // Compression beyond an even gather deepens the pleats. Loose cloth flattens them a little.
+                    float gather = clamp(1 - k * reach, -.4, .7);
+                    o.gather = gather;
+                    float billow = .045 * _Flutter * sin(d * 9 - _Time.y * 7) * drop;
+                    v.p.z = 7.86 + (v.p.z - 7.86) * (1 + .35 * gather) + billow;
+                    v.p.y += .12 * saturate(t) * drop * v.uv.x;
                 }
                 o.p=UnityObjectToClipPos(v.p);
                 o.local=v.p.xyz;
@@ -54,7 +70,11 @@ Shader "RaidPartyManager/Dock Playhouse"
                 {
                     float pleat=uv.x*12+.14*sin(uv.x*14+uv.y*3)*(1-uv.y)+.16*sin(uv.x*18+.45);
                     float folds=cos(6.28318*pleat);
-                    float light=.68+.225*folds+.07*sin(6.28318*pleat+.8)+.12*uv.y;
+                    float depth=1+.9*i.gather;
+                    float light=.68+.225*folds*depth+.07*sin(6.28318*pleat+.8)+.12*uv.y;
+                    light*=1-.08*max(0,i.gather);
+                    // A shiver runs through the sailcloth while it travels.
+                    light*=1+.05*_Flutter*sin(uv.x*26-_Time.y*10+uv.y*5)*(1-.6*uv.y);
                     float hem=min(abs(uv.y-.036),abs(uv.y-.048));
                     float embroidery=1-smoothstep(.001,.0015+fwidth(uv.y),hem);
                     ink=lerp(ink,float3(.66,.49,.28),embroidery*.82)*light;

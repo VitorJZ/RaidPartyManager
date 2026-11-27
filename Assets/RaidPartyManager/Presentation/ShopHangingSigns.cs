@@ -6,61 +6,42 @@ namespace RaidPartyManager.Presentation
 {
     internal sealed partial class ShopStage
     {
-        private const float SignWidth = .81f, SignHeight = .47f;
-        private readonly List<ShopSign> shopSigns = new();
-        private Mesh signArrow;
+        private const float PlankDepth = .105f, RopeThickness = .021f;
+        // The way back to town is the same square sign the talent market and camp hang, at the same size on screen.
+        private const float TownSignWorldHeight = .47f;
+        private static readonly float TownSignWorldWidth = TownSignWorldHeight * HangingSign.TownSignWidth / HangingSign.TownSignHeight;
+        // Only sets the depth of the flown board; its place and size on screen follow the panel sign. It hangs just
+        // downstage of the proscenium so its rings show over the header, as the panel sign's do in the other rooms.
+        private static readonly Vector3 TownSignRest = new(0, 3.2f, -10.1f);
+        private readonly List<FlownSign> townSigns = new();
+        private readonly List<HangingSign> panelSigns = new();
 
-        private sealed class ShopSign
-        {
-            public HangingSign Target;
-            public Transform Board;
-            public Transform[] Ropes;
-            public Vector3 Rest;
-            public bool ReturnsToTown;
-        }
-
+        /// <summary>
+        /// The return-to-town sign hangs over the playing area, so it is built into the scenery and leaves with the
+        /// camera. Other signs, such as the standalone exit arrow, stay the panel's own hanging signs as in every other scene.
+        /// </summary>
         internal void MountShopSigns(VisualElement root)
         {
             foreach (var target in root.Query<HangingSign>().ToList())
             {
-                bool rear = shopSigns.Count % 2 == 0;
-                float side = shopSigns.Count == 0 ? 4.77f : 5.36f;
-                Vector3 rest = new(side, rear ? 3.01f : 2.83f, rear ? .64f : -1.85f);
-                var board = new GameObject("Shop route sign " + target.name).transform;
-                board.SetParent(stage, false);
-                var plate = Box("Carved plank", Vector3.zero, new Vector3(SignWidth, SignHeight, .105f), art.timber, WheelIron);
-                Part(plate, board, Vector3.zero);
-                var face = Box("Raised plank face", Vector3.zero, new Vector3(SignWidth - .055f, SignHeight - .060f, .028f),
-                    art.timber, new Color32(154, 100, 58, 255));
-                Part(face, board, new Vector3(0, 0, -.061f));
-                foreach (float x in new[] { -.33f, .33f })
-                {
-                    var rivet = Shape("Brass rivet", PrimitiveType.Sphere, Vector3.zero, new Vector3(.04f, .04f, .023f),
-                        null, WheelBrass, Surface.Solid);
-                    Part(rivet, board, new Vector3(x, 0, -.086f));
-                }
                 var artwork = target.Q<Image>("route-node-icon")?.image as Texture2D;
-                if (artwork != null)
-                    Part(Flat("Route emblem", Vector3.zero, .33f, .33f, artwork), board, new Vector3(0, 0, -.086f));
-                else
+                if (artwork == null)
                 {
-                    signArrow ??= MakeSignArrow();
-                    var arrow = Flat("Brass direction inlay", Vector3.zero, 1, 1, null);
-                    arrow.GetComponent<MeshFilter>().sharedMesh = signArrow;
-                    Part(arrow, board, new Vector3(0, 0, -.088f));
-                    SetTint(arrow, WheelBrass);
+                    panelSigns.Add(target);
+                    continue;
                 }
-                if (artwork != null) board.localScale = Vector3.one * 1.23f;
-                var ropes = new Transform[2];
-                for (int i = 0; i < ropes.Length; i++)
-                {
-                    var rope = Shape("Shop sign braided line", PrimitiveType.Cylinder, rest, Vector3.one,
-                        art.bark, new Color32(184, 135, 85, 255), Surface.Solid, new Vector2(2, 12));
-                    Dressing.Flown.Add(rope);
-                    ropes[i] = rope.transform;
-                }
+                var sign = HangingBoard("Shop route sign " + target.name, "Carved plank", SignFace.Square,
+                    TownSignWorldWidth, TownSignWorldHeight, PlankDepth, "Shop sign braided line", RopeThickness);
+                // The emblem keeps the panel sign's proportion: 44 of its 58 pixels, just proud of the carved panel.
+                float emblem = TownSignWorldHeight * 44f / HangingSign.TownSignHeight;
+                sign.Paint(Part(Flat("Route emblem", Vector3.zero, emblem, emblem, artwork), sign.Board,
+                    new Vector3(0, 0, -PlankDepth / 2 - .009f)), Color.white);
+                foreach (var (part, _) in sign.Painted) Dressing.Flown.Add(part);
+                foreach (var rope in sign.Ropes) Dressing.Flown.Add(rope);
+                sign.Target = target;
                 target.MountInScenery();
-                shopSigns.Add(new ShopSign { Target = target, Board = board, Ropes = ropes, Rest = rest, ReturnsToTown = artwork != null });
+                target.RetractInScenery = chosen => sign.Retract(chosen);
+                townSigns.Add(sign);
             }
             PoseShopSigns(root);
         }
@@ -69,43 +50,37 @@ namespace RaidPartyManager.Presentation
         {
             var frame = root.worldBound;
             if (!(frame.height > 0 && frame.width > 0)) return;
-            foreach (var sign in shopSigns)
+            bool wide = RecruitmentFocus < .44f && counterFocus < .44f;
+            foreach (var sign in panelSigns)
+                sign.style.visibility = wide ? Visibility.Visible : Visibility.Hidden;
+            foreach (var sign in townSigns)
             {
-                if (sign.Target.parent == null) continue;
-                bool visible = RecruitmentFocus < .44f && counterFocus < .44f;
-                sign.Board.gameObject.SetActive(visible);
-                foreach (var rope in sign.Ropes) rope.gameObject.SetActive(visible);
-                var rest = sign.Rest;
-                float depth = camera.WorldToViewportPoint(rest).z;
-                if (sign.ReturnsToTown)
-                {
-                    float centreY = RunTopBar.Height + HangingSign.ExitTopGap + HangingSign.TownSignHeight * .5f;
-                    rest = camera.ViewportToWorldPoint(new Vector3(.5f, 1 - centreY / frame.height, depth));
-                }
-                float scale = sign.Board.localScale.x;
-                sign.Board.SetPositionAndRotation(rest, Quaternion.Euler(0, sign.ReturnsToTown ? 0 : 13, 0));
+                var target = sign.Target;
+                if (target.parent == null) continue;
+                sign.Board.gameObject.SetActive(wide);
+                target.style.visibility = wide ? Visibility.Visible : Visibility.Hidden;
+                float depth = camera.WorldToViewportPoint(TownSignRest).z;
+                float centreY = RunTopBar.Height + HangingSign.ExitTopGap + HangingSign.TownSignHeight * .5f;
+                var rest = camera.ViewportToWorldPoint(new Vector3(.5f, 1 - centreY / frame.height, depth));
+                // Size the board so it covers exactly the panel sign's pixels.
+                float perMetre = (camera.WorldToViewportPoint(rest + Vector3.up).y - camera.WorldToViewportPoint(rest).y) * frame.height;
+                float scale = HangingSign.TownSignHeight / (TownSignWorldHeight * perMetre);
+                sign.Board.localScale = Vector3.one * scale;
                 // The rigging descends from above the shot, leaving the overhead scenery clear.
                 var aboveFrame = camera.WorldToViewportPoint(rest);
                 aboveFrame.y = 1.03f;
                 float hangerY = Mathf.Max(rest.y + .5f, camera.ViewportToWorldPoint(aboveFrame).y);
-                for (int i = 0; i < sign.Ropes.Length; i++)
-                {
-                    float x = i == 0 ? -.23f : .23f;
-                    Vector3 start = new(rest.x + x * scale, hangerY, rest.z);
-                    Vector3 tip = sign.Board.TransformPoint(new Vector3(x, SignHeight * .47f, 0));
-                    Vector3 span = start - tip;
-                    var rope = sign.Ropes[i];
-                    rope.SetPositionAndRotation((tip + start) * .5f, Quaternion.FromToRotation(Vector3.up, span));
-                    rope.localScale = new Vector3(.023f, span.magnitude * .5f, .023f);
-                }
-                Vector2 a = Project(rest + scale * new Vector3(-SignWidth * .54f, SignHeight * .55f, -.07f));
-                Vector2 b = Project(rest + scale * new Vector3(SignWidth * .54f, -SignHeight * .55f, -.07f));
-                Vector2 local = sign.Target.parent.WorldToLocal(a);
-                sign.Target.style.left = local.x;
-                sign.Target.style.right = StyleKeyword.Auto;
-                sign.Target.style.top = local.y;
-                sign.Target.style.width = Mathf.Max(0, b.x - a.x);
-                sign.Target.style.height = Mathf.Max(0, b.y - a.y);
+                sign.RopeThickness = RopeThickness * scale;
+                sign.Pose(this, rest, Quaternion.identity, hangerY);
+
+                Vector2 a = Project(rest + scale * new Vector3(-TownSignWorldWidth * .5f, TownSignWorldHeight * .5f, -.07f));
+                Vector2 b = Project(rest + scale * new Vector3(TownSignWorldWidth * .5f, -TownSignWorldHeight * .5f, -.07f));
+                Vector2 local = target.parent.WorldToLocal(a);
+                target.style.left = local.x;
+                target.style.right = StyleKeyword.Auto;
+                target.style.top = local.y;
+                target.style.width = Mathf.Max(0, b.x - a.x);
+                target.style.height = Mathf.Max(0, b.y - a.y);
             }
 
             Vector2 Project(Vector3 point)
@@ -113,17 +88,6 @@ namespace RaidPartyManager.Presentation
                 var view = camera.WorldToViewportPoint(point);
                 return frame.min + Vector2.Scale(frame.size, new Vector2(view.x, 1 - view.y));
             }
-        }
-
-        private static Mesh MakeSignArrow()
-        {
-            var mesh = new Mesh { name = "Brass sign arrow" };
-            mesh.vertices = new[] { new Vector3(-.23f, -.060f), new Vector3(.028f, -.060f), new Vector3(.028f, -.124f),
-                new Vector3(.225f, 0), new Vector3(.028f, .124f), new Vector3(.028f, .060f), new Vector3(-.23f, .060f) };
-            mesh.triangles = new[] { 0, 6, 5, 0, 5, 1, 2, 4, 3 };
-            mesh.uv = new Vector2[7];
-            mesh.RecalculateNormals();
-            return mesh;
         }
     }
 }

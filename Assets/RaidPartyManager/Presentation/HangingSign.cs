@@ -4,72 +4,167 @@ using UnityEngine.UIElements;
 
 namespace RaidPartyManager.Presentation
 {
+    internal enum SignFace { Plank, Square, Arrow }
+
     internal sealed class HangingSign : Button
     {
-        private static readonly Color Rim = new Color32(135, 96, 52, 255);
-        private static readonly Color Lettering = new Color32(255, 233, 184, 255);
+        internal static readonly Color Lettering = new Color32(255, 226, 160, 255);
+        internal static readonly Color LitLettering = new Color32(255, 243, 212, 255);
+        internal static readonly TextShadow Carved = new() { offset = new Vector2(0, 1.5f), blurRadius = 1.5f, color = new Color(.1f, .05f, .02f, .95f) };
+        internal static readonly TextShadow Gleam = new() { offset = Vector2.zero, blurRadius = 7, color = new Color(1f, .72f, .3f, .7f) };
+        internal static readonly Color Resting = new Color(.82f, .8f, .78f);
+        private static readonly Color HempShade = new Color32(78, 52, 29, 255), HempStrand = new Color32(201, 163, 104, 255);
+
+        /// <summary>Painted board split from its hanging rings so the board alone can be 9-sliced.</summary>
+        private sealed class Art
+        {
+            internal Texture2D Board, Ring;
+            internal int Side, Top, Bottom, RingInset;
+            internal float RopeX = .5f;
+            static Art plank, square, arrow;
+
+            static Texture2D Load(string file) => Resources.Load<Texture2D>("HangingSign/" + file);
+            internal static Art For(SignFace face) => face switch
+            {
+                SignFace.Square => square ??= new Art { Board = Load("SignSquareBoard"), Ring = Load("SignSquareRing"), Side = 100, Top = 104, Bottom = 108, RingInset = 32 },
+                SignFace.Arrow => arrow ??= new Art { Board = Load("SignArrow"), RopeX = .471f },
+                _ => plank ??= new Art { Board = Load("SignPlankBoard"), Ring = Load("SignPlankRing"), Side = 128, Top = 84, Bottom = 98, RingInset = 35 },
+            };
+        }
+
         private readonly VisualElement rope;
+        private readonly Image[] rings = new Image[2];
         private readonly Action select;
-        private readonly Texture2D grain;
-        private readonly bool arrow;
-        private bool mountedInScenery;
+        private readonly SignFace face;
+        private readonly Art art;
+        private float scale = 1, sway;
+        private double swayStart = double.NegativeInfinity;
+        private bool mountedInScenery, lit, pressed;
+        /// <summary>
+        /// A sign mounted in the scenery keeps this element as its lettering and hit area, while a 3D board
+        /// mirrors the same hover, press and sway. Choosing it hands the rise to the beam to that board.
+        /// </summary>
+        internal Action<Action> RetractInScenery;
+        internal bool Lit => lit;
+        internal bool Pressed => pressed;
+        /// <summary>The current swing in degrees, clockwise on screen.</summary>
+        internal float Sway => sway;
         /// <summary>False for signs such as pagers that act in place instead of flying up to the beam.</summary>
         internal bool FliesWhenChosen = true;
         private const string FlightLayer = "selected-sign-flight";
 
-        internal HangingSign(string id, string caption, Action select, Texture2D grain = null, bool arrow = false)
+        internal HangingSign(string id, string caption, Action select, SignFace face = SignFace.Plank)
         {
             name = id;
             text = caption;
             this.select = select;
-            this.grain = grain;
-            this.arrow = arrow;
+            this.face = face;
+            art = Art.For(face);
             style.alignItems = Align.Center;
             style.justifyContent = Justify.Center;
             style.unityTextAlign = TextAnchor.MiddleCenter;
             style.whiteSpace = WhiteSpace.Normal;
             style.fontSize = 16;
             style.color = Lettering;
+            style.textShadow = Carved;
             style.unityFontStyleAndWeight = FontStyle.Bold;
             style.marginTop = style.marginBottom = style.marginLeft = style.marginRight = 0;
             style.paddingLeft = style.paddingRight = 7;
+            style.paddingTop = style.paddingBottom = 2;
             style.overflow = Overflow.Visible;
-            if (arrow)
+            style.backgroundColor = Color.clear;
+            PrototypeStyle.Outline(this, Color.clear, 0);
+            style.transformOrigin = new TransformOrigin(Length.Percent(50), 0);
+            if (art.Board != null)
             {
-                style.backgroundColor = Color.clear;
-                PrototypeStyle.Outline(this, Color.clear, 0);
-                generateVisualContent += DrawArrow;
+                style.backgroundImage = art.Board;
+                style.backgroundSize = new BackgroundSize(Length.Percent(100), Length.Percent(100));
+                style.unitySliceLeft = style.unitySliceRight = art.Side;
+                style.unitySliceTop = art.Top;
+                style.unitySliceBottom = art.Bottom;
             }
-            else
-            {
-                style.backgroundColor = (Color)new Color32(74, 47, 26, 255);
-                if (grain != null) style.backgroundImage = new StyleBackground(grain);
-                style.unityBackgroundImageTintColor = new Color(.66f, .52f, .36f);
-                PrototypeStyle.Outline(this, Rim, 4);
-            }
+            else style.backgroundColor = (Color)new Color32(74, 47, 26, 255);
+            style.unityBackgroundImageTintColor = Resting;
             rope = new VisualElement { name = "sign-rope", pickingMode = PickingMode.Ignore };
             rope.style.position = Position.Absolute;
             rope.style.left = rope.style.right = 0;
             rope.style.bottom = Length.Percent(100);
             rope.style.height = 0;
             rope.generateVisualContent += DrawRope;
+            if (art.Ring != null)
+                for (int i = 0; i < 2; i++)
+                {
+                    rings[i] = new Image { image = art.Ring, scaleMode = ScaleMode.StretchToFill, pickingMode = PickingMode.Ignore };
+                    rings[i].style.position = Position.Absolute;
+                    rings[i].style.bottom = 0;
+                    rope.Add(rings[i]);
+                }
             Add(rope);
-            RegisterCallback<GeometryChangedEvent>(_ => FitRope());
-            schedule.Execute(FitRope).Every(16);
+            RegisterCallback<GeometryChangedEvent>(_ => { Fit(); FitRope(); });
+            schedule.Execute(Tick).Every(16);
+            RegisterCallback<PointerEnterEvent>(_ => { lit = true; swayStart = Time.realtimeSinceStartupAsDouble; Light(); });
+            RegisterCallback<PointerLeaveEvent>(_ => { lit = pressed = false; Light(); });
+            RegisterCallback<PointerDownEvent>(_ => { pressed = true; Light(); }, TrickleDown.TrickleDown);
+            RegisterCallback<PointerUpEvent>(_ => { pressed = false; Light(); }, TrickleDown.TrickleDown);
+            RegisterCallback<PointerCancelEvent>(_ => { pressed = false; Light(); }, TrickleDown.TrickleDown);
 
             clickable.clickedWithEventInfo += evt =>
             {
                 if (panel == null || panel.visualTree.Q(FlightLayer) != null) return;
-                if (mountedInScenery || !FliesWhenChosen || evt is NavigationSubmitEvent) select();
+                if (!FliesWhenChosen || evt is NavigationSubmitEvent) select();
+                else if (mountedInScenery)
+                {
+                    if (RetractInScenery != null) RetractInScenery(select);
+                    else select();
+                }
                 else FlyToBeam();
             };
+        }
+
+        /// <summary>Scales the board's carved frame and iron rings with the sign's height, keeping the corners inside narrow signs.</summary>
+        private void Fit()
+        {
+            if (mountedInScenery || art.Board == null) return;
+            float w = layout.width, h = layout.height;
+            if (!(w > 0) || !(h > 0)) return;
+            scale = art.Ring == null ? h / art.Board.height : Mathf.Min(h / art.Board.height, w * .45f / art.Side);
+            if (art.Ring != null)
+            {
+                style.unitySliceScale = scale;
+                float pad = Mathf.Max(6, art.Side * scale * .3f);
+                if (Mathf.Abs(resolvedStyle.paddingLeft - pad) > .5f) style.paddingLeft = style.paddingRight = pad;
+                for (int i = 0; i < 2; i++)
+                {
+                    rings[i].style.width = art.Ring.width * scale;
+                    rings[i].style.height = art.Ring.height * scale;
+                    if (i == 0) rings[i].style.left = art.RingInset * scale; else rings[i].style.right = art.RingInset * scale;
+                }
+            }
+            rope.MarkDirtyRepaint();
+        }
+
+        private void Light()
+        {
+            style.color = lit ? LitLettering : Lettering;
+            style.textShadow = lit ? Gleam : Carved;
+            style.unityBackgroundImageTintColor = lit ? Color.white : Resting;
+            style.translate = new Translate(0, pressed ? 2 : lit ? -2 : 0);
+        }
+
+        private void Tick()
+        {
+            FitRope();
+            // A light push sets the board swinging on its ropes, dying away within a second.
+            float t = (float)(Time.realtimeSinceStartupAsDouble - swayStart);
+            sway = t is >= 0 and < 1.4f ? 2.4f * Mathf.Exp(-t * 3.2f) * Mathf.Sin(t * 11f) : 0;
+            if (Mathf.Abs(sway - resolvedStyle.rotate.angle.value) > .01f) style.rotate = new Rotate(new Angle(sway));
         }
 
         internal const int TownSignWidth = 84, TownSignHeight = 58, ExitTopGap = 32;
 
         internal static HangingSign Exit(string id, Action leave, bool belowTopBar = false, Texture2D icon = null)
         {
-            var sign = new HangingSign(id, "", leave, arrow: icon == null);
+            var sign = new HangingSign(id, "", leave, icon == null ? SignFace.Arrow : SignFace.Square);
             if (icon != null)
             {
                 var emblem = new Image { name = "route-node-icon", image = icon, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore };
@@ -81,7 +176,7 @@ namespace RaidPartyManager.Presentation
             else sign.style.right = Length.Percent(9);
             sign.style.position = Position.Absolute;
             sign.style.top = (belowTopBar ? 0 : RunTopBar.Height) + ExitTopGap;
-            sign.style.width = icon == null ? 68 : TownSignWidth;
+            sign.style.width = icon == null ? 74 : TownSignWidth;
             sign.style.height = icon == null ? 35 : TownSignHeight;
             return sign;
         }
@@ -101,7 +196,7 @@ namespace RaidPartyManager.Presentation
             layer.Add(new StageSignMask(opening));
 
             // Leave the hit target in its rack so reward flights still originate at this choice.
-            var board = new HangingSign("retracting-sign",text,()=>{},grain,arrow);
+            var board = new HangingSign("retracting-sign",text,()=>{},face);
             board.SetEnabled(true);
             board.style.position = Position.Absolute;
             board.style.left = startRect.xMin;
@@ -159,7 +254,6 @@ namespace RaidPartyManager.Presentation
             mountedInScenery = true;
             style.marginLeft = 0;
             rope.style.display = DisplayStyle.None;
-            if (arrow) generateVisualContent -= DrawArrow;
             style.backgroundColor = Color.clear;
             style.backgroundImage = StyleKeyword.None;
             PrototypeStyle.Outline(this, Color.clear, 0);
@@ -169,41 +263,34 @@ namespace RaidPartyManager.Presentation
         private void DrawRope(MeshGenerationContext context)
         {
             var p = context.painter2D;
-            float y = rope.contentRect.height;
-            float x = rope.contentRect.center.x;
-            float span = Mathf.Min(x * .62f, 30);
-            if (y <= 0) return;
-            float knot = y - 9;
-            void Line(float x1, float y1, float x2, float y2)
+            float bottom = rope.contentRect.height;
+            if (bottom <= 0) return;
+            if (art.Ring == null)
             {
-                p.BeginPath(); p.MoveTo(new Vector2(x1,y1)); p.LineTo(new Vector2(x2,y2)); p.Stroke();
+                // The arrow's ring is painted into the board, just below the sign's top edge.
+                Hemp(p, layout.width * art.RopeX, bottom + layout.height * .05f);
+                return;
             }
-            p.strokeColor = new Color32(83,54,30,255); p.lineWidth = 3.8f;
-            if (knot > 0) Line(x,0,x,knot);
-            p.strokeColor = new Color32(204,167,106,255); p.lineWidth = 1.6f;
-            if (knot > 0) Line(x-.5f,0,x-.5f,knot);
-            float clippedSpan = span * Mathf.Clamp01(-knot / 9);
-            Line(x-clippedSpan,Mathf.Max(0,knot),x-span,y);
-            Line(x+clippedSpan,Mathf.Max(0,knot),x+span,y);
-        }
+            float ring = art.Ring.width * scale, inset = art.RingInset * scale;
+            // Each rope runs behind the top of its ring, so it reads as tied through it.
+            float end = bottom - art.Ring.height * scale * .8f;
+            Hemp(p, inset + ring * .5f, end);
+            Hemp(p, layout.width - inset - ring * .5f, end);
 
-        private void DrawArrow(MeshGenerationContext context)
-        {
-            var p = context.painter2D;
-            float w = layout.width, h = layout.height;
-            p.fillColor = new Color32(120,77,39,255);
-            p.strokeColor = Lettering; p.lineWidth = 1.5f;
-            p.BeginPath(); p.MoveTo(new Vector2(2,h*.2f)); p.LineTo(new Vector2(w*.66f,h*.2f));
-            p.LineTo(new Vector2(w*.66f,2)); p.LineTo(new Vector2(w-2,h*.5f));
-            p.LineTo(new Vector2(w*.66f,h-2)); p.LineTo(new Vector2(w*.66f,h*.8f));
-            p.LineTo(new Vector2(2,h*.8f)); p.ClosePath(); p.Fill(); p.Stroke();
-            p.strokeColor = new Color32(86,52,30,255); p.lineWidth = 1.3f;
-            p.BeginPath(); p.MoveTo(new Vector2(w*.12f,h*.6f)); p.LineTo(new Vector2(w*.34f,h*.57f));
-            p.LineTo(new Vector2(w*.56f,h*.6f)); p.Stroke();
-            p.fillColor = Lettering;
-            foreach (float x in new[] { w*.15f, w*.64f })
+            void Hemp(Painter2D painter, float x, float length)
             {
-                p.BeginPath(); p.Arc(new Vector2(x,h*.34f),1.7f,0,360,ArcDirection.Clockwise); p.Fill();
+                if (length <= 0) return;
+                painter.lineCap = LineCap.Round;
+                painter.strokeColor = HempShade; painter.lineWidth = 3.6f;
+                painter.BeginPath(); painter.MoveTo(new Vector2(x, 0)); painter.LineTo(new Vector2(x, length)); painter.Stroke();
+                painter.strokeColor = HempStrand; painter.lineWidth = 1.1f;
+                painter.BeginPath();
+                for (float y = 1; y < length - 1.5f; y += 3.4f)
+                {
+                    painter.MoveTo(new Vector2(x - 1.1f, y));
+                    painter.LineTo(new Vector2(x + 1.1f, Mathf.Min(length, y + 2.2f)));
+                }
+                painter.Stroke();
             }
         }
     }

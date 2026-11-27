@@ -2015,33 +2015,84 @@ namespace RaidPartyManager.Tests
         [TestCase("bulwark", NodeKind.NormalBattle, 5)]
         [TestCase("hunt", NodeKind.NormalBattle, 0)]
         [TestCase("hunt", NodeKind.EliteBattle, 1)]
-        public void CommissionCreditsTheChosenObjectiveOnce(string id, NodeKind kind, int expected)
+        [TestCase("grit", NodeKind.NormalBattle, 3)]
+        [TestCase("skirmish", NodeKind.NormalBattle, 1)]
+        [TestCase("lean", NodeKind.NormalBattle, 1)]
+        [TestCase("unscathed", NodeKind.NormalBattle, 1)]
+        [TestCase("arcane", NodeKind.NormalBattle, 7)]
+        [TestCase("bounty", NodeKind.NormalBattle, 0)]
+        [TestCase("bounty", NodeKind.EliteBattle, 1)]
+        public void CommissionCreditsTheChosenObjectiveOnce(string id, NodeKind kind, int expected) =>
+            Assert.That(CommissionCredit(id, kind), Is.EqualTo(expected));
+
+        [TestCase("unscathed")]
+        [TestCase("ironwall")]
+        [TestCase("blitz")]
+        [TestCase("stormfront")]
+        [TestCase("lean")]
+        public void ConditionalCommissionsIgnoreVictoriesThatMissTheCondition(string id)
+        {
+            Assert.That(CommissionCredit(id, NodeKind.NormalBattle), Is.EqualTo(1));
+            Assert.That(CommissionCredit(id, NodeKind.NormalBattle, missCondition: true), Is.EqualTo(0));
+        }
+
+        [Test]
+        public void EveryDifficultyOffersSeveralKindsOfCommission()
         {
             var run = Create();
-            for (int i = 0; i < 40 && !run.QuestActive; i++)
+            var seen = new HashSet<string>();
+            for (int i = 0; i < 200; i++)
+            {
+                run.Inspect(NodeKind.Town);
+                var board = run.Current.Commissions;
+                Assert.That(board.Select(job => job.Difficulty), Is.EqualTo(new[] { 0, 1, 2 }));
+                Assert.That(board.Select(job => job.Kind).Distinct().Count(), Is.EqualTo(3));
+                seen.UnionWith(board.Select(job => job.Id));
+            }
+            Assert.That(seen.Count, Is.EqualTo(18));
+        }
+
+        /// <summary>
+        /// Takes <paramref name="id"/> and settles one won battle against it. A missed condition adds an ally
+        /// casualty, rounds past every time limit and a full four-member line-up.
+        /// </summary>
+        private int CommissionCredit(string id, NodeKind kind, bool missCondition = false)
+        {
+            var run = Create();
+            for (int i = 0; i < 80 && !run.QuestActive; i++)
             {
                 run.Inspect(NodeKind.Town);
                 run.AcceptCommission(id);
             }
-            Assert.That(run.QuestActive, Is.True);
+            Assert.That(run.QuestActive, Is.True, id);
             run.Inspect(kind);
             var opponents = run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
             string enemy = opponents.First().Id, ally = run.Party.Members.First().Id;
             var health = opponents.ToDictionary(unit => unit.Id, _ => 0);
             health[ally] = 1;
-            var events = new[] {
+            var events = new List<BattleEvent> {
                 new BattleEvent(1, BattleEventKind.Action, ally, enemy, actorEnergy: new BattleEnergy(3, 1), skillBookId: "book"),
                 new BattleEvent(1, BattleEventKind.Effect, ally, enemy, damageTaken: new[] { (DamageType.Magic, 7) }, shieldAbsorbed: 2),
                 new BattleEvent(1, BattleEventKind.Effect, enemy, ally, shieldAbsorbed: 5),
+                new BattleEvent(1, BattleEventKind.Effect, enemy, ally, damageTaken: new[] { (DamageType.Physical, 3) }),
                 new BattleEvent(1, BattleEventKind.Effect, ally, ally, actionKind: ActionKind.Heal, amount: 4),
                 new BattleEvent(1, BattleEventKind.Effect, enemy, enemy, actionKind: ActionKind.Heal, amount: 8),
                 new BattleEvent(1, BattleEventKind.Defeated, ally, enemy)
             };
+            Dictionary<string, int> positions = null;
+            if (missCondition)
+            {
+                string fallen = run.Party.Members.Last().Id;
+                health[fallen] = 0;
+                events.Add(new BattleEvent(1, BattleEventKind.Defeated, enemy, fallen));
+                events.AddRange(Enumerable.Range(0, 6).Select(_ => new BattleEvent(1, BattleEventKind.RoundStarted)));
+                positions = run.Party.Members.Take(4).Select((member, i) => (member.Id, i + 1)).ToDictionary(p => p.Id, p => p.Item2);
+            }
             run.BindBattle("credit");
-            var victory = new BattleResult("credit", BattleOutcome.Victory, health, events);
+            var victory = new BattleResult("credit", BattleOutcome.Victory, health, events, positions);
             Assert.That(run.SettleBattle(victory), Is.True);
             Assert.That(run.SettleBattle(victory), Is.False);
-            Assert.That(run.QuestProgress, Is.EqualTo(expected));
+            return run.QuestProgress;
         }
 
         [Test]

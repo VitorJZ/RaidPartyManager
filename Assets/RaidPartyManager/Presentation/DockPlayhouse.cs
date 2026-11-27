@@ -43,6 +43,9 @@ namespace RaidPartyManager.Presentation
         private const float TownTransitionSpeed = 1.5f;
         private float cueSpeed = 1f;
         private float travel, hold;
+        // The hem hangs on a spring behind the track, so the cloth trails, swings and settles.
+        private float hem, hemSpeed, flutter, trackOpen;
+        private const float HemFrequency = 8.4f, HemDamping = .34f;
         private bool closedFrame;
 
         internal static bool Moving => current != null && current.owner != null && (current.cue != Cue.Playing || current.performance.Busy);
@@ -103,6 +106,8 @@ namespace RaidPartyManager.Presentation
             current.cue = continuous ? Cue.Playing : Cue.Opening;
             current.travel = continuous ? 1 : 0;
             current.hold = .13f;
+            current.hem = current.trackOpen = Ease(current.travel);
+            current.hemSpeed = current.flutter = 0;
             current.ApplyCue();
             if (continuous) document.style.opacity = 0;
             return current;
@@ -151,7 +156,7 @@ namespace RaidPartyManager.Presentation
             Bounds cloth = house.right.localBounds;
             var seam = cloth.center;
             seam.x = Mathf.Lerp(cloth.min.x,cloth.max.x + (cloth.min.x-cloth.max.x)*.112f,
-                Mathf.SmoothStep(0,1,house.travel));
+                Ease(house.travel));
             seam.z = cloth.max.z;
             var camera = house.framedCamera;
             Vector3 l = camera.WorldToViewportPoint(house.left.transform.TransformPoint(seam));
@@ -375,6 +380,7 @@ namespace RaidPartyManager.Presentation
                 bool arriving = performance.FirstEntrance;
                 performance.Tick(panel, dt);
                 if (arriving && !performance.FirstEntrance) ApplyCue();
+                else if (Swing(dt)) ApplyFolds();
                 return;
             }
             if (cue == Cue.Opening) performance.PrepareFirstEntrance();
@@ -392,19 +398,59 @@ namespace RaidPartyManager.Presentation
                 if (cue == Cue.Opening && travel == 0 && owner.gameObject.scene.name == "EventSelect" &&
                     AdventureFlow.OnRoute && AdventureFlow.Active is { Floor: 1, Stage: 1, Current: null })
                     GameAudio.Play(SoundCue.StageCurtainOpen, .54f);
-                travel = Mathf.MoveTowards(travel, cue == Cue.Opening ? 1 : 0, dt / (cue == Cue.Opening ? .84f : .68f));
+                travel = Mathf.MoveTowards(travel, cue == Cue.Opening ? 1 : 0, dt / (cue == Cue.Opening ? 1f : .8f));
             }
+            Swing(dt);
             if (cue == Cue.Opening && travel >= 1) cue = Cue.Playing;
-            if (cue == Cue.Closing && travel <= 0) cue = Cue.Closed;
+            // Wait for the trailing hem as well, or the next set would show through the gap at the floor.
+            if (cue == Cue.Closing && travel <= 0 && hem < .01f) cue = Cue.Closed;
             ApplyCue();
+        }
+
+        /// <summary>Quintic ease: the track starts and stops without a jolt.</summary>
+        private static float Ease(float t)
+        {
+            t = Mathf.Clamp01(t);
+            return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        /// <summary>Advances the hem spring. Returns false once the cloth hangs still.</summary>
+        private bool Swing(float dt)
+        {
+            float open = Ease(travel);
+            float pull = dt > 0 ? Mathf.Abs(open - trackOpen) / dt : 0;
+            trackOpen = open;
+            if (Mathf.Abs(hem - open) < 1e-4f && Mathf.Abs(hemSpeed) < 1e-3f && flutter < 1e-3f && pull == 0)
+            {
+                if (hem == open && flutter == 0) return false;
+                hem = open; hemSpeed = 0; flutter = 0;
+                return true;
+            }
+            int steps = Mathf.Max(1, Mathf.CeilToInt(dt / .01f));
+            float h = dt / steps;
+            for (int i = 0; i < steps; i++)
+            {
+                hemSpeed += (HemFrequency * HemFrequency * (open - hem) - 2 * HemDamping * HemFrequency * hemSpeed) * h;
+                hem += hemSpeed * h;
+            }
+            float target = Mathf.Clamp01(pull * .55f + Mathf.Abs(hemSpeed) * .35f);
+            flutter = Mathf.MoveTowards(flutter, target, dt * (target > flutter ? 6f : 1.6f));
+            return true;
+        }
+
+        private void ApplyFolds()
+        {
+            folds.SetFloat("_Travel", Ease(travel));
+            folds.SetFloat("_Hem", hem);
+            folds.SetFloat("_Flutter", flutter);
+            left.SetPropertyBlock(folds);
+            right.SetPropertyBlock(folds);
         }
 
         private void ApplyCue()
         {
-            float open = Mathf.SmoothStep(0, 1, travel);
-            folds.SetFloat("_Travel", open);
-            left.SetPropertyBlock(folds);
-            right.SetPropertyBlock(folds);
+            float open = Ease(travel);
+            ApplyFolds();
             if (cue == Cue.Playing && !performance.FirstEntrance)
             {
                 panel.style.opacity = previousOpacity;
