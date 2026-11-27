@@ -52,6 +52,7 @@ namespace RaidPartyManager.Content
         [SerializeField] private Texture2D battleFinaleEffect;
         [SerializeField] private Texture2D battleStrikeEffect;
         [SerializeField] private Texture2D battleProjectile;
+        [SerializeField] private SkillCatalogAsset innateSpellCatalog;
         [SerializeField] private Profession profession;
         [SerializeField] private EnemyRank enemyRank;
         [SerializeField, Range(1, Rules.Positions)] private int positionSlots = 1;
@@ -93,6 +94,7 @@ namespace RaidPartyManager.Content
                 basicAttack.ToDefinition(), hasSkill ? skill.ToDefinition() : null,
                 rosterNumber, stage, reach, fixedTrait, traitPower, traitText,
                 battleForm != null ? battleForm.Id : null, evolutions.Where(form => form != null).Select(form => form.Id),
-                enemyRank, Math.Clamp(positionSlots, 1, Rules.Positions), enemyBehavior?.ToDefinition());
+                enemyRank, Math.Clamp(positionSlots, 1, Rules.Positions), enemyBehavior?.ToDefinition(),
+                innateSpellCatalog?.Skills.Where(skill => skill.Requirement == SkillRequirement.Mage).Select(skill => skill.ToBook()));
     }
 }

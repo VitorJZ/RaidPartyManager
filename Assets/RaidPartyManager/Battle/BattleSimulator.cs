@@ -48,10 +48,12 @@ namespace RaidPartyManager.Battle
         {
             public Combatant Input { get; private set; }
             public readonly Combatant Original;
+            public BattleRating Rating;
+            public readonly LayerSources PoisonSources = new();
+            public readonly LayerSources ShieldSources = new();
             public readonly Dictionary<StatusKind, int> Statuses;
             public HashSet<StatusKind> DelayStatusDecay;
-            public CharacterTrait? CopiedTrait;
-            public int CopiedTraitPower;
+            public CharacterDefinition CopiedTraitSource;
             public int AttackGrowth;
             public int GourdAttack;
             public int PermanentAttack;
@@ -64,6 +66,7 @@ namespace RaidPartyManager.Battle
             public int LastSkillRound;
             public readonly Dictionary<string, int> LastBookCast = new Dictionary<string, int>();
             public int ProtectedRound;
+            public Unit BellCaster;
             public int BonusMaximumHealth;
             public bool DoubleNextAttack;
             public SkillBookDefinition SweepSkill;
@@ -100,8 +103,10 @@ namespace RaidPartyManager.Battle
             public int BellRings;
             public bool EnemyTriggered;
 
-            public CharacterTrait Trait => CopiedTrait ?? Input.Character.Trait;
-            public int TraitPower => CopiedTrait.HasValue ? CopiedTraitPower : Input.Character.TraitPower;
+            public CharacterDefinition TraitSource => CopiedTraitSource ?? Input.Character;
+            public CharacterTrait Trait => TraitSource.Trait;
+            public int TraitPower => TraitSource.TraitPower;
+            public bool CanReceiveHealing => Trait != CharacterTrait.AbyssWard && Layers(StatusKind.Cursed) == 0;
             public EquipmentDefinition[] Gear;
             public Unit LinkedFront;
             public Stats Stats;
@@ -134,6 +139,7 @@ namespace RaidPartyManager.Battle
                     }
                 }
                 Statuses = input.StartingStatuses.ToDictionary(status => status.Key, status => status.Value);
+                PoisonSources.Add(null, Layers(StatusKind.Poison));
             }
 
             public void ChangeForm(CharacterDefinition form)
@@ -471,9 +477,11 @@ namespace RaidPartyManager.Battle
             if (actor.Input.Side == Side.Enemy && TryEnemyTurn(actor))
                 return;
             bool canCast = Round != 1 || actor.Talent != PlayerTrait.Warmup;
+            if (canCast && actor.Trait == CharacterTrait.AstralCasting && actor.Energy.Remaining > 0 && TryCastAstralSpell(actor))
+                return;
             var options = new List<ActionOption>();
             if (canCast && actor.Input.Side == Side.Party && actor.Original.LearnedSkills.Count > 0)
-                AddLearnedSkillOptions(actor, options);
+                AddSkillOptions(actor, options, actor.Original.LearnedSkills);
             var skill = actor.Input.Character.Skill;
             if (canCast && skill != null && Tick >= actor.SkillReadyAt)
                 AddLegalOptions(actor, skill, options);
@@ -498,7 +506,7 @@ namespace RaidPartyManager.Battle
             var target = randomShot ? RandomTarget(AttackTargets(actor, choice.Action)) : unitsById[choice.Target.Id];
             if (choice.Book != null)
             {
-                CastLearnedSkill(actor, target, choice.Book, decision.Reason);
+                CastLearnedSkill(actor, target, choice.Book, decision.Reason, choice.EnergyCost);
                 return;
             }
             if (choice.Action == skill || skill != null && choice.Action.Id == skill.Id)
@@ -566,7 +574,7 @@ namespace RaidPartyManager.Battle
 
             foreach (var ally in units.Where(unit => unit.Input.Side == actor.Input.Side && unit.Health > 0))
             {
-                if (action.Target == TargetRule.Self && ally != actor || ally.Layers(StatusKind.Cursed) > 0)
+                if (action.Target == TargetRule.Self && ally != actor || !ally.CanReceiveHealing)
                     continue;
                 int gain = Math.Min(HealingPower(ally, healing), ally.Stats.Health - ally.Health);
                 if (gain > 0)
@@ -609,7 +617,7 @@ namespace RaidPartyManager.Battle
             Result = new BattleResult(request.Id, outcome, health, events, partyPositions,
                 recruits.Select(unit => unit.RecruitmentResult()), attackGains, potions, currentLoadout, gold, accessories,
                 party.Where(unit => unit.BonusMaximumHealth > 0).Select(unit =>
-                    new KeyValuePair<string, int>(unit.Input.Id, unit.BonusMaximumHealth)));
+                    new KeyValuePair<string, int>(unit.Input.Id, unit.BonusMaximumHealth)), BuildRatings());
         }
 
         private void ReportCountdown(Unit unit, BattleCountdownKind kind, int remaining)
@@ -666,6 +674,14 @@ namespace RaidPartyManager.Battle
             bool poisonDamage = false, int shieldAbsorbed = 0, CharacterDefinition copiedTraitSource = null,
             bool charmTriggered = false, EquipmentEffect equipment = EquipmentEffect.None, bool intercepted = false)
         {
+            if (amount > 0 && actor != null && kind is (BattleEventKind.Action or BattleEventKind.Effect))
+            {
+                if (action == ActionKind.Heal && actor.Input.Side == target.Input.Side)
+                    actor.Rating.Healing += amount;
+                if (action == ActionKind.Shield)
+                    target.ShieldSources.Add(actor, amount);
+            }
+            if (kind == BattleEventKind.Retreated) target.Rating.Retreated = true;
             var statuses = target.Health > 0 && target.Statuses.Count > 0
                 ? Array.AsReadOnly(target.Statuses.OrderBy(entry => entry.Key)
                     .Select(entry => new StatusStack(entry.Key, entry.Value)).ToArray()) : null;

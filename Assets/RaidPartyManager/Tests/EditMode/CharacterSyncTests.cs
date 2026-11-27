@@ -20,11 +20,15 @@ namespace RaidPartyManager.Tests
 
             Assert.That(scene.Party.Select(unit => unit.Stats.Health), Is.EqualTo(new[] { 10, 7, 9, 8 }));
             Assert.That(scene.CharacterCatalog.Single(character => character.Id == "DawnHealer").BaseStats,
-                Is.EqualTo(new Stats(2, 1, 3, 9)));
+                Is.EqualTo(new Stats(2, 1, 2, 9)));
             Assert.That(scene.CharacterCatalog.Single(character => character.Id == "DivinePriest").BaseStats,
-                Is.EqualTo(new Stats(4, 2, 3, 12)));
+                Is.EqualTo(new Stats(4, 2, 2, 12)));
+            Assert.That(scene.CharacterCatalog.Single(character => character.Id == "ValiantSoldier").BaseStats,
+                Is.EqualTo(new Stats(6, 2, 2, 11)));
+            Assert.That(scene.CharacterCatalog.Single(character => character.Id == "TwilightKnight").BaseStats,
+                Is.EqualTo(new Stats(8, 2, 3, 12)));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0)
-                .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 39)));
+                .Select(character => character.RosterNumber), Is.EquivalentTo(Enumerable.Range(1, 41)));
             Assert.That(scene.CharacterCatalog.Where(character => character.RosterNumber > 0).Select(character => character.Skill),
                 Is.All.Null);
             var singer = scene.CharacterCatalog.Single(character => character.RosterNumber == 36);
@@ -58,7 +62,13 @@ namespace RaidPartyManager.Tests
             Assert.That(whiteFeather.Reach, Is.EqualTo(AttackReach.Ranged));
             Assert.That(whiteFeather.BaseStats, Is.EqualTo(new Stats(7, 1, 0, 9)));
             Assert.That(whiteFeather.Trait, Is.EqualTo(CharacterTrait.DoubleShot));
-            var branches = new[] { archer.Id, diSha.Id };
+            var abyss = scene.CharacterCatalog.Single(c => c.RosterNumber == 40);
+            var star = scene.CharacterCatalog.Single(c => c.RosterNumber == 41);
+            Assert.That((abyss.Name, abyss.Stage, abyss.Profession, abyss.Reach, abyss.BaseStats),
+                Is.EqualTo(("冥渊", 2, Profession.Support, AttackReach.Ranged, new Stats(4, 0, 0, 20))));
+            Assert.That((star.Name, star.Stage, star.Profession, star.Reach, star.BaseStats),
+                Is.EqualTo(("星罗", 2, Profession.Mage, AttackReach.Melee, new Stats(5, 1, 1, 14))));
+            var branches = new[] { archer.Id, diSha.Id, abyss.Id, star.Id };
             Assert.That(whiteFeather.EvolutionIds, Is.EqualTo(branches));
             Assert.That(PlayerMarket.BaseValue(whiteFeather), Is.EqualTo(25));
             Assert.That(PlayerMarket.BaseValue(archer), Is.EqualTo(48));
@@ -93,6 +103,60 @@ namespace RaidPartyManager.Tests
                 Assert.That(walk != null && walk.width % 4 == 0 && walk.height == walk.width, Is.True,
                     $"Missing or invalid sixteen-frame walk atlas for {entry.Name}.");
             }
+        }
+
+        [Test]
+        public void AbyssWardStopsLethalDamageUntilTheGuardianFallsAndRejectsRecovery()
+        {
+            var guardian = Load("AbyssKeeper");
+            var pendant = LoadEncounter().StartingEquipment.First(item => item.Effect == EquipmentEffect.LifePendant);
+            var wounded = new Combatant("guardian", guardian, Side.Party, 2, guardian.BaseStats, 5, new[] { pendant });
+            var ally = Fighter("ally", Side.Party, 1, health: 10);
+            var attacker = Fighter("front-hunter", Side.Enemy, 1, attack: 30);
+            var rearShot = new ActionDefinition("rear", "后排打击", ActionKind.Attack, TargetRule.RearEnemy, 0);
+            var hunter = new CharacterDefinition("hunter", "hunter", Profession.Warrior, Personality.Frank,
+                new Stats(30, 0, 0, 100), 1, rearShot);
+            var enemy = new Combatant("rear-hunter", hunter, Side.Enemy, 2, hunter.BaseStats, 100);
+            var simulator = new BattleSimulator(random: new FixedOrder());
+            var result = simulator.Simulate(new BattleRequest("ward", new[] { ally, wounded, attacker, enemy }, 36));
+            var blows = result.Events.Where(e => e.ActorId == attacker.Id && e.Kind == BattleEventKind.Action).ToArray();
+            Assert.That(blows.Select(e => e.TargetHealth), Is.EqualTo(new[] { 1, 0 }));
+            Assert.That(result.Ratings.Single(row => row.UnitId == wounded.Id).Saves, Is.EqualTo(1));
+            Assert.That(result.HealthById[wounded.Id], Is.Zero);
+
+            var protectedBattle = simulator.Simulate(new BattleRequest("pendant", new[] { ally, wounded, attacker }, 24));
+            Assert.That(protectedBattle.HealthById[ally.Id], Is.EqualTo(1));
+            Assert.That(protectedBattle.HealthById[wounded.Id], Is.EqualTo(5));
+            var run = new PartyRun(new[] { new PartyMemberStart("g", guardian, 1, 5) }, Array.Empty<EquipmentDefinition>());
+            Assert.That(run.Rest(1), Is.Zero);
+            Assert.That(run.Members.Single().Health, Is.EqualTo(5));
+        }
+
+        [Test]
+        public void StarWeaverCastsDifferentMageSpellsForOneEnergyThenUsesABasicAttack()
+        {
+            var star = Unit(Load("StarWeaver"), "star", 1);
+            var enemy = Fighter("enemy", Side.Enemy, 1, health: 200);
+            var spells = star.Character.InnateSpells.ToDictionary(book => book.Id);
+            Assert.That(spells.Values.All(book => book.Requirement == SkillRequirement.Mage), Is.True);
+            var seen = new HashSet<string>();
+            for (int seed = 0; seed < 12; seed++)
+            {
+                var battle = new BattleSimulator(random: new Random(seed)).Start(
+                    new BattleRequest("stars", new[] { star, enemy }, 4 * star.Character.ActionInterval));
+                for (int remaining = 1; remaining >= 0; remaining--)
+                {
+                    var cast = battle.AdvanceRound().Single(e => e.Kind == BattleEventKind.Action && e.ActorId == star.Id);
+                    Assert.That(cast.SkillBookId, Is.Not.Null);
+                    Assert.That(spells.ContainsKey(cast.SkillBookId), Is.True);
+                    seen.Add(cast.SkillBookId);
+                    Assert.That(cast.ActorEnergy.Value.Remaining, Is.EqualTo(remaining));
+                }
+                var strike = battle.AdvanceRound().First(e => e.Kind == BattleEventKind.Action && e.ActorId == star.Id);
+                Assert.That(strike.ActionKind, Is.EqualTo(ActionKind.Attack));
+            }
+            Assert.That(seen.Count, Is.GreaterThan(1));
+            Assert.That(seen.Any(id => spells[id].Cost > 1), Is.True);
         }
 
         [Test]
@@ -282,6 +346,8 @@ namespace RaidPartyManager.Tests
             Assert.That(party.Inventory, Is.Empty);
             Assert.That(result.Outcome, Is.EqualTo(BattleOutcome.Victory));
             Assert.That(result.Events.Any(entry => entry.ActionName == "拿回装备"), Is.EqualTo(!escapes));
+            var thiefRating = result.Ratings.Single(row => row.UnitId == thief.Id);
+            Assert.That((thiefRating.Retreated, thiefRating.Fallen), Is.EqualTo((escapes, !escapes)));
             if (escapes)
                 Assert.That(result.Events.Single(entry => entry.Kind == BattleEventKind.Retreated).Tick, Is.EqualTo(40));
             else

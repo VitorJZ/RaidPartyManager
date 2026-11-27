@@ -483,7 +483,6 @@ namespace RaidPartyManager.Tests
             var backpackIcon = top.Q<Image>("run-backpack-icon");
             Assert.That(backpackIcon.image, Is.Not.Null);
             var backpack = top.Q("run-backpack-items");
-            Assert.That(backpack.childCount, Is.EqualTo(16));
             Assert.That(top.Q<Button>("start"), Is.Not.Null);
             Assert.That(top.Q("open-settings").Q("settings-icon"), Is.Not.Null);
             Assert.That(root.Q("return-main-menu"), Is.Null);
@@ -491,9 +490,14 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Label>("battle-phase"), Is.Null);
             yield return null;
             var available = ((PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene)).BackpackItems;
-            Assert.That(backpack.Children().Select(tile => tile.name), Is.EqualTo(
-                available.Skip(available.Count - 16).Select(item => "run-backpack-item-" + item.Id)));
-            Assert.That(backpack.Children().Take(4).Select(tile => tile.Q<Image>().image).Distinct().Count(), Is.EqualTo(1));
+            var firstTile = backpack.ElementAt(0);
+            float tileWidth = firstTile.resolvedStyle.width + firstTile.resolvedStyle.marginRight;
+            int visible = Mathf.Min(available.Count, 16, Mathf.FloorToInt(backpack.layout.width / tileWidth));
+            var visibleItems = available.Skip(available.Count - visible).ToArray();
+            Assert.That(backpack.Children().Select(tile => tile.name), Is.EqualTo(visibleItems.Select(item => "run-backpack-item-" + item.Id)));
+            var art = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
+            Assert.That(backpack.Children().Take(4).Select(tile => (tile.Q<Image>("skill-scroll-symbol") ?? tile.Q<Image>()).image),
+                Is.EqualTo(visibleItems.Take(4).Select(item => art.IconFor(item.Definition.Id))));
             Assert.That(backpack.Q("run-item-count"), Is.Null);
             var teamButton = top.Q("open-party-editor");
             Assert.That(top.Q("run-wallet").worldBound.xMax, Is.LessThanOrEqualTo(teamButton.worldBound.xMin));
@@ -506,7 +510,7 @@ namespace RaidPartyManager.Tests
             var firstBackpackItem = backpack.ElementAt(0);
             using (var enter = PointerEnterEvent.GetPooled(Mouse(EventType.MouseMove, firstBackpackItem.worldBound.center)))
                 Send(firstBackpackItem, enter);
-            Assert.That(root.Q<Label>("equipment-tooltip-name").text, Is.EqualTo(available[available.Count - 16].Definition.Name));
+            Assert.That(root.Q<Label>("equipment-tooltip-name").text, Is.EqualTo(visibleItems[0].Definition.Name));
             using (var leave = PointerLeaveEvent.GetPooled(Mouse(EventType.MouseMove, Vector2.zero)))
                 Send(firstBackpackItem, leave);
 
@@ -575,9 +579,23 @@ namespace RaidPartyManager.Tests
             var first = (BattleResult)typeof(BattlePrototype).GetField("result", PrivateInstance).GetValue(scene);
             Assert.That(first.Events.First(hit => hit.ActionName == "突袭队尾").TargetId, Is.EqualTo("archer"));
             var rewards = root.Q("victory-rewards");
+            var scoreboard = rewards.Q("battle-scoreboard");
+            Assert.That(scoreboard, Is.Not.Null);
+            foreach (var rating in first.Ratings)
+            {
+                var unit = scoreboard.Q<Button>("battle-rating-" + rating.UnitId);
+                Assert.That(unit, Is.Not.Null, rating.Name);
+                Assert.That(unit.Query<Label>().ToList().Last().text, Is.EqualTo((rating.ScoreTenths / 10m).ToString("0.0")));
+            }
+            Press(scoreboard, "battle-rating-guard");
+            var detail = scoreboard.Q<Label>("battle-rating-detail-guard");
+            Assert.That(detail.style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(detail.text, Does.Contain("为队友挡伤"));
+            Press(scoreboard, "battle-rating-guard");
+            Assert.That(detail.style.display.value, Is.EqualTo(DisplayStyle.None));
             Assert.That(rewards.Q<Button>("claim-loot-0").Q<Label>().text, Is.EqualTo("狂战士之印"));
             Assert.That(rewards.Q<Button>("claim-gold").Q("reward-gold-icon"), Is.Not.Null);
-            foreach (var reward in rewards.Query<Button>().ToList())
+            foreach (var reward in rewards.Query<Button>().ToList().Where(b => b.name?.StartsWith("claim-") == true))
             {
                 Assert.That(reward.style.backgroundColor.value, Is.EqualTo(Color.clear));
                 Assert.That(reward.style.borderLeftWidth.value, Is.Zero);
@@ -652,6 +670,60 @@ namespace RaidPartyManager.Tests
             Press(root, "open-party-editor");
             Press(root, "edit-member-mage");
             Assert.That(FindBackpackCell(root, VictoryRewardItemName()), Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator TimeoutShowsTheWholeFieldBeforeReset() => BattleWithoutLoot(timeout: true);
+
+        [UnityTest]
+        public IEnumerator RewardlessVictoryWaitsForThePlayerToFinishReading() => BattleWithoutLoot(timeout: false);
+
+        private static IEnumerator BattleWithoutLoot(bool timeout)
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return WaitForScene("BattlePrototype");
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var source = (EncounterAsset)typeof(BattlePrototype).GetField("encounter", PrivateInstance).GetValue(scene);
+            var fixture = Object.Instantiate(source);
+            typeof(EncounterAsset).GetField("victoryReward", PrivateInstance).SetValue(fixture, null);
+            if (timeout) typeof(EncounterAsset).GetField("tickLimit", PrivateInstance).SetValue(fixture, 1);
+            var data = fixture.ToData();
+            typeof(BattlePrototype).GetField("content", PrivateInstance).SetValue(scene, data);
+            Object.Destroy(fixture);
+            if (!timeout)
+            {
+                var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+                party.AddGold(int.MaxValue - party.Gold);
+                var foe = data.Enemies[0];
+                typeof(BattlePrototype).GetField("preparedEnemies", PrivateInstance).SetValue(scene,
+                    new[] { new Combatant(foe.Id, foe.Character, Side.Enemy, 1, foe.Stats, 1) });
+            }
+            UseFastAttacks(scene);
+            Press(root, "start");
+            yield return ResolveBattle(root);
+            yield return null;
+            var result = (BattleResult)typeof(BattlePrototype).GetField("result", PrivateInstance).GetValue(scene);
+            Assert.That(result.Outcome, Is.EqualTo(timeout ? BattleOutcome.Timeout : BattleOutcome.Victory));
+            var scoreboard = root.Q("battle-scoreboard");
+            Assert.That(scoreboard, Is.Not.Null);
+            foreach (var row in result.Ratings)
+                Assert.That(scoreboard.Q<Button>("battle-rating-" + row.UnitId), Is.Not.Null, row.Name);
+            Assert.That(scoreboard.worldBound.width, Is.GreaterThan(0));
+            Assert.That(root.Q("victory-panel") ?? root.Q("defeat-summary"), Is.Not.Null);
+            if (timeout)
+            {
+                Press(root, "leave-battle-ratings");
+                Assert.That(root.Q<Button>("start"), Is.Not.Null);
+            }
+            else
+            {
+                Press(root, "open-settings");
+                Press(root, "close-settings");
+                Assert.That(root.Q("battle-scoreboard"), Is.SameAs(scoreboard));
+                Press(root, "continue-after-ratings");
+                yield return WaitForScene("MainMenu");
+            }
         }
 
         [UnityTest]

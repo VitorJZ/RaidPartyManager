@@ -18,8 +18,7 @@ namespace RaidPartyManager.Battle
                 if (available.Length == 0)
                     continue;
                 var source = available[random.Next(available.Length)];
-                unit.CopiedTrait = source.Trait;
-                unit.CopiedTraitPower = source.TraitPower;
+                unit.CopiedTraitSource = source;
                 Report(BattleEventKind.Effect, unit, unit, "复制被动", ActionKind.Shield, detail: source.Name, copiedTraitSource: source);
             }
 

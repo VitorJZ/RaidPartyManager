@@ -1704,6 +1704,10 @@ namespace RaidPartyManager.Tests
             int maximum = eventKind == AdventureEventKind.Ambush ? 18 : enemies.Sum(e => run.Current.Battle.EliteIds.Contains(e.Id) ? 20 : 9);
             Assert.That(run.Party.Gold - startingGold, Is.InRange(minimum, maximum));
             Assert.That(run.SettleBattle(result), Is.False);
+            var recorded = run.FloorBattles.Single();
+            Assert.That(recorded.Kind, Is.EqualTo(kind));
+            Assert.That(recorded.Members.Select(m => (m.UnitId, m.ScoreTenths)),
+                Is.EqualTo(result.Ratings.Where(r => r.Side == Side.Party).Select(r => (r.UnitId, r.ScoreTenths))));
             if (eventKind == AdventureEventKind.AscensionTrial)
             {
                 var member = run.EvolutionCandidates.First(); var form = run.EvolutionForms(member.Id).First();
@@ -1775,6 +1779,77 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
+        public void FloorHistoryCountsSettledFightsOnceAndAveragesBattlesEquallyAcrossReloads()
+        {
+            var catalogue = gear.Concat(content.SkillBooks).ToArray();
+            AdventureRun Reload(AdventureCheckpoint state) => AdventureRun.RestoreCheckpoint(
+                UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(UnityEngine.JsonUtility.ToJson(state)), content.CharacterCatalog, catalogue);
+            var saved = Create(71, false).CheckpointForExit();
+            saved.Nodes[1].Kind = NodeKind.EliteBattle;
+            saved.Nodes[1].Fork = false;
+            saved.Nodes[1].AlternativePlusOne = 0;
+            var run = Reload(saved);
+            string a = run.Party.Members[0].Id, b = run.Party.Members[1].Id;
+            BattleRating Rated(string id, int damage) => new BattleRating { UnitId = id, Name = id, Side = Side.Party, HealthDamage = damage };
+            void Settle(params BattleRating[] party)
+            {
+                var enemies = run.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
+                string key = "rated-" + run.Stage;
+                run.BindBattle(key);
+                var foe = new BattleRating { Side = Side.Enemy, UnitId = enemies[0].Id, HealthDamage = 50 };
+                var result = new BattleResult(key, BattleOutcome.Victory, enemies.ToDictionary(e => e.Id, _ => 0),
+                    Array.Empty<BattleEvent>(), ratings: BattleRating.ScoreBattle(party.Append(foe)));
+                Assert.That(run.SettleBattle(result, out int gold), Is.True);
+                Assert.That(run.SettleBattle(result, out _), Is.False);
+                run.RecordBattleRewards(gold, Array.Empty<EquipmentDefinition>());
+            }
+
+            Assert.That(run.EnterRoute(0), Is.True);
+            Settle(Rated(a, 0), Rated(b, 40));
+            Assert.That(run.ClaimReward(0) && run.CloseVisit(), Is.True);
+            Assert.That(run.EnterRoute(0), Is.True);
+            var interrupted = run.CheckpointForExit();
+            Assert.That(interrupted.FloorBattles.Select(f => f.Stage), Is.EqualTo(new[] { 1 }));
+            run = Reload(interrupted);
+            Assert.That(run.EnterRoute(0), Is.True);
+            Settle(Rated(a, 30));
+            run = Reload(run.CheckpointForExit());
+            Assert.That(run.FloorBattles.Select(f => f.Kind), Is.EqualTo(new[] { NodeKind.NormalBattle, NodeKind.EliteBattle }));
+            Assert.That(run.FloorBattles.Select(f => f.ScoreFor(null)), Is.EqualTo(new int?[] { 40, 60 }));
+            Assert.That(BattleRating.AverageTenths(run.FloorBattles.Select(f => f.ScoreFor(null))), Is.EqualTo(50));
+            Assert.That(run.FloorBattles.Select(f => f.ScoreFor(a)), Is.EqualTo(new int?[] { 0, 60 }));
+            Assert.That(run.FloorBattles.Select(f => f.ScoreFor(b)), Is.EqualTo(new int?[] { 80, null }));
+            Assert.That(BattleRating.AverageTenths(run.FloorBattles.Select(f => f.ScoreFor(b))), Is.EqualTo(80));
+        }
+
+        [Test]
+        public void OldRewardSaveRescoresItsKnownFightWithoutInventingEarlierBattles()
+        {
+            var catalogue = gear.Concat(content.SkillBooks).ToArray();
+            var saved = Create(23, false).CheckpointForExit();
+            saved.FirstRatedStage = 0;
+            saved.FloorBattles = null;
+            saved.Stage = DockRoute.Stages;
+            saved.Options = new[] { NodeKind.Boss };
+            saved.Choice = 0;
+            saved.HasBattleReward = true;
+            saved.BattleReward = new BattleRewardCheckpoint { Kind = NodeKind.Boss, Resolved = true, Gold = 5,
+                Items = Array.Empty<string>(), Choices = Array.Empty<string>(),
+                Ratings = new[] { new BattleRating { UnitId = "medic", Name = "医师", Healing = 4, ScoreTenths = 100 } } };
+            var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, catalogue);
+            Assert.That(run.FirstRatedStage, Is.EqualTo(DockRoute.Stages));
+            Assert.That(run.Current.Battle.Ratings.Single().ScoreTenths, Is.EqualTo(10));
+            Assert.That(run.FloorBattles.Single().ScoreFor(null), Is.EqualTo(10));
+            run = AdventureRun.RestoreCheckpoint(run.CheckpointForExit(), content.CharacterCatalog, catalogue);
+            Assert.That(run.FloorBattles.Single().Stage, Is.EqualTo(DockRoute.Stages));
+            Assert.That(run.FloorBattles[0].ScoreFor("absent"), Is.Null);
+            Assert.That(run.Current.Battle.Reward.ClaimGold(run.Party) && run.CloseVisit(), Is.True);
+            Assert.That(run.Floor, Is.EqualTo(2));
+            Assert.That(run.FloorBattles, Is.Empty);
+            Assert.That(run.FirstRatedStage, Is.EqualTo(1));
+        }
+
+        [Test]
         public void BossChoiceAndGuaranteedRewardsCanBeCollectedSeparatelyAcrossReloads()
         {
             var catalogue = gear.Concat(content.SkillBooks).ToArray();
@@ -1787,7 +1862,12 @@ namespace RaidPartyManager.Tests
             var enemies = route.PrepareEnemies(content.EnemyRoster, content.EnemyFormations);
             route.BindBattle("boss-reward");
             var victory = new BattleResult("boss-reward", BattleOutcome.Victory,
-                enemies.ToDictionary(enemy => enemy.Id, _ => 0), Array.Empty<BattleEvent>());
+                enemies.ToDictionary(enemy => enemy.Id, _ => 0), Array.Empty<BattleEvent>(), ratings: BattleRating.ScoreBattle(new[] {
+                    new BattleRating { UnitId = route.Party.Members[0].Id, CharacterId = route.Party.Members[0].Character.Id,
+                        Name = route.Party.Members[0].Character.Name, Side = Side.Party, DebuffLayers = 4, PoisonDamage = 6, HealthDamage = 6 },
+                    new BattleRating { UnitId = enemies[0].Id, CharacterId = enemies[0].Character.Id,
+                        Name = enemies[0].Character.Name, Side = Side.Enemy, Fallen = true, DamageTaken = 6 }
+                }));
             Assert.That(route.SettleBattle(victory, out int gold), Is.True);
             foreach (var member in route.Party.Members)
                 Assert.That(member.Health, Is.EqualTo(Math.Min(member.EffectiveStats.Health, 1 + (member.EffectiveStats.Health + 1) / 2)));
@@ -1802,6 +1882,7 @@ namespace RaidPartyManager.Tests
             string json = UnityEngine.JsonUtility.ToJson(route.CheckpointForExit());
             route = AdventureRun.RestoreCheckpoint(UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(json),
                 content.CharacterCatalog, catalogue);
+            Assert.That(route.Current.Battle.Ratings, Is.EqualTo(victory.Ratings));
             Assert.That(route.Current.Rewards, Is.Empty);
             Assert.That(route.ClaimReward(0), Is.False);
             Assert.That(route.Party.SkillBooks.Count(item => item.Definition.Id == choice.Id), Is.EqualTo(1));

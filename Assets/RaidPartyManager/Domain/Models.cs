@@ -18,7 +18,7 @@ namespace RaidPartyManager.Domain
         EnemyTideFollower, EnemyWreckScavenger, EnemyDeckSailor,
         EnemyMudEel, EnemySaltCrab, EnemyLanternMoth, EnemyFogSignalGunner, EnemyShipCaulker,
         EnemyAnchorHermit, EnemyFogAngler, EnemyMooringWarden, EnemyBlockadeAdmiral, EnemyDrownedLanternRay, SoakEnemyEachRound,
-        DoubleShot, GravePollen, RottenBloom
+        DoubleShot, GravePollen, RottenBloom, AbyssWard, AstralCasting
     }
     public enum Personality
     {
@@ -185,17 +185,18 @@ namespace RaidPartyManager.Domain
         public string TraitText { get; }
         public string BattleFormId { get; }
         public IReadOnlyList<string> EvolutionIds { get; }
+        public IReadOnlyList<SkillBookDefinition> InnateSpells { get; }
         public EnemyBehaviorDefinition EnemyBehavior { get; }
 
-        public CharacterDefinition WithName(string name) => new(Id, name, Profession, Personality, BaseStats, ActionInterval, BasicAttack, Skill, RosterNumber, Stage, Reach, Trait, TraitPower, TraitText, BattleFormId, EvolutionIds, Rank, PositionSlots, EnemyBehavior);
-        public CharacterDefinition WithPersonality(Personality personality) => personality == Personality ? this : new(Id, Name, Profession, personality, BaseStats, ActionInterval, BasicAttack, Skill, RosterNumber, Stage, Reach, Trait, TraitPower, TraitText, BattleFormId, EvolutionIds, Rank, PositionSlots, EnemyBehavior);
+        public CharacterDefinition WithName(string name) => new(Id, name, Profession, Personality, BaseStats, ActionInterval, BasicAttack, Skill, RosterNumber, Stage, Reach, Trait, TraitPower, TraitText, BattleFormId, EvolutionIds, Rank, PositionSlots, EnemyBehavior, InnateSpells);
+        public CharacterDefinition WithPersonality(Personality personality) => personality == Personality ? this : new(Id, Name, Profession, personality, BaseStats, ActionInterval, BasicAttack, Skill, RosterNumber, Stage, Reach, Trait, TraitPower, TraitText, BattleFormId, EvolutionIds, Rank, PositionSlots, EnemyBehavior, InnateSpells);
 
         public CharacterDefinition(string id, string name, Profession profession, Personality personality,
             Stats baseStats, int actionInterval, ActionDefinition basicAttack, ActionDefinition skill = null,
             int rosterNumber = 0, int stage = 1, AttackReach reach = AttackReach.Unspecified,
             CharacterTrait trait = CharacterTrait.None, int traitPower = 0, string traitText = null,
             string battleFormId = null, IEnumerable<string> evolutionIds = null, EnemyRank rank = EnemyRank.Unspecified,
-            int positionSlots = 1, EnemyBehaviorDefinition enemyBehavior = null)
+            int positionSlots = 1, EnemyBehaviorDefinition enemyBehavior = null, IEnumerable<SkillBookDefinition> innateSpells = null)
         {
             if (string.IsNullOrWhiteSpace(id) || baseStats.Health <= 0 || actionInterval <= 0 || !Rules.Fits(1, positionSlots))
                 throw new ArgumentException("A character needs an ID, positive health and an action interval.");
@@ -222,6 +223,7 @@ namespace RaidPartyManager.Domain
             BattleFormId = battleFormId;
             EvolutionIds = Array.AsReadOnly(evolutionIds?.ToArray() ?? Array.Empty<string>());
             EnemyBehavior = enemyBehavior;
+            InnateSpells = Array.AsReadOnly(innateSpells?.ToArray() ?? Array.Empty<SkillBookDefinition>());
         }
     }
 
@@ -534,6 +536,7 @@ namespace RaidPartyManager.Domain
         public IReadOnlyDictionary<string, int> HealthById { get; }
         public IReadOnlyDictionary<string, int> PartyPositionsById { get; }
         public IReadOnlyList<BattleEvent> Events { get; }
+        public IReadOnlyList<BattleRating> Ratings { get; }
         public IReadOnlyList<Combatant> Recruits { get; }
         public IReadOnlyDictionary<string, int> PermanentAttackGains { get; }
         public IReadOnlyDictionary<string, int> PermanentHealthGains { get; }
@@ -546,7 +549,7 @@ namespace RaidPartyManager.Domain
             IEnumerable<BattleEvent> events, IEnumerable<KeyValuePair<string, int>> partyPositions = null,
             IEnumerable<Combatant> recruits = null, IEnumerable<KeyValuePair<string, int>> permanentAttackGains = null,
             int potionsEarned = 0, BattleLoadout loadout = null, int goldEarned = 0, int accessoriesEarned = 0,
-            IEnumerable<KeyValuePair<string, int>> permanentHealthGains = null)
+            IEnumerable<KeyValuePair<string, int>> permanentHealthGains = null, IEnumerable<BattleRating> ratings = null)
         {
             Id = id;
             Outcome = outcome;
@@ -556,6 +559,7 @@ namespace RaidPartyManager.Domain
                 (partyPositions ?? Enumerable.Empty<KeyValuePair<string, int>>())
                     .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal));
             Events = Array.AsReadOnly(events.ToArray());
+            Ratings = Array.AsReadOnly(ratings?.ToArray() ?? Array.Empty<BattleRating>());
             Recruits = Array.AsReadOnly(recruits?.ToArray() ?? Array.Empty<Combatant>());
             PermanentAttackGains = new System.Collections.ObjectModel.ReadOnlyDictionary<string, int>(
                 (permanentAttackGains ?? Enumerable.Empty<KeyValuePair<string, int>>())

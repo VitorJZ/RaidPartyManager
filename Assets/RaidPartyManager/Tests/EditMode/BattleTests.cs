@@ -13,6 +13,53 @@ namespace RaidPartyManager.Tests
         private static readonly ActionDefinition Guard = new ActionDefinition("guard", "guard", ActionKind.Shield, TargetRule.Self, 5, 3);
 
         [Test]
+        public void RatingsKeepBothSidesAndCountOnlyEffectiveDamageHealingAndShielding()
+        {
+            var hit = Fight(Unit("striker", Side.Party, 1, attack: 50), Unit("foe", Side.Enemy, 1, hp: 3),
+                Unit("fallen", Side.Party, 2, hp: 0)).Ratings.ToDictionary(row => row.UnitId);
+            Assert.That(hit.Keys, Is.EquivalentTo(new[] { "striker", "foe", "fallen" }));
+            Assert.That((hit["striker"].HealthDamage, hit["striker"].Kills, hit["striker"].ScoreTenths),
+                Is.EqualTo((3L, 1, 12)));
+            Assert.That((hit["foe"].Side, hit["foe"].DamageTaken, hit["foe"].Fallen), Is.EqualTo((Side.Enemy, 3L, true)));
+            Assert.That(hit["fallen"].ScoreTenths, Is.Zero);
+
+            var healed = Fight(Unit("medic", Side.Party, 1, hp: 19, skill: Heal),
+                Unit("foe", Side.Enemy, 1)).Ratings.Single(row => row.UnitId == "medic");
+            Assert.That(healed.Healing, Is.EqualTo(1));
+            var shield = Fight(Unit("guard", Side.Party, 1, skill: Guard),
+                Unit("raider", Side.Enemy, 1, attack: 8)).Ratings.ToDictionary(row => row.UnitId);
+            Assert.That((shield["raider"].Damage, shield["raider"].ShieldDamage), Is.EqualTo((8L, 5L)));
+            Assert.That((shield["guard"].DamageTaken, shield["guard"].ShieldAbsorbed, shield["guard"].AllyShielding),
+                Is.EqualTo((3L, 5L, 0L)));
+        }
+
+        [Test]
+        public void RatingsAddEachContributionFromZeroIndependentlyOfTheField()
+        {
+            var rows = BattleRating.ScoreBattle(new[] { new BattleRating { Side = Side.Enemy, HealthDamage = 20 },
+                new BattleRating { Healing = 4 }, new BattleRating { DebuffLayers = 4, BuffLayers = 1, CleansedLayers = 1 },
+                new BattleRating { ShieldAbsorbed = 5, AllyShielding = 6 }, new BattleRating() });
+            Assert.That(rows.Select(r => r.ScoreTenths), Is.EqualTo(new[] { 40, 10, 20, 20, 0 }));
+            var extra = new BattleRating { HealthDamage = 1000 };
+            var withExtra = BattleRating.ScoreBattle(rows.Append(extra));
+            Assert.That(withExtra.Take(rows.Length).Select(r => r.ScoreTenths), Is.EqualTo(rows.Select(r => r.ScoreTenths)));
+            Assert.That(withExtra.Last().ScoreTenths, Is.EqualTo(100));
+            var nearCap = new BattleRating { HealthDamage = 49, ShieldAbsorbed = 1 };
+            Assert.That(nearCap.EarnedPoints, Is.EqualTo(9.96m));
+            Assert.That(BattleRating.ScoreBattle(new[] { nearCap })[0].ScoreTenths, Is.EqualTo(99));
+            var member = new BattleRating();
+            Assert.That(member.EarnedPoints, Is.Zero);
+            member.Healing = 1;
+            Assert.That(member.EarnedPoints, Is.EqualTo(.25m));
+            member.DebuffLayers = 1;
+            member.DamageTaken = 1;
+            Assert.That(member.EarnedPoints, Is.EqualTo(.73m));
+            Assert.That(BattleRating.ScoreBattle(new[] { member })[0].ScoreTenths, Is.EqualTo(7));
+            Assert.That(BattleRating.ScoreBattle(new[] { new BattleRating(), new BattleRating() }).Select(r => r.ScoreTenths),
+                Is.All.EqualTo(0));
+        }
+
+        [Test]
         public void DefaultPolicyChoosesHighestDamageAcrossAttackTypesAndTargets()
         {
             var magic = Attack("magic", TargetRule.AnyEnemy, 2, 3, DamageType.Magic);
@@ -181,20 +228,23 @@ namespace RaidPartyManager.Tests
                 return new Combatant(unit.Id, unit.Character, unit.Side, position, unit.Stats, unit.Health, learnedSkills: new[] { book });
             }
             var enemy = Unit("enemy", Side.Enemy, 1, maxHealth: 200, attack: 9);
-            var battle = new BattleSimulator().Start(new BattleRequest("protect", new[] { Learner("bell", 1, bell), Learner("stone", 2, stone), enemy }, 6));
+            var battle = new BattleSimulator(random: new System.Random(1)).Start(new BattleRequest("protect",
+                new[] { Learner("bell", 1, bell), Learner("stone", 2, stone), enemy }, 2));
             var events = battle.AdvanceRound().Concat(battle.AdvanceRound()).ToList();
 
             int Index(System.Func<BattleEvent, bool> match) => events.FindIndex(entry => match(entry));
             Assert.That(Index(e => e.Countdown is { Kind: BattleCountdownKind.StoneGuard, Remaining: 1 } && e.TargetId == "stone"), Is.GreaterThanOrEqualTo(0));
             Assert.That(Index(e => e.Countdown is { Kind: BattleCountdownKind.GoldenBell, Remaining: 1 } && e.TargetId == "bell"), Is.GreaterThanOrEqualTo(0));
             Assert.That(events.Any(e => e.ActorId == "enemy" && e.Detail == BattleSession.GoldenBellBlocked), Is.True);
+            Assert.That(battle.Result.Ratings.Single(row => row.UnitId == "bell").SkillBlocks, Is.GreaterThan(0));
 
-            var alone = new BattleSimulator().Start(new BattleRequest("stone", new[] { Learner("stone", 1, stone), enemy }, 6));
+            var alone = new BattleSimulator().Start(new BattleRequest("stone", new[] { Learner("stone", 1, stone), enemy }, 2));
             events = alone.AdvanceRound().Concat(alone.AdvanceRound()).ToList();
             int broken = Index(e => e.ActorId == "enemy" && e.TargetId == "stone" && e.Detail == BattleSession.StoneGuardBlocked);
             Assert.That(broken, Is.GreaterThanOrEqualTo(0));
             Assert.That(events[broken + 1].Countdown, Is.EqualTo(new BattleCountdown(BattleCountdownKind.StoneGuard, 0)),
                 "The stone guard badge comes off right after the hit it absorbed.");
+            Assert.That(alone.Result.Ratings.Single(row => row.UnitId == "stone").SkillBlocks, Is.GreaterThan(0));
         }
 
         [Test]

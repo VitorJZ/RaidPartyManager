@@ -59,7 +59,7 @@ namespace RaidPartyManager.Run
         internal void GiveSoup(string id)
         {
             var employee = FindMember(id);
-            if (employee != null) employee.Health = Math.Min(PersonalStats(employee).Health, employee.Health + 5);
+            if (employee?.CanRecoverHealth == true) employee.Health = Math.Min(PersonalStats(employee).Health, employee.Health + 5);
         }
 
         internal (int first, int second) SharedHealth(string first, string second, bool settle = false)
@@ -68,6 +68,8 @@ namespace RaidPartyManager.Run
             var b = FindMember(second);
             int total = a.Health + b.Health;
             int hp = Math.Max(total - PersonalStats(b).Health, Math.Min(PersonalStats(a).Health, (total + 1) / 2));
+            if ((!a.CanRecoverHealth && hp > a.Health) || (!b.CanRecoverHealth && total - hp > b.Health))
+                hp = a.Health;
             if (settle) { a.Health = hp; b.Health = total - hp; }
             return (hp, total - hp);
         }

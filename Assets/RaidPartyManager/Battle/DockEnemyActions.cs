@@ -40,7 +40,7 @@ namespace RaidPartyManager.Battle
                     return true;
                 case EnemyShipCaulker when random.NextDouble() >= 0.60:
                     var wounded = units.Where(unit => unit.Input.Side == Side.Enemy && unit.Health > 0 &&
-                        unit.Health < unit.Stats.Health && unit.Layers(Cursed) == 0)
+                        unit.Health < unit.Stats.Health && unit.CanReceiveHealing)
                         .OrderBy(unit => (double)unit.Health / unit.Stats.Health).FirstOrDefault();
                     if (wounded == null)
                         return false;

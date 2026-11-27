@@ -13,6 +13,8 @@ namespace RaidPartyManager.Run
         public int Seed;
         public int Floor;
         public int Stage;
+        public int FirstRatedStage;
+        public FloorBattleRating[] FloorBattles;
         public int CompletedNodes;
         public int EventsTaken;
         public int GraveSeedStage;
@@ -90,6 +92,7 @@ namespace RaidPartyManager.Run
     [Serializable]
     public sealed class BattleRewardCheckpoint
     {
+        public BattleRating[] Ratings;
         public bool BloomWaitingForRoom;
         public NodeKind Kind;
         public int Event = -1;

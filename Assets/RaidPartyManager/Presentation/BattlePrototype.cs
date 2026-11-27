@@ -423,7 +423,7 @@ namespace RaidPartyManager.Presentation
             if (gardenBloom != null && !gardenBloom.Draw(root, now))
             {
                 gardenBloom = null;
-                ContinueVictory();
+                Render();
             }
             if (entrance.Active)
                 entrance.Show(now, entranceLayer, unitCards, playbackSpeed);
@@ -491,7 +491,7 @@ namespace RaidPartyManager.Presentation
             if (endingTeamWipe && floatingNumbers.Count == 0 && Time.unscaledTimeAsDouble >= curtainCallUntil)
             {
                 endingTeamWipe = false;
-                PrototypeSceneMenu.OpenStandalone("MainMenu");
+                RenderDefeat();
             }
         }
 
@@ -648,7 +648,7 @@ namespace RaidPartyManager.Presentation
                             content.BattleWalkFor(AdventureRun.GraveGardenerId), root.WorldToLocal(card.BodyBounds), now);
                     }
                     else
-                        ContinueVictory();
+                        Render();
                     return;
                 }
 
@@ -1138,7 +1138,11 @@ namespace RaidPartyManager.Presentation
             numberLayer.style.top = RunTopBar.Height;
             root.Add(numberLayer);
             if (defeat)
-                RenderDefeat(page);
+            {
+                page.SetEnabled(false);
+                if (TeamWiped) topBar.SetEnabled(false);
+                if (!endingTeamWipe) RenderDefeat();
+            }
             else if (phase == Phase.Settlement)
             {
                 page.SetEnabled(false);
@@ -1212,7 +1216,8 @@ namespace RaidPartyManager.Presentation
                 statusTooltip.Hide();
                 HideEquipmentTooltip();
             }
-            else if (phase == Phase.Settlement && victoryRewards != null && gardenBloom == null && !victoryRewards.HasUnclaimed && LootChoices.Count == 0)
+            else if (phase == Phase.Settlement && victoryRewards != null && gardenBloom == null &&
+                !victoryRewards.HasUnclaimed && LootChoices.Count == 0 && root.Q("continue-after-ratings") == null)
                 ContinueVictory();
         }
 
@@ -1740,37 +1745,53 @@ namespace RaidPartyManager.Presentation
             else AdventureFlow.ReturnFromNode();
         }
 
-        private void RenderVictory()
+        private VisualElement SettlementPanel(string overlayId, string panelId, string title)
         {
             HideEquipmentTooltip();
-            root.Q("victory-rewards")?.RemoveFromHierarchy();
-            var overlay = new VisualElement { name = "victory-rewards" };
+            root.Q(overlayId)?.RemoveFromHierarchy();
+            var overlay = new VisualElement { name = overlayId };
             PrototypeStyle.Fill(overlay);
             overlay.style.top = RunTopBar.Height;
             overlay.style.alignItems = Align.Center;
             overlay.style.justifyContent = Justify.Center;
             overlay.style.backgroundColor = new Color(0.03f, 0.026f, 0.033f, 0.76f);
             var panel = PrototypeStyle.Panel();
-            panel.name = "victory-panel";
-            panel.style.width = Length.Percent(90);
-            panel.style.maxWidth = 550;
-            panel.style.maxHeight = Length.Percent(88);
-            panel.style.paddingTop = panel.style.paddingBottom = 18;
-            panel.style.paddingLeft = panel.style.paddingRight = 18;
+            panel.name = panelId;
+            panel.style.width = Length.Percent(94);
+            panel.style.maxWidth = 840;
+            panel.style.maxHeight = Length.Percent(94);
+            panel.style.paddingTop = panel.style.paddingBottom = 10;
+            panel.style.paddingLeft = panel.style.paddingRight = 14;
             panel.style.marginTop = 0;
             PrototypeStyle.Outline(panel, PrototypeStyle.Accent, 6);
-            var heading = PrototypeStyle.Text("胜利", 26, PrototypeStyle.Accent);
+            var heading = PrototypeStyle.Text(title, 24, PrototypeStyle.Accent);
             PrototypeStyle.Middle(heading);
             panel.Add(heading);
-            if (adventure?.Current?.Battle?.Kind == NodeKind.Boss)
-                panel.Add(PrototypeStyle.Text("首领已击败，全队恢复 50% 最大生命值。", 15, PrototypeStyle.Ink));
+            overlay.Add(panel);
+            root.Add(overlay);
+            return panel;
+        }
 
-            if (adventure?.Current?.Battle?.BloomWaitingForRoom == true)
-                panel.Add(PrototypeStyle.Text("种子已经成熟。腾出一个队伍空位，再装备它赢一场即可招募花匠。", 15, PrototypeStyle.Ink));
+        private void AddBattleRatings(VisualElement parent)
+        {
+            if (adventure?.Current is { Kind: NodeKind.Boss, Battle: { Settled: true } })
+                parent.Add(new FloorRatingChart(adventure));
+            parent.Add(new BattleScoreboard(result?.Ratings ?? adventure?.Current?.Battle?.Ratings, content));
+        }
 
+        private void RenderVictory()
+        {
+            var panel = SettlementPanel("victory-rewards", "victory-panel", "胜利");
             var rewards = new ScrollView(ScrollViewMode.Vertical);
             rewards.style.flexShrink = 1;
             panel.Add(rewards);
+            AddBattleRatings(rewards);
+            if (adventure?.Current?.Battle?.Kind == NodeKind.Boss)
+                rewards.Add(PrototypeStyle.Text("首领已击败，全队恢复 50% 最大生命值。", 15, PrototypeStyle.Ink));
+
+            if (adventure?.Current?.Battle?.BloomWaitingForRoom == true)
+                rewards.Add(PrototypeStyle.Text("种子已经成熟。腾出一个队伍空位，再装备它赢一场即可招募花匠。", 15, PrototypeStyle.Ink));
+
             var row = RewardRow();
             for (int i = 0; i < victoryRewards.Items.Count; i++)
             {
@@ -1798,7 +1819,12 @@ namespace RaidPartyManager.Presentation
                     });
             }
             if (row.childCount > 0)
+            {
+                var lootHeading = PrototypeStyle.Text("战利品", 16, PrototypeStyle.Accent);
+                lootHeading.style.marginTop = 6;
+                rewards.Add(lootHeading);
                 rewards.Add(row);
+            }
             if (choices.Count > 1)
             {
                 var label = PrototypeStyle.Text(choices.All(item => item.BossExclusive) ? "首领专属战利品 · 2 选 1" : $"战利品 · {choices.Count} 选 1", 14, PrototypeStyle.Muted);
@@ -1808,10 +1834,9 @@ namespace RaidPartyManager.Presentation
                 rewards.Add(choiceRow);
             }
 
-            overlay.Add(panel);
-            root.Add(overlay);
+            if (!victoryRewards.HasUnclaimed && choices.Count == 0)
+                panel.Add(PrototypeStyle.Button("继续", "continue-after-ratings", ContinueVictory, true));
             topBar.BringRewardFlightsToFront();
-            overlay.Q<Button>()?.Focus();
 
             void Claim(Button source, Func<bool> grant)
             {
@@ -1861,11 +1886,13 @@ namespace RaidPartyManager.Presentation
             return button;
         }
 
-        private void RenderDefeat(VisualElement page)
+        private void RenderDefeat()
         {
-            var summary = PrototypeStyle.Panel();
-            summary.name = "defeat-summary";
-            summary.Add(PrototypeStyle.Text(OutcomeText(result.Outcome), 20, PrototypeStyle.Accent));
+            var panel = SettlementPanel("defeat-ratings", "defeat-summary", OutcomeText(result.Outcome));
+            var summary = new ScrollView(ScrollViewMode.Vertical);
+            summary.style.flexShrink = 1;
+            panel.Add(summary);
+            AddBattleRatings(summary);
             summary.Add(PrototypeStyle.Text("剩余生命  " + string.Join("  ·  ", run.Members.Select(member =>
                 $"{member.Character.Name} {HealthText(member.Health, member.EffectiveStats.Health)}")), 14));
             if (result.GoldEarned > 0)
@@ -1874,7 +1901,12 @@ namespace RaidPartyManager.Presentation
                 summary.Add(PrototypeStyle.Text($"获得 {result.AccessoriesEarned} 件饰品，已放入共享背包", 13, PrototypeStyle.Accent));
             if (adventure?.Current is { } visit)
                 summary.Add(PrototypeStyle.Text(visit.Message, 15, PrototypeStyle.Accent));
-            page.Add(summary);
+            if (TeamWiped)
+                panel.Add(PrototypeStyle.Button("返回主菜单", "leave-battle-ratings", () => PrototypeSceneMenu.OpenStandalone("MainMenu"), true));
+            else if (adventure == null)
+                panel.Add(PrototypeStyle.Button("重置演练", "leave-battle-ratings", () => ResetDemo(reroll: true), true));
+            else
+                panel.Add(PrototypeStyle.Button("返回事件选择", "leave-battle-ratings", AdventureFlow.ReturnFromNode, true));
         }
 
         private static string OutcomeText(BattleOutcome outcome) => outcome switch

@@ -69,7 +69,7 @@ namespace RaidPartyManager.Battle
                 .OrderBy(unit => unit.Input.Position).ToArray();
             // Healing only chooses a living, injured, healable ally. Shields may protect a full-health ally.
             var wounded = action.Kind == EnemyActionKind.Heal
-                ? allies.Where(unit => unit.Health < unit.Stats.Health && unit.Layers(StatusKind.Cursed) == 0)
+                ? allies.Where(unit => unit.Health < unit.Stats.Health && unit.CanReceiveHealing)
                 : allies.AsEnumerable();
             return action.Target switch
             {

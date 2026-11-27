@@ -73,7 +73,7 @@ namespace RaidPartyManager.Battle
             if (random.NextDouble() < 0.5)
             {
                 var target = units.Where(unit => unit.Input.Side == actor.Input.Side &&
-                    unit.Health > 0 && unit.Health < unit.Stats.Health && unit.Layers(StatusKind.Cursed) == 0)
+                    unit.Health > 0 && unit.Health < unit.Stats.Health && unit.CanReceiveHealing)
                     .OrderBy(unit => (double)unit.Health / unit.Stats.Health).FirstOrDefault();
                 if (target != null)
                 {

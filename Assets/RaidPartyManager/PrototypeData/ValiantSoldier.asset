@@ -31,7 +31,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 608a2af79ca548c19ec7c9b5cdda981a, type: 2}
   personality: 4
   attack: 6
-  defense: 3
+  defense: 2
   specialDefense: 2
   health: 11
   actionInterval: 10

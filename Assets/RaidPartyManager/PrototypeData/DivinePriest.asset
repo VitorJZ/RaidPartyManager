@@ -29,7 +29,7 @@ MonoBehaviour:
   personality: 5
   attack: 4
   defense: 2
-  specialDefense: 3
+  specialDefense: 2
   health: 12
   actionInterval: 12
   basicAttack:

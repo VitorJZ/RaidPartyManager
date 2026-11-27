@@ -11,7 +11,21 @@ namespace RaidPartyManager.Battle
     {
         private const double ToxicMistDollChance = .30;
 
-        private void AddLearnedSkillOptions(Unit actor, List<ActionOption> options)
+        private bool TryCastAstralSpell(Unit actor)
+        {
+            var options = new List<ActionOption>();
+            AddSkillOptions(actor, options, actor.TraitSource.InnateSpells, astralCast: true);
+            var spells = options.GroupBy(option => option.Book).ToArray();
+            if (spells.Length == 0) return false;
+
+            // Pick the spell first so single-target spells do not get extra rolls for each enemy.
+            var cast = spells[random.Next(spells.Length)].OrderByDescending(option => option.ProjectedAmount).First();
+            CastLearnedSkill(actor, unitsById[cast.Target.Id], cast.Book, DecisionReason.UseSkill, cast.EnergyCost);
+            return true;
+        }
+
+        private void AddSkillOptions(Unit actor, List<ActionOption> options, IReadOnlyList<SkillBookDefinition> books,
+            bool astralCast = false)
         {
             var enemies = Opponents(actor).ToArray();
             var allies = units.Where(unit => unit.Input.Side == actor.Input.Side && unit.Health > 0).ToArray();
@@ -19,11 +33,12 @@ namespace RaidPartyManager.Battle
             int reachableEnergy = actor.Energy.Remaining + Math.Max(0, actor.ChargeTarget - actor.Energy.Capacity);
             int reserveCost = 0;
             long reserveValue = 0;
-            foreach (var book in actor.Original.LearnedSkills)
+            foreach (var book in books)
             {
                 if (!CanAttackThisRound(actor) && !CanCastWithoutAttacking(actor, book.SkillEffect)) continue;
-                bool charging = book.Cost > actor.Energy.Remaining;
-                if (book.Cost > reachableEnergy) continue;
+                int required = astralCast ? 1 : book.Cost;
+                bool charging = required > actor.Energy.Remaining;
+                if (required > reachableEnergy) continue;
                 var action = new ActionDefinition(book.Id, book.Name, ActionKind.Shield, TargetRule.Self, 0);
                 int attack = CurrentAttack(actor);
                 switch (book.SkillEffect)
@@ -57,7 +72,7 @@ namespace RaidPartyManager.Battle
                         Add(rear, Estimate(rear, attack + 3, DamageType.Physical) + 1); break;
                     case TwinCover: Add(actor, Behind(actor) != null ? 8 : 4); break;
                     case FieldMedic:
-                        foreach (var ally in allies) Add(ally, Math.Min(8, ally.Stats.Health - ally.Health) +
+                        foreach (var ally in allies) Add(ally, (ally.Trait == CharacterTrait.AbyssWard ? 0 : Math.Min(8, ally.Stats.Health - ally.Health)) +
                             4 * (ally.Layers(Poison) + ally.Layers(Cursed))); break;
                     case ColdTide: Add(actor, enemies.Sum(e => (long)Estimate(e, attack + 1, DamageType.Magic) + 2)); break;
                     case BronzeMirror when actor.MirrorShield == 0: Add(actor, 20); break;
@@ -67,7 +82,7 @@ namespace RaidPartyManager.Battle
                             NearbyEnemies(actor, foe).Where(e => e != foe).Sum(e => (long)Estimate(e, attack + 2, DamageType.Physical))); break;
                     case Intercept when allies.Length > 1 && (actor.Intercepts == 0 || actor.InterceptUntil < Round): Add(actor, 15); break;
                     case BackPay:
-                        foreach (var dead in units.Where(u => u.Input.Side == actor.Input.Side && u.Health == 0 && !u.CorpseConsumed))
+                        foreach (var dead in units.Where(u => u.Input.Side == actor.Input.Side && u.Health == 0 && !u.CorpseConsumed && u.Trait != CharacterTrait.AbyssWard))
                             Add(dead, dead.Stats.Health + 5); break;
                     case ThunderVerdict when actor.ThunderRound <= Round:
                         Add(actor, enemies.Sum(e => (long)Estimate(e, 2 * attack + 6, DamageType.Lightning))); break;
@@ -103,7 +118,7 @@ namespace RaidPartyManager.Battle
                             foreach (var target in allies)
                                 Add(target, HealingValue(target, 10));
                         break;
-                    case SweepNextAttack when actor.SweepSkill == null && enemies.Length > 1 && attack > 0:
+                    case SweepNextAttack when actor.SweepSkill == null && (enemies.Length > 1 || astralCast) && attack > 0:
                         Add(actor, (long)(enemies.Length - 1) * attack);
                         break;
                     case LightningWhip:
@@ -163,7 +178,7 @@ namespace RaidPartyManager.Battle
 
                 void Add(Unit target, long projected)
                 {
-                    if (projected <= 0) return;
+                    if (projected <= 0 && !astralCast) return;
                     if (charging)
                     {
                         if (projected > reserveValue || projected == reserveValue && book.Cost < reserveCost)
@@ -173,7 +188,7 @@ namespace RaidPartyManager.Battle
                     options.Add(new ActionOption(action, target.Snapshot(), target.Health,
                         (int)Math.Min(int.MaxValue, projected), book: book,
                         lastCastRound: actor.LastBookCast.GetValueOrDefault(book.Id),
-                        energyCost: book.EnergyCost(actor.Energy.Remaining)));
+                        energyCost: astralCast ? 1 : book.EnergyCost(actor.Energy.Remaining)));
                 }
 
                 int Estimate(Unit target, int power, DamageType type) =>
@@ -193,7 +208,7 @@ namespace RaidPartyManager.Battle
             _ => false
         };
 
-        private static int HealingGain(Unit target, int power) => target.Layers(Cursed) > 0 ? 0 :
+        private static int HealingGain(Unit target, int power) => !target.CanReceiveHealing ? 0 :
             Math.Min(HealingPower(target, power), target.Stats.Health - target.Health);
 
         private static long HealingValue(Unit target, int power) =>
@@ -212,7 +227,7 @@ namespace RaidPartyManager.Battle
         }
 
         private Unit ToxicMistDollTarget(Unit actor) => Teammates(actor)
-            .Where(ally => ally.Has(EquipmentEffect.WitchDoctorDoll) && CanAffect(ally, Poison) && ally.Layers(Cursed) == 0)
+            .Where(ally => ally.Has(EquipmentEffect.WitchDoctorDoll) && CanAffect(ally, Poison) && ally.CanReceiveHealing)
             .OrderByDescending(ally => ally.Stats.Health - ally.Health).FirstOrDefault();
 
         private static int ArrowPower(Unit target) => Math.Max(1, target.Health / 5);
@@ -220,9 +235,8 @@ namespace RaidPartyManager.Battle
         private IEnumerable<Unit> NearbyEnemies(Unit actor, Unit target) =>
             Opponents(actor).Where(enemy => Math.Abs(enemy.Input.Position - target.Input.Position) <= 1);
 
-        private void CastLearnedSkill(Unit actor, Unit target, SkillBookDefinition book, DecisionReason reason)
+        private void CastLearnedSkill(Unit actor, Unit target, SkillBookDefinition book, DecisionReason reason, int spent)
         {
-            int spent = book.EnergyCost(actor.Energy.Remaining);
             actor.SpendEnergy(spent);
             actor.LastSkillRound = Round;
             actor.LastBookCast[book.Id] = Round;
@@ -269,7 +283,7 @@ namespace RaidPartyManager.Battle
                     foreach (var ally in Allies().ToArray())
                     {
                         foreach (var status in ally.Statuses.Keys.Where(status => StatusRules.For(status).Negative).ToArray())
-                            RemoveLayers(ally, status, int.MaxValue);
+                            RemoveLayers(ally, status, int.MaxValue, actor);
                         Show(ally);
                         Restore(ally, 5);
                         if (ally.Health > 0) ShieldAlly(actor, ally, 5, book.Name, book.Id);
@@ -285,8 +299,8 @@ namespace RaidPartyManager.Battle
                     if (behind != null) ShieldAlly(actor, behind, behind.Health * 2 <= behind.Stats.Health ? 7 : 4, book.Name, book.Id);
                     break;
                 case FieldMedic:
-                    int cleansed = (RemoveLayers(target, Poison, int.MaxValue) ? 1 : 0) +
-                        (RemoveLayers(target, Cursed, int.MaxValue) ? 1 : 0);
+                    int cleansed = (RemoveLayers(target, Poison, int.MaxValue, actor) ? 1 : 0) +
+                        (RemoveLayers(target, Cursed, int.MaxValue, actor) ? 1 : 0);
                     Restore(target, 8 + 2 * cleansed); break;
                 case ColdTide:
                     foreach (var enemy in Opponents(actor).ToArray())
@@ -303,6 +317,7 @@ namespace RaidPartyManager.Battle
                 case SiegeBolt:
                     var neighbors = NearbyEnemies(actor, target).Where(e => e != target).ToArray();
                     target.Shield = target.MirrorShield = 0;
+                    target.ShieldSources.Clear();
                     target.ReliquaryWard = false;
                     DamageEnemy(target, 2 * attack + 4, DamageType.Physical);
                     foreach (var enemy in neighbors) DamageEnemy(enemy, attack + 2, DamageType.Physical);
@@ -310,6 +325,7 @@ namespace RaidPartyManager.Battle
                 case Intercept:
                     actor.Intercepts = 3; actor.InterceptUntil = Round + 1; Show(actor); break;
                 case BackPay:
+                    actor.Rating.Saves++;
                     target.Health = Math.Max(1, (int)Math.Ceiling(target.Stats.Health * .4));
                     target.SpendEnergy(target.Energy.Remaining);
                     target.BlockedRound = Round;
@@ -379,6 +395,7 @@ namespace RaidPartyManager.Battle
                 case GoldenBell:
                     foreach (var ally in Allies())
                     {
+                        if (ally.ProtectedRound != Round) ally.BellCaster = actor;
                         ally.ProtectedRound = Round;
                         Show(ally);
                         ReportCountdown(ally, BattleCountdownKind.GoldenBell, 1);

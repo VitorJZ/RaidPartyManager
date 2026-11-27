@@ -715,6 +715,7 @@ namespace RaidPartyManager.Tests
             var result = new BattleSimulator(random: new FixedRoll(0.9)).Simulate(request);
             Assert.That(result.Events.Any(entry => entry.ActionName == "寻人启事"), Is.True);
             Assert.That(result.Recruits.Single().Position, Is.EqualTo(2));
+            Assert.That(result.Ratings.Single(row => row.UnitId == result.Recruits.Single().Id).CharacterId, Is.EqualTo(recruit.Id));
             Assert.That(run.TrySettle(result, out _), Is.True);
             Assert.That(run.Members.Single(member => member.Id != fighter.Id).Character, Is.SameAs(recruit));
             Assert.That(run.Inventory.Any(i => i.Definition.Effect == RecruitmentNotice), Is.False);
@@ -1068,6 +1069,73 @@ namespace RaidPartyManager.Tests
             // Without an adjacent ward, the foe can attack before the second application could freeze it.
             var duel = Fight(2, wearer, foe);
             Assert.That(duel.Events.Count(e => e.ActionName == "冷魂圣匣" && e.TargetId == foe.Id), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void PoisonRatingsTrackIndividualSourcesAfterDecayAndIgnoreImmunityAndStartingLayers()
+        {
+            var a = Unit("a", Side.Party, trait: CharacterTrait.PoisonOpponents, traitPower: 2);
+            var b = Unit("b", Side.Party, 2, trait: CharacterTrait.PoisonOpponents, traitPower: 3);
+            var foe = Unit("foe", Side.Enemy, stats: new Stats(1, 0, 0, 150),
+                statuses: new Dictionary<StatusKind, int> { [StatusKind.Poison] = 1 });
+            var immune = Unit("immune", Side.Enemy, 2, statuses: new Dictionary<StatusKind, int> { [StatusKind.Purity] = 3 });
+            var ratings = Fight(2, a, b, foe, immune).Ratings.ToDictionary(r => r.UnitId);
+            Assert.That((ratings["a"].DebuffLayers, ratings["a"].PoisonDamage), Is.EqualTo((4L, 6L)));
+            Assert.That((ratings["b"].DebuffLayers, ratings["b"].PoisonDamage), Is.EqualTo((6L, 9L)));
+            Assert.That(ratings["foe"].DamageTaken + ratings["immune"].DamageTaken,
+                Is.EqualTo(ratings["a"].Damage + ratings["b"].Damage + 1));
+        }
+
+        [Test]
+        public void VenomSurgesSelfPoisonAwardsNeitherOffenseNorTankingCredit()
+        {
+            var model = Unit("caster", Side.Party, stats: new Stats(1, 0, 0, 60));
+            var book = new SkillBookDefinition("venom", "毒潮", "", SkillRequirement.None, 2, 1, SkillEffect.VenomSurge);
+            var caster = new Combatant(model.Id, model.Character, model.Side, 1, model.Stats, model.Health, learnedSkills: new[] { book });
+            var fight = Fight(caster, Unit("front", Side.Enemy), Unit("rear", Side.Enemy, 2));
+            var row = fight.Ratings.Single(r => r.UnitId == caster.Id);
+            int selfPoison = fight.Events.Single(e => e.PoisonDamage && e.TargetId == caster.Id).Amount;
+            Assert.That(selfPoison, Is.EqualTo(2));
+            Assert.That(row.DamageTaken, Is.EqualTo(caster.Health - fight.HealthById[caster.Id] - selfPoison));
+            Assert.That((row.DebuffLayers, row.PoisonDamage), Is.EqualTo((12L, 12L)));
+        }
+
+        [Test]
+        public void FieldMedicGetsCreditForRemovedLayersAndCleansedPoisonStopsDealingDamage()
+        {
+            var model = Unit("medic", Side.Party);
+            var book = new SkillBookDefinition("field-medic", "战地急救", "", SkillRequirement.None, 1, 1, SkillEffect.FieldMedic);
+            var medic = new Combatant(model.Id, model.Character, model.Side, 1, model.Stats, model.Health, learnedSkills: new[] { book });
+            var patient = Unit("patient", Side.Party, 2, health: 22,
+                statuses: new Dictionary<StatusKind, int> { [StatusKind.Poison] = 3, [StatusKind.Cursed] = 2 });
+            var enemy = Unit("poisoner", Side.Enemy, trait: CharacterTrait.PoisonOpponents, traitPower: 1);
+            var ratings = Fight(medic, patient, enemy).Ratings.ToDictionary(row => row.UnitId);
+            Assert.That(ratings["medic"].CleansedLayers, Is.EqualTo(6));
+            Assert.That(ratings["medic"].Healing, Is.EqualTo(8));
+            Assert.That(ratings["poisoner"].PoisonDamage, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void AOneHealthPoisonKillCreditsTheDominantSourceAndNoOverkill()
+        {
+            var stunned = new Dictionary<StatusKind, int> { [StatusKind.Stunned] = 1 };
+            var a = Unit("a", Side.Party, statuses: stunned, trait: CharacterTrait.PoisonOpponents, traitPower: 9);
+            var b = Unit("b", Side.Party, 2, statuses: stunned, trait: CharacterTrait.PoisonOpponents, traitPower: 1);
+            var ratings = Fight(a, b, Unit("foe", Side.Enemy, health: 1)).Ratings.ToDictionary(r => r.UnitId);
+            Assert.That((ratings["a"].PoisonDamage, ratings["a"].Kills), Is.EqualTo((1L, 1)));
+            Assert.That((ratings["b"].PoisonDamage, ratings["b"].Kills), Is.EqualTo((0L, 0)));
+        }
+
+        [Test]
+        public void AllyShieldCreditTracksOnlyTheBarrierActuallySpentOnTheAlly()
+        {
+            var tank = Unit("tank", Side.Party, statuses: new Dictionary<StatusKind, int> { [StatusKind.Purity] = 3 });
+            var support = Unit("support", Side.Party, 2, gear: Gear(ColdSoulReliquary));
+            var enemy = Unit("foe", Side.Enemy, stats: new Stats(8, 0, 0, 100),
+                statuses: new Dictionary<StatusKind, int> { [StatusKind.Purity] = 3 });
+            var ratings = Fight(tank, support, enemy).Ratings.ToDictionary(r => r.UnitId);
+            Assert.That((ratings["tank"].ShieldAbsorbed, ratings["tank"].DamageTaken), Is.EqualTo((3L, 5L)));
+            Assert.That((ratings["support"].AllyShielding, ratings["support"].ShieldAbsorbed), Is.EqualTo((3L, 0L)));
         }
 
         private static BattleEvent Action(BattleResult result, string actor) =>

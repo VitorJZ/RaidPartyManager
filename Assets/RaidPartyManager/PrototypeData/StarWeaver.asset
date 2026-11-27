@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: StarWeaver
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: StarWeaver
+  displayName: "星罗"
+  portrait: {fileID: 2800000, guid: 71127de6cf3355c99920117ddbfec6ff, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 83faafc645415b7e82c9d8768585366b, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 03d882a1ecd75d03adc1b0737c2f7c52, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: 6ca7bf99c60859d2bde30bb34b9d0da5, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: 0f0a65bad44c59a4aa0cb42221fb58ac, type: 3}
+  innateSpellCatalog: {fileID: 11400000, guid: 5d2799f97ec448aab35b51a5ed0ce044, type: 2}
+  profession: 1
+  rosterNumber: 41
+  stage: 2
+  reach: 1
+  fixedTrait: 53
+  traitPower: 0
+  traitText: "有能量时，行动改为随机施放一种法师法术，固定消耗 1 点能量。"
+  personality: 2
+  attack: 5
+  defense: 1
+  specialDefense: 1
+  health: 14
+  actionInterval: 10
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 1
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 82af80acb3844d9dbafd53411b9e3df4, type: 3}
+  m_Name: AbyssKeeper
+  m_EditorClassIdentifier: RaidPartyManager.Content::RaidPartyManager.Content.CharacterAsset
+  id: AbyssKeeper
+  displayName: "冥渊"
+  portrait: {fileID: 2800000, guid: 3e57b357fec35568bce5c605269c3d18, type: 3}
+  campSeatedSprite: {fileID: 2800000, guid: 9b44e989a3d7564490764f225b4b3c03, type: 3}
+  battleSpriteSheet: {fileID: 2800000, guid: 6befb7e77fcb5c26bd3583032aca1bb6, type: 3}
+  battleWalkSheet: {fileID: 2800000, guid: cadff988b7b6593eb0819cf9c8960059, type: 3}
+  battleAttackSheet: {fileID: 2800000, guid: f59d5ea5f6585ffa8729f69e9b824371, type: 3}
+  profession: 3
+  rosterNumber: 40
+  stage: 2
+  reach: 2
+  fixedTrait: 52
+  traitPower: 0
+  traitText: "自身无法恢复生命值。存活在场时，其他队友的生命值不会低于 1 点。"
+  personality: 2
+  attack: 4
+  defense: 0
+  specialDefense: 0
+  health: 20
+  actionInterval: 12
+  basicAttack:
+    id: basic
+    displayName: 普攻
+    kind: 0
+    target: 0
+    power: 0
+    cooldown: 0
+    damageType: 5
+  hasSkill: 0

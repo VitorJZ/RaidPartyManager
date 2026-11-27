@@ -30,6 +30,8 @@ MonoBehaviour:
   evolutions:
   - {fileID: 11400000, guid: dac678d7eeb14344a6e1c949c2424d14, type: 2}
   - {fileID: 11400000, guid: 513fe91324cb45b18e69a8805184c8e5, type: 2}
+  - {fileID: 11400000, guid: 44af7eb8635d5b448cd4c2ff0b94c88f, type: 2}
+  - {fileID: 11400000, guid: 1b662c5df75a58b482700aeb0d2da319, type: 2}
   personality: 4
   attack: 7
   defense: 1

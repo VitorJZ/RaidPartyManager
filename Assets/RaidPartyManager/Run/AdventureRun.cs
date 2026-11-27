@@ -174,6 +174,7 @@ namespace RaidPartyManager.Run
         public string RequestId { get; internal set; }
         public bool Settled { get; internal set; }
         public BattleRewards Reward { get; internal set; }
+        public IReadOnlyList<BattleRating> Ratings { get; internal set; } = Array.Empty<BattleRating>();
         internal EquipmentDefinition BonusEquipment { get; set; }
         public string BloomWearer { get; internal set; }
         public bool BloomWaitingForRoom { get; internal set; }
@@ -242,11 +243,14 @@ namespace RaidPartyManager.Run
         private int eventsTaken, elitesTaken;
         private IReadOnlyList<NodeKind> routeOptions;
         private AdventureCheckpoint nodeCheckpoint;
+        private readonly List<FloorBattleRating> floorBattles = new();
         private int shopRecruitPrice = ShopRecruitment.StartingPrice;
 
         public PartyRun Party { get; }
         public bool IsInspection { get; }
         public int Floor { get; private set; } = 1;
+        public int FirstRatedStage { get; private set; } = 1;
+        public IReadOnlyList<FloorBattleRating> FloorBattles => floorBattles;
         public bool InGraveyard => (Floor - 1) % 3 == 1;
         public bool InCapital => (Floor - 1) % 3 == 2;
         public string RegionName => InCapital ? "机巧遗都" : InGraveyard ? "低语墓园" : "弥雾码头";
@@ -331,6 +335,7 @@ namespace RaidPartyManager.Run
                 saved.HasBattleReward = true;
                 saved.BattleReward = new BattleRewardCheckpoint
                 {
+                    Ratings = Current.Battle.Ratings.ToArray(),
                     Kind = Current.Battle.Kind, BloomWaitingForRoom = Current.Battle.BloomWaitingForRoom,
                     Event = Current.Event.HasValue ? (int)Current.Event.Value : -1,
                     Resolved = Current.Resolved, Message = Current.Message,
@@ -379,6 +384,7 @@ namespace RaidPartyManager.Run
             new AdventureCheckpoint
             {
                 Party = Party.CaptureCheckpoint(), Seed = seed, Floor = Floor, Stage = Stage, CompletedNodes = CompletedNodes,
+                FirstRatedStage = FirstRatedStage, FloorBattles = floorBattles.ToArray(),
                 EventsTaken = eventsTaken, GraveSeedStage = graveSeedStage, ElitesTaken = elitesTaken, Investment = Investment, InvestmentPaid = InvestmentPaid,
                 InvestorFloors = investorFloors.ToArray(), SeenEvents = seenEvents.OrderBy(kind => kind).ToArray(),
                 FloorCleared = FloorCleared, Failed = Failed, PayrollDepartures = PayrollDepartures.ToArray(),
@@ -417,6 +423,7 @@ namespace RaidPartyManager.Run
             var run = new AdventureRun(party, catalog, items.Values, false, new Random(saved.Seed))
             {
                 Floor = saved.Floor, Stage = saved.Stage, CompletedNodes = saved.CompletedNodes, eventsTaken = saved.EventsTaken,
+                FirstRatedStage = saved.FirstRatedStage > 0 ? saved.FirstRatedStage : saved.Stage + (saved.FinishVisit ? 1 : 0),
                 graveSeedStage = saved.GraveSeedStage, elitesTaken = saved.ElitesTaken, Investment = saved.Investment, InvestmentPaid = saved.InvestmentPaid,
                 FloorCleared = saved.FloorCleared, Failed = saved.Failed,
                 PayrollDepartures = saved.PayrollDepartures ?? Array.Empty<string>(),
@@ -430,6 +437,8 @@ namespace RaidPartyManager.Run
                 shopRecruitPrice = saved.ShopRecruitPricePlusOne == 0 ? ShopRecruitment.StartingPrice : saved.ShopRecruitPricePlusOne - 1,
                 random = new Random(saved.Seed)
             };
+            if (saved.FloorBattles != null)
+                run.floorBattles.AddRange(saved.FloorBattles.Where(fight => fight?.Members != null));
             run.investorFloors.UnionWith(saved.InvestorFloors ?? Array.Empty<int>());
             run.seenEvents.UnionWith(saved.SeenEvents ?? Array.Empty<AdventureEventKind>());
             if (run.InGraveyard && run.graveSeedStage == 0)
@@ -456,11 +465,15 @@ namespace RaidPartyManager.Run
                     Rewards = reward.Choices.Select(id => items[id]).ToArray(),
                     Battle = new AdventureBattle(reward.Kind)
                     {
+                        Ratings = Array.AsReadOnly(BattleRating.ScoreBattle(reward.Ratings ?? Array.Empty<BattleRating>())),
                         Settled = true, BloomWaitingForRoom = reward.BloomWaitingForRoom,
                         Reward = new BattleRewards(reward.Gold,
                             reward.Items.Select(id => string.IsNullOrEmpty(id) ? null : items[id]))
                     }
                 };
+                // Reward saves made before floor history still contain this fight's raw contributions.
+                if (saved.FirstRatedStage == 0)
+                    run.RecordFloorBattle();
             }
             else if (saved.HasFinalBossPreparation)
             {
@@ -1012,6 +1025,7 @@ namespace RaidPartyManager.Run
             var ticket = Current?.Battle;
             if (ticket == null || ticket.Settled || result == null || ticket.RequestId != result.Id || ticket.Enemies == null ||
                 ticket.Enemies.Any(e => !result.HealthById.ContainsKey(e.Id))) return false;
+            ticket.Ratings = result.Ratings;
             bool victory = result.Outcome == BattleOutcome.Victory;
             if (victory && ticket.Kind == NodeKind.Boss)
             {
@@ -1020,6 +1034,7 @@ namespace RaidPartyManager.Run
                 ticket.BonusEquipment = spoils.Equipment;
             }
             ticket.Settled = true;
+            RecordFloorBattle();
             gold = Current.Event == AdventureEventKind.Ambush ? (victory ? random.Next(12, 19) : 0) :
                 RollKillGold(result, ticket.Enemies, random, ticket.EliteIds, Floor);
             if (victory)
@@ -1092,6 +1107,9 @@ namespace RaidPartyManager.Run
             int tier = roll < rareChance + (elite ? .5 : .3) ? 1 : random.Next(2, 4);
             return PickItem(battleRewardTickets.Where(item => item.Tier == tier), excluded);
         }
+
+        private void RecordFloorBattle() =>
+            floorBattles.Add(new FloorBattleRating(Stage, Current.Kind, Current.Battle.Ratings));
 
         public BattleRewards RecordBattleRewards(int gold, IEnumerable<EquipmentDefinition> items)
         {
@@ -1336,6 +1354,8 @@ namespace RaidPartyManager.Run
             if (Party.HasBorrowedName) return false;
             seenEvents.RemoveWhere(kind => GraveStories.Contains(kind) || CapitalStories.Contains(kind));
             Floor++; Stage = 1; FloorCleared = Failed = false; eventsTaken = elitesTaken = 0;
+            floorBattles.Clear();
+            FirstRatedStage = 1;
             RouteCurrent = default;
             RoutePrevious = RouteDestination = null;
             routeOptions = null;

@@ -91,6 +91,7 @@ namespace RaidPartyManager.Run
         {
             public readonly PartyMemberStart Start;
             public string Id => Start.Id;
+            public bool CanRecoverHealth => Character.Trait != CharacterTrait.AbyssWard;
             public CharacterDefinition Character;
             public int? Position;
             public int Health;
@@ -686,7 +687,7 @@ namespace RaidPartyManager.Run
             {
                 member.PermanentHealth += result.PermanentHealthGains.GetValueOrDefault(member.Id);
                 member.Health = Math.Max(1, Math.Min(result.HealthById[member.Id], PersonalStats(member).Health));
-                if (result.Outcome == BattleOutcome.Victory && member.Trait == PlayerTrait.Bandages && result.HealthById[member.Id] > 0)
+                if (result.Outcome == BattleOutcome.Victory && member.CanRecoverHealth && member.Trait == PlayerTrait.Bandages && result.HealthById[member.Id] > 0)
                     member.Health = Math.Min(PersonalStats(member).Health, member.Health + 2);
                 member.PermanentAttack += result.PermanentAttackGains.GetValueOrDefault(member.Id);
                 member.StartingStatuses = null;
@@ -843,7 +844,7 @@ namespace RaidPartyManager.Run
 
         internal void RecoverAfterBoss()
         {
-            foreach (var member in members)
+            foreach (var member in members.Where(member => member.CanRecoverHealth))
             {
                 int maximum = PersonalStats(member).Health;
                 member.Health = (int)Math.Min(maximum, (long)member.Health + ((long)maximum + 1) / 2);
@@ -855,7 +856,7 @@ namespace RaidPartyManager.Run
             if (activeBattle != null || fraction <= 0 || fraction > 1)
                 return 0;
             int healed = 0;
-            foreach (var member in members.Where(member => member.Health > 0 && !member.IsAway))
+            foreach (var member in members.Where(member => member.Health > 0 && !member.IsAway && member.CanRecoverHealth))
             {
                 int before = member.Health;
                 int maximum = PersonalStats(member).Health;

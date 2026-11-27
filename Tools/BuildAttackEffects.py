@@ -20,13 +20,13 @@ SIZE = 128
 PAINTINGS = {
     "Elements-a": """
         CampGuard - HeavyWarrior GreenRanger
-        SilverArcher StarMage - DawnHealer
+        SilverArcher StarMage StarWeaver DawnHealer
         EnemySeismoSpider RadiantMixer MistAlchemist GoldHunter
         ShieldCommander EnemyAnchorHermit GloomWatcher -
     """,
     "Elements-b": """
         EnemyMudEel CalamityChanter Chronomancer -
-        - Vanguard FateWeaver -
+        AbyssKeeper Vanguard FateWeaver -
         EnemyInkScribe EnemySignalBeacon EnemyWaxAttendant DiSha
         - - - EnemyFogSignalGunner
     """,

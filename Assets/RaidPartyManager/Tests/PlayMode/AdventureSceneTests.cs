@@ -891,6 +891,11 @@ namespace RaidPartyManager.Tests
         public IEnumerator CampOffersEvolutionRestAndTrainingAsExclusiveActions()
         {
             yield return OpenMenu();
+            var hub = Object.FindAnyObjectByType<AdventureEventHub>();
+            var assets = (AdventureContentAsset)typeof(AdventureEventHub).GetField("assets", Private).GetValue(hub);
+            var archer = assets.Encounter.CharacterCatalog.Single(character => character.Id == "WhiteFeatherArcher");
+            if (run.Party.Members.All(member => member.Character.Id != archer.Id))
+                Assert.That(run.Party.TryRecruit(archer), Is.True);
             Press(Root<AdventureEventHub>(), "inspect-node-Camp");
             yield return WaitScene("Camp");
             var root = Root<CampPrototype>();
@@ -899,14 +904,21 @@ namespace RaidPartyManager.Tests
             Press(root, "camp-evolve");
             Press(root, "close-camp-choice");
             Assert.That(actions.All(id => root.Q<Button>(id).enabledInHierarchy), Is.True);
-            var candidate = run.EvolutionCandidates.First();
-            var form = run.EvolutionForms(candidate.Id).Last();
+            var candidate = run.EvolutionCandidates.Single(member => member.Character.Id == archer.Id);
+            var forms = run.EvolutionForms(candidate.Id);
+            var form = forms.Single(branch => branch.Id == "StarWeaver");
             Press(root, "camp-evolve");
             yield return null;
             AssertCharacterPreview(root, "pick-evolution-member-" + candidate.Id, candidate.Character);
             Press(root, "pick-evolution-member-" + candidate.Id);
             Assert.That(run.Current.Resolved, Is.False);
             yield return null;
+            Assert.That(forms.Count, Is.EqualTo(4));
+            foreach (var choice in forms)
+            {
+                var button = root.Q<Button>($"evolve-{candidate.Id}-{choice.Id}");
+                Assert.That(button.Q<Image>().image.name, Is.EqualTo(choice.Id + "-Expressive"));
+            }
             string branch = "evolve-" + candidate.Id + "-" + form.Id;
             AssertCharacterPreview(root, branch, form);
             Press(root, branch);
@@ -1609,7 +1621,12 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator APartyWipeReturnsToTheMenuAndClearsTheCheckpoint()
+        public IEnumerator APartyWipeShowsBothSidesRatingsBeforeReturningAndClearsTheCheckpoint() => WipeReturnsToMenu(false);
+
+        [UnityTest]
+        public IEnumerator GraveyardBossDefeatShowsTheFloorChartUntilExit() => WipeReturnsToMenu(true);
+
+        private IEnumerator WipeReturnsToMenu(bool boss)
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");
             yield return null;
@@ -1619,6 +1636,15 @@ namespace RaidPartyManager.Tests
             SaveAndExit(Root<AdventureEventHub>());
             yield return WaitScene("MainMenu");
             Assert.That(File.Exists(savePath), Is.True);
+            if (boss)
+            {
+                var saved = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+                saved.Floor = 2;
+                saved.Stage = DockRoute.Stages;
+                saved.Options = new[] { NodeKind.Boss };
+                File.WriteAllText(savePath, JsonUtility.ToJson(saved));
+                ResetAdventureFlow();
+            }
             File.WriteAllText(savePath + ".tmp", "interrupted save");
             Press(Root<PrototypeSceneMenu>(), "open-route");
             yield return WaitScene("EventSelect");
@@ -1630,17 +1656,29 @@ namespace RaidPartyManager.Tests
             run.Party.ResetRoster(new[] { new PartyMemberStart("last-ally", weak, 1, 1) });
             yield return WaitForRoadstone(Root<AdventureEventHub>());
             Press(Root<AdventureEventHub>(), "route-choice-0");
-            yield return WaitScene("BattlePrototype");
+            yield return WaitScene(boss ? "WhisperingGraveyard" : "BattlePrototype");
             FastBattle();
 
-            float deadline = Time.realtimeSinceStartup + 10;
-            while (SceneManager.GetActiveScene().name == "BattlePrototype" && Time.realtimeSinceStartup < deadline)
+            var battle = Root<BattlePrototype>();
+            float deadline = Time.realtimeSinceStartup + 15;
+            while (battle.Q("defeat-ratings") == null && Time.realtimeSinceStartup < deadline)
                 yield return null;
 
-            Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("MainMenu"));
+            Assert.That(battle.Q("battle-scoreboard"), Is.Not.Null);
+            Assert.That(battle.Q("floor-rating-chart") != null, Is.EqualTo(boss));
+            if (boss)
+            {
+                Assert.That(run.FloorBattles.Single().Kind, Is.EqualTo(NodeKind.Boss));
+                Assert.That(battle.Q<Label>("floor-rating-point-0").text,
+                    Is.EqualTo((run.FloorBattles[0].ScoreFor("last-ally").Value / 10m).ToString("0.0")));
+            }
+            Assert.That(battle.Q<Button>("battle-rating-last-ally"), Is.Not.Null);
+            Assert.That(battle.Q("battle-scoreboard").Query<Button>().ToList().Count, Is.GreaterThan(1));
             Assert.That(run.Failed, Is.True);
             Assert.That(File.Exists(savePath), Is.False);
             Assert.That(File.Exists(savePath + ".tmp"), Is.False);
+            Press(battle, "leave-battle-ratings");
+            yield return WaitScene("MainMenu");
             Assert.That(Root<PrototypeSceneMenu>().Q<Button>("open-route").text, Is.EqualTo("开始讨伐"));
             Press(Root<PrototypeSceneMenu>(), "open-route");
             yield return WaitScene("EventSelect");
@@ -2003,6 +2041,7 @@ namespace RaidPartyManager.Tests
             var root = Root<BattlePrototype>();
             yield return WaitForShow();
             Assert.That(root.panel.visualTree.Q("campaign-finale"), Is.Null);
+            Assert.That(root.Q("battle-scoreboard").Query<Label>().ToList().Any(label => label.text.Contains("没有评分记录")), Is.True);
             Press(root, "claim-gold");
             float deadline = Time.realtimeSinceStartup + 6;
             while (root.panel.visualTree.Q("campaign-finale") == null && Time.realtimeSinceStartup < deadline) yield return null;
@@ -2510,6 +2549,31 @@ namespace RaidPartyManager.Tests
                     yield return WaitSettlement();
                     Assert.That(run.Failed, Is.False);
                     var battle = Root<BattlePrototype>();
+                    var chart = battle.Q("floor-rating-chart");
+                    if (kind == NodeKind.Boss)
+                    {
+                        Assert.That(chart, Is.Not.Null);
+                        Assert.That(run.FloorBattles.Last().Kind, Is.EqualTo(NodeKind.Boss));
+                        Assert.That(run.FloorBattles.Count, Is.GreaterThan(1));
+                        var selector = chart.Q<DropdownField>("floor-rating-series");
+                        Assert.That(selector, Is.Not.Null);
+                        AssertSeries(null);
+                        string member = run.FloorBattles[0].Members[0].UnitId;
+                        selector.value = member;
+                        AssertSeries(member);
+                        selector.value = string.Empty;
+
+                        void AssertSeries(string id)
+                        {
+                            var scores = run.FloorBattles.Select(fight => fight.ScoreFor(id)).ToArray();
+                            for (int i = 0; i < scores.Length; i++)
+                                Assert.That(chart.Q<Label>("floor-rating-point-" + i).text,
+                                    Is.EqualTo(scores[i] is int value ? (value / 10m).ToString("0.0") : "—"));
+                            var mean = BattleRating.AverageTenths(scores).Value;
+                            Assert.That(chart.Q<Label>("floor-rating-average").text, Does.EndWith((mean / 10m).ToString("0.0")));
+                        }
+                    }
+                    else Assert.That(chart, Is.Null);
                     if (stage == 1)
                     {
                         yield return null;
@@ -2547,6 +2611,7 @@ namespace RaidPartyManager.Tests
                     if (stage == 1)
                     {
                         int unclaimedGold = run.Current.Battle.Reward.Gold;
+                        var ratings = run.Current.Battle.Ratings.ToArray();
                         int itemsAfterClaim = run.Party.Inventory.Count + run.Party.SkillBooks.Count;
                         SaveAndExit(battle);
                         yield return WaitScene("MainMenu");
@@ -2558,6 +2623,9 @@ namespace RaidPartyManager.Tests
                         Assert.That(run.Party.Gold, Is.EqualTo(gold));
                         Assert.That(run.Party.Inventory.Count + run.Party.SkillBooks.Count, Is.EqualTo(itemsAfterClaim));
                         Assert.That(run.Current.Battle.Reward.Gold, Is.EqualTo(unclaimedGold));
+                        Assert.That(run.Current.Battle.Ratings, Is.EqualTo(ratings));
+                        foreach (var rating in ratings)
+                            Assert.That(battle.Q<Button>("battle-rating-" + rating.UnitId), Is.Not.Null, rating.Name);
                         Assert.That(battle.Q("victory-rewards"), Is.Not.Null);
                         Assert.That(battle.Q("claim-route-loot-0"), Is.Null);
                         Assert.That(battle.Q("claim-gold"), Is.Not.Null);
@@ -2583,6 +2651,7 @@ namespace RaidPartyManager.Tests
             Assert.That(tookRightBranch && checkedLeftTurn, Is.True, "Both choices should be exercised on the route.");
             Assert.That(run.CompletedNodes, Is.EqualTo(DockRoute.Stages + 1));
             Assert.That(run.InGraveyard && run.Floor == 2, Is.True);
+            Assert.That(run.FloorBattles, Is.Empty);
             Assert.That(run.Stage, Is.EqualTo(1));
             int dayAtGate = run.Party.Day;
             RemoveTestWeapons();

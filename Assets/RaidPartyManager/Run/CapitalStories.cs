@@ -154,7 +154,7 @@ namespace RaidPartyManager.Run
         internal int AdjustCapitalHealth(string id, int delta)
         {
             var member = FindMember(id);
-            if (member == null || member.Health <= 0 || member.IsAway) return 0;
+            if (member == null || member.Health <= 0 || member.IsAway || (delta > 0 && !member.CanRecoverHealth)) return 0;
             int before = member.Health;
             member.Health = Math.Clamp(before + delta, 1, PersonalStats(member).Health);
             return member.Health - before;
