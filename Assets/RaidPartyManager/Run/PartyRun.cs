@@ -580,7 +580,8 @@ namespace RaidPartyManager.Run
                 member.Character.Trait == CharacterTrait.AccessoryOnSurvival);
             var request = new BattleRequest($"battle-{nextBattleId + 1}", party.Concat(enemyUnits), tickLimit,
                 recruitmentPool, characterCatalog, Gold, Math.Max(0, RosterLimit - members.Count), hardFight, grave.Porter,
-                grave.Bell, capitalField, reserveArcherCount: reserveArchers, reserveAccessoryHunterCount: reserveAccessoryHunters);
+                grave.Bell, capitalField, reserveArcherCount: reserveArchers, reserveAccessoryHunterCount: reserveAccessoryHunters,
+                partyRoster: members.Select(member => member.Character));
             nextBattleId++;
             activeBattle = request;
             activeReward = victoryReward;

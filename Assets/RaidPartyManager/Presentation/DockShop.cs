@@ -43,9 +43,8 @@ namespace RaidPartyManager.Presentation
         private VisualElement root;
         private ShopStage stage;
         private VisualElement stockLayer;
-        private VisualElement checkout;
         private VisualElement counterBackdrop;
-        private Button counterVisit;
+        private readonly Button[] counterVisits = new Button[2];
         private Label closeUpHint;
         private RunTopBar topBar;
         private PartyRun party;
@@ -102,13 +101,16 @@ namespace RaidPartyManager.Presentation
             hovered = null;
             offers.Clear();
             stockLayer.Clear();
+            stage.ClearTableStock();
+            int gear = 0, books = 0;
             for (int i = 0; i < stock.Count; i++)
             {
                 var record = stock[i];
                 var offer = new Offer { Index = i, Item = record.Item, Icon = content.IconFor(record.Item.Id),
                     Record = record, Sold = record.Sold };
                 offers.Add(offer);
-                stage.SetTableItem(i, offer.Item, offer.Icon, offer.Sold);
+                int tableSlot = offer.Item is SkillBookDefinition ? books++ : gear++;
+                stage.SetTableItem(i, tableSlot, offer.Item, offer.Icon, offer.Sold);
                 var view = BuildOffer(offer);
                 stockLayer.Add(view);
                 if (!offer.Sold) stage.PlaceOffer(view, offer.PriceTag, i);
@@ -119,6 +121,8 @@ namespace RaidPartyManager.Presentation
         {
             CloseSale();
             CloseRecruitment();
+            recruitTargets.Clear();
+            recruitActorLayer = null;
             recruitment = null;
             CancelPurchaseHold();
             HideTooltip();
@@ -141,21 +145,6 @@ namespace RaidPartyManager.Presentation
             root.focusable = true;
 
             if (!isWheelEvent) AddGoodsCounter();
-
-            checkout = new VisualElement { name = "shop-checkout", pickingMode = PickingMode.Ignore };
-            checkout.style.justifyContent = Justify.Center;
-            checkout.style.alignItems = Align.Center;
-            PrototypeStyle.Outline(checkout, Color.clear, 7);
-            var instruction = PrototypeStyle.Text(party.ContractsEnabled ? "将候选人拖到这里签约" : "将候选人拖到这里招募",
-                17, PrototypeStyle.Accent);
-            instruction.pickingMode = PickingMode.Ignore;
-            instruction.style.display = DisplayStyle.None;
-            instruction.style.backgroundColor = new Color(0.05f, 0.06f, 0.065f, 0.88f);
-            instruction.style.paddingLeft = instruction.style.paddingRight = 12;
-            instruction.style.paddingTop = instruction.style.paddingBottom = 6;
-            checkout.Add(instruction);
-            root.Add(checkout);
-            stage.PlaceCounter(checkout);
 
             topBar = new RunTopBar(root, party, content, OpenEditor, "open-shop-editor",
                 () => Gold, "shop-gold", expenseOverride: adventure == null ? standaloneExpenses : null);
@@ -214,17 +203,24 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Fill(stockLayer);
             root.Add(stockLayer);
 
-            counterVisit = PrototypeStyle.Button("查看商品", "shop-counter", OpenCounter);
-            counterVisit.style.justifyContent = Justify.FlexEnd;
-            counterVisit.style.paddingBottom = 8;
-            counterVisit.style.marginTop = counterVisit.style.marginBottom = 0;
-            counterVisit.style.backgroundColor = Color.clear;
-            counterVisit.style.unityFontStyleAndWeight = FontStyle.Bold;
-            counterVisit.style.unityTextOutlineColor = (Color)new Color32(35, 23, 20, 255);
-            counterVisit.style.unityTextOutlineWidth = 1f;
-            PrototypeStyle.Outline(counterVisit, Color.clear, 0);
-            stage.PlaceCounterVisit(counterVisit);
-            root.Add(counterVisit);
+            counterVisits[0] = CounterButton("装备", "shop-counter", books: false);
+            counterVisits[1] = CounterButton("技能书", "shop-books-counter", books: true);
+        }
+
+        private Button CounterButton(string text, string name, bool books)
+        {
+            var button = PrototypeStyle.Button(text, name, () => OpenCounter(books));
+            button.style.justifyContent = Justify.FlexEnd;
+            button.style.paddingBottom = 8;
+            button.style.marginTop = button.style.marginBottom = 0;
+            button.style.backgroundColor = Color.clear;
+            button.style.unityFontStyleAndWeight = FontStyle.Bold;
+            button.style.unityTextOutlineColor = (Color)new Color32(35, 23, 20, 255);
+            button.style.unityTextOutlineWidth = 1f;
+            PrototypeStyle.Outline(button, Color.clear, 0);
+            stage.PlaceCounterVisit(button, books);
+            root.Add(button);
+            return button;
         }
 
         private void AddGoodsControls()
@@ -270,7 +266,16 @@ namespace RaidPartyManager.Presentation
             price.style.unityTextAlign = TextAnchor.MiddleCenter;
             price.style.unityFontStyleAndWeight = FontStyle.Bold;
             view.Add(price);
-            var track = new VisualElement { name = "shop-hold-progress", pickingMode = PickingMode.Ignore };
+            offer.HoldFill = AddHoldProgress(price, "shop-hold-progress");
+            view.RegisterCallback<PointerEnterEvent>(_ => { if (CanInspect(offer) && heldOffer == null) Hover(offer); });
+            view.RegisterCallback<PointerLeaveEvent>(_ => { if (heldOffer == null && hovered == offer) Hover(null); });
+            view.RegisterCallback<PointerDownEvent>(evt => BeginPurchaseHold(evt, offer));
+            return view;
+        }
+
+        private static VisualElement AddHoldProgress(VisualElement parent, string name)
+        {
+            var track = new VisualElement { name = name, pickingMode = PickingMode.Ignore };
             track.style.position = Position.Absolute;
             track.style.left = track.style.right = 0;
             track.style.bottom = -5;
@@ -281,20 +286,22 @@ namespace RaidPartyManager.Presentation
             fill.style.height = Length.Percent(100);
             fill.style.backgroundColor = PrototypeStyle.Accent;
             track.Add(fill);
-            price.Add(track);
-            offer.HoldFill = fill;
-            view.RegisterCallback<PointerEnterEvent>(_ => { if (stage.CounterReady && heldOffer == null) Hover(offer); });
-            view.RegisterCallback<PointerLeaveEvent>(_ => { if (heldOffer == null && hovered == offer) Hover(null); });
-            view.RegisterCallback<PointerDownEvent>(evt => BeginPurchaseHold(evt, offer));
-            return view;
+            parent.Add(track);
+            return fill;
         }
 
-        private void OpenCounter()
+        private bool CanInspect(Offer offer) => stage.CounterReady &&
+            (offer.Item is SkillBookDefinition) == stage.BooksFocused;
+
+        private void OpenCounter(bool books)
         {
-            if (!stage.WideView || recruitmentWindow != null) return;
-            stage.CounterFocused = true;
+            if (!stage.CounterAvailable(books) || recruitmentWindow != null || saleWindow != null || replacementPanel != null) return;
+            ReleaseHeldRecruit();
+            CancelPurchaseHold();
+            Hover(null);
+            stage.FocusCounter(books);
             counterBackdrop.style.display = DisplayStyle.Flex;
-            counterVisit.style.display = DisplayStyle.None;
+            counterVisits[books ? 1 : 0].style.display = DisplayStyle.None;
             root.Focus();
         }
 
@@ -316,7 +323,7 @@ namespace RaidPartyManager.Presentation
 
         private void BeginPurchaseHold(PointerDownEvent evt, Offer offer)
         {
-            if (evt.button != 0 || !stage.CounterReady || !offer.View.enabledInHierarchy ||
+            if (evt.button != 0 || !CanInspect(offer) || !offer.View.enabledInHierarchy ||
                 offer.Sold || heldOffer != null || !offer.View.worldBound.Contains(evt.position))
                 return;
 
@@ -353,7 +360,9 @@ namespace RaidPartyManager.Presentation
         {
             if (evt.keyCode != KeyCode.Escape) return;
             if (saleWindow != null) { CloseSale(); evt.StopPropagation(); }
+            else if (replacementPanel != null) { CloseRecruitSelection(); evt.StopPropagation(); }
             else if (recruitmentWindow != null) CloseRecruitment();
+            else if (recruitHeld != null) ReleaseHeldRecruit();
             else if (stage.CounterFocused) CloseCounter();
         }
 
@@ -369,7 +378,7 @@ namespace RaidPartyManager.Presentation
                 return;
             }
             if (saleWindow == null && stage.CounterReady && stockLayer.enabledInHierarchy)
-                Hover(offers.FirstOrDefault(offer => !offer.Sold && offer.View.worldBound.Contains(evt.position)));
+                Hover(offers.FirstOrDefault(offer => !offer.Sold && CanInspect(offer) && offer.View.worldBound.Contains(evt.position)));
         }
 
         private void OnPointerUp(PointerUpEvent evt)
@@ -381,7 +390,9 @@ namespace RaidPartyManager.Presentation
 
         private void OnApplicationFocus(bool focused)
         {
-            if (!focused) CancelPurchaseHold();
+            if (focused) return;
+            CancelPurchaseHold();
+            ReleaseHeldRecruit();
         }
 
         private void Purchase(Offer offer)
@@ -446,16 +457,17 @@ namespace RaidPartyManager.Presentation
             stage.UpdateCamera(Time.unscaledDeltaTime);
             if (recruitment != null) UpdateRecruitment(Time.unscaledDeltaTime);
             stage.PoseShopSigns(root);
-            stage.PlaceCounter(checkout);
             if (feedback != null && Time.unscaledTimeAsDouble >= feedbackUntil)
                 feedback.style.display = DisplayStyle.None;
             if (isWheelEvent) return;
-            if (stage.WideView)
+            for (int i = 0; i < counterVisits.Length; i++)
             {
-                stage.PlaceCounterVisit(counterVisit);
-                counterVisit.style.display = DisplayStyle.Flex;
+                bool books = i == 1;
+                var button = counterVisits[i];
+                bool available = stage.CounterAvailable(books) && saleWindow == null;
+                button.style.display = available ? DisplayStyle.Flex : DisplayStyle.None;
+                if (available) stage.PlaceCounterVisit(button, books);
             }
-            else counterVisit.style.display = DisplayStyle.None;
 
             bool ready = stage.CounterReady;
             closeUpHint.style.display = ready && saleWindow == null ? DisplayStyle.Flex : DisplayStyle.None;
@@ -464,7 +476,7 @@ namespace RaidPartyManager.Presentation
             {
                 if (offer.Sold) continue;
                 stage.PlaceOffer(offer.View, offer.PriceTag, offer.Index);
-                offer.View.pickingMode = ready ? PickingMode.Position : PickingMode.Ignore;
+                offer.View.pickingMode = CanInspect(offer) ? PickingMode.Position : PickingMode.Ignore;
             }
             if (heldOffer != null)
             {
@@ -543,6 +555,10 @@ namespace RaidPartyManager.Presentation
             if (adventure == null) BattlePrototype.MarkPartyEdited();
             else if (isWheelEvent) AdventureFlow.AutoSaveResolvedVisit(adventure);
             CloseRecruitment();
+            stage.ClearRecruitCast();
+            recruitTargets.Clear();
+            recruitActorLayer.Clear();
+            restoredCompany = false;
             RefreshRecruitmentButton();
             RefreshGold();
             ShowFeedback($"{candidate.Name} 加入了讨伐队");

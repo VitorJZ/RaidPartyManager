@@ -111,7 +111,9 @@ namespace RaidPartyManager.Presentation
                 int order = 0;
                 foreach (var job in run.Current.Commissions)
                     board.Offer(job, run.CommissionReward(job), order++, () => {
-                        if (run.AcceptCommission(job.Id)) OpenQuest();
+                        if (!run.AcceptCommission(job.Id)) return;
+                        topBar.Refresh();
+                        OpenQuest();
                     });
             }
             town.Add(board);

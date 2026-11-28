@@ -23,9 +23,9 @@ MonoBehaviour:
   rosterNumber: 10
   stage: 1
   reach: 2
-  fixedTrait: 3
+  fixedTrait: 57
   traitPower: 2
-  traitText: "连续攻击同一目标时，下次造成的伤害+2"
+  traitText: "再次用武器攻击上一次命中的敌人时，本次攻击力+2。"
   evolutions:
   - {fileID: 11400000, guid: 7a83498507db451391d97ccbc8af57e5, type: 2}
   - {fileID: 11400000, guid: 45e3171fa85746acb75e2bbecce38902, type: 2}

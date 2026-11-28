@@ -210,6 +210,7 @@ namespace RaidPartyManager.Presentation
 
         public override void Dispose()
         {
+            Object.Destroy(merchantWalkMesh);
             if (segmentMesh != null) Object.Destroy(segmentMesh);
             if (portraitMesh != null) Object.Destroy(portraitMesh);
             if (recruitWalkMesh != null) Object.Destroy(recruitWalkMesh);

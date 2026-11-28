@@ -81,9 +81,9 @@ namespace RaidPartyManager.Battle
                 EnemyTargetRule.Rear => opponents.TakeLast(1),
                 EnemyTargetRule.LowestHealth => opponents.OrderBy(unit => (double)unit.Health / unit.Stats.Health).Take(1),
                 EnemyTargetRule.HighestAttack => opponents.OrderByDescending(CurrentAttack).Take(1),
-                EnemyTargetRule.LowestDefense => opponents.OrderBy(unit => unit.Stats.Defense).Take(1),
+                EnemyTargetRule.LowestDefense => opponents.OrderBy(unit => unit.Defense).Take(1),
                 EnemyTargetRule.CursedOrLowestDefense => opponents.OrderByDescending(unit => unit.Layers(StatusKind.Cursed) > 0)
-                    .ThenBy(unit => unit.Stats.Defense).Take(1),
+                    .ThenBy(unit => unit.Defense).Take(1),
                 EnemyTargetRule.ExposedOrFront => opponents.Where(unit => unit.Layers(StatusKind.Exposed) > 0)
                     .Concat(FrontAttackTargets(actor)).Take(1),
                 EnemyTargetRule.ExposedOrRear => opponents.OrderByDescending(unit => unit.Layers(StatusKind.Exposed) > 0)

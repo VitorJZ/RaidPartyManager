@@ -13,6 +13,27 @@ namespace RaidPartyManager.Tests
     public sealed class CharacterSyncTests
     {
         [Test]
+        public void EveryRecruitHasAnExplicitPriceAndEvolutionPremiumIsAtMostOneQuarter()
+        {
+            var scene = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
+                "Assets/RaidPartyManager/PrototypeData/RoadsideEncounter.asset").ToData();
+            var recruits = scene.CharacterCatalog.Where(c => c.RosterNumber > 0).ToArray();
+            Assert.That(recruits.Length, Is.EqualTo(41));
+            foreach (var character in recruits)
+            {
+                int price = PlayerMarket.BaseValue(character);
+                Assert.That(price, Is.InRange(60, 115), character.Name);
+                foreach (var form in recruits.Where(c => character.EvolutionIds.Contains(c.Id)))
+                {
+                    int evolvedPrice = PlayerMarket.BaseValue(form);
+                    Assert.That(evolvedPrice, Is.GreaterThanOrEqualTo(price), form.Name);
+                    Assert.That(4 * evolvedPrice, Is.LessThanOrEqualTo(5 * price),
+                        character.Name + " → " + form.Name);
+                }
+            }
+        }
+
+        [Test]
         public void EncounterIncludesSyncedStatsRecruitsPortraitsAndEvolutions()
         {
             var scene = AssetDatabase.LoadAssetAtPath<EncounterAsset>(
@@ -70,8 +91,8 @@ namespace RaidPartyManager.Tests
                 Is.EqualTo(("星罗", 2, Profession.Mage, AttackReach.Melee, new Stats(5, 1, 1, 14))));
             var branches = new[] { archer.Id, diSha.Id, abyss.Id, star.Id };
             Assert.That(whiteFeather.EvolutionIds, Is.EqualTo(branches));
-            Assert.That(PlayerMarket.BaseValue(whiteFeather), Is.EqualTo(25));
-            Assert.That(PlayerMarket.BaseValue(archer), Is.EqualTo(48));
+            Assert.That(PlayerMarket.BaseValue(whiteFeather), Is.EqualTo(95));
+            Assert.That(PlayerMarket.BaseValue(archer), Is.EqualTo(115));
 
             foreach (string branch in branches)
             {
@@ -106,30 +127,43 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void AbyssWardStopsLethalDamageUntilTheGuardianFallsAndRejectsRecovery()
+        public void AbyssWardRedirectsLethalDamageAndSkipsDirectTargetSelection()
         {
-            var guardian = Load("AbyssKeeper");
-            var pendant = LoadEncounter().StartingEquipment.First(item => item.Effect == EquipmentEffect.LifePendant);
-            var wounded = new Combatant("guardian", guardian, Side.Party, 2, guardian.BaseStats, 5, new[] { pendant });
+            var definition = Load("AbyssKeeper");
+            var guardian = new Combatant("guardian", definition, Side.Party, 2, definition.BaseStats, 15);
             var ally = Fighter("ally", Side.Party, 1, health: 10);
-            var attacker = Fighter("front-hunter", Side.Enemy, 1, attack: 30);
             var rearShot = new ActionDefinition("rear", "后排打击", ActionKind.Attack, TargetRule.RearEnemy, 0);
-            var hunter = new CharacterDefinition("hunter", "hunter", Profession.Warrior, Personality.Frank,
-                new Stats(30, 0, 0, 100), 1, rearShot);
-            var enemy = new Combatant("rear-hunter", hunter, Side.Enemy, 2, hunter.BaseStats, 100);
+            var hunter = new CharacterDefinition("rear-hunter", "rear-hunter", Profession.Archer, Personality.Frank,
+                new Stats(10, 0, 0, 100), 1, rearShot, reach: AttackReach.Ranged);
+            var enemy = new Combatant("hunter", hunter, Side.Enemy, 1, hunter.BaseStats, 100);
             var simulator = new BattleSimulator(random: new FixedOrder());
-            var result = simulator.Simulate(new BattleRequest("ward", new[] { ally, wounded, attacker, enemy }, 36));
-            var blows = result.Events.Where(e => e.ActorId == attacker.Id && e.Kind == BattleEventKind.Action).ToArray();
-            Assert.That(blows.Select(e => e.TargetHealth), Is.EqualTo(new[] { 1, 0 }));
-            Assert.That(result.Ratings.Single(row => row.UnitId == wounded.Id).Saves, Is.EqualTo(1));
-            Assert.That(result.HealthById[wounded.Id], Is.Zero);
+            var result = simulator.Simulate(new BattleRequest("ward", new[] { ally, guardian, enemy }, 36));
 
-            var protectedBattle = simulator.Simulate(new BattleRequest("pendant", new[] { ally, wounded, attacker }, 24));
-            Assert.That(protectedBattle.HealthById[ally.Id], Is.EqualTo(1));
-            Assert.That(protectedBattle.HealthById[wounded.Id], Is.EqualTo(5));
-            var run = new PartyRun(new[] { new PartyMemberStart("g", guardian, 1, 5) }, Array.Empty<EquipmentDefinition>());
-            Assert.That(run.Rest(1), Is.Zero);
-            Assert.That(run.Members.Single().Health, Is.EqualTo(5));
+            var strikes = result.Events.Where(e => e.ActorId == enemy.Id && e.Kind == BattleEventKind.Action).ToArray();
+            Assert.That(strikes.Select(e => e.TargetId), Is.All.EqualTo(ally.Id));
+            Assert.That(strikes.Select(e => e.TargetHealth), Is.EqualTo(new[] { 10, 10, 0 }));
+            var transfers = result.Events.Where(e => e.Kind == BattleEventKind.Effect && e.ActionName == "冥渊代伤").ToArray();
+            Assert.That(transfers.Select(e => (e.TargetId, e.Amount, e.TargetHealth)),
+                Is.EqualTo(new[] { (guardian.Id, 10, 5), (guardian.Id, 5, 0) }));
+            var rating = result.Ratings.Single(row => row.UnitId == guardian.Id);
+            Assert.That((rating.Saves, rating.DamageTaken), Is.EqualTo((2, 15L)));
+        }
+
+        [Test]
+        public void AbyssWardRejectsRecoveryAndSingleTargetEnemiesHaveNoFallback()
+        {
+            var definition = Load("AbyssKeeper");
+            var pendant = LoadEncounter().StartingEquipment.First(item => item.Effect == EquipmentEffect.LifePendant);
+            var guardian = new Combatant("guardian", definition, Side.Party, 1, definition.BaseStats, 5, new[] { pendant });
+            var enemy = Fighter("enemy", Side.Enemy, 1, attack: 30, trait: CharacterTrait.EnemyRearAmbush);
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(
+                new BattleRequest("untargetable", new[] { guardian, enemy }, 24));
+
+            Assert.That(result.HealthById[guardian.Id], Is.EqualTo(5));
+            Assert.That(result.Events.Any(e => e.ActorId == enemy.Id && e.TargetId == guardian.Id), Is.False);
+            var party = new PartyRun(new[] { new PartyMemberStart(guardian.Id, definition, 1, 5) }, Array.Empty<EquipmentDefinition>());
+            Assert.That(party.Rest(1), Is.Zero);
+            Assert.That(party.Members.Single().Health, Is.EqualTo(5));
         }
 
         [Test]
@@ -352,7 +386,7 @@ namespace RaidPartyManager.Tests
                 Assert.That(result.Events.Single(entry => entry.Kind == BattleEventKind.Retreated).Tick, Is.EqualTo(40));
             else
                 Assert.That(result.Events.Single(entry => entry.ActionName == "拿回装备").TargetEnergy.Value.Capacity, Is.EqualTo(4));
-            Assert.That(AdventureRun.RollKillGold(result, new[] { thief }, new Random(0)), escapes ? Is.Zero : Is.GreaterThan(0));
+            Assert.That(AdventureRun.RollBattleGold(result.Outcome, NodeKind.NormalBattle, new Random(0), 1), Is.InRange(4, 6));
             Assert.That(party.TrySettle(result, out _), Is.True);
             Assert.That(party.Inventory.Count, Is.EqualTo(escapes ? 0 : 1));
         }
@@ -490,7 +524,44 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void SurvivingTreasureHuntersSettleTheirGoldAndAccessory()
+        public void HeavyBulwarkStopsDrawingAttacksAsSoonAsHealthFallsBelowFive()
+        {
+            var definition = Load("HeavyBulwark");
+            var guard = new Combatant("guard", definition, Side.Party, 2, definition.BaseStats, 5);
+            var front = Fighter("front", Side.Party, 1);
+            var first = Fighter("first", Side.Enemy, 1, attack: 6);
+            var second = Fighter("second", Side.Enemy, 2);
+            var battle = new BattleSimulator(random: new FixedOrder()).Start(
+                new BattleRequest("wounded-bulwark", new[] { front, guard, first, second }, 10));
+
+            var actions = battle.AdvanceRound().Where(entry => entry.Kind == BattleEventKind.Action).ToArray();
+            var firstHit = actions.Single(entry => entry.ActorId == first.Id);
+            Assert.That((firstHit.TargetId, firstHit.TargetHealth), Is.EqualTo((guard.Id, 4)));
+            Assert.That(actions.Single(entry => entry.ActorId == second.Id).TargetId, Is.EqualTo(front.Id));
+        }
+
+        [Test]
+        public void HeavyWarriorGainsTwoArmorAfterEachRound()
+        {
+            var front = Fighter("front", Side.Party, 1);
+            var warrior = Unit(Load("HeavyWarrior"), "warrior", 2);
+            var enemy = Fighter("enemy", Side.Enemy, 1);
+            var battle = new BattleSimulator(random: new FixedOrder()).Start(
+                new BattleRequest("heavy-warrior", new[] { front, warrior, enemy }, 20));
+
+            for (int round = 1; round <= 2; round++)
+            {
+                var events = battle.AdvanceRound();
+                var hit = events.Single(entry => entry.ActorId == enemy.Id && entry.Kind == BattleEventKind.Action);
+                Assert.That(hit.TargetId, Is.EqualTo(front.Id));
+                var armor = events.Last(entry => entry.Kind != BattleEventKind.Finished);
+                Assert.That((armor.ActionName, armor.ActorId, armor.TargetId, armor.Amount, armor.TargetShield),
+                    Is.EqualTo(("重甲护甲", warrior.Id, warrior.Id, 2, 2 * round)));
+            }
+        }
+
+        [Test]
+        public void SurvivingTreasureHuntersSettleTheirGoldAndEquipment()
         {
             var goldHunter = Load("GoldHunter");
             var relicHunter = Load("RelicHunter");
@@ -504,17 +575,17 @@ namespace RaidPartyManager.Tests
             var result = new BattleSimulator(random: new FixedOrder()).Simulate(run.BeginBattle(new[] { enemy }, 10, null));
 
             Assert.That(run.TrySettle(result, out _), Is.True);
-            Assert.That(run.Gold, Is.EqualTo(8));
+            Assert.That(run.Gold, Is.EqualTo(5));
             Assert.That(run.Inventory.Select(item => item.Definition.Id), Is.EqualTo(new[] { accessory.Id, accessory.Id }));
         }
 
         [Test]
-        public void ReserveRelicHunterAddsAnAccessoryWithoutEnteringBattle()
+        public void ReserveRelicHunterCanBringBackArmorWithoutEnteringBattle()
         {
             var starters = Enumerable.Range(1, 4).Select(position => Fighter($"fighter-{position}", Side.Party, position))
                 .Select(fighter => new PartyMemberStart(fighter.Id, fighter.Character, fighter.Position, fighter.Health));
-            var accessory = new EquipmentDefinition("ring", "ring", default);
-            var party = new PartyRun(starters, new[] { accessory });
+            var armor = new EquipmentDefinition("plate", "板甲", new Stats(0, 2, 0, 0));
+            var party = new PartyRun(starters, new[] { armor });
             var relicHunter = Load("RelicHunter");
             Assert.That(party.TryRecruit(relicHunter), Is.True);
             Assert.That(party.Members.Single(m => m.Character.Id == relicHunter.Id).Position, Is.Null);
@@ -525,8 +596,58 @@ namespace RaidPartyManager.Tests
 
             Assert.That(result.AccessoriesEarned, Is.EqualTo(1));
             Assert.That(party.TryFinishBattle(result, out var loot), Is.True);
-            Assert.That(loot, Is.EqualTo(new[] { accessory }));
+            Assert.That(loot, Is.EqualTo(new[] { armor }));
             Assert.That(party.TryFinishBattle(result, out _), Is.False);
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void GoldHunterPaysFiveGoldEvenIfBenchedOrDefeated(bool reserve)
+        {
+            var hunter = Load("GoldHunter");
+            var allies = Enumerable.Range(reserve ? 1 : 2, reserve ? 4 : 3)
+                .Select(position => Fighter($"ally-{position}", Side.Party, position))
+                .Select(ally => new PartyMemberStart(ally.Id, ally.Character, ally.Position, ally.Health));
+            var starters = reserve ? allies : allies.Prepend(new PartyMemberStart("hunter", hunter, 1, 1));
+            var run = new PartyRun(starters, Array.Empty<EquipmentDefinition>());
+            if (reserve) Assert.That(run.TryRecruit(hunter), Is.True);
+            string hunterId = run.Members.Single(member => member.Character.Id == hunter.Id).Id;
+            var foe = Fighter("enemy", Side.Enemy, 1, attack: 20);
+            var request = run.BeginBattle(new[] { foe }, 10, null);
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(request);
+
+            if (reserve) Assert.That(result.HealthById.ContainsKey(hunterId), Is.False);
+            else Assert.That(result.HealthById[hunterId], Is.Zero);
+            Assert.That(result.GoldEarned, Is.EqualTo(5));
+            Assert.That(run.TrySettle(result, out _), Is.True);
+            Assert.That(run.Gold, Is.EqualTo(5));
+        }
+
+        [Test]
+        public void FallenRelicHunterDoesNotEarnEquipment()
+        {
+            var hunter = Load("RelicHunter");
+            var ally = Fighter("ally", Side.Party, 2);
+            var ring = new EquipmentDefinition("ring", "戒指", default);
+            var run = new PartyRun(new[] { new PartyMemberStart("hunter", hunter, 1, 1),
+                new PartyMemberStart(ally.Id, ally.Character, ally.Position, ally.Health) }, new[] { ring });
+            var foe = Fighter("enemy", Side.Enemy, 1, attack: 20);
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(run.BeginBattle(new[] { foe }, 10, null));
+            Assert.That(result.HealthById["hunter"], Is.Zero);
+            Assert.That(run.TryFinishBattle(result, out var loot), Is.True);
+            Assert.That(loot, Is.Empty);
+        }
+
+        [Test]
+        public void GreenRangerGainsAttackAgainstThePreviousTargetWithoutApplyingForestMark()
+        {
+            var ranger = Unit(Load("GreenRanger"), "ranger", 1);
+            var foe = Fighter("foe", Side.Enemy, 1, attack: 0);
+            var result = new BattleSimulator(random: new FixedOrder()).Simulate(
+                new BattleRequest("green-ranger", new[] { ranger, foe }, 20));
+            Assert.That(result.Events.Where(e => e.ActorId == ranger.Id && e.Kind == BattleEventKind.Action)
+                .Select(e => e.Amount), Is.EqualTo(new[] { 6, 8 }));
+            Assert.That(result.Events.Any(e => e.ActionName == "森之印"), Is.False);
         }
 
         [Test]

@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 6
   traitPower: 0
-  traitText: "攻击时，额外造成等同于自己损失生命的值"
+  traitText: "武器攻击时，本次攻击力增加等同于自身已损失的生命值。"
   personality: 3
   attack: 7
   defense: 2

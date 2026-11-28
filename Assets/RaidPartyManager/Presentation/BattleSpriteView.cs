@@ -7,12 +7,14 @@ namespace RaidPartyManager.Presentation
     // Rows are idle, primary action, hit reaction, and death.
     internal sealed class BattleSpriteView : VisualElement
     {
-        private enum Motion { Idle, Action, Hit, Death }
+        private enum Motion { Idle, Action, Hit, Death, Rebirth }
 
         private const int Columns = AnimationCels.Count;
         private const int Rows = 4;
         private const int AttackColumns = 4;
         private const int AttackRows = 4;
+        private const float RebirthFallLength = 0.25f;
+        internal const float RebirthLength = 1.30f;
         private const float IdleLength = 1.6f;
         // The impact key holds briefly in pose time; the recovery keys play faster so the action keeps its length.
         private const float HitStop = 0.05f;
@@ -26,6 +28,7 @@ namespace RaidPartyManager.Presentation
         private readonly Profession profession;
         private readonly Texture2D attackSheet;
         private Texture2D specialSheet;
+        private Texture2D rebirthSheet;
         private readonly float idleOffset;
         private readonly float[] actionEnds;
         private readonly float impactTime;
@@ -157,10 +160,22 @@ namespace RaidPartyManager.Presentation
             SetAlive(false, now);
         }
 
+        public void PlayRebirth(Texture2D standingSheet, double now, float scale)
+        {
+            if (UsesPortrait || standingSheet == null) return;
+            rebirthSheet = standingSheet;
+            actionScale = scale;
+            SetMotion(Motion.Rebirth, now);
+        }
+
+        public bool IsRebirthingAt(double now) =>
+            motion == Motion.Rebirth && now < motionStart + RebirthLength * actionScale;
+
         public bool IsReactingAt(double now) => motion switch
         {
             Motion.Hit => now < motionStart + HitEnds[^1],
             Motion.Death => now < motionStart + DeathEnds[^1],
+            Motion.Rebirth => IsRebirthingAt(now),
             _ => false
         };
 
@@ -199,7 +214,8 @@ namespace RaidPartyManager.Presentation
             }
             float actionLength = ActionLength;
             if ((motion == Motion.Hit && elapsed >= HitEnds[^1]) ||
-                (motion == Motion.Action && elapsed >= actionLength * actionScale))
+                (motion == Motion.Action && elapsed >= actionLength * actionScale) ||
+                (motion == Motion.Rebirth && !IsRebirthingAt(now)))
             {
                 SetMotion(Motion.Idle, now);
                 elapsed = 0f;
@@ -213,6 +229,12 @@ namespace RaidPartyManager.Presentation
             int frame;
             switch (motion)
             {
+                case Motion.Rebirth:
+                    float rebirthTime = elapsed / actionScale;
+                    frame = rebirthTime < RebirthFallLength
+                        ? 3 * Columns + AnimationCels.At(rebirthTime / RebirthFallLength)
+                        : Rows * Columns + AnimationCels.At((rebirthTime - RebirthFallLength) / (RebirthLength - RebirthFallLength));
+                    break;
                 case Motion.Death:
                     if (pendingFall && elapsed >= DeathEnds[4])
                     {
@@ -377,10 +399,11 @@ namespace RaidPartyManager.Presentation
             displayedFrame = frame;
             var actionTexture = specialSheet ?? attackSheet;
             bool usingAttack = actionTexture != null && frame >= Columns && frame < 2 * Columns;
-            var texture = usingAttack ? actionTexture : Sheet;
-            int columns = usingAttack ? AttackColumns : Columns;
-            int rows = usingAttack ? AttackRows : Rows;
-            int index = usingAttack ? frame - Columns : frame;
+            bool rising = frame >= Rows * Columns;
+            var texture = rising ? rebirthSheet : usingAttack ? actionTexture : Sheet;
+            int columns = usingAttack || rising ? AttackColumns : Columns;
+            int rows = usingAttack || rising ? AttackRows : Rows;
+            int index = rising ? frame - Rows * Columns : usingAttack ? frame - Columns : frame;
             int width = texture.width / columns;
             int height = texture.height / rows;
             figure.image = texture;

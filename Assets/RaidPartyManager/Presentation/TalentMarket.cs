@@ -114,7 +114,10 @@ namespace RaidPartyManager.Presentation
                 var trait = run.Party.TalentFor(c);
                 var training = run.Party.TownCandidateTraining(c);
                 var stats = c.BaseStats + training.Bonus;
-                int signingPrice = run.Party.SigningPrice(c);
+                int signingPrice = run.TownRecruitPrice(c);
+                int pricePercent = run.TownRecruitPricePercent(c);
+                bool isSpecial = pricePercent < 100;
+                string special = isSpecial ? $"{pricePercent / 10} 折特惠" : "";
                 string trainingInfo = training.Sessions > 0
                     ? $"已训练 {training.Sessions}/{CampTraining.Limit} 次 · {training.Describe()}\n" : "";
                 int expectedWage = run.Party.ContractsEnabled
@@ -124,7 +127,8 @@ namespace RaidPartyManager.Presentation
                     (run.Party.ContractsEnabled ? $"期望日薪 {expectedWage} 金币\n" : "") +
                     (string.IsNullOrEmpty(c.TraitText) ? "" : ProfileLine("被动：" + c.TraitText, PrototypeStyle.Passive) + "\n") +
                     ProfileLine(PlayerMarket.Describe(trait), PrototypeStyle.Trait) + "\n" +
-                    ProfileLine("性格：" + EmployeeVoice.For(c.Personality).Name, PrototypeStyle.Personality);
+                    ProfileLine("性格：" + EmployeeVoice.For(c.Personality).Name, PrototypeStyle.Personality) +
+                    (isSpecial ? $"\n{special} · {signingPrice} 金币" : "");
                 var entry = PrototypeStyle.Button("", "town-recruit-" + c.Id, () => {
                     if (run.Party.Members.Count >= PartyRun.RosterLimit)
                     {
@@ -141,7 +145,8 @@ namespace RaidPartyManager.Presentation
                     {
                         panel = ContractPanel.Sheet("招募队员", out var paper, Close);
                         panel.name = "market-recruit-confirmation";
-                        paper.Add(ContractPanel.Text($"花费 {signingPrice} 金币招募{c.Name}。", 17));
+                        string offer = isSpecial ? $"{special}，" : "";
+                        paper.Add(ContractPanel.Text($"{offer}花费 {signingPrice} 金币招募{c.Name}。", 17));
                         var confirm = PrototypeStyle.Button("确认招募", "confirm-market-recruit", () =>
                         {
                             if (Recruit(0, default, null)) Close();
@@ -166,7 +171,12 @@ namespace RaidPartyManager.Presentation
                 });
                 entry.style.backgroundColor = Color.clear;
                 PrototypeStyle.Outline(entry, Color.clear, 0);
-                var price = PrototypeStyle.Text($"价格 {signingPrice}", 13, new Color32(65, 38, 21, 255));
+                var price = PrototypeStyle.Text($"{(isSpecial ? "特价" : "价格")} {signingPrice}", 13, pricePercent switch
+                {
+                    10 => new Color32(140, 21, 28, 255),
+                    50 => new Color32(141, 50, 18, 255),
+                    _ => new Color32(65, 38, 21, 255)
+                });
                 price.name = "town-price-" + c.Id;
                 price.pickingMode = PickingMode.Ignore;
                 price.style.unityTextAlign = TextAnchor.MiddleCenter;

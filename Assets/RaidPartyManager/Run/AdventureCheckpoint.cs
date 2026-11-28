@@ -95,6 +95,7 @@ namespace RaidPartyManager.Run
         public ShopOfferCheckpoint[] Stock;
         public TownService[] UsedServices;
         public string[] TownRecruits;
+        public int[] TownRecruitPricePercents;
         public string PendingRecruit;
         public int BrokerRefusals, BrokerCounter, BrokerLastAsk;
         public string BrokerMember;

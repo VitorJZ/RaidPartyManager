@@ -24,8 +24,8 @@ MonoBehaviour:
   stage: 2
   reach: 1
   fixedTrait: 23
-  traitPower: 0
-  traitText: "在场时，敌方只能以自己为目标"
+  traitPower: 5
+  traitText: "生命值至少为5时，吸引敌方需要选定目标的攻击。"
   personality: 7
   attack: 4
   defense: 5

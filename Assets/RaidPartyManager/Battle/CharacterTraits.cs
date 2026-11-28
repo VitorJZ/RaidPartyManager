@@ -48,12 +48,13 @@ namespace RaidPartyManager.Battle
                 switch (unit.Trait)
                 {
                     case SoakEnemyEachRound:
-                        var targets = Opponents(unit).ToArray();
+                        var targets = DirectOpponents(unit).ToArray();
                         if (targets.Length > 0)
                             GrantStatus(unit, targets[random.Next(targets.Length)], Wet, unit.TraitPower,
                                 "深海轻语", kind: BattleEventKind.Effect);
                         break;
                     case PoisonOpponents:
+                    case PoisonOpponentsAndPreservePoison:
                         foreach (var enemy in Opponents(unit))
                             GrantStatus(unit, enemy, Poison, unit.TraitPower,
                                 "幽雾炼药", BattleVisualCue.RoundStartPoison, BattleEventKind.Effect);
@@ -92,6 +93,8 @@ namespace RaidPartyManager.Battle
                     Report(BattleEventKind.Effect, unit, unit, "星辉增长", ActionKind.Shield, detail: $"攻击 +{gain}",
                         visual: BattleVisualCue.RoundEndGrowth);
                 }
+                else if (unit.Trait == GainShieldAtRoundEnd)
+                    ShieldAlly(unit, unit, unit.TraitPower, "重甲护甲");
                 else if (unit.Trait == LightningChant && Round % 3 == 0)
                 {
                     for (int strike = 0; strike < unit.TraitPower && unit.Health > 0; strike++)

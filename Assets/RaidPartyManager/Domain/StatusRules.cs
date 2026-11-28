@@ -16,7 +16,7 @@ namespace RaidPartyManager.Domain
     {
         private static readonly (string Name, string Description, bool Negative)[] Entries =
         {
-            ("盛气", "每有1层，造成的伤害增加20%", false),
+            ("盛气", "每层使攻击力+1。层数不随回合衰减。", false),
             ("迅捷", "有20%概率躲避敌人的攻击", false),
             ("坚毅", "受到的伤害-50%", false),
             ("不灭", "生命值最低为1", false),

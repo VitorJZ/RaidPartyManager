@@ -9,17 +9,16 @@ namespace RaidPartyManager.Presentation
 {
     public sealed partial class DockShop
     {
-        private VisualElement recruitmentWindow, recruitmentControls, replacementPanel;
-        private readonly Dictionary<CharacterDefinition, VisualElement> recruitTargets = new();
+        private VisualElement recruitmentWindow, recruitmentControls, recruitActorLayer, replacementPanel;
+        private readonly Dictionary<CharacterDefinition, (VisualElement View, VisualElement Fill)> recruitTargets = new();
         private Button spinButton;
         private ShopPriceCounter priceCounter;
         private CharacterDefinition recruitHeld;
-        private IVisualElementScheduledItem recruitHold;
         private int recruitPointer = -1;
-        private bool recruitDragging;
+        private double recruitHoldStarted;
         private bool restoredCompany;
         private bool focusWheelOnArrival;
-        private Vector2 recruitPointerPosition;
+        private Vector2 recruitHoldOrigin;
 
         private void PrepareRecruitment()
         {
@@ -47,13 +46,23 @@ namespace RaidPartyManager.Presentation
             recruitmentButton.style.unityTextOutlineWidth = 1;
             stage.PlaceRecruitmentTarget(recruitmentButton);
             root.Add(recruitmentButton);
+
+            recruitActorLayer = new VisualElement { name = "shop-recruit-actors", pickingMode = PickingMode.Ignore };
+            PrototypeStyle.Fill(recruitActorLayer);
+            recruitActorLayer.RegisterCallback<PointerMoveEvent>(MoveRecruitPointer);
+            recruitActorLayer.RegisterCallback<PointerUpEvent>(EndRecruitPointer);
+            recruitActorLayer.RegisterCallback<PointerCaptureOutEvent>(e => { if (e.pointerId == recruitPointer) ReleaseHeldRecruit(); });
+            recruitActorLayer.RegisterCallback<PointerCancelEvent>(e => { if (e.pointerId == recruitPointer) ReleaseHeldRecruit(); });
+            root.Insert(root.IndexOf(topBar), recruitActorLayer);
+            SyncRecruitCast();
             RefreshRecruitmentButton();
         }
 
         private void ShowRecruitment()
         {
-            if (recruitment.Signed || recruitmentWindow != null || stage.RecruitmentDropping) return;
+            if (recruitment.Signed || recruitmentWindow != null || stage.RecruitmentDropping || replacementPanel != null) return;
             if (!isWheelEvent) CloseCounter();
+            ReleaseHeldRecruit();
             stockLayer?.SetEnabled(false);
             stage.RecruitmentFocused = true;
             stage.HideCompany();
@@ -64,11 +73,7 @@ namespace RaidPartyManager.Presentation
             PrototypeStyle.Fill(recruitmentWindow);
             recruitmentWindow.style.opacity = 0;
             recruitmentWindow.RegisterCallback<PointerDownEvent>(OnRecruitmentBackground);
-            recruitmentWindow.RegisterCallback<PointerMoveEvent>(MoveRecruitPointer);
-            recruitmentWindow.RegisterCallback<PointerUpEvent>(EndRecruitPointer);
-            recruitmentWindow.RegisterCallback<PointerCaptureOutEvent>(e => { if (e.pointerId == recruitPointer) ReleaseHeldRecruit(); });
-            recruitmentWindow.RegisterCallback<PointerCancelEvent>(e => { if (e.pointerId == recruitPointer) ReleaseHeldRecruit(); });
-            root.Insert(root.IndexOf(topBar), recruitmentWindow);
+            root.Insert(root.IndexOf(recruitActorLayer), recruitmentWindow);
             RefreshRecruitmentButton();
 
             recruitmentControls = new VisualElement { name = "shop-wheel-controls", pickingMode = PickingMode.Ignore };
@@ -94,19 +99,19 @@ namespace RaidPartyManager.Presentation
                 leave.style.top = RunTopBar.Height + 10;
                 leave.style.right = 16;
                 recruitmentWindow.Add(leave);
-
-                var hint = PrototypeStyle.Text(AdventureFlow.Narrative(AdventureEventKind.RecruitmentWheel), 15, PrototypeStyle.Accent);
-                hint.name = "wheel-contract-hint";
-                hint.style.position = Position.Absolute;
-                hint.style.left = 18;
-                hint.style.top = RunTopBar.Height + 41;
-                hint.pickingMode = PickingMode.Ignore;
-                recruitmentWindow.Add(hint);
             }
+            var hint = PrototypeStyle.Text(RecruitHoldHint, 15, PrototypeStyle.Accent);
+            hint.name = "wheel-contract-hint";
+            hint.style.position = Position.Absolute;
+            hint.style.left = 18;
+            hint.style.top = RunTopBar.Height + (isWheelEvent ? 41 : 10);
+            hint.pickingMode = PickingMode.Ignore;
+            recruitmentWindow.Add(hint);
             RefreshSpinControl();
-            SyncRecruitCast();
             spinButton.Focus();
         }
+
+        private string RecruitHoldHint => party.ContractsEnabled ? "长按候选人签约" : "长按候选人招募";
 
         private void OnRecruitmentBackground(PointerDownEvent evt)
         {
@@ -121,91 +126,106 @@ namespace RaidPartyManager.Presentation
             for (int i = 0; i < recruitment.Candidates.Count; i++)
             {
                 var candidate = recruitment.Candidates[i];
+                if (!recruitment.CanSign(candidate.Id)) continue;
                 stage.ShowRecruitActor(content, candidate, i, candidate == arriving);
                 if (recruitTargets.ContainsKey(candidate)) continue;
                 var hit = new VisualElement { name = "shop-recruit-actor-" + candidate.Id, focusable = true };
+                hit.tooltip = RecruitHoldHint;
                 hit.RegisterCallback<PointerDownEvent>(evt => BeginRecruitPointer(evt, candidate));
                 CharacterChoicePreview.Attach(hit, candidate, content.PortraitFor(candidate.Id));
                 hit.style.display = DisplayStyle.None;
-                recruitmentWindow.Insert(0, hit);
-                recruitTargets.Add(candidate, hit);
+                var fill = AddHoldProgress(hit, "shop-recruit-hold-progress");
+                recruitActorLayer.Add(hit);
+                recruitTargets.Add(candidate, (hit, fill));
             }
         }
 
+        private bool CanHoldRecruit(CharacterDefinition candidate) =>
+            !DockPlayhouse.Moving && !stage.RecruitmentSpinning && !stage.CounterFocused &&
+            (stage.WideView || stage.RecruitmentFocused && stage.RecruitmentFocus >= .93f) &&
+            replacementPanel == null && saleWindow == null && !recruitment.Signed && stage.RecruitReady(candidate);
+
         private void BeginRecruitPointer(PointerDownEvent evt, CharacterDefinition candidate)
         {
-            if (evt.button != 0 || recruitHeld != null || stage.RecruitmentSpinning || replacementPanel != null ||
-                !recruitment.CanSign(candidate.Id) || !stage.RecruitReady(candidate)) return;
+            var (view, fill) = recruitTargets[candidate];
+            if (evt.button != 0 || recruitHeld != null || !CanHoldRecruit(candidate) ||
+                !view.enabledInHierarchy || !view.worldBound.Contains(evt.position) || !recruitment.CanSign(candidate.Id)) return;
 
             recruitHeld = candidate;
             recruitPointer = evt.pointerId;
-            recruitPointerPosition = evt.position;
-            recruitmentWindow.CapturePointer(recruitPointer);
-            recruitHold = recruitmentWindow.schedule.Execute(() =>
-            {
-                recruitDragging = true;
-                checkout[0].style.display = DisplayStyle.Flex;
-                MoveHeldRecruit();
-            }).StartingIn(290);
+            recruitHoldOrigin = evt.position;
+            recruitHoldStarted = Time.unscaledTimeAsDouble;
+            fill.style.width = Length.Percent(0);
+            fill.parent.style.display = DisplayStyle.Flex;
+            recruitActorLayer.CapturePointer(recruitPointer);
+            root.Focus();
+            RefreshSpinControl();
             evt.StopPropagation();
         }
 
         private void MoveRecruitPointer(PointerMoveEvent evt)
         {
             if (recruitHeld == null || evt.pointerId != recruitPointer) return;
-            recruitPointerPosition = evt.position;
-            if (recruitDragging) MoveHeldRecruit();
+            Vector2 position = evt.position;
+            if ((position - recruitHoldOrigin).sqrMagnitude > 18 * 18 ||
+                !recruitTargets[recruitHeld].View.worldBound.Contains(position)) ReleaseHeldRecruit();
             evt.StopPropagation();
         }
 
         private void EndRecruitPointer(PointerUpEvent evt)
         {
             if (evt.button != 0 || recruitHeld == null || evt.pointerId != recruitPointer) return;
-            var candidate = recruitHeld;
-            bool atCounter = recruitDragging && checkout.worldBound.Contains(evt.position);
             ReleaseHeldRecruit();
             evt.StopPropagation();
-            if (!atCounter || !recruitment.CanSign(candidate.Id)) return;
-            if (party.Members.Count >= PartyRun.RosterLimit) ShowRecruitReplacement(candidate);
-            else OpenRecruitContract(candidate);
         }
 
-        private void MoveHeldRecruit()
+        private void UpdateRecruitHold()
         {
-            var bounds = root.worldBound;
-            if (bounds.width <= 0 || bounds.height <= 0) return;
-            stage.MoveHeldRecruit(recruitHeld, new Vector2((recruitPointerPosition.x - bounds.xMin) / bounds.width,
-                1 - (recruitPointerPosition.y - bounds.yMin) / bounds.height));
-            bool atCounter = checkout.worldBound.Contains(recruitPointerPosition);
-            checkout.style.backgroundColor = atCounter ? new Color(.65f, .46f, .16f, .22f) : Color.clear;
-            PrototypeStyle.Outline(checkout, atCounter ? PrototypeStyle.Accent : Color.clear, 7);
+            if (recruitHeld == null) return;
+            var candidate = recruitHeld;
+            var (view, fill) = recruitTargets[candidate];
+            if (!CanHoldRecruit(candidate) || !view.enabledInHierarchy)
+            {
+                ReleaseHeldRecruit();
+                return;
+            }
+            float progress = (float)(Time.unscaledTimeAsDouble - recruitHoldStarted) / PurchaseHoldSeconds;
+            fill.style.width = Length.Percent(Mathf.Clamp01(progress) * 100);
+            if (progress < 1) return;
+
+            ReleaseHeldRecruit();
+            if (!recruitment.CanSign(candidate.Id)) return;
+            if (party.Members.Count >= PartyRun.RosterLimit) ShowRecruitReplacement(candidate);
+            else OpenRecruitContract(candidate);
         }
 
         private void ReleaseHeldRecruit()
         {
             if (recruitHeld == null) return;
-            recruitHold?.Pause();
-            recruitHold = null;
-            stage.ReleaseRecruit(recruitHeld);
+            recruitTargets[recruitHeld].Fill.parent.style.display = DisplayStyle.None;
             int captured = recruitPointer;
             recruitPointer = -1;
             recruitHeld = null;
-            recruitDragging = false;
-            if (recruitmentWindow.HasPointerCapture(captured)) recruitmentWindow.ReleasePointer(captured);
-            checkout[0].style.display = DisplayStyle.None;
-            checkout.style.backgroundColor = Color.clear;
-            PrototypeStyle.Outline(checkout, Color.clear, 7);
+            if (recruitActorLayer.HasPointerCapture(captured)) recruitActorLayer.ReleasePointer(captured);
+            RefreshSpinControl();
+        }
+
+        private void CloseRecruitSelection()
+        {
+            replacementPanel?.RemoveFromHierarchy();
+            replacementPanel = null;
+            RefreshSpinControl();
         }
 
         private void OpenRecruitContract(CharacterDefinition candidate, string replace = null)
         {
-            replacementPanel?.RemoveFromHierarchy();
+            CloseRecruitSelection();
             if (adventure == null || !party.ContractsEnabled) { SignRecruit(candidate, replace); return; }
             var talent = party.TalentFor(candidate);
             replacementPanel = ContractPanel.Negotiate(candidate, party.ContractDay, talent, 0, null, CrewContract.ExpectedWage(candidate, talent), EmployeeAttributes.Starting,
                 (days, terms, fee) => SignRecruit(candidate, replace, days, terms, fee),
-                () => { replacementPanel?.RemoveFromHierarchy(); replacementPanel = null; if (recruitmentWindow != null) RefreshSpinControl(); });
-            recruitmentWindow.Add(replacementPanel);
+                CloseRecruitSelection);
+            root.Add(replacementPanel);
             RefreshSpinControl();
         }
 
@@ -221,18 +241,14 @@ namespace RaidPartyManager.Presentation
             var choices = new ScrollView();
             replacementPanel.Add(choices);
             AdventureWidgets.RecruitReplacement(choices, candidate, party, content, id => OpenRecruitContract(candidate, id));
-            AdventureWidgets.Action(choices, "取消换人", "shop-recruit-back", () =>
-            {
-                replacementPanel.RemoveFromHierarchy();
-                replacementPanel = null;
-                RefreshSpinControl();
-            });
-            recruitmentWindow.Add(replacementPanel);
+            AdventureWidgets.Action(choices, "取消换人", "shop-recruit-back", CloseRecruitSelection);
+            root.Add(replacementPanel);
             RefreshSpinControl();
         }
 
         private void RefreshSpinControl()
         {
+            if (recruitmentWindow == null) return;
             bool available = recruitment.CanDraw;
             bool affordable = Gold >= recruitment.NextPrice;
             spinButton.text = !available ? "候选已抽完" : !affordable ? "金币不足" : "转动转盘";
@@ -270,11 +286,8 @@ namespace RaidPartyManager.Presentation
             {
                 stage.RefreshWheel(recruitment);
                 RefreshRecruitmentButton();
-                if (recruitmentWindow != null)
-                {
-                    SyncRecruitCast(recruitment.Candidates.Last());
-                    RefreshSpinControl();
-                }
+                SyncRecruitCast(recruitment.Candidates.Last());
+                RefreshSpinControl();
             }
             stage.UpdateRecruitCast(delta);
             stage.PlaceRecruitmentTarget(recruitmentButton);
@@ -285,26 +298,30 @@ namespace RaidPartyManager.Presentation
                     stage.ShowCompany(party, content);
                     restoredCompany = true;
                 }
-                return;
             }
-            recruitmentWindow.style.opacity = Mathf.InverseLerp(.24f, .93f, stage.RecruitmentFocus);
-            stage.PlaceRecruitmentControls(recruitmentControls);
-            priceCounter.Tick(delta);
+            else
+            {
+                recruitmentWindow.style.opacity = Mathf.InverseLerp(.24f, .93f, stage.RecruitmentFocus);
+                stage.PlaceRecruitmentControls(recruitmentControls);
+                priceCounter.Tick(delta);
+            }
             foreach (var pair in recruitTargets)
             {
-                bool ready = stage.RecruitReady(pair.Key) && replacementPanel == null;
-                pair.Value.style.display = ready ? DisplayStyle.Flex : DisplayStyle.None;
-                if (ready) stage.PlaceRecruitTarget(pair.Key, pair.Value);
+                bool ready = CanHoldRecruit(pair.Key);
+                var view = pair.Value.View;
+                view.style.display = ready ? DisplayStyle.Flex : DisplayStyle.None;
+                if (ready) stage.PlaceRecruitTarget(pair.Key, view);
             }
+            UpdateRecruitHold();
         }
 
         private void CloseRecruitment()
         {
-            if (recruitmentWindow == null) return;
             ReleaseHeldRecruit();
+            CloseRecruitSelection();
+            if (recruitmentWindow == null) return;
             recruitmentWindow.RemoveFromHierarchy();
-            recruitmentWindow = recruitmentControls = replacementPanel = null;
-            recruitTargets.Clear();
+            recruitmentWindow = recruitmentControls = null;
             priceCounter = null;
             stage.RecruitmentFocused = false;
             stockLayer?.SetEnabled(true);

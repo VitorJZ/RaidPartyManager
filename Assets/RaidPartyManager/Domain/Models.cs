@@ -13,12 +13,13 @@ namespace RaidPartyManager.Domain
         MissingHealthDamage, EscalatingAttack, PermanentAttackOnKill, IgnoreMagicDefense, LightningChant,
         Rebirth, GeneratePotion, PoisonOpponents, EvolveAlly, CopyAdvancedTrait, ChorusArmory, RevealEnemies,
         PiercingArrow, BorrowAllyAttack, HealAlly, FirstDamageToTarget, HealOnDamage, DrawAttacks,
-        ExposeMeleeAttacker, GoldOnSurvival, AccessoryOnSurvival, ShopDiscount,
+        ExposeMeleeAttacker, GoldAtBattleEnd, AccessoryOnSurvival, ShopDiscount,
         EnemyWarCry, EnemyCeramicPierce, EnemyBell, EnemyRearAmbush, EnemyResolve, EnemyCrossbow, EnemyQuack,
         EnemyTideFollower, EnemyWreckScavenger, EnemyDeckSailor,
         EnemyMudEel, EnemySaltCrab, EnemyLanternMoth, EnemyFogSignalGunner, EnemyShipCaulker,
         EnemyAnchorHermit, EnemyFogAngler, EnemyMooringWarden, EnemyBlockadeAdmiral, EnemyDrownedLanternRay, SoakEnemyEachRound,
-        DoubleShot, GravePollen, RottenBloom, AbyssWard, AstralCasting
+        DoubleShot, GravePollen, RottenBloom, AbyssWard, AstralCasting, GainShieldAtRoundEnd,
+        PoisonOpponentsAndPreservePoison, ImmuneToFire, RepeatTargetDamage
     }
     public enum Personality
     {
@@ -55,7 +56,8 @@ namespace RaidPartyManager.Domain
         RoundEndEmber, RoundEndHeal, RoundEndPoison, RoundEndPoisonHeal, RoundEndGrowth,
         RoundEndLightning, RoundEndFormShift, RoundEndTransfer,
         RoundStartExposed, RoundStartPoison, RoundStartBlessing, RoundStartBonus, PiercingArrow,
-        GraveyardSpecial, GraveyardCharge, GraveyardPhase, SkillFireImpact, SkillLightningImpact
+        GraveyardSpecial, GraveyardCharge, GraveyardPhase, SkillFireImpact, SkillLightningImpact,
+        Rebirth
     }
 
     public static class Rules
@@ -284,7 +286,7 @@ namespace RaidPartyManager.Domain
 
         public SkillBookDefinition(string id, string name, string description, SkillRequirement requirement, int cost, int tier,
             SkillEffect skillEffect = SkillEffect.None, string rewardBossId = null)
-            : base(id, name, default, description, tier: tier, price: !string.IsNullOrEmpty(rewardBossId) ? 100 : tier switch { 0 => 50, 1 => 35, 2 => 25, _ => 15 }, rewardBossId: rewardBossId)
+            : base(id, name, default, description, tier: tier, price: !string.IsNullOrEmpty(rewardBossId) ? 150 : tier switch { 0 => 75, 1 => 53, 2 => 38, _ => 23 }, rewardBossId: rewardBossId)
         {
             if (cost < 1 || cost > Rules.MaximumEnergy)
                 throw new ArgumentOutOfRangeException(nameof(cost));
@@ -370,6 +372,7 @@ namespace RaidPartyManager.Domain
         public int RecruitLimit { get; }
         public int ReserveArcherCount { get; }
         public int ReserveAccessoryHunterCount { get; }
+        public long RosterGoldReward { get; }
         public bool HardFight { get; }
         public bool CapitalField { get; }
 
@@ -379,7 +382,8 @@ namespace RaidPartyManager.Domain
         public BattleRequest(string id, IEnumerable<Combatant> combatants, int tickLimit,
             IEnumerable<CharacterDefinition> recruitmentPool = null, IEnumerable<CharacterDefinition> characterCatalog = null,
             int partyGold = 0, int recruitLimit = Rules.Positions, bool hardFight = false, string pallbearerId = null, int graveBell = 0,
-            bool capitalField = false, int reserveArcherCount = 0, int reserveAccessoryHunterCount = 0)
+            bool capitalField = false, int reserveArcherCount = 0, int reserveAccessoryHunterCount = 0,
+            IEnumerable<CharacterDefinition> partyRoster = null)
         {
             if (string.IsNullOrWhiteSpace(id) || tickLimit <= 0 || partyGold < 0)
                 throw new ArgumentException("A battle needs an ID and a positive time limit.");
@@ -402,6 +406,9 @@ namespace RaidPartyManager.Domain
             if (reserveAccessoryHunterCount < 0 || reserveAccessoryHunterCount > int.MaxValue - Rules.Positions)
                 throw new ArgumentOutOfRangeException(nameof(reserveAccessoryHunterCount));
             ReserveAccessoryHunterCount = reserveAccessoryHunterCount;
+            RosterGoldReward = (partyRoster ?? units.Where(unit => unit.Side == Side.Party).Select(unit => unit.Character))
+                .Where(character => character.Trait == CharacterTrait.GoldAtBattleEnd)
+                .Sum(character => (long)character.TraitPower);
             PallbearerId = pallbearerId;
             GraveBell = graveBell;
             CapitalField = capitalField;

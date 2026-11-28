@@ -28,7 +28,7 @@ Material:
     m_Floats:
     - _Cloth: 1
     - _DepthTest: 8
-    - _DepthWrite: 0
+    - _DepthWrite: 1
     - _Travel: 1
     m_Colors: []
   m_BuildTextureStacks: []

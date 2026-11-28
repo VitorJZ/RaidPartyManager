@@ -16,6 +16,7 @@ namespace RaidPartyManager.Presentation
     {
         private const float NameShare = 3.6f;
         private const int GoldTenths = 60, SilverTenths = 30;
+        private static readonly Color MvpMedalTint = new Color32(216, 67, 87, 255);
         private static readonly string[] Columns = { "伤害", "治疗", "承伤", "挡伤", "异常", "击败" };
 
         public BattleScoreboard(IReadOnlyList<BattleRating> ratings, EncounterData content)
@@ -44,7 +45,15 @@ namespace RaidPartyManager.Presentation
             unit.style.paddingLeft = 14;
             header.Add(unit);
             foreach (string caption in Columns)
-                header.Add(Cell(caption, 1, InkSoft, 12));
+            {
+                var column = Cell(caption, 1, InkSoft, 12);
+                if (caption == "承伤")
+                {
+                    column.pickingMode = PickingMode.Position;
+                    column.tooltip = "实际生命损失＋防御与特防减免，护盾计入挡伤";
+                }
+                header.Add(column);
+            }
             var scoreHeading = Cell("评分 / 10", 1.15f, InkSoft, 12);
             scoreHeading.style.unityTextAlign = TextAnchor.MiddleCenter;
             header.Add(scoreHeading);
@@ -72,7 +81,7 @@ namespace RaidPartyManager.Presentation
         }
 
         private static long[] Amounts(BattleRating row) =>
-            new[] { row.Damage, row.Healing, row.DamageTaken, row.ShieldAbsorbed + row.AllyShielding, row.DebuffLayers, row.Kills };
+            new[] { row.Damage, row.Healing, row.RatedDamageTaken, row.ShieldAbsorbed + row.AllyShielding, row.DebuffLayers, row.Kills };
 
         private static VisualElement Group(Side side, int? mean)
         {
@@ -131,6 +140,7 @@ namespace RaidPartyManager.Presentation
             bool down = row.Fallen || row.Retreated;
             var detail = Lettering(
                 $"{row.Name}（{state}）　生命伤害 {row.HealthDamage} · 护盾伤害 {row.ShieldDamage} · 其中毒伤 {row.PoisonDamage}\n" +
+                $"实际掉血 {row.DamageTaken} · 抗性减免 {row.ResistancePrevented}\n" +
                 $"自身护盾挡伤 {row.ShieldAbsorbed} · 为队友挡伤 {row.AllyShielding} · 拦截 {row.Interceptions} 次 · 技能格挡 {row.SkillBlocks} 次\n" +
                 $"施加异常 {row.DebuffLayers} 层 · 给予队友增益 {row.BuffLayers} 层 · 净化异常 {row.CleansedLayers} 层 · 救援 {row.Saves} 次",
                 12, Ink);
@@ -246,22 +256,28 @@ namespace RaidPartyManager.Presentation
             medal.style.width = medal.style.height = 32;
             medal.style.alignItems = Align.Center;
             medal.style.justifyContent = Justify.Center;
-            string tier = row.ScoreTenths >= GoldTenths ? "Gold" : row.ScoreTenths >= SilverTenths ? "Silver" : "Bronze";
+            string tier = star || row.ScoreTenths >= GoldTenths ? "Gold" : row.ScoreTenths >= SilverTenths ? "Silver" : "Bronze";
             if (Art("Medal" + tier) is { } medalArt)
             {
                 medal.style.backgroundImage = medalArt;
+                if (star) medal.style.unityBackgroundImageTintColor = MvpMedalTint;
                 medal.style.backgroundSize = new BackgroundSize(BackgroundSizeType.Contain);
             }
             else
             {
-                medal.style.backgroundColor = (Color)(tier == "Gold" ? new Color32(226, 178, 74, 255) :
+                medal.style.backgroundColor = star ? MvpMedalTint : (Color)(tier == "Gold" ? new Color32(226, 178, 74, 255) :
                     tier == "Silver" ? new Color32(196, 200, 204, 255) : new Color32(164, 104, 64, 255));
                 PrototypeStyle.Outline(medal, InkSoft, 16);
             }
             medalSlot.Add(medal);
-            var score = Lettering((row.ScoreTenths / 10m).ToString("0.0"), 13, tier == "Bronze" ? Gilt : Ink, bold: true);
+            bool lightScore = star || tier == "Bronze";
+            var score = Lettering((row.ScoreTenths / 10m).ToString("0.0"), 13, lightScore ? Gilt : Ink, bold: true);
+            score.style.alignSelf = Align.Stretch;
+            score.style.marginLeft = score.style.marginRight = 0;
+            score.style.paddingLeft = score.style.paddingRight = 0;
+            score.style.whiteSpace = WhiteSpace.NoWrap;
             score.style.unityTextAlign = TextAnchor.MiddleCenter;
-            score.style.textShadow = tier == "Bronze"
+            score.style.textShadow = lightScore
                 ? new TextShadow { offset = new Vector2(0, 1), blurRadius = 1.5f, color = new Color(.16f, .06f, .02f, .9f) }
                 : new TextShadow { offset = new Vector2(0, 1), blurRadius = 1, color = new Color(1, 1, 1, .45f) };
             medal.Add(score);

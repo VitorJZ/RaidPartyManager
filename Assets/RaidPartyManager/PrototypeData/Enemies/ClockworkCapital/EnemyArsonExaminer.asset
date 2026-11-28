@@ -27,9 +27,9 @@ MonoBehaviour:
   rosterNumber: 0
   stage: 1
   reach: 2
-  fixedTrait: 0
+  fixedTrait: 56
   traitPower: 0
-  traitText: "引火取证（63%） / 回溯燃点（37%）"
+  traitText: "免疫火焰伤害。引火取证（63%） / 回溯燃点（37%）"
   personality: 1
   attack: 11
   defense: 3

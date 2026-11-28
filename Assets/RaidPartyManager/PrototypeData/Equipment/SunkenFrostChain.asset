@@ -22,5 +22,5 @@ MonoBehaviour:
   specialDefenseBonus: 0
   healthBonus: 0
   shopTier: 0
-  shopPrice: 100
+  shopPrice: 150
   rewardBossId: EnemyDrownedLanternRay

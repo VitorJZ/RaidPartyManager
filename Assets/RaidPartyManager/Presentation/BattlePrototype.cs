@@ -534,6 +534,8 @@ namespace RaidPartyManager.Presentation
 
             while (eventIndex < roundEvents.Count)
             {
+                if (battleSprites.Values.Any(sprite => sprite.panel != null && sprite.IsRebirthingAt(now)))
+                    return;
                 var entry = roundEvents[eventIndex];
                 if (entry.Kind == BattleEventKind.RoundStarted)
                 {
@@ -702,9 +704,11 @@ namespace RaidPartyManager.Presentation
                         entry.TargetHealth - health.GetValueOrDefault(entry.TargetId, entry.TargetHealth);
                     if (healed > 0 || entry.DamageTaken.Count > 0)
                     {
-                        int lane = floatingNumbers.Count(numbers => numbers.TargetId == entry.TargetId && numbers.RecentlyStarted(now));
+                        float stackOffset = floatingNumbers
+                            .Where(numbers => numbers.TargetId == entry.TargetId && numbers.RecentlyStarted(now))
+                            .Sum(numbers => numbers.StackHeight);
                         Rect body = unitCards.GetValueOrDefault(entry.TargetId)?.BodyBounds ?? default;
-                        floatingNumbers.Add(new FloatingCombatNumbers(entry, healed, body, now, lane));
+                        floatingNumbers.Add(new FloatingCombatNumbers(entry, healed, body, now, stackOffset));
                     }
                     health[entry.TargetId] = entry.TargetHealth;
                     shields[entry.TargetId] = entry.TargetShield;
@@ -723,7 +727,16 @@ namespace RaidPartyManager.Presentation
                     bool equipmentEffectShown = QueueEquipmentEffect(entry, now);
                     if (entry.Detail != "未命中")
                     {
-                        if (showRoundEndEffect || isRoundStartEffect && entry.Detail != "状态未生效")
+                        if (entry.VisualCue == BattleVisualCue.Rebirth)
+                        {
+                            var id = appearances[entry.TargetId].Character.Id;
+                            var poses = Resources.Load<Texture2D>($"Rebirth/{id}-Rise");
+                            battleSprites.GetValueOrDefault(entry.TargetId)?.PlayRebirth(poses, now, AnimationScale);
+                            var aura = Resources.Load<Texture2D>($"Rebirth/{id}-Aura");
+                            if (aura != null)
+                                impactEffects.Add(new BattleEffectPlayback(entry.TargetId, aura, now, AnimationScale, rebirth: true));
+                        }
+                        else if (showRoundEndEffect || isRoundStartEffect && entry.Detail != "状态未生效")
                         {
                             int lane = isRoundStartEffect
                                 ? roundEffects.Count(effect => effect.AtRoundStart && effect.TargetId == entry.TargetId && effect.ActiveAt(now))
@@ -857,16 +870,28 @@ namespace RaidPartyManager.Presentation
 
             if (!run.TryFinishBattle(result, out var loot))
                 throw new InvalidOperationException("The active replay could not be settled.");
+            var standaloneBoss = adventure == null
+                ? preparedEnemies.FirstOrDefault(e => e.Character.Rank == EnemyRank.Boss) : null;
             int gold;
             if (adventure == null)
-                gold = AdventureRun.RollKillGold(result, battle.Formation.Where(unit => unit.Side == Side.Enemy), draftRandom);
+            {
+                var kind = standaloneBoss != null ? NodeKind.Boss :
+                    preparedEnemies.Any(e => e.Character.Rank == EnemyRank.Elite) ? NodeKind.EliteBattle : NodeKind.NormalBattle;
+                int floor = gameObject.scene.name switch
+                {
+                    "WhisperingGraveyard" => 2,
+                    "ClockworkCapital" => 3,
+                    _ => 1
+                };
+                gold = AdventureRun.RollBattleGold(result.Outcome, kind, draftRandom, floor);
+            }
             else if (!adventure.SettleBattle(result, out gold))
                 throw new InvalidOperationException("The route encounter could not be settled.");
 
             int totalGold = (int)Math.Min(int.MaxValue - run.Gold, (long)result.GoldEarned + gold);
-            if (adventure == null && preparedEnemies.FirstOrDefault(e => e.Character.Rank == EnemyRank.Boss) is { } boss)
+            if (standaloneBoss != null)
             {
-                var spoils = BossSpoils.Roll(boss.Character.Id, content.StartingEquipment.Concat(content.SkillBooks), draftRandom);
+                var spoils = BossSpoils.Roll(standaloneBoss.Character.Id, content.StartingEquipment.Concat(content.SkillBooks), draftRandom);
                 standaloneChoices = spoils.Choices;
                 victoryRewards = new BattleRewards(totalGold, loot.Append(spoils.Equipment));
             }
@@ -1892,7 +1917,7 @@ namespace RaidPartyManager.Presentation
             if (result.GoldEarned > 0)
                 summary.Add(SettlementArt.Note($"获得 {result.GoldEarned} 金币 · 当前 {run.Gold} 金币", SettlementArt.Ochre, 13));
             if (result.AccessoriesEarned > 0)
-                summary.Add(SettlementArt.Note($"获得 {result.AccessoriesEarned} 件饰品，已放入共享背包", SettlementArt.Ochre, 13));
+                summary.Add(SettlementArt.Note($"获得 {result.AccessoriesEarned} 件装备，已放入共享背包", SettlementArt.Ochre, 13));
             if (adventure?.Current is { } visit)
                 summary.Add(SettlementArt.Note(visit.Message, SettlementArt.EnemyInk, 14));
             if (TeamWiped)

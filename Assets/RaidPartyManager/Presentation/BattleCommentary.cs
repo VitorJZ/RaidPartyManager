@@ -90,6 +90,12 @@ namespace RaidPartyManager.Presentation
             void Say(string key, TellerMood mood, int rank, params string[] choices) =>
                 Offer(key + (ally ? "/party" : "/enemy"), mood, rank, now, choices);
             var name = e.ActionName;
+            if (e.VisualCue == BattleVisualCue.Rebirth)
+            {
+                Say("rebirth", ally ? TellerMood.Cheer : TellerMood.Warn, 8,
+                    $"{target}又站起来了！生命全满，攻击、防御和特防都翻倍了！");
+                return;
+            }
             if (e.Countdown is { } clock)
             {
                 if (clock.Remaining <= 0) return;
@@ -312,7 +318,7 @@ namespace RaidPartyManager.Presentation
                 StatusKind.Injured => "带伤出手，现在有可能打空。",
                 StatusKind.Swift => "有迅捷在身，有机会避开来招。",
                 StatusKind.Greed => "添了贪婪，此后再挂状态，层数也会跟着涨。",
-                _ => $"有{stack.Layers}层盛气，打起人来更疼了。"
+                _ => $"叠到了{stack.Layers}层盛气，每层加1点攻击力。"
             };
             Offer("status/" + stack.Kind + ally, mood, stack.Kind is StatusKind.Frozen or StatusKind.Stunned ? 7 : 5, now,
                 (good ? "机会！" : "当心！") + target + effect, (good ? "这可帮了讨伐队！" : "讨伐队得留个心眼。") + target + effect);

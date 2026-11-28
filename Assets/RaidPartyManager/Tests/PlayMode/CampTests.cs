@@ -2,6 +2,8 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
+using RaidPartyManager.Content;
+using RaidPartyManager.Domain;
 using RaidPartyManager.Presentation;
 using RaidPartyManager.Run;
 using UnityEngine;
@@ -23,6 +25,37 @@ namespace RaidPartyManager.Tests
 
         [TearDown]
         public void RestoreContractsVisibility() => ContractsFeature.SetValue(null, false);
+
+        [UnityTest]
+        public IEnumerator RotBloomWitchPlaysHerSeatedAnimationInCamp()
+        {
+            yield return SceneManager.LoadSceneAsync("Camp");
+            yield return null;
+            var camp = Object.FindAnyObjectByType<CampPrototype>();
+            const BindingFlags privateInstance = BindingFlags.Instance | BindingFlags.NonPublic;
+            var content = (EncounterData)typeof(CampPrototype).GetField("content", privateInstance).GetValue(camp);
+            var witch = content.CharacterCatalog.Single(character => character.Id == "RotBloomWitch");
+            var party = new PartyRun(new[] { new PartyMemberStart("witch", witch, 1, witch.BaseStats.Health) },
+                System.Array.Empty<EquipmentDefinition>());
+            var stage = typeof(CampPrototype).GetField("stage", privateInstance).GetValue(camp);
+            stage.GetType().GetMethod("SeatParty").Invoke(stage, new object[] { party, content });
+
+            var seat = camp.transform.Find("Service theatre/camp-seat-1").GetComponent<MeshRenderer>();
+            var paint = new MaterialPropertyBlock();
+            seat.GetPropertyBlock(paint);
+            var artwork = paint.GetTexture("_MainTex");
+            Assert.That(seat.enabled, Is.True);
+            Assert.That(artwork, Is.SameAs(content.CampSpriteFor(witch.Id)));
+            Assert.That((artwork.width, artwork.height), Is.EqualTo((1024, 1024)));
+            var first = paint.GetVector("_MainTex_ST");
+            float deadline = Time.realtimeSinceStartup + 2;
+            while (paint.GetVector("_MainTex_ST") == first && Time.realtimeSinceStartup < deadline)
+            {
+                yield return null;
+                seat.GetPropertyBlock(paint);
+            }
+            Assert.That(paint.GetVector("_MainTex_ST"), Is.Not.EqualTo(first));
+        }
 
         [UnityTest]
         public IEnumerator CampTrainingShowsTheGainsAndDisablesTheOtherActions()

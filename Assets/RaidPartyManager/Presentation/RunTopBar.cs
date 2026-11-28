@@ -23,6 +23,7 @@ namespace RaidPartyManager.Presentation
         private readonly Label calendar;
         private readonly Label payrollDeadline;
         private readonly Label finalBattleHint;
+        private readonly Label commissionProgress;
         private readonly VisualElement coin;
         private readonly VisualElement bag;
         private readonly VisualElement rewardLayer;
@@ -133,6 +134,18 @@ namespace RaidPartyManager.Presentation
                 teamButton.style.marginRight = 12;
                 Add(teamButton);
             }
+
+            commissionProgress = PrototypeStyle.Text("", 14, PrototypeStyle.Accent);
+            commissionProgress.name = "run-commission-progress";
+            commissionProgress.style.whiteSpace = WhiteSpace.NoWrap;
+            commissionProgress.style.overflow = Overflow.Hidden;
+            commissionProgress.style.textOverflow = TextOverflow.Ellipsis;
+            commissionProgress.style.marginRight = 10;
+            commissionProgress.style.paddingLeft = commissionProgress.style.paddingRight = 8;
+            commissionProgress.style.paddingTop = commissionProgress.style.paddingBottom = 4;
+            commissionProgress.style.backgroundColor = PrototypeStyle.Inset;
+            PrototypeStyle.Outline(commissionProgress, PrototypeStyle.Edge, 4);
+            Add(commissionProgress);
 
             bag = new Image { name = "run-backpack-icon", image = content.BackpackIcon, pickingMode = PickingMode.Ignore,
                 scaleMode = ScaleMode.ScaleToFit };
@@ -447,7 +460,17 @@ namespace RaidPartyManager.Presentation
             calendar.tooltip = "进入新节点推进 1 天。" +
                 (party.ContractsEnabled ? "工资按合同约定的日期扣款。" : "") + "点击金币可查看账单。";
             var adventure = AdventureFlow.Active;
-            int? remaining = adventure?.Party == party ? adventure.DaysUntilFinalPayroll : null;
+            bool currentRun = adventure?.Party == party;
+            var commission = currentRun ? adventure.Commission : null;
+            commissionProgress.style.display = commission != null ? DisplayStyle.Flex : DisplayStyle.None;
+            if (commission != null)
+            {
+                int progress = adventure.QuestProgress;
+                bool done = progress >= commission.Target;
+                commissionProgress.text = $"委托 {progress}/{commission.Target} · {(done ? "可领奖" : commission.Title)}";
+                commissionProgress.tooltip = $"{commission.Title}\n{commission.Objective}";
+            }
+            int? remaining = currentRun ? adventure.DaysUntilFinalPayroll : null;
             payrollDeadline.style.display = remaining.HasValue ? DisplayStyle.Flex : DisplayStyle.None;
             if (remaining is int days)
             {

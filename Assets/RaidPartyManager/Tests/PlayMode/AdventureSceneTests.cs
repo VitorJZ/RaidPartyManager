@@ -110,14 +110,15 @@ namespace RaidPartyManager.Tests
             yield return OpenMenu();
             Press(Root<AdventureEventHub>(), "inspect-node-Town");
             yield return WaitScene("Town");
-            var candidate = run.Current.Recruits[0];
-            int price = run.Party.SigningPrice(candidate);
+            var candidate = run.Current.Recruits.Single(c => run.TownRecruitPricePercent(c) == 50);
+            int price = run.TownRecruitPrice(candidate);
             run.Party.AddGold(price);
             int balance = run.Party.Gold;
             Press(Root<DockTown>(), "town-service-Recruit");
             yield return WaitScene("TalentMarket");
 
             var root = Root<TalentMarket>();
+            Assert.That(root.Q<Label>("town-price-" + candidate.Id).text, Is.EqualTo($"特价 {price}"));
             Press(root, "town-recruit-" + candidate.Id);
             Assert.That(root.Q("crew-contract"), Is.Null);
             Press(root, "confirm-market-recruit");
@@ -225,6 +226,84 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator StageLensFollowsShopStockAndEventPropsDuringCloseups()
+        {
+            if (SystemInfo.graphicsDeviceType == GraphicsDeviceType.Null) Assert.Ignore("Requires a graphics device.");
+            yield return OpenMenu();
+            yield return OpenShopFromInspection();
+            var shop = Object.FindAnyObjectByType<DockShop>();
+            var root = Root<DockShop>();
+            var wide = PhotographLens(shop);
+
+            Press(root, "shop-counter");
+            float deadline = Time.realtimeSinceStartup + 5;
+            while (root.Q("shop-counter-hint").style.display.value != DisplayStyle.Flex && Time.realtimeSinceStartup < deadline)
+                yield return null;
+            var close = PhotographLens(shop);
+            var theatre = shop.transform.Find("Service theatre");
+            for (int i = 0; i < AdventureShopOffer.EquipmentSlots; i++)
+            {
+                AssertInFocus(close, theatre.Find($"Table stock {i}/Stock artwork").GetComponent<Renderer>());
+                AssertInFocus(close, theatre.Find($"Table stock {i}/Counter price paper").GetComponent<Renderer>());
+            }
+            Assert.That(Vector4.Distance(close.axis, wide.axis), Is.GreaterThan(.05f));
+
+            Down(root.Q("shop-counter-background"));
+            deadline = Time.realtimeSinceStartup + 5;
+            while (root.Q("shop-counter").style.display.value != DisplayStyle.Flex && Time.realtimeSinceStartup < deadline)
+                yield return null;
+            var returned = PhotographLens(shop);
+            Assert.That(Vector4.Distance(returned.axis, wide.axis), Is.LessThan(.001f));
+            Assert.That(Vector4.Distance(returned.band, wide.band), Is.LessThan(.001f));
+
+            ResetAdventureFlow();
+            yield return OpenMenu();
+            var eventRoot = Root<AdventureEventHub>();
+            Press(eventRoot, "inspect-event-Alchemist");
+            deadline = Time.realtimeSinceStartup + 6;
+            while (!eventRoot.Q<Button>("event-potion-1").enabledInHierarchy && Time.realtimeSinceStartup < deadline)
+                yield return null;
+            var hub = Object.FindAnyObjectByType<AdventureEventHub>();
+            var table = hub.transform.Find("Service theatre");
+            var tableLens = PhotographLens(hub);
+            for (int i = 0; i < 3; i++)
+                AssertInFocus(tableLens, table.Find("Apothecary bottle " + i).GetComponent<Renderer>());
+
+            static (Vector4 axis, Vector4 band) PhotographLens(MonoBehaviour scene)
+            {
+                var stage = scene.GetType().GetField("stage", Private).GetValue(scene);
+                var effect = stage.GetType().BaseType.GetField("tiltShift", Private).GetValue(stage);
+                var lens = (Material)effect.GetType().GetField("lens", Private).GetValue(effect);
+                var camera = Camera.main;
+                var previous = camera.targetTexture;
+                var target = RenderTexture.GetTemporary(Mathf.RoundToInt(540 * camera.aspect), 540, 24);
+                try
+                {
+                    camera.targetTexture = target;
+                    camera.Render();
+                    return (lens.GetVector("_FocusAxis"), lens.GetVector("_SharpBand"));
+                }
+                finally
+                {
+                    camera.targetTexture = previous;
+                    RenderTexture.ReleaseTemporary(target);
+                }
+            }
+
+            static void AssertInFocus((Vector4 axis, Vector4 band) lens, Renderer subject)
+            {
+                var bounds = subject.bounds;
+                var camera = Camera.main;
+                foreach (var edge in new[] { bounds.min, bounds.max })
+                {
+                    var point = camera.WorldToViewportPoint(edge);
+                    float offset = Vector2.Dot(lens.axis, point) + lens.axis.z;
+                    Assert.That(offset, Is.InRange(lens.band.x, lens.band.y), subject.name);
+                }
+            }
+        }
+
+        [UnityTest]
         public IEnumerator TownFlyBeamStaysAboveTheFrameAsTheAspectChanges()
         {
             yield return OpenMenu();
@@ -300,8 +379,8 @@ namespace RaidPartyManager.Tests
             yield return OpenMenu();
             Press(Root<AdventureEventHub>(), "inspect-node-Town"); yield return WaitScene("Town");
             var candidates = run.Current.Recruits.Select(c => c.Id).ToArray();
-            int firstPrice = run.Party.SigningPrice(run.Current.Recruits[0]);
-            int secondPrice = run.Party.SigningPrice(run.Current.Recruits[1]);
+            int firstPrice = run.TownRecruitPrice(run.Current.Recruits[0]);
+            int secondPrice = run.TownRecruitPrice(run.Current.Recruits[1]);
             run.Party.AddGold(firstPrice + secondPrice + 250);
             int day = run.Party.Day, balance = run.Party.Gold;
             int members = run.Party.Members.Count;
@@ -337,7 +416,9 @@ namespace RaidPartyManager.Tests
             {
                 var bounds = bodies[i].bounds;
                 var price = root.Q<Label>("town-price-" + candidates[i]);
-                Assert.That(price.text, Is.EqualTo($"价格 {run.Party.SigningPrice(run.Current.Recruits[i])}"));
+                var offered = run.Current.Recruits[i];
+                string caption = run.TownRecruitPricePercent(offered) < 100 ? "特价" : "价格";
+                Assert.That(price.text, Is.EqualTo($"{caption} {run.TownRecruitPrice(offered)}"));
                 Assert.That(placards[i].bounds.center.z, Is.LessThan(bounds.center.z));
                 Assert.That(placards[i].bounds.center.x, Is.EqualTo(bounds.center.x));
                 Assert.That(Camera.main.WorldToViewportPoint(bounds.min).x, Is.GreaterThan(0f));
@@ -1047,6 +1128,37 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator TopBarShowsCommissionProgressAcrossFacilitiesUntilClaimed()
+        {
+            yield return OpenMenu();
+            yield return OpenShopFromInspection();
+            Press(Root<DockShop>(), "return-event-select");
+            yield return WaitScene("Town");
+            var town = Root<DockTown>();
+            Assert.That(town.Q("run-commission-progress").style.display.value, Is.EqualTo(DisplayStyle.None));
+            Press(town, "town-service-Quest");
+            Press(town, "town-quest-offer-0");
+            var progress = $"委托 0/{run.Commission.Target} · {run.Commission.Title}";
+            Assert.That(town.Q<Label>("run-commission-progress").text, Is.EqualTo(progress));
+            Press(town, "dismiss-paper");
+
+            Press(town, "town-service-Shop");
+            yield return WaitScene("DockShop");
+            var shop = Root<DockShop>();
+            Assert.That(shop.Q<Label>("run-commission-progress").text, Is.EqualTo(progress));
+            typeof(AdventureRun).GetProperty(nameof(AdventureRun.QuestProgress)).SetValue(run, run.Commission.Target);
+            Press(shop, "return-event-select");
+
+            yield return WaitScene("Town");
+            town = Root<DockTown>();
+            Assert.That(town.Q<Label>("run-commission-progress").text, Does.EndWith("可领奖"));
+            Press(town, "town-service-Quest");
+            Press(town, "town-quest-act");
+            Assert.That(run.QuestActive, Is.False);
+            Assert.That(town.Q("run-commission-progress").style.display.value, Is.EqualTo(DisplayStyle.None));
+        }
+
+        [UnityTest]
         public IEnumerator CampOffersEvolutionRestAndTrainingAsExclusiveActions()
         {
             yield return OpenMenu();
@@ -1094,7 +1206,7 @@ namespace RaidPartyManager.Tests
         [UnityTest]
         public IEnumerator FallingRecruitmentWheelPreservesItsDrawAndReturnsToTheRoute([ValueSource(nameof(WheelFloors))] int floor)
         {
-            ContractsFeature.SetValue(null, true);
+            ContractsFeature.SetValue(null, floor != 2);
             yield return OpenMenu();
             var hub = Object.FindAnyObjectByType<AdventureEventHub>();
             var content = ((AdventureContentAsset)typeof(AdventureEventHub).GetField("assets", Private).GetValue(hub)).Encounter;
@@ -1164,13 +1276,16 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Current.ShopRecruitment.NextPrice, Is.EqualTo(20));
             var actor = root.Q("shop-recruit-actor-" + candidate);
             Assert.That(actor, Is.Not.Null);
-            if (floor == 3)
+            if (floor is 2 or 3)
             {
-                yield return new WaitForSecondsRealtime(.56f);
+                yield return new WaitForSecondsRealtime(.6f);
+                Assert.That(actor.resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+                var position = actor.worldBound.center;
                 Down(actor);
-                yield return new WaitForSecondsRealtime(.34f);
-                Up(root.Q("shop-recruit-window"), root.Q("shop-checkout").worldBound.center);
-                Press(root, "sign-crew-contract");
+                yield return new WaitForSecondsRealtime(.65f);
+                Up(root.Q("shop-recruit-actors"), position);
+                if (floor == 3) Press(root, "sign-crew-contract");
+                else Assert.That(root.Q("crew-contract"), Is.Null);
                 Assert.That(run.Current.Resolved && run.Current.ShopRecruitment.Signed, Is.True);
                 Assert.That(JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath)).FinishVisit, Is.True);
                 Press(root, "return-event-select");
@@ -1227,7 +1342,7 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
-        public IEnumerator ShopStagesDrawnActorsAndSignsOneByDraggingToTheCounter()
+        public IEnumerator ShopKeepsDrawnActorsOnstageAndSignsOneByLongPress()
         {
             ContractsFeature.SetValue(null, true);
             RecruitmentWheelVisibility.SetValue(null, true);
@@ -1287,8 +1402,20 @@ namespace RaidPartyManager.Tests
             Vector2 empty = root.worldBound.min + Vector2.Scale(root.worldBound.size, new Vector2(.05f, .25f));
             using (var blank = PointerDownEvent.GetPooled(new Event { type = EventType.MouseDown, button = 0, mousePosition = empty }))
                 Send(root.Q("shop-recruit-window"), blank);
-            yield return new WaitForSecondsRealtime(.52f);
+            var mark = body.transform.position;
+            float pulledBackAt = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup < pulledBackAt + .52f)
+            {
+                yield return null;
+                Assert.That(body.enabled, Is.True, "The drawn actor must stay visible during the camera move.");
+            }
             Assert.That(Vector3.Distance(camera.transform.position, wide), Is.LessThan(.1f));
+            Assert.That(body.transform.position, Is.EqualTo(mark));
+            string actorId = "shop-recruit-actor-" + recruit.Id;
+            Assert.That(root.Q(actorId).resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            yield return HoldToRecruit();
+            Press(root, "close-contract");
+
             Press(root, "shop-recruit-open");
             Press(root, "shop-recruit-draw");
             yield return new WaitForSecondsRealtime(1.55f);
@@ -1296,18 +1423,16 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo($"金币  {startingGold - 35}"));
             Assert.That(root.Q<Label>("shop-price-digit-0").text + root.Q<Label>("shop-price-digit-1").text, Is.EqualTo("25"));
             yield return null;
-            string actorId = "shop-recruit-actor-" + recruit.Id;
             AssertCharacterPreview(root, actorId, recruit);
             var target = root.Q(actorId);
-            var counter = root.Q("shop-checkout").worldBound.center;
-            var window = root.Q("shop-recruit-window");
             Down(target);
-            Up(window, counter);
+            Assert.That(target.Q("shop-recruit-hold-progress").style.display.value, Is.EqualTo(DisplayStyle.Flex));
+            Up(root.Q("shop-recruit-actors"), target.worldBound.center);
+            yield return new WaitForSecondsRealtime(.61f);
             Assert.That(root.Q("shop-recruit-replacement"), Is.Null);
-            yield return DragToCounter();
-            Press(root, "close-contract");
+            Assert.That(root.Q("crew-contract"), Is.Null);
             Assert.That(run.Current.ShopRecruitment.Signed, Is.False);
-            yield return DragToCounter();
+            yield return HoldToRecruit();
             Press(root, "sign-crew-contract");
             Assert.That(run.Party.Members.Single(entry => entry.Character.Id == recruit.Id).Contract, Is.Not.Null);
             Assert.That(run.Party.Members.Single(entry => entry.Character.Id == recruit.Id).Position, Is.Null);
@@ -1316,13 +1441,13 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.Gold, Is.EqualTo(startingGold - 35 -
                 run.Party.Members.Single(m => m.Character.Id == recruit.Id).Contract.BaseTotal));
 
-            IEnumerator DragToCounter()
+            IEnumerator HoldToRecruit()
             {
-                Down(target);
-                yield return new WaitForSecondsRealtime(.34f);
-                using var move = PointerMoveEvent.GetPooled(new Event { type = EventType.MouseMove, button = 0, mousePosition = counter });
-                Send(window, move);
-                Up(window, counter);
+                var candidate = root.Q(actorId);
+                var position = candidate.worldBound.center;
+                Down(candidate);
+                yield return new WaitForSecondsRealtime(.65f);
+                Up(root.Q("shop-recruit-actors"), position);
                 Assert.That(root.Q("crew-contract"), Is.Not.Null);
             }
         }
@@ -2319,10 +2444,13 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("run-payroll-deadline").style.display.value, Is.EqualTo(DisplayStyle.None));
         }
 
+        private static readonly bool[] FinaleContractModes = { false, true };
+
         [UnityTest]
-        public IEnumerator CapitalBossRewardsLeadToFiveSecondsBehindTheClosedCurtain()
+        public IEnumerator CapitalBossRewardsLeadToFiveSecondsBehindTheClosedCurtain(
+            [ValueSource(nameof(FinaleContractModes))] bool contracts)
         {
-            ContractsFeature.SetValue(null, true);
+            ContractsFeature.SetValue(null, contracts);
             yield return SceneManager.LoadSceneAsync("MainMenu");
             yield return null;
             Press(Root<PrototypeSceneMenu>(), "open-route");
@@ -2350,12 +2478,13 @@ namespace RaidPartyManager.Tests
             var root = Root<BattlePrototype>();
             yield return WaitForShow();
             Assert.That(root.panel.visualTree.Q("campaign-finale"), Is.Null);
-            Assert.That(root.Q("battle-scoreboard").Query<Label>().ToList().Any(label => label.text.Contains("没有评分记录")), Is.True);
+            Assert.That(root.Q("battle-scoreboard").Q("battle-scoreboard-header"), Is.Null);
             Press(root, "claim-gold");
             float deadline = Time.realtimeSinceStartup + 6;
             while (root.panel.visualTree.Q("campaign-finale") == null && Time.realtimeSinceStartup < deadline) yield return null;
             var finale = root.panel.visualTree.Q("campaign-finale");
             Assert.That(finale, Is.Not.Null);
+            float showUntil = Time.realtimeSinceStartup + 4.8f;
             var battleScreen = root.Q("battle-screen");
             Assert.That(finale.parent, Is.SameAs(root));
             Assert.That(root.IndexOf(finale), Is.GreaterThan(root.IndexOf(battleScreen)));
@@ -2363,7 +2492,8 @@ namespace RaidPartyManager.Tests
             var title = finale.Q<Image>("campaign-finale-title");
             Assert.That(title?.image?.name, Is.EqualTo("CampaignFinaleTitle"));
             Assert.That(title.tooltip, Is.EqualTo("感谢游玩"));
-            Assert.That(finale.Q<Label>("campaign-payroll-summary")?.text, Is.EqualTo("剩余 0 金币  ·  仍欠工资 55 金币"));
+            Assert.That(finale.Q<Label>("campaign-payroll-summary")?.text, Is.EqualTo(contracts ? "仍欠工资 55 金币" : null));
+            Assert.That(finale.Query<Label>().ToList().Any(label => label.text.Contains("剩余")), Is.False);
             var folds = new MaterialPropertyBlock();
             var house = Object.FindAnyObjectByType<DockPlayhouse>();
             var cast = Object.FindAnyObjectByType<BattlePrototype>().transform.Find("Paper Theatre")
@@ -2374,16 +2504,56 @@ namespace RaidPartyManager.Tests
                 var curtain = house.transform.Find(curtainName).GetComponent<MeshRenderer>();
                 curtain.GetPropertyBlock(folds);
                 Assert.That(folds.GetFloat("_Travel"), Is.Zero, curtainName);
-                Assert.That(cast.All(actor => actor.sharedMaterial.renderQueue < curtain.sharedMaterial.renderQueue), Is.True);
             }
+            if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Null)
+                AssertCurtainOccludesCast(cast);
             yield return null;
             Assert.That(title.worldBound.width, Is.GreaterThan(0));
             Assert.That(title.worldBound.center.x, Is.EqualTo(finale.worldBound.center.x).Within(1f));
-            yield return new WaitForSecondsRealtime(4.8f);
-            Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("ClockworkCapital"));
+            while (Time.realtimeSinceStartup < showUntil)
+            {
+                Assert.That(SceneManager.GetActiveScene().name, Is.EqualTo("ClockworkCapital"));
+                yield return null;
+            }
             yield return WaitScene("MainMenu");
             Assert.That(File.Exists(savePath), Is.False);
             Assert.That(Root<PrototypeSceneMenu>().Q<Button>("open-route").text, Is.EqualTo("开始讨伐"));
+        }
+
+        private static void AssertCurtainOccludesCast(MeshRenderer[] cast)
+        {
+            var camera = Camera.main;
+            var target = RenderTexture.GetTemporary(384, Mathf.RoundToInt(384 / camera.aspect), 24);
+            var screenshot = new Texture2D(target.width, target.height, TextureFormat.RGB24, false);
+            var previousTarget = camera.targetTexture;
+            var previousActive = RenderTexture.active;
+            var originalVisibility = cast.Select(actor => actor.forceRenderingOff).ToArray();
+            try
+            {
+                camera.targetTexture = target;
+                var closed = ReadFrame();
+                foreach (var actor in cast) actor.forceRenderingOff = true;
+                var withoutCast = ReadFrame();
+                int changed = closed.Zip(withoutCast, (a, b) => Mathf.Abs(a.r - b.r) > 8 ||
+                    Mathf.Abs(a.g - b.g) > 8 || Mathf.Abs(a.b - b.b) > 8).Count(different => different);
+                Assert.That(changed, Is.LessThan(closed.Length / 1000), "No character should show through the closed curtain.");
+            }
+            finally
+            {
+                for (int i = 0; i < cast.Length; i++) cast[i].forceRenderingOff = originalVisibility[i];
+                camera.targetTexture = previousTarget;
+                RenderTexture.active = previousActive;
+                RenderTexture.ReleaseTemporary(target);
+                Object.Destroy(screenshot);
+            }
+
+            Color32[] ReadFrame()
+            {
+                camera.Render();
+                RenderTexture.active = target;
+                screenshot.ReadPixels(new Rect(0, 0, target.width, target.height), 0, 0, false);
+                return screenshot.GetPixels32();
+            }
         }
 
         [UnityTest]
@@ -2538,6 +2708,27 @@ namespace RaidPartyManager.Tests
             Assert.That(townAutosave.Party.Day, Is.EqualTo(townDay));
             Assert.That(townAutosave.Stage, Is.EqualTo(route.Stage));
             Assert.That(townAutosave.Choice, Is.EqualTo(-1));
+
+            yield return WaitForShow();
+            var chestRoot = Root<AdventureEventHub>();
+            var latch = chestRoot.Q<Button>("open-treasure-chest");
+            int goldBeforeOpening = route.Party.Gold;
+            Down(latch);
+            Up(latch, latch.worldBound.center);
+            int goldAfterOpening = route.Party.Gold;
+            Assert.That(goldAfterOpening - goldBeforeOpening, Is.InRange(20, 25));
+            Assert.That(chestRoot.Q("reward-flight").Q("reward-gold-icon"), Is.Not.Null);
+            float chestDeadline = Time.realtimeSinceStartup + 3f;
+            while (chestRoot.Q<Button>("chest-reward-0")?.enabledInHierarchy != true &&
+                Time.realtimeSinceStartup < chestDeadline) yield return null;
+            var prize = chestRoot.Q<Button>("chest-reward-0");
+            Assert.That(prize?.enabledInHierarchy, Is.True);
+            Down(prize);
+            Up(prize, prize.worldBound.center);
+            Assert.That(route.Current.Resolved, Is.True);
+            var chestAutosave = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            Assert.That(chestAutosave.FinishVisit, Is.True);
+            Assert.That(chestAutosave.Party.Gold, Is.EqualTo(goldAfterOpening));
 
             void ClickFacilityExit(VisualElement root)
             {

@@ -226,8 +226,22 @@ namespace RaidPartyManager.Presentation
         internal BattleStage BattleCast(VisualElement panel, BattleStageArt battleArt, double now) =>
             battleCast = new BattleStage(stage, camera, panel, battleArt, null, now, house);
 
-        protected override Bounds FormationBounds() =>
-            battleCast is { IsActive: true } ? battleCast.FormationBounds : base.FormationBounds();
+        protected override Bounds FocusBounds()
+        {
+            if (battleCast is { IsActive: true }) return battleCast.FocusBounds;
+
+            var wide = base.FocusBounds();
+            if (zoom <= 0) return wide;
+
+            var props = cases[0] != null ? cases : bottles[0] != null ? bottles : hats;
+            var subject = new Bounds();
+            foreach (var prop in props)
+                if (prop != null) IncludeActor(ref subject, prop);
+
+            return subject.size.y > 0
+                ? StageTiltShift.BlendFocus(wide, subject, Mathf.SmoothStep(0, 1, zoom))
+                : wide;
+        }
 
         private readonly MeshRenderer[] bottles = new MeshRenderer[3];
         private readonly MeshRenderer[] hats = new MeshRenderer[3];

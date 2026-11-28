@@ -159,6 +159,43 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator FallenAcolytesRebirthPlaysTheStandingSpriteAndCrimsonAura()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return null;
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var party = (PartyRun)typeof(BattlePrototype).GetField("run", PrivateInstance).GetValue(scene);
+            var content = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
+            var acolyte = content.CharacterCatalog.Single(c => c.Id == "FallenAcolyte");
+            party.ResetRoster(new[] { new PartyMemberStart("acolyte", acolyte, 1, 1,
+                new Dictionary<StatusKind, int> { [StatusKind.Poison] = 8 }) });
+            Press(root, "start");
+
+            var poses = new HashSet<Rect>();
+            var flames = new HashSet<Rect>();
+            float deadline = Time.realtimeSinceStartup + 18;
+            while (Time.realtimeSinceStartup < deadline)
+            {
+                var aura = root.Q<Image>("battle-rebirth-aura");
+                if (aura == null && flames.Count > 0) break;
+                var body = root.Q("party-position-1")?.Q<Image>("battle-sprite");
+                if (body?.image?.name == "FallenAcolyte-Rise")
+                    poses.Add(body.sourceRect);
+                if (aura != null && aura.worldBound.width > 0)
+                {
+                    Assert.That(aura.image.name, Is.EqualTo("FallenAcolyte-Aura"));
+                    Assert.That(aura.worldBound.center.x, Is.EqualTo(body.worldBound.center.x).Within(2f));
+                    flames.Add(aura.sourceRect);
+                }
+                yield return null;
+            }
+            Assert.That(poses.Count, Is.GreaterThan(3));
+            Assert.That(flames.Count, Is.GreaterThan(3));
+            Assert.That(root.Q("party-position-1")?.Q<Image>("battle-sprite")?.image?.name, Is.EqualTo("FallenAcolyte-Combat"));
+        }
+
+        [UnityTest]
         public IEnumerator PotionArtworkAnimatesOverItsOwnerAfterTheBottleIsConsumed()
         {
             yield return SceneManager.LoadSceneAsync("BattlePrototype");
@@ -354,7 +391,7 @@ namespace RaidPartyManager.Tests
             yield return null;
             var statusTooltip = root.Q("battle-status-tooltip");
             Assert.That(statusTooltip.Q<Label>("battle-status-tooltip-name").text, Is.EqualTo("盛气 ×3"));
-            Assert.That(statusTooltip.Q<Label>("battle-status-tooltip-description").text, Does.Contain("伤害增加20%"));
+            Assert.That(statusTooltip.Q<Label>("battle-status-tooltip-description").text, Does.Contain("每层使攻击力+1"));
             var largeIcon = statusTooltip.Q("battle-status-tooltip-art").Q<Image>();
             Assert.That(largeIcon.image, Is.SameAs(vigor.Q<Image>().image));
             Assert.That(largeIcon.worldBound.width, Is.GreaterThan(vigor.worldBound.width));
@@ -365,7 +402,7 @@ namespace RaidPartyManager.Tests
             var details = HoverCharacter(root, portrait);
             Assert.That(details.Q<Label>("battle-detail-name").text, Does.Contain("篝火守夜人"));
             Assert.That(details.Q<Label>("battle-detail-health").text, Is.EqualTo("生命  10/10"));
-            Assert.That(details.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  5"));
+            Assert.That(details.Q<Label>("battle-detail-attack").text, Is.EqualTo("攻击  8"));
             Assert.That(details.Q<Label>("battle-detail-defense").text, Is.EqualTo("防御  4"));
             Assert.That(details.Q<Label>("battle-detail-special-defense").text, Is.EqualTo("特防  4"));
             Assert.That(details.Q<Label>("battle-detail-personality").text, Does.Contain("冷幽默"));
@@ -418,6 +455,50 @@ namespace RaidPartyManager.Tests
                 while (root.Q("curtain-input-shield") != null && Time.realtimeSinceStartup < deadline)
                     yield return null;
                 Assert.That(root.Q("curtain-input-shield"), Is.Null);
+            }
+        }
+
+        [UnityTest]
+        public IEnumerator PerfectScoreFitsOnOneLineAndOnlyMvpMedalIsRed()
+        {
+            yield return SceneManager.LoadSceneAsync("BattlePrototype");
+            yield return WaitForScene("BattlePrototype");
+            var scene = Object.FindAnyObjectByType<BattlePrototype>();
+            var root = scene.GetComponent<UIDocument>().rootVisualElement;
+            var content = (EncounterData)typeof(BattlePrototype).GetField("content", PrivateInstance).GetValue(scene);
+            var type = typeof(BattlePrototype).Assembly.GetType("RaidPartyManager.Presentation.BattleScoreboard");
+            var ratings = new[]
+            {
+                new BattleRating { UnitId = "mvp", Name = "天弓", CharacterId = "mvp", Side = Side.Party, Position = 1, ScoreTenths = 100 },
+                new BattleRating { UnitId = "second", Name = "星罗", CharacterId = "second", Side = Side.Party, Position = 2, ScoreTenths = 100 },
+                new BattleRating { UnitId = "third", Name = "余烬斗士", CharacterId = "third", Side = Side.Party, Position = 3, ScoreTenths = 99 }
+            };
+            var scoreboard = (VisualElement)System.Activator.CreateInstance(type, ratings, content);
+            scoreboard.style.width = 540;
+            root.Add(scoreboard);
+            yield return null;
+
+            var mvp = scoreboard.Q("battle-rating-mvp").Q("battle-rating-medal");
+            var other = scoreboard.Q("battle-rating-second").Q("battle-rating-medal");
+            try
+            {
+                var tint = mvp.resolvedStyle.unityBackgroundImageTintColor;
+                Assert.That(tint.r, Is.GreaterThan(tint.g * 2));
+                Assert.That(other.resolvedStyle.unityBackgroundImageTintColor, Is.EqualTo(Color.white));
+                var singleLine = scoreboard.Q("battle-rating-third").Q("battle-rating-medal").Q<Label>().layout.height;
+                foreach (var medal in new[] { mvp, other })
+                {
+                    var score = medal.Q<Label>();
+                    Assert.That(score.text, Is.EqualTo(10m.ToString("0.0")));
+                    Assert.That(score.resolvedStyle.whiteSpace, Is.EqualTo(WhiteSpace.NoWrap));
+                    var size = score.MeasureTextSize(score.text, 0, VisualElement.MeasureMode.Undefined, 0, VisualElement.MeasureMode.Undefined);
+                    Assert.That(score.contentRect.width, Is.GreaterThanOrEqualTo(size.x));
+                    Assert.That(score.layout.height, Is.EqualTo(singleLine).Within(1));
+                }
+            }
+            finally
+            {
+                scoreboard.RemoveFromHierarchy();
             }
         }
 
@@ -615,7 +696,7 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("status-row-flanker").parent.Q<Label>("health-value").text, Does.StartWith("倒下"));
             AssertNoFormationButtons(root);
             Press(root, "claim-gold");
-            Assert.That(party.Gold - startingGold, Is.InRange(12, 18));
+            Assert.That(party.Gold - startingGold - first.GoldEarned, Is.InRange(4, 6));
             Assert.That(party.Inventory.Count, Is.EqualTo(startingItems));
             Assert.That(root.Q("claim-gold"), Is.Null);
             Assert.That(root.Q("reward-flight").Q("reward-gold-icon"), Is.Not.Null);
@@ -1208,6 +1289,7 @@ namespace RaidPartyManager.Tests
             var triggers = new List<string>();
             bool decayShownDuringEffect = false;
             var colors = new Dictionary<string, Color>();
+            var damageMarks = new Dictionary<string, Rect>();
             var kinds = new[] { "physical", "magic", "fire", "lightning", "healing", "poison" };
             Label firstDamage = null;
             float firstHeight = 0;
@@ -1223,7 +1305,11 @@ namespace RaidPartyManager.Tests
                 decayShownDuringEffect |= root.Q("round-end-effect") != null && PoisonLayers() == "1";
                 foreach (var number in root.Query<Label>("combat-number").ToList())
                     foreach (var kind in kinds.Where(kind => number.ClassListContains("combat-number-" + kind)))
-                        colors[kind] = number.style.color.value;
+                    {
+                        colors[kind] = number.Q<Image>("combat-number-glyph").tintColor;
+                        if (kind != "healing")
+                            damageMarks[kind] = number.Q<Image>("combat-number-type-mark").sourceRect;
+                    }
 
                 if (firstDamage == null && root.Q<Label>(className: "combat-number-fire") is { } fire &&
                     fire.worldBound.height > 0 && !float.IsNaN(fire.worldBound.y))
@@ -1242,6 +1328,8 @@ namespace RaidPartyManager.Tests
 
             Assert.That(colors.Keys, Is.EquivalentTo(kinds));
             Assert.That(colors.Values.Distinct().Count(), Is.EqualTo(6));
+            Assert.That(colors["physical"], Is.EqualTo(Color.white));
+            Assert.That(damageMarks.Values.Distinct().Count(), Is.EqualTo(5));
             Assert.That(rose, Is.True);
             Assert.That(firstDamage.panel, Is.Null);
             Assert.That(firstGone - firstSeen, Is.InRange(0.37f, 0.67f));

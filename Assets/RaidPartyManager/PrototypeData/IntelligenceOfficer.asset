@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 17
   traitPower: 0
-  traitText: "进入战斗节点前，可以查看敌方的阵容"
+  traitText: "在队伍池里且存活时，可以在开战前查看敌方阵容。"
   personality: 6
   attack: 5
   defense: 1

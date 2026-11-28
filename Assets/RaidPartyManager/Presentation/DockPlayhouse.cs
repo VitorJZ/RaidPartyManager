@@ -38,19 +38,18 @@ namespace RaidPartyManager.Presentation
         private Cue cue;
         private DockPerformance performance;
         internal DockSet Set { get; private set; }
-        private Bounds lastFormation;
+        private Bounds lastFocus;
 
-        internal Bounds FocusOn(Bounds formation)
+        internal Bounds FocusOn(Bounds focus)
         {
             // Route signs can keep the outgoing set onstage after its scene has unloaded.
-            if (!performance.ShowingOutgoingSet || lastFormation.size.y <= 0) lastFormation = formation;
-            return lastFormation;
+            if (!performance.ShowingOutgoingSet || lastFocus.size.y <= 0) lastFocus = focus;
+            return lastFocus;
         }
 
         internal static bool HoldingSet => current != null && current.performance.HoldsScenery;
         private Action afterClose;
-        private const float TownTransitionSpeed = 1.5f;
-        private float cueSpeed = 1f;
+        private const float TransitionSpeed = 1.5f;
         private float travel, hold;
         // The hem hangs on a spring behind the track, so the cloth trails, swings and settles.
         private float hem, hemSpeed, flutter, trackOpen;
@@ -109,9 +108,6 @@ namespace RaidPartyManager.Presentation
             current.inputShield.RegisterCallback<KeyDownEvent>(e => e.StopPropagation());
             current.gameObject.SetActive(true);
             bool continuous = current.performance.Crossing;
-            if (!continuous)
-                current.cueSpeed = owner.gameObject.scene.name is "Town" or "TalentMarket" or "DockShop" ||
-                    AdventureFlow.FromTownFacility ? TownTransitionSpeed : 1f;
             current.cue = continuous ? Cue.Playing : Cue.Opening;
             current.travel = continuous ? 1 : 0;
             current.hold = .13f;
@@ -299,10 +295,9 @@ namespace RaidPartyManager.Presentation
             if (!performance.Crossing) gameObject.SetActive(false);
         }
 
-        internal static void ChangeSet(Action next, bool toSigns = false, StageTurn turn = StageTurn.Automatic, bool townVisit = false)
+        internal static void ChangeSet(Action next, bool toSigns = false, StageTurn turn = StageTurn.Automatic)
         {
             if (current == null || current.panel == null) { next(); return; }
-            current.cueSpeed = townVisit ? TownTransitionSpeed : 1f;
             current.performance.EndFirstEntrance();
             if (AdventureFlow.OnRoute || turn != StageTurn.Automatic)
             {
@@ -316,11 +311,10 @@ namespace RaidPartyManager.Presentation
             current.CloseCurtain(next);
         }
 
-        internal void ShowFinalCurtain(int gold, long? payrollDebt, Action returnToMenu)
+        internal void ShowFinalCurtain(long? payrollDebt, Action returnToMenu)
         {
             if (cue is Cue.Closing or Cue.Closed) return;
             performance.EndFirstEntrance();
-            cueSpeed = 1;
             GameAudio.Play(SoundCue.StageCurtainClose, .58f);
             CloseCurtain(() =>
             {
@@ -354,15 +348,15 @@ namespace RaidPartyManager.Presentation
                     finale.Add(title);
                 }
 
-                string wages = payrollDebt > 0 ? $"  ·  仍欠工资 {payrollDebt} 金币" :
-                    payrollDebt.HasValue ? "  ·  工资已结清" : "";
-                var accounts = PrototypeStyle.Text($"剩余 {gold} 金币{wages}", 20);
-                accounts.name = "campaign-payroll-summary";
-                accounts.pickingMode = PickingMode.Ignore;
-                accounts.style.marginTop = 8;
-                accounts.style.textShadow = new TextShadow { offset = new Vector2(0, 2), blurRadius = 4, color = Color.black };
-                PrototypeStyle.Middle(accounts);
-                finale.Add(accounts);
+                if (payrollDebt is long debt)
+                {
+                    var accounts = PrototypeStyle.Text(debt > 0 ? $"仍欠工资 {debt} 金币" : "工资已结清", 20);
+                    accounts.name = "campaign-payroll-summary";
+                    accounts.style.marginTop = 8;
+                    accounts.pickingMode = PickingMode.Ignore;
+                    PrototypeStyle.Middle(accounts);
+                    finale.Add(accounts);
+                }
 
                 // Cast sheets stay on the stage under the curtain renderers. Put the title on the
                 // screen panel above the camera and outside the gameplay document's opacity fade.
@@ -384,7 +378,7 @@ namespace RaidPartyManager.Presentation
         private void LateUpdate()
         {
             if (panel == null) return;
-            float dt = Mathf.Min(Time.unscaledDeltaTime, .08f) * cueSpeed;
+            float dt = Mathf.Min(Time.unscaledDeltaTime, .08f) * TransitionSpeed;
             if (cue == Cue.Playing)
             {
                 bool arriving = performance.FirstEntrance;

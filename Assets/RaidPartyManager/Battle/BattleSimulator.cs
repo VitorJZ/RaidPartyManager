@@ -97,6 +97,7 @@ namespace RaidPartyManager.Battle
             }
             public EquippedItem[] Slots;
             public readonly HashSet<string> DamagedTargets = new HashSet<string>();
+            public string LastHitTarget;
             public bool Revived;
             public bool ResolvingDamageHeal;
             public bool ResolvingCrystalHeal;
@@ -106,7 +107,12 @@ namespace RaidPartyManager.Battle
             public CharacterDefinition TraitSource => CopiedTraitSource ?? Input.Character;
             public CharacterTrait Trait => TraitSource.Trait;
             public int TraitPower => TraitSource.TraitPower;
-            public bool CanReceiveHealing => Trait != CharacterTrait.AbyssWard && Layers(StatusKind.Cursed) == 0;
+            public int Defense => StatAfterRebirth(Stats.Defense);
+            public int SpecialDefense => StatAfterRebirth(Stats.SpecialDefense);
+            public int StatAfterRebirth(long value) =>
+                (int)Math.Clamp(Revived && Trait == CharacterTrait.Rebirth ? 2 * value : value, int.MinValue, int.MaxValue);
+            public bool CanBeTargeted => Trait != CharacterTrait.AbyssWard;
+            public bool CanReceiveHealing => CanBeTargeted && Layers(StatusKind.Cursed) == 0;
             public EquipmentDefinition[] Gear;
             public Unit LinkedFront;
             public Stats Stats;
@@ -247,7 +253,8 @@ namespace RaidPartyManager.Battle
                 string id = unit.Input.Id;
                 var stats = formationStats.TryGetValue(id, out var current) ? current : unit.Stats;
                 int attack = EffectiveAttack(unit, stats.Attack);
-                yield return new KeyValuePair<string, Stats>(id, new Stats(attack, stats.Defense, stats.SpecialDefense, stats.Health));
+                yield return new KeyValuePair<string, Stats>(id,
+                    new Stats(attack, unit.StatAfterRebirth(stats.Defense), unit.StatAfterRebirth(stats.SpecialDefense), stats.Health));
             }
         }
 
@@ -377,10 +384,13 @@ namespace RaidPartyManager.Battle
         private IEnumerable<Unit> Opponents(Unit actor) =>
             units.Where(unit => unit.Input.Side != actor.Input.Side && unit.Health > 0);
 
+        private IEnumerable<Unit> DirectOpponents(Unit actor) =>
+            Opponents(actor).Where(unit => unit.CanBeTargeted);
+
         private IEnumerable<Unit> TargetableOpponents(Unit actor)
         {
-            var enemies = Opponents(actor).ToArray();
-            var guards = enemies.Where(unit => unit.Trait == CharacterTrait.DrawAttacks).ToArray();
+            var enemies = DirectOpponents(actor).ToArray();
+            var guards = enemies.Where(unit => unit.Trait == CharacterTrait.DrawAttacks && unit.Health >= unit.TraitPower).ToArray();
             if (guards.Length > 0)
                 return guards;
             var visible = enemies.Where(unit => !unit.Has(EquipmentEffect.StealthCloak)).ToArray();
@@ -609,9 +619,7 @@ namespace RaidPartyManager.Battle
             var attackGains = party.Where(unit => unit.PermanentAttack > 0)
                 .Select(unit => new KeyValuePair<string, int>(unit.Input.Id, unit.PermanentAttack));
             var potions = party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GeneratePotion);
-            int gold = (int)Math.Min((long)int.MaxValue - request.PartyGold, equipmentGold + party
-                .Where(unit => unit.Health > 0 && unit.Trait == CharacterTrait.GoldOnSurvival)
-                .Sum(unit => (long)unit.TraitPower));
+            int gold = (int)Math.Min((long)int.MaxValue - request.PartyGold, equipmentGold + request.RosterGoldReward);
             int accessories = request.ReserveAccessoryHunterCount +
                 party.Count(unit => unit.Health > 0 && unit.Trait == CharacterTrait.AccessoryOnSurvival);
             Result = new BattleResult(request.Id, outcome, health, events, partyPositions,
@@ -650,7 +658,7 @@ namespace RaidPartyManager.Battle
                 .OrderBy(unit => unit.Input.Position).FirstOrDefault();
             if (witch == null) return;
 
-            var enemies = Opponents(witch).ToLookup(unit =>
+            var enemies = DirectOpponents(witch).ToLookup(unit =>
             {
                 if (fallen.Input.Side == witch.Input.Side)
                     return fallen.Input.Position + unit.Input.Position;
@@ -692,6 +700,8 @@ namespace RaidPartyManager.Battle
                 loadout, RecordPartyStatChanges(), reach, visual, actorEnergy, skillBookId, targetEnergy, damageTaken, poisonDamage,
                 shieldAbsorbed: shieldAbsorbed, copiedTraitSource: copiedTraitSource, charmTriggered: charmTriggered,
                 equipment: equipment, intercepted: intercepted));
+            if (detail == RebirthProtection)
+                Report(BattleEventKind.Effect, target, target, "死而复生", ActionKind.Heal, visual: BattleVisualCue.Rebirth);
             if (kind == BattleEventKind.Action && action == ActionKind.Attack && actor != null)
                 ApplyGravePollen(actor, target);
             if (kind == BattleEventKind.Defeated)

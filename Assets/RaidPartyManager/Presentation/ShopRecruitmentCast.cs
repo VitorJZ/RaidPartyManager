@@ -36,7 +36,6 @@ namespace RaidPartyManager.Presentation
             public float VisibleHeight, FrontQuadHeight, FrontWidth, Elapsed;
             public float Stride;
             public int Index;
-            public bool Held;
         }
 
         internal static PoseFraming FramingFor(int rosterNumber)
@@ -115,14 +114,9 @@ namespace RaidPartyManager.Presentation
 
         private void PoseRecruit(RecruitActor actor, int seed, float delta)
         {
-            bool visible = RecruitmentFocused || focus > .1f;
-            actor.Body.enabled = visible;
-            actor.Shadow.enabled = visible && !actor.Held;
-            if (!visible) return;
             actor.Mark = RecruitMark(actor.Index);
             actor.Elapsed = Mathf.Min(ArrivalTime, actor.Elapsed + delta);
             bool walking = actor.Elapsed < ArrivalTime;
-            if (actor.Held) return;
             float progress = Mathf.SmoothStep(0, 1, actor.Elapsed / ArrivalTime);
             var foot = Vector3.Lerp(actor.Entrance, actor.Mark, progress);
             var texture = walking ? actor.Walk ?? actor.Battle : actor.Front ?? actor.Battle;
@@ -161,19 +155,15 @@ namespace RaidPartyManager.Presentation
             Pin(target, actor.Mark + new Vector3(-halfWidth, actor.VisibleHeight, 0), actor.Mark + Vector3.right * halfWidth);
         }
 
-        internal void MoveHeldRecruit(CharacterDefinition character, Vector2 viewport)
+        internal void ClearRecruitCast()
         {
-            var actor = recruitCast[character];
-            actor.Held = true;
-            var pointer = camera.ViewportToWorldPoint(new Vector3(viewport.x, viewport.y,
-                actor.Mark.z - camera.transform.position.z - .14f));
-            actor.Body.transform.position = pointer;
-            actor.Shadow.enabled = false;
-        }
-
-        internal void ReleaseRecruit(CharacterDefinition character)
-        {
-            if (recruitCast.TryGetValue(character, out var actor)) actor.Held = false;
+            foreach (var actor in recruitCast.Values)
+            {
+                actor.Body.enabled = actor.Shadow.enabled = false;
+                UnityEngine.Object.Destroy(actor.Body.gameObject);
+                UnityEngine.Object.Destroy(actor.Shadow.gameObject);
+            }
+            recruitCast.Clear();
         }
     }
 }

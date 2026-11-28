@@ -1,0 +1,1651 @@
+{
+  "日期": "2026-11-28",
+  "Unity": "6000.6.9f1",
+  "数据及运行时源码SHA256": "9d5f18ff2bd7021587a1b916d1b5d37c1557f8a661c51f718c1bf6eb6ee48893",
+  "结论口径": "固定自动运营策略的三层完整流程模拟；不是实际玩家统计，也不是理论最优策略。六组各500局，共3000局，同一组种子0至499。",
+  "规则": [
+    "随机四选二开局，100金币、两件正式开局装备",
+    "正式三层路线和战斗AI，连续生命值、战后恢复、战利品及物品消耗",
+    "人才市场按实际报价付费，招募至4人，队伍上限6人；不买卖套利",
+    "普通与城镇营地共享一次行动：休息、升阶或单属性训练；单人最多训练两次",
+    "工资与合同按当前正式版本禁用，员工属性与目标继续生效"
+  ],
+  "运营策略及限制": [
+    "不回档，不预知敌阵；城镇、营地和宝箱优先，事件优先于额外战斗",
+    "按固定角色估值和当前生命值选人、配装、学习可用技能，出售多余物品",
+    "执行拾金币、呼朋引伴、种子和可支付祭品的深海轻语事件；遗都选择可负担的必成选项",
+    "其余复杂事件保守跳过，未覆盖精细流派、完整事件解法和玩家手动指令优化"
+  ],
+  "随机性复核": "为战斗、奖励及员工随机流固定种子，并用生产方法重新生成初始员工目标；每个方案重复种子0并核对逐字段一致。",
+  "验证": {
+    "EditMode通过": 391,
+    "EditMode失败": 0,
+    "完整流程审计局数": 3000,
+    "跨进程复核": "常规运营新价的前10个种子逐字段复现一致"
+  },
+  "模拟源码": "Tools/CampaignBalanceAudit.cs",
+  "方案结果": [
+    {
+      "方案": "before",
+      "模拟局数": 500,
+      "策略": "常规运营，不提前预留祭品",
+      "基础价格范围": [
+        12,
+        90
+      ],
+      "累计通过各层": [
+        {
+          "地图": "码头",
+          "通过局数": 479,
+          "累计通过率%": 95.8,
+          "通过率95%区间": [
+            93.66,
+            97.24
+          ],
+          "抵达该层后的通过率%": 95.8
+        },
+        {
+          "地图": "低语墓园",
+          "通过局数": 404,
+          "累计通过率%": 80.8,
+          "通过率95%区间": [
+            77.12,
+            84.01
+          ],
+          "抵达该层后的通过率%": 84.3
+        },
+        {
+          "地图": "机巧遗都",
+          "通过局数": 124,
+          "累计通过率%": 24.8,
+          "通过率95%区间": [
+            21.22,
+            28.77
+          ],
+          "抵达该层后的通过率%": 30.7
+        }
+      ],
+      "平均付费招募人数": 1.724,
+      "首次城镇招募人数分布": {
+        "0": 7,
+        "1": 115,
+        "2": 373
+      },
+      "平均购买物品次数": 2.616,
+      "平均结束金币": 243.8,
+      "模拟战斗总数": 5207,
+      "深海轻语入队局数": 11,
+      "最常失败节点": [
+        {
+          "层": 3,
+          "节点": 1,
+          "次数": 133
+        },
+        {
+          "层": 2,
+          "节点": 10,
+          "次数": 33
+        },
+        {
+          "层": 3,
+          "节点": 3,
+          "次数": 32
+        },
+        {
+          "层": 3,
+          "节点": 6,
+          "次数": 22
+        },
+        {
+          "层": 3,
+          "节点": 7,
+          "次数": 19
+        },
+        {
+          "层": 3,
+          "节点": 5,
+          "次数": 18
+        }
+      ],
+      "通关示例": [
+        {
+          "Seed": 380,
+          "Starters": "篝火守夜人/秘术学徒",
+          "Gold": 113,
+          "Team": "薪火铁卫[1,HP20/20,A8,D4,S3,train0;gear:沉灯霜链+无面王冠+寻人启事+狂战士之印;skills:双人掩护+妙手回春]/灾厄吟唱者[2,HP13/13,A10,D4,S4,train2;gear:狂战士之印+贪心之手+精灵护符;skills:极度冰点+猩红收割]/堕落神侍[3,HP9/9,A6,D2,S3,train0;gear:处刑者面具+处刑者面具+生命吊坠;skills:战争咆哮]/逐星神射[4,HP7/12,A7,D2,S2,train1;gear:醉仙葫芦+巫医玩偶+浑浊的水;skills:万箭齐发+闪身步]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/HatTrick gold=111 members=2",
+            "1-3 NormalBattle/ gold=111 members=2",
+            "1-4 Camp/ gold=125 members=2",
+            "1-5 Town/ gold=125 members=2",
+            "1-5 Event/TidePact gold=20 members=4",
+            "1-6 TreasureChest/ gold=20 members=4",
+            "1-7 Camp/ gold=20 members=4",
+            "1-8 EliteBattle/ gold=20 members=4",
+            "1-9 Event/RecruitmentWheel gold=45 members=4",
+            "1-10 Boss/ gold=45 members=4",
+            "2-1 NormalBattle/ gold=64 members=4",
+            "2-2 Event/GraveSeed gold=94 members=4",
+            "2-3 Town/ gold=94 members=4",
+            "2-4 TreasureChest/ gold=9 members=4",
+            "2-5 Camp/ gold=9 members=4",
+            "2-6 EliteBattle/ gold=9 members=4",
+            "2-7 NormalBattle/ gold=42 members=4",
+            "2-8 Event/DeadLetters gold=72 members=4",
+            "2-9 Camp/ gold=72 members=4",
+            "2-10 Boss/ gold=72 members=4",
+            "3-1 NormalBattle/ gold=92 members=4",
+            "3-2 Event/GoldStandard gold=132 members=5",
+            "3-3 Event/LastMeridian gold=147 members=5",
+            "3-4 NormalBattle/ gold=166 members=5",
+            "3-5 Camp/ gold=200 members=5",
+            "3-6 Town/ gold=200 members=5",
+            "3-7 TreasureChest/ gold=42 members=5",
+            "3-8 EliteBattle/ gold=42 members=5",
+            "3-9 Camp/ gold=79 members=5",
+            "3-10 Boss/ gold=79 members=5"
+          ]
+        },
+        {
+          "Seed": 241,
+          "Starters": "英勇士兵/晨曦圣女",
+          "Gold": 146,
+          "Team": "残晖骑士[1,HP12/15,A8,D2,S4,train2;gear:沉灯霜链+冷魂圣匣+寒冰戒指;skills:血肉盛宴+横扫千军]/灾厄吟唱者[2,HP12/13,A7,D2,S3,train2;gear:疾风手套+火焰戒指;skills:星陨术+闪电鞭]/堕落神侍[3,HP6/6,A7,D2,S4,train1;gear:醉仙葫芦+精钢壁垒+余响圣杯;skills:毒瘴爆发+血肉盛宴]/神恩主祭[4,HP15/15,A4,D3,S2,train0;gear:洞察图腾+感电棱镜+绝缘灵珠;skills:]/墓园花匠[bench,HP15/15,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=109 members=2",
+            "1-3 TreasureChest/ gold=109 members=2",
+            "1-4 Town/ gold=109 members=2",
+            "1-4 Event/TidePact gold=27 members=4",
+            "1-5 Camp/ gold=27 members=4",
+            "1-6 EliteBattle/ gold=27 members=4",
+            "1-7 NormalBattle/ gold=52 members=4",
+            "1-8 NormalBattle/ gold=73 members=4",
+            "1-9 Camp/ gold=90 members=4",
+            "1-10 Boss/ gold=90 members=4",
+            "2-1 NormalBattle/ gold=110 members=4",
+            "2-2 Event/GraveSeed gold=142 members=4",
+            "2-3 TreasureChest/ gold=142 members=4",
+            "2-4 NormalBattle/ gold=142 members=4",
+            "2-5 Event/WhisperWall gold=172 members=4",
+            "2-6 Camp/ gold=172 members=4",
+            "2-7 Camp/ gold=172 members=4",
+            "2-8 Town/ gold=172 members=4",
+            "2-9 EliteBattle/ gold=9 members=4",
+            "2-10 Boss/ gold=39 members=4",
+            "3-1 NormalBattle/ gold=62 members=4",
+            "3-2 Event/WrongSwitch gold=101 members=4",
+            "3-3 Town/ gold=112 members=4",
+            "3-4 TreasureChest/ gold=40 members=4",
+            "3-5 Camp/ gold=40 members=4",
+            "3-6 Event/WaterCharter gold=40 members=4",
+            "3-7 NormalBattle/ gold=40 members=4",
+            "3-8 Camp/ gold=76 members=5",
+            "3-9 EliteBattle/ gold=76 members=5",
+            "3-10 Boss/ gold=115 members=5"
+          ]
+        },
+        {
+          "Seed": 298,
+          "Starters": "篝火守夜人/晨曦圣女",
+          "Gold": 147,
+          "Team": "薪火铁卫[1,HP20/20,A5,D4,S3,train0;gear:沉灯霜链+冷魂圣匣+寻人启事;skills:战争咆哮+妙手回春]/灾厄吟唱者[2,HP13/13,A12,D3,S3,train2;gear:魔导水晶+狂战士之印+精灵护符+精灵护符;skills:战争咆哮+坚如磐石]/堕落神侍[3,HP9/9,A6,D2,S3,train2;gear:圣愈戒指+圣愈戒指+元素石英;skills:横扫千军]/神恩主祭[4,HP12/12,A5,D3,S2,train2;gear:绝缘灵珠+红水晶吊坠+传话筒+短弓;skills:拔毒急救]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=112 members=2",
+            "1-3 NormalBattle/ gold=112 members=2",
+            "1-4 Town/ gold=124 members=2",
+            "1-4 Event/TidePact gold=18 members=4",
+            "1-5 Camp/ gold=18 members=4",
+            "1-6 TreasureChest/ gold=18 members=4",
+            "1-7 Camp/ gold=18 members=4",
+            "1-8 EliteBattle/ gold=18 members=4",
+            "1-9 NormalBattle/ gold=43 members=4",
+            "1-10 Boss/ gold=60 members=4",
+            "2-1 NormalBattle/ gold=81 members=4",
+            "2-2 Event/GraveSeed gold=107 members=4",
+            "2-3 Town/ gold=107 members=4",
+            "2-4 TreasureChest/ gold=4 members=4",
+            "2-5 Camp/ gold=4 members=4",
+            "2-6 NormalBattle/ gold=4 members=4",
+            "2-7 EliteBattle/ gold=33 members=4",
+            "2-8 Event/WhisperWall gold=62 members=4",
+            "2-9 Camp/ gold=62 members=4",
+            "2-10 Boss/ gold=62 members=4",
+            "3-1 NormalBattle/ gold=85 members=5",
+            "3-2 Event/ClinicQueue gold=127 members=5",
+            "3-3 NormalBattle/ gold=127 members=5",
+            "3-4 Event/TimeOffice gold=165 members=5",
+            "3-5 Camp/ gold=165 members=5",
+            "3-6 TreasureChest/ gold=165 members=5",
+            "3-7 Town/ gold=165 members=5",
+            "3-8 Camp/ gold=74 members=5",
+            "3-9 EliteBattle/ gold=74 members=5",
+            "3-10 Boss/ gold=117 members=5"
+          ]
+        }
+      ]
+    },
+    {
+      "方案": "higher",
+      "模拟局数": 500,
+      "策略": "常规运营，不提前预留祭品",
+      "基础价格范围": [
+        75,
+        140
+      ],
+      "累计通过各层": [
+        {
+          "地图": "码头",
+          "通过局数": 404,
+          "累计通过率%": 80.8,
+          "通过率95%区间": [
+            77.12,
+            84.01
+          ],
+          "抵达该层后的通过率%": 80.8
+        },
+        {
+          "地图": "低语墓园",
+          "通过局数": 247,
+          "累计通过率%": 49.4,
+          "通过率95%区间": [
+            45.04,
+            53.77
+          ],
+          "抵达该层后的通过率%": 61.1
+        },
+        {
+          "地图": "机巧遗都",
+          "通过局数": 57,
+          "累计通过率%": 11.4,
+          "通过率95%区间": [
+            8.9,
+            14.48
+          ],
+          "抵达该层后的通过率%": 23.1
+        }
+      ],
+      "平均付费招募人数": 1.262,
+      "首次城镇招募人数分布": {
+        "0": 32,
+        "1": 463
+      },
+      "平均购买物品次数": 0.854,
+      "平均结束金币": 143.3,
+      "模拟战斗总数": 4092,
+      "深海轻语入队局数": 10,
+      "最常失败节点": [
+        {
+          "层": 3,
+          "节点": 1,
+          "次数": 115
+        },
+        {
+          "层": 1,
+          "节点": 10,
+          "次数": 46
+        },
+        {
+          "层": 2,
+          "节点": 1,
+          "次数": 38
+        },
+        {
+          "层": 2,
+          "节点": 10,
+          "次数": 30
+        },
+        {
+          "层": 3,
+          "节点": 3,
+          "次数": 23
+        },
+        {
+          "层": 2,
+          "节点": 3,
+          "次数": 22
+        }
+      ],
+      "通关示例": [
+        {
+          "Seed": 185,
+          "Starters": "篝火守夜人/晨曦圣女",
+          "Gold": 129,
+          "Team": "薪火铁卫[1,HP23/23,A6,D4,S3,train0;gear:沉灯霜链+冷魂圣匣+寻人启事;skills:妙手回春+战争咆哮]/残晖骑士[2,HP15/15,A8,D2,S3,train2;gear:寒冰戒指+处刑者面具+圣愈戒指;skills:坚如磐石]/灾厄吟唱者[3,HP10/10,A7,D3,S2,train2;gear:魔导水晶+余响圣杯+余响圣杯;skills:熊熊烈火+星陨术]/神恩主祭[4,HP15/15,A4,D2,S2,train1;gear:鹰眼石+永恒之火+红水晶吊坠;skills:妙手回春]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/LostTraveler gold=109 members=2",
+            "1-3 Town/ gold=109 members=3",
+            "1-3 Event/TidePact gold=66 members=3",
+            "1-4 Camp/ gold=66 members=3",
+            "1-5 NormalBattle/ gold=66 members=3",
+            "1-6 Event/LockedChest gold=88 members=3",
+            "1-7 Camp/ gold=88 members=3",
+            "1-8 TreasureChest/ gold=88 members=3",
+            "1-9 EliteBattle/ gold=86 members=3",
+            "1-10 Boss/ gold=106 members=3",
+            "2-1 NormalBattle/ gold=125 members=3",
+            "2-2 Town/ gold=154 members=3",
+            "2-3 Event/HoundWalk gold=11 members=4",
+            "2-4 Camp/ gold=11 members=4",
+            "2-5 EliteBattle/ gold=11 members=4",
+            "2-6 TreasureChest/ gold=48 members=4",
+            "2-7 Event/RecruitmentWheel gold=48 members=4",
+            "2-8 Camp/ gold=48 members=4",
+            "2-9 NormalBattle/ gold=48 members=4",
+            "2-10 Boss/ gold=78 members=4",
+            "3-1 NormalBattle/ gold=100 members=4",
+            "3-2 Event/TimeOffice gold=139 members=4",
+            "3-3 Event/FareGate gold=139 members=4",
+            "3-4 Camp/ gold=148 members=4",
+            "3-5 Town/ gold=148 members=4",
+            "3-6 TreasureChest/ gold=17 members=4",
+            "3-7 NormalBattle/ gold=17 members=4",
+            "3-8 Camp/ gold=54 members=4",
+            "3-9 EliteBattle/ gold=54 members=4",
+            "3-10 Boss/ gold=95 members=4"
+          ]
+        },
+        {
+          "Seed": 202,
+          "Starters": "篝火守夜人/晨曦圣女",
+          "Gold": 133,
+          "Team": "薪火铁卫[1,HP23/23,A6,D5,S4,train1;gear:封港信笛+无面王冠+精灵护符+精灵护符;skills:妙手回春+战争咆哮]/逐星神射[2,HP13/13,A7,D1,S2,train2;gear:古树根茎+疾风手套+醉仙葫芦;skills:万箭齐发+闪身步]/灾厄吟唱者[3,HP13/13,A8,D2,S3,train2;gear:魔导水晶+浑浊的水+感电棱镜;skills:熊熊烈火+猩红收割]/神恩主祭[4,HP12/12,A5,D2,S2,train0;gear:感电棱镜;skills:]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Town/ gold=122 members=2",
+            "1-2 Event/TidePact gold=33 members=3",
+            "1-3 Event/HatTrick gold=33 members=3",
+            "1-4 Camp/ gold=33 members=3",
+            "1-5 NormalBattle/ gold=33 members=3",
+            "1-6 Event/Investor gold=51 members=3",
+            "1-7 TreasureChest/ gold=51 members=3",
+            "1-8 Camp/ gold=51 members=3",
+            "1-9 EliteBattle/ gold=51 members=3",
+            "1-10 Boss/ gold=75 members=3",
+            "2-1 NormalBattle/ gold=90 members=3",
+            "2-2 Event/GraveSeed gold=119 members=3",
+            "2-3 NormalBattle/ gold=119 members=3",
+            "2-4 Camp/ gold=149 members=3",
+            "2-5 TreasureChest/ gold=149 members=3",
+            "2-6 Town/ gold=149 members=3",
+            "2-7 EliteBattle/ gold=3 members=4",
+            "2-8 Event/Epitaph gold=35 members=4",
+            "2-9 Camp/ gold=35 members=4",
+            "2-10 Boss/ gold=35 members=4",
+            "3-1 NormalBattle/ gold=55 members=4",
+            "3-2 Event/TimeOffice gold=94 members=5",
+            "3-3 Event/ClinicQueue gold=94 members=5",
+            "3-4 TreasureChest/ gold=94 members=5",
+            "3-5 Camp/ gold=94 members=5",
+            "3-6 Town/ gold=94 members=5",
+            "3-7 Camp/ gold=28 members=5",
+            "3-8 EliteBattle/ gold=28 members=5",
+            "3-9 NormalBattle/ gold=66 members=5",
+            "3-10 Boss/ gold=106 members=5"
+          ]
+        },
+        {
+          "Seed": 451,
+          "Starters": "篝火守夜人/晨曦圣女",
+          "Gold": 137,
+          "Team": "薪火铁卫[1,HP25/25,A6,D5,S3,train1;gear:封港信笛+无面王冠+寒冰戒指+疾风手套;skills:血肉盛宴+妙手回春]/重盾铁卫[2,HP15/15,A7,D6,S4,train2;gear:狂战士之印+贪心之手+圣愈戒指;skills:]/焚星魔导师[3,HP11/11,A7,D3,S4,train0;gear:生命吊坠+醉仙葫芦+余响圣杯+独狼石雕;skills:熊熊烈火]/神恩主祭[4,HP12/12,A5,D4,S4,train2;gear:万能药瓶+传话筒+绝缘灵珠;skills:妙手回春]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/Ambush gold=109 members=2",
+            "1-3 TreasureChest/ gold=109 members=2",
+            "1-4 Camp/ gold=109 members=2",
+            "1-5 Event/Investor gold=109 members=2",
+            "1-6 NormalBattle/ gold=109 members=2",
+            "1-7 Town/ gold=118 members=2",
+            "1-7 Event/TidePact gold=26 members=3",
+            "1-8 EliteBattle/ gold=26 members=3",
+            "1-9 Camp/ gold=52 members=3",
+            "1-10 Boss/ gold=52 members=3",
+            "2-1 NormalBattle/ gold=70 members=3",
+            "2-2 Event/GraveSeed gold=100 members=3",
+            "2-3 Event/BellRope gold=100 members=3",
+            "2-4 Town/ gold=100 members=3",
+            "2-5 EliteBattle/ gold=7 members=4",
+            "2-6 Camp/ gold=41 members=4",
+            "2-7 TreasureChest/ gold=41 members=4",
+            "2-8 NormalBattle/ gold=41 members=4",
+            "2-9 Camp/ gold=72 members=4",
+            "2-10 Boss/ gold=72 members=4",
+            "3-1 NormalBattle/ gold=93 members=4",
+            "3-2 Event/TimeOffice gold=133 members=5",
+            "3-3 Event/WaterCharter gold=133 members=5",
+            "3-4 NormalBattle/ gold=133 members=5",
+            "3-5 Camp/ gold=172 members=5",
+            "3-6 EliteBattle/ gold=172 members=5",
+            "3-7 TreasureChest/ gold=211 members=5",
+            "3-8 Town/ gold=211 members=5",
+            "3-9 Camp/ gold=108 members=5",
+            "3-10 Boss/ gold=108 members=5"
+          ]
+        }
+      ]
+    },
+    {
+      "方案": "premium",
+      "模拟局数": 500,
+      "策略": "常规运营，不提前预留祭品",
+      "基础价格范围": [
+        90,
+        168
+      ],
+      "累计通过各层": [
+        {
+          "地图": "码头",
+          "通过局数": 362,
+          "累计通过率%": 72.4,
+          "通过率95%区间": [
+            68.32,
+            76.14
+          ],
+          "抵达该层后的通过率%": 72.4
+        },
+        {
+          "地图": "低语墓园",
+          "通过局数": 196,
+          "累计通过率%": 39.2,
+          "通过率95%区间": [
+            35.02,
+            43.55
+          ],
+          "抵达该层后的通过率%": 54.1
+        },
+        {
+          "地图": "机巧遗都",
+          "通过局数": 42,
+          "累计通过率%": 8.4,
+          "通过率95%区间": [
+            6.27,
+            11.16
+          ],
+          "抵达该层后的通过率%": 21.4
+        }
+      ],
+      "平均付费招募人数": 0.944,
+      "首次城镇招募人数分布": {
+        "0": 172,
+        "1": 323
+      },
+      "平均购买物品次数": 0.83,
+      "平均结束金币": 143.0,
+      "模拟战斗总数": 3676,
+      "深海轻语入队局数": 10,
+      "最常失败节点": [
+        {
+          "层": 3,
+          "节点": 1,
+          "次数": 95
+        },
+        {
+          "层": 2,
+          "节点": 1,
+          "次数": 56
+        },
+        {
+          "层": 1,
+          "节点": 10,
+          "次数": 55
+        },
+        {
+          "层": 2,
+          "节点": 10,
+          "次数": 26
+        },
+        {
+          "层": 1,
+          "节点": 8,
+          "次数": 24
+        },
+        {
+          "层": 2,
+          "节点": 3,
+          "次数": 20
+        }
+      ],
+      "通关示例": [
+        {
+          "Seed": 107,
+          "Starters": "英勇士兵/晨曦圣女",
+          "Gold": 106,
+          "Team": "余烬斗士[1,HP15/15,A11,D3,S4,train1;gear:沉灯霜链+无面王冠+狂战士之印+处刑者面具;skills:猩红收割+金钟罩]/残晖骑士[2,HP15/15,A10,D3,S4,train2;gear:精钢壁垒+巫医玩偶+祈风铃+雷神之眼;skills:铜墙反震+战争咆哮]/神恩主祭[3,HP15/15,A5,D2,S4,train2;gear:元素石英+狮王金雕+古树根茎;skills:]/星罗[4,HP14/14,A5,D2,S1,train0;gear:打狗棒+守护者之旗;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=111 members=2",
+            "1-3 NormalBattle/ gold=111 members=2",
+            "1-4 Camp/ gold=123 members=2",
+            "1-5 TreasureChest/ gold=123 members=2",
+            "1-6 EliteBattle/ gold=123 members=2",
+            "1-7 Camp/ gold=134 members=2",
+            "1-8 Town/ gold=134 members=2",
+            "1-8 Event/TidePact gold=11 members=3",
+            "1-9 Event/AscensionTrial gold=11 members=3",
+            "1-10 Boss/ gold=11 members=3",
+            "2-1 NormalBattle/ gold=29 members=3",
+            "2-2 Town/ gold=60 members=3",
+            "2-3 NormalBattle/ gold=71 members=3",
+            "2-4 Camp/ gold=98 members=3",
+            "2-5 EliteBattle/ gold=98 members=3",
+            "2-6 TreasureChest/ gold=130 members=3",
+            "2-7 Camp/ gold=130 members=3",
+            "2-8 NormalBattle/ gold=130 members=3",
+            "2-9 Event/Auction gold=156 members=3",
+            "2-10 Boss/ gold=156 members=3",
+            "3-1 NormalBattle/ gold=183 members=3",
+            "3-2 Event/WrongSwitch gold=220 members=3",
+            "3-3 Event/WaterCharter gold=231 members=3",
+            "3-4 NormalBattle/ gold=231 members=3",
+            "3-5 Town/ gold=268 members=3",
+            "3-6 Camp/ gold=40 members=4",
+            "3-7 TreasureChest/ gold=40 members=4",
+            "3-8 EliteBattle/ gold=40 members=4",
+            "3-9 Camp/ gold=78 members=4",
+            "3-10 Boss/ gold=78 members=4"
+          ]
+        },
+        {
+          "Seed": 373,
+          "Starters": "英勇士兵/晨曦圣女",
+          "Gold": 139,
+          "Team": "残晖骑士[1,HP15/15,A8,D5,S4,train2;gear:沉灯霜链+冷魂圣匣+寻人启事;skills:妙手回春+铜墙反震]/幽林守望者[2,HP8/13,A10,D2,S3,train1;gear:狂战士之印+雷电戒指+生命吊坠;skills:闪身步+坚如磐石]/堕落神侍[3,HP6/6,A6,D4,S6,train0;gear:精钢壁垒+精钢壁垒+精钢壁垒;skills:血肉盛宴]/神恩主祭[4,HP12/12,A5,D3,S3,train2;gear:感电棱镜+红水晶吊坠+绝缘灵珠;skills:妙手回春]/墓园花匠[bench,HP13/13,A6,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Town/ gold=114 members=2",
+            "1-2 Event/TidePact gold=13 members=3",
+            "1-3 NormalBattle/ gold=13 members=3",
+            "1-4 Camp/ gold=39 members=3",
+            "1-5 EliteBattle/ gold=39 members=3",
+            "1-6 TreasureChest/ gold=65 members=3",
+            "1-7 Event/Investor gold=65 members=3",
+            "1-8 Camp/ gold=65 members=3",
+            "1-9 Event/Alchemist gold=65 members=3",
+            "1-10 Boss/ gold=65 members=3",
+            "2-1 NormalBattle/ gold=84 members=3",
+            "2-2 Event/GraveSeed gold=114 members=3",
+            "2-3 NormalBattle/ gold=114 members=3",
+            "2-4 Event/Obituary gold=142 members=3",
+            "2-5 TreasureChest/ gold=142 members=3",
+            "2-6 Camp/ gold=142 members=3",
+            "2-7 Camp/ gold=142 members=3",
+            "2-8 Town/ gold=142 members=3",
+            "2-9 EliteBattle/ gold=6 members=4",
+            "2-10 Boss/ gold=36 members=4",
+            "3-1 NormalBattle/ gold=57 members=5",
+            "3-2 Event/RecruitmentWheel gold=93 members=5",
+            "3-3 Town/ gold=93 members=5",
+            "3-4 TreasureChest/ gold=27 members=5",
+            "3-5 NormalBattle/ gold=27 members=5",
+            "3-6 Camp/ gold=65 members=5",
+            "3-7 Camp/ gold=65 members=5",
+            "3-8 Event/WaterCharter gold=65 members=5",
+            "3-9 EliteBattle/ gold=65 members=5",
+            "3-10 Boss/ gold=107 members=5"
+          ]
+        },
+        {
+          "Seed": 172,
+          "Starters": "英勇士兵/白羽弓手",
+          "Gold": 181,
+          "Team": "薪火铁卫[1,HP20/20,A5,D4,S3,train0;gear:冷魂圣匣+处刑者面具;skills:横扫千军]/残晖骑士[2,HP15/15,A12,D2,S3,train1;gear:封港信笛+寒冰戒指+狂战士之印+万能药瓶;skills:猩红收割+坚如磐石]/天弓[3,HP8/14,A9,D4,S1,train2;gear:疾风手套+岩石铠甲+醉仙葫芦;skills:闪身步]/时序秘法师[4,HP6/10,A5,D0,S3,train0;gear:魔导水晶+浑浊的水+独狼石雕;skills:]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:红绳;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/Ambush gold=111 members=2",
+            "1-3 NormalBattle/ gold=111 members=2",
+            "1-4 Event/LockedChest gold=120 members=2",
+            "1-5 Camp/ gold=120 members=2",
+            "1-6 TreasureChest/ gold=120 members=2",
+            "1-7 EliteBattle/ gold=120 members=2",
+            "1-8 Camp/ gold=130 members=2",
+            "1-9 Town/ gold=130 members=2",
+            "1-9 Event/TidePact gold=19 members=3",
+            "1-10 Boss/ gold=19 members=3",
+            "2-1 NormalBattle/ gold=38 members=3",
+            "2-2 Event/GraveSeed gold=68 members=3",
+            "2-3 NormalBattle/ gold=68 members=3",
+            "2-4 Camp/ gold=101 members=3",
+            "2-5 EliteBattle/ gold=101 members=3",
+            "2-6 NormalBattle/ gold=133 members=3",
+            "2-7 TreasureChest/ gold=164 members=3",
+            "2-8 Town/ gold=164 members=3",
+            "2-9 Camp/ gold=11 members=4",
+            "2-10 Boss/ gold=11 members=4",
+            "3-1 NormalBattle/ gold=36 members=4",
+            "3-2 Event/TimeOffice gold=75 members=5",
+            "3-3 Town/ gold=75 members=5",
+            "3-4 Camp/ gold=75 members=5",
+            "3-5 Event/BoilerUnion gold=75 members=5",
+            "3-6 TreasureChest/ gold=67 members=5",
+            "3-7 Camp/ gold=67 members=5",
+            "3-8 NormalBattle/ gold=67 members=5",
+            "3-9 EliteBattle/ gold=108 members=5",
+            "3-10 Boss/ gold=152 members=5"
+          ]
+        }
+      ]
+    },
+    {
+      "方案": "selected",
+      "模拟局数": 500,
+      "策略": "常规运营，不提前预留祭品",
+      "基础价格范围": [
+        60,
+        115
+      ],
+      "累计通过各层": [
+        {
+          "地图": "码头",
+          "通过局数": 436,
+          "累计通过率%": 87.2,
+          "通过率95%区间": [
+            83.99,
+            89.85
+          ],
+          "抵达该层后的通过率%": 87.2
+        },
+        {
+          "地图": "低语墓园",
+          "通过局数": 308,
+          "累计通过率%": 61.6,
+          "通过率95%区间": [
+            57.26,
+            65.76
+          ],
+          "抵达该层后的通过率%": 70.6
+        },
+        {
+          "地图": "机巧遗都",
+          "通过局数": 67,
+          "累计通过率%": 13.4,
+          "通过率95%区间": [
+            10.69,
+            16.67
+          ],
+          "抵达该层后的通过率%": 21.8
+        }
+      ],
+      "平均付费招募人数": 1.39,
+      "首次城镇招募人数分布": {
+        "0": 8,
+        "1": 486,
+        "2": 1
+      },
+      "平均购买物品次数": 1.142,
+      "平均结束金币": 158.5,
+      "模拟战斗总数": 4479,
+      "深海轻语入队局数": 11,
+      "最常失败节点": [
+        {
+          "层": 3,
+          "节点": 1,
+          "次数": 121
+        },
+        {
+          "层": 1,
+          "节点": 10,
+          "次数": 34
+        },
+        {
+          "层": 2,
+          "节点": 1,
+          "次数": 33
+        },
+        {
+          "层": 3,
+          "节点": 3,
+          "次数": 27
+        },
+        {
+          "层": 3,
+          "节点": 6,
+          "次数": 21
+        },
+        {
+          "层": 2,
+          "节点": 3,
+          "次数": 20
+        }
+      ],
+      "通关示例": [
+        {
+          "Seed": 134,
+          "Starters": "重甲战士/晨曦圣女",
+          "Gold": 105,
+          "Team": "重盾铁卫[1,HP21/21,A5,D6,S3,train2;gear:封港信笛+无面王冠+寒冰戒指;skills:铜墙反震+金钟罩]/幽雾炼药师[2,HP13/13,A23,D6,S3,train1;gear:贪心之手+狂战士之印+疾风手套;skills:饮鸩强袭]/时序秘法师[3,HP13/13,A23,D3,S3,train2;gear:魔导水晶+疾风手套+传国玉玺;skills:战争咆哮+妙手回春]/神恩主祭[4,HP15/15,A5,D3,S2,train2;gear:醉仙葫芦+绝缘灵珠+巫医玩偶;skills:妙手回春]/墓园花匠[bench,HP13/13,A5,D1,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=108 members=2",
+            "1-3 Event/Ambush gold=108 members=2",
+            "1-4 NormalBattle/ gold=108 members=2",
+            "1-5 Camp/ gold=119 members=2",
+            "1-6 Town/ gold=119 members=2",
+            "1-6 Event/TidePact gold=21 members=3",
+            "1-7 TreasureChest/ gold=21 members=3",
+            "1-8 EliteBattle/ gold=21 members=3",
+            "1-9 Camp/ gold=43 members=3",
+            "1-10 Boss/ gold=43 members=3",
+            "2-1 NormalBattle/ gold=60 members=3",
+            "2-2 Event/GraveSeed gold=87 members=3",
+            "2-3 NormalBattle/ gold=87 members=3",
+            "2-4 TreasureChest/ gold=116 members=3",
+            "2-5 Town/ gold=116 members=3",
+            "2-6 Camp/ gold=20 members=4",
+            "2-7 Event/DeadLetters gold=20 members=4",
+            "2-8 EliteBattle/ gold=20 members=4",
+            "2-9 Camp/ gold=51 members=4",
+            "2-10 Boss/ gold=51 members=4",
+            "3-1 NormalBattle/ gold=74 members=4",
+            "3-2 Event/LastMeridian gold=116 members=4",
+            "3-3 Event/ClinicQueue gold=135 members=4",
+            "3-4 Camp/ gold=135 members=4",
+            "3-5 NormalBattle/ gold=135 members=4",
+            "3-6 TreasureChest/ gold=171 members=5",
+            "3-7 EliteBattle/ gold=171 members=5",
+            "3-8 Town/ gold=212 members=5",
+            "3-9 Camp/ gold=72 members=5",
+            "3-10 Boss/ gold=72 members=5"
+          ]
+        },
+        {
+          "Seed": 172,
+          "Starters": "英勇士兵/白羽弓手",
+          "Gold": 144,
+          "Team": "残晖骑士[1,HP11/15,A9,D3,S3,train2;gear:封港信笛+冷魂圣匣+寒冰戒指+浑浊的水;skills:猩红收割+坚如磐石]/天弓[2,HP8/14,A12,D4,S1,train2;gear:寻人启事+狂战士之印+岩石铠甲;skills:]/堕落神侍[3,HP5/6,A7,D1,S3,train0;gear:处刑者面具+醉仙葫芦+万能药瓶;skills:]/星罗[4,HP14/14,A6,D1,S1,train0;gear:魔导水晶+魔导水晶+疾风手套;skills:]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/Ambush gold=111 members=2",
+            "1-3 NormalBattle/ gold=111 members=2",
+            "1-4 Event/LockedChest gold=120 members=2",
+            "1-5 Camp/ gold=120 members=2",
+            "1-6 TreasureChest/ gold=120 members=2",
+            "1-7 EliteBattle/ gold=120 members=2",
+            "1-8 Camp/ gold=130 members=2",
+            "1-9 Town/ gold=130 members=2",
+            "1-9 Event/TidePact gold=9 members=3",
+            "1-10 Boss/ gold=9 members=3",
+            "2-1 NormalBattle/ gold=28 members=3",
+            "2-2 Event/GraveSeed gold=58 members=3",
+            "2-3 NormalBattle/ gold=58 members=3",
+            "2-4 Camp/ gold=91 members=3",
+            "2-5 EliteBattle/ gold=91 members=3",
+            "2-6 NormalBattle/ gold=123 members=3",
+            "2-7 TreasureChest/ gold=154 members=3",
+            "2-8 Town/ gold=154 members=3",
+            "2-9 Camp/ gold=4 members=4",
+            "2-10 Boss/ gold=4 members=4",
+            "3-1 NormalBattle/ gold=29 members=4",
+            "3-2 Event/TimeOffice gold=68 members=5",
+            "3-3 Town/ gold=68 members=5",
+            "3-4 Camp/ gold=34 members=5",
+            "3-5 Event/RecruitmentWheel gold=34 members=5",
+            "3-6 TreasureChest/ gold=34 members=5",
+            "3-7 Camp/ gold=34 members=5",
+            "3-8 NormalBattle/ gold=34 members=5",
+            "3-9 EliteBattle/ gold=72 members=5",
+            "3-10 Boss/ gold=110 members=5"
+          ]
+        },
+        {
+          "Seed": 127,
+          "Starters": "篝火守夜人/晨曦圣女",
+          "Gold": 156,
+          "Team": "薪火铁卫[1,HP26/26,A6,D5,S3,train1;gear:沉灯霜链+冷魂圣匣+寒冰戒指+寻人启事;skills:双人掩护+血肉盛宴]/残晖骑士[2,HP12/12,A12,D3,S3,train2;gear:寻人启事+狂战士之印+生命吊坠;skills:]/幽林守望者[3,HP13/13,A7,D2,S2,train0;gear:圣愈戒指+余响圣杯+余响圣杯;skills:穿云箭+闪身步]/神恩主祭[4,HP12/12,A5,D3,S3,train2;gear:岩石铠甲+独狼石雕+短弓;skills:妙手回春]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/HatTrick gold=108 members=2",
+            "1-3 NormalBattle/ gold=108 members=2",
+            "1-4 Town/ gold=119 members=2",
+            "1-4 Event/TidePact gold=26 members=3",
+            "1-5 Camp/ gold=26 members=3",
+            "1-6 NormalBattle/ gold=26 members=3",
+            "1-7 TreasureChest/ gold=44 members=3",
+            "1-8 EliteBattle/ gold=44 members=3",
+            "1-9 Camp/ gold=65 members=3",
+            "1-10 Boss/ gold=65 members=3",
+            "2-1 NormalBattle/ gold=81 members=3",
+            "2-2 Event/GraveSeed gold=113 members=3",
+            "2-3 NormalBattle/ gold=113 members=3",
+            "2-4 Camp/ gold=137 members=3",
+            "2-5 TreasureChest/ gold=137 members=3",
+            "2-6 Event/Obituary gold=137 members=3",
+            "2-7 Camp/ gold=137 members=3",
+            "2-8 EliteBattle/ gold=137 members=3",
+            "2-9 Town/ gold=171 members=3",
+            "2-10 Boss/ gold=28 members=4",
+            "3-1 NormalBattle/ gold=56 members=4",
+            "3-2 Town/ gold=93 members=5",
+            "3-3 Event/TimeOffice gold=7 members=5",
+            "3-4 NormalBattle/ gold=7 members=5",
+            "3-5 TreasureChest/ gold=45 members=5",
+            "3-6 Camp/ gold=45 members=5",
+            "3-7 EliteBattle/ gold=45 members=5",
+            "3-8 Camp/ gold=87 members=5",
+            "3-9 NormalBattle/ gold=87 members=5",
+            "3-10 Boss/ gold=122 members=5"
+          ]
+        }
+      ]
+    },
+    {
+      "方案": "prepared-before",
+      "模拟局数": 500,
+      "策略": "预留祭品，在城镇优先购买祭品技能书",
+      "基础价格范围": [
+        12,
+        90
+      ],
+      "累计通过各层": [
+        {
+          "地图": "码头",
+          "通过局数": 472,
+          "累计通过率%": 94.4,
+          "通过率95%区间": [
+            92.03,
+            96.1
+          ],
+          "抵达该层后的通过率%": 94.4
+        },
+        {
+          "地图": "低语墓园",
+          "通过局数": 381,
+          "累计通过率%": 76.2,
+          "通过率95%区间": [
+            72.28,
+            79.72
+          ],
+          "抵达该层后的通过率%": 80.7
+        },
+        {
+          "地图": "机巧遗都",
+          "通过局数": 97,
+          "累计通过率%": 19.4,
+          "通过率95%区间": [
+            16.17,
+            23.09
+          ],
+          "抵达该层后的通过率%": 25.5
+        }
+      ],
+      "平均付费招募人数": 1.652,
+      "首次城镇招募人数分布": {
+        "0": 7,
+        "1": 150,
+        "2": 338
+      },
+      "平均购买物品次数": 2.536,
+      "平均结束金币": 223.1,
+      "模拟战斗总数": 5031,
+      "深海轻语入队局数": 495,
+      "最常失败节点": [
+        {
+          "层": 3,
+          "节点": 1,
+          "次数": 133
+        },
+        {
+          "层": 3,
+          "节点": 3,
+          "次数": 30
+        },
+        {
+          "层": 2,
+          "节点": 10,
+          "次数": 30
+        },
+        {
+          "层": 3,
+          "节点": 6,
+          "次数": 26
+        },
+        {
+          "层": 3,
+          "节点": 5,
+          "次数": 22
+        },
+        {
+          "层": 1,
+          "节点": 10,
+          "次数": 19
+        }
+      ],
+      "通关示例": [
+        {
+          "Seed": 143,
+          "Starters": "篝火守夜人/情报官",
+          "Gold": 128,
+          "Team": "薪火铁卫[1,HP20/20,A5,D5,S5,train2;gear:沉灯霜链+冷魂圣匣+摇钱树枝;skills:坚如磐石+猩红收割]/地煞[2,HP11/11,A10,D4,S2,train2;gear:狂战士之印+精灵护符+精灵护符+处刑者面具;skills:血肉盛宴+横扫千军]/灾厄吟唱者[3,HP16/16,A7,D3,S2,train2;gear:圣愈戒指+火焰戒指+生命吊坠;skills:熊熊烈火+妙手回春]/墓园花匠[4,HP15/15,A5,D0,S0,train0;gear:红水晶吊坠;skills:]/情报官[bench,HP7/12,A5,D2,S3,train2;gear:精钢壁垒+巫医玩偶+传话筒;skills:火眼金睛]/深海轻语[bench,HP9/15,A6,D2,S2,train0;gear:精钢壁垒+余响圣杯+传话筒;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/FoundCoins gold=109 members=2",
+            "1-3 Event/HatTrick gold=121 members=2",
+            "1-4 NormalBattle/ gold=121 members=2",
+            "1-5 Camp/ gold=135 members=2",
+            "1-6 Town/ gold=135 members=2",
+            "1-6 Event/TidePact gold=14 members=4",
+            "1-7 Camp/ gold=14 members=5",
+            "1-8 TreasureChest/ gold=14 members=5",
+            "1-9 EliteBattle/ gold=14 members=5",
+            "1-10 Boss/ gold=39 members=5",
+            "2-1 NormalBattle/ gold=54 members=5",
+            "2-2 Event/GraveSeed gold=87 members=5",
+            "2-3 TreasureChest/ gold=87 members=5",
+            "2-4 Event/Auction gold=87 members=5",
+            "2-5 EliteBattle/ gold=87 members=5",
+            "2-6 Camp/ gold=119 members=5",
+            "2-7 Camp/ gold=119 members=5",
+            "2-8 NormalBattle/ gold=119 members=5",
+            "2-9 Town/ gold=149 members=5",
+            "2-10 Boss/ gold=30 members=5",
+            "3-1 NormalBattle/ gold=55 members=6",
+            "3-2 Town/ gold=93 members=6",
+            "3-3 NormalBattle/ gold=13 members=6",
+            "3-4 Event/SpareHands gold=53 members=6",
+            "3-5 TreasureChest/ gold=48 members=6",
+            "3-6 Camp/ gold=48 members=6",
+            "3-7 Event/SeedArchive gold=48 members=6",
+            "3-8 Camp/ gold=48 members=6",
+            "3-9 EliteBattle/ gold=48 members=6",
+            "3-10 Boss/ gold=92 members=6"
+          ]
+        },
+        {
+          "Seed": 241,
+          "Starters": "英勇士兵/晨曦圣女",
+          "Gold": 135,
+          "Team": "残晖骑士[1,HP19/19,A8,D2,S5,train2;gear:沉灯霜链+冷魂圣匣+寒冰戒指;skills:血肉盛宴+横扫千军]/灾厄吟唱者[2,HP13/13,A7,D3,S2,train2;gear:精灵护符+精灵护符+疾风手套;skills:星陨术+闪电鞭]/神恩主祭[3,HP12/12,A4,D2,S2,train2;gear:火焰戒指+蓝祭祀面具+余响圣杯;skills:]/晨曦圣女[4,HP9/9,A2,D1,S2,train0;gear:祖传毒方+绝缘灵珠+感电棱镜;skills:]/深海轻语[bench,HP9/15,A6,D2,S2,train0;gear:精钢壁垒+八卦+洞察图腾;skills:阳光普照]/墓园花匠[bench,HP15/15,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=109 members=2",
+            "1-3 TreasureChest/ gold=109 members=2",
+            "1-4 Town/ gold=109 members=2",
+            "1-4 Event/TidePact gold=6 members=4",
+            "1-5 Camp/ gold=6 members=5",
+            "1-6 EliteBattle/ gold=6 members=5",
+            "1-7 NormalBattle/ gold=31 members=5",
+            "1-8 NormalBattle/ gold=52 members=5",
+            "1-9 Camp/ gold=69 members=5",
+            "1-10 Boss/ gold=69 members=5",
+            "2-1 NormalBattle/ gold=89 members=5",
+            "2-2 Event/GraveSeed gold=121 members=5",
+            "2-3 TreasureChest/ gold=121 members=5",
+            "2-4 NormalBattle/ gold=121 members=5",
+            "2-5 Event/WhisperWall gold=151 members=5",
+            "2-6 Camp/ gold=151 members=5",
+            "2-7 Camp/ gold=151 members=5",
+            "2-8 Town/ gold=151 members=5",
+            "2-9 EliteBattle/ gold=29 members=5",
+            "2-10 Boss/ gold=59 members=5",
+            "3-1 NormalBattle/ gold=82 members=5",
+            "3-2 Event/WrongSwitch gold=121 members=5",
+            "3-3 Town/ gold=132 members=5",
+            "3-4 TreasureChest/ gold=29 members=5",
+            "3-5 Camp/ gold=29 members=5",
+            "3-6 Event/WaterCharter gold=29 members=5",
+            "3-7 NormalBattle/ gold=29 members=5",
+            "3-8 Camp/ gold=65 members=6",
+            "3-9 EliteBattle/ gold=65 members=6",
+            "3-10 Boss/ gold=104 members=6"
+          ]
+        },
+        {
+          "Seed": 140,
+          "Starters": "重甲战士/天启",
+          "Gold": 136,
+          "Team": "重盾铁卫[1,HP10/16,A4,D5,S1,train0;gear:沉灯霜链+无面王冠+寒冰戒指+寒冰戒指+守护者之旗;skills:坚如磐石+血肉盛宴]/残晖骑士[2,HP12/12,A13,D8,S4,train1;gear:狂战士之印+疾风手套+处刑者面具+疾风手套;skills:金钟罩]/天启[3,HP16/16,A5,D6,S1,train0;gear:红水晶吊坠+永恒之火+红水晶吊坠;skills:守夜灯火]/天弓[4,HP19/20,A19,D0,S0,train2;gear:精钢壁垒+猩红玫瑰+余响圣杯;skills:穿云箭+闪身步]/深海轻语[bench,HP9/15,A6,D1,S2,train0;gear:传话筒+巫医玩偶+红绳;skills:]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=114 members=2",
+            "1-3 Event/LostTraveler gold=114 members=2",
+            "1-4 TreasureChest/ gold=114 members=3",
+            "1-5 Camp/ gold=114 members=3",
+            "1-6 EliteBattle/ gold=114 members=3",
+            "1-7 NormalBattle/ gold=131 members=3",
+            "1-8 Town/ gold=148 members=3",
+            "1-8 Event/TidePact gold=0 members=4",
+            "1-9 Camp/ gold=0 members=5",
+            "1-10 Boss/ gold=0 members=5",
+            "2-1 NormalBattle/ gold=18 members=5",
+            "2-2 Event/GraveSeed gold=47 members=5",
+            "2-3 Event/Pallbearer gold=47 members=5",
+            "2-4 NormalBattle/ gold=47 members=5",
+            "2-5 Town/ gold=75 members=5",
+            "2-6 Camp/ gold=19 members=5",
+            "2-7 EliteBattle/ gold=19 members=5",
+            "2-8 TreasureChest/ gold=50 members=5",
+            "2-9 Camp/ gold=50 members=5",
+            "2-10 Boss/ gold=50 members=5",
+            "3-1 NormalBattle/ gold=75 members=5",
+            "3-2 Event/GoldStandard gold=113 members=6",
+            "3-3 Event/LastMeridian gold=128 members=6",
+            "3-4 TreasureChest/ gold=147 members=6",
+            "3-5 Camp/ gold=147 members=6",
+            "3-6 EliteBattle/ gold=147 members=6",
+            "3-7 Town/ gold=182 members=6",
+            "3-8 Camp/ gold=66 members=6",
+            "3-9 NormalBattle/ gold=66 members=6",
+            "3-10 Boss/ gold=105 members=6"
+          ]
+        }
+      ]
+    },
+    {
+      "方案": "prepared-selected",
+      "模拟局数": 500,
+      "策略": "预留祭品，在城镇优先购买祭品技能书",
+      "基础价格范围": [
+        60,
+        115
+      ],
+      "累计通过各层": [
+        {
+          "地图": "码头",
+          "通过局数": 441,
+          "累计通过率%": 88.2,
+          "通过率95%区间": [
+            85.08,
+            90.74
+          ],
+          "抵达该层后的通过率%": 88.2
+        },
+        {
+          "地图": "低语墓园",
+          "通过局数": 317,
+          "累计通过率%": 63.4,
+          "通过率95%区间": [
+            59.09,
+            67.51
+          ],
+          "抵达该层后的通过率%": 71.9
+        },
+        {
+          "地图": "机巧遗都",
+          "通过局数": 62,
+          "累计通过率%": 12.4,
+          "通过率95%区间": [
+            9.79,
+            15.58
+          ],
+          "抵达该层后的通过率%": 19.6
+        }
+      ],
+      "平均付费招募人数": 0.858,
+      "首次城镇招募人数分布": {
+        "0": 103,
+        "1": 392
+      },
+      "平均购买物品次数": 1.994,
+      "平均结束金币": 188.8,
+      "模拟战斗总数": 4594,
+      "深海轻语入队局数": 495,
+      "最常失败节点": [
+        {
+          "层": 3,
+          "节点": 1,
+          "次数": 128
+        },
+        {
+          "层": 2,
+          "节点": 10,
+          "次数": 33
+        },
+        {
+          "层": 1,
+          "节点": 10,
+          "次数": 28
+        },
+        {
+          "层": 3,
+          "节点": 3,
+          "次数": 28
+        },
+        {
+          "层": 3,
+          "节点": 6,
+          "次数": 22
+        },
+        {
+          "层": 3,
+          "节点": 7,
+          "次数": 21
+        }
+      ],
+      "通关示例": [
+        {
+          "Seed": 244,
+          "Starters": "篝火守夜人/秘术学徒",
+          "Gold": 145,
+          "Team": "薪火铁卫[1,HP20/20,A9,D4,S3,train0;gear:封港信笛+冷魂圣匣+狂战士之印;skills:战争咆哮+毒瘴爆发]/灾厄吟唱者[2,HP6/10,A8,D2,S2,train1;gear:魔导水晶+雷电戒指+雷电戒指;skills:星陨术+金钟罩]/深海轻语[3,HP14/15,A6,D1,S1,train0;gear:雷电戒指+火焰戒指+醉仙葫芦;skills:英雄赞歌]/神恩主祭[4,HP12/12,A5,D3,S4,train2;gear:醉仙葫芦+精钢壁垒+巫医玩偶+万能药瓶;skills:]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=112 members=2",
+            "1-3 Town/ gold=112 members=2",
+            "1-3 Event/TidePact gold=74 members=2",
+            "1-4 NormalBattle/ gold=74 members=3",
+            "1-5 Event/LockedChest gold=98 members=3",
+            "1-6 Camp/ gold=98 members=3",
+            "1-7 TreasureChest/ gold=98 members=3",
+            "1-8 EliteBattle/ gold=98 members=3",
+            "1-9 Camp/ gold=120 members=3",
+            "1-10 Boss/ gold=120 members=3",
+            "2-1 NormalBattle/ gold=137 members=3",
+            "2-2 Event/GraveSeed gold=169 members=3",
+            "2-3 Town/ gold=169 members=3",
+            "2-4 Event/Epitaph gold=9 members=4",
+            "2-5 TreasureChest/ gold=9 members=4",
+            "2-6 Camp/ gold=9 members=4",
+            "2-7 EliteBattle/ gold=9 members=4",
+            "2-8 NormalBattle/ gold=42 members=4",
+            "2-9 Camp/ gold=74 members=4",
+            "2-10 Boss/ gold=74 members=4",
+            "3-1 NormalBattle/ gold=100 members=4",
+            "3-2 Event/ClinicQueue gold=139 members=4",
+            "3-3 NormalBattle/ gold=139 members=4",
+            "3-4 Event/GoldStandard gold=178 members=5",
+            "3-5 Camp/ gold=193 members=5",
+            "3-6 Town/ gold=193 members=5",
+            "3-7 EliteBattle/ gold=80 members=5",
+            "3-8 TreasureChest/ gold=117 members=5",
+            "3-9 Camp/ gold=117 members=5",
+            "3-10 Boss/ gold=117 members=5"
+          ]
+        },
+        {
+          "Seed": 283,
+          "Starters": "重甲战士/白羽弓手",
+          "Gold": 163,
+          "Team": "重盾铁卫[1,HP10/18,A4,D5,S2,train0;gear:沉灯霜链+冷魂圣匣+寒冰戒指;skills:裂地震击+坚如磐石]/天弓[2,HP14/14,A15,D4,S2,train2;gear:寻人启事+狂战士之印+狂战士之印+永恒之火;skills:闪身步]/深海轻语[3,HP15/15,A6,D2,S1,train0;gear:醉仙葫芦+醉仙葫芦+红水晶吊坠;skills:]/神恩主祭[4,HP12/12,A5,D2,S3,train0;gear:八卦+浑浊的水+魔导水晶;skills:]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:魔导水晶;skills:裂地震击]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/Ambush gold=110 members=2",
+            "1-3 TreasureChest/ gold=110 members=2",
+            "1-4 Camp/ gold=110 members=2",
+            "1-5 EliteBattle/ gold=110 members=2",
+            "1-6 Event/RecruitmentWheel gold=123 members=2",
+            "1-7 Camp/ gold=123 members=2",
+            "1-8 Town/ gold=123 members=2",
+            "1-8 Event/TidePact gold=79 members=2",
+            "1-9 NormalBattle/ gold=79 members=3",
+            "1-10 Boss/ gold=99 members=3",
+            "2-1 NormalBattle/ gold=118 members=3",
+            "2-2 Event/GraveSeed gold=149 members=3",
+            "2-3 NormalBattle/ gold=149 members=3",
+            "2-4 TreasureChest/ gold=178 members=3",
+            "2-5 Camp/ gold=178 members=3",
+            "2-6 Town/ gold=178 members=3",
+            "2-7 Camp/ gold=0 members=4",
+            "2-8 NormalBattle/ gold=0 members=4",
+            "2-9 EliteBattle/ gold=30 members=4",
+            "2-10 Boss/ gold=62 members=5",
+            "3-1 NormalBattle/ gold=88 members=5",
+            "3-2 Event/BoilerUnion gold=129 members=5",
+            "3-3 Town/ gold=121 members=5",
+            "3-4 TreasureChest/ gold=56 members=5",
+            "3-5 NormalBattle/ gold=56 members=5",
+            "3-6 Camp/ gold=95 members=5",
+            "3-7 Event/ElectionPress gold=95 members=5",
+            "3-8 EliteBattle/ gold=95 members=5",
+            "3-9 Camp/ gold=131 members=5",
+            "3-10 Boss/ gold=131 members=5"
+          ]
+        },
+        {
+          "Seed": 134,
+          "Starters": "重甲战士/晨曦圣女",
+          "Gold": 167,
+          "Team": "重盾铁卫[1,HP18/18,A5,D5,S1,train2;gear:封港信笛+无面王冠+寻人启事;skills:战争咆哮+金钟罩]/深海轻语[2,HP15/15,A7,D2,S2,train0;gear:寒冰戒指+寒冰戒指+寻人启事;skills:英雄赞歌]/时序秘法师[3,HP10/10,A31,D0,S0,train2;gear:猩红玫瑰+疾风手套+圣愈戒指;skills:毒瘴爆发]/神恩主祭[4,HP18/18,A12,D2,S2,train2;gear:雷电戒指+传国玉玺+醉仙葫芦;skills:拔毒急救]/墓园花匠[bench,HP13/13,A5,D0,S0,train0;gear:;skills:]",
+          "Trace": [
+            "1-1 NormalBattle/ gold=100 members=2",
+            "1-2 Event/RecruitmentWheel gold=108 members=2",
+            "1-3 Event/Ambush gold=108 members=2",
+            "1-4 NormalBattle/ gold=108 members=2",
+            "1-5 Camp/ gold=119 members=2",
+            "1-6 Town/ gold=119 members=2",
+            "1-6 Event/TidePact gold=21 members=3",
+            "1-7 TreasureChest/ gold=21 members=4",
+            "1-8 EliteBattle/ gold=21 members=4",
+            "1-9 Camp/ gold=43 members=4",
+            "1-10 Boss/ gold=43 members=4",
+            "2-1 NormalBattle/ gold=60 members=4",
+            "2-2 Event/GraveSeed gold=87 members=4",
+            "2-3 NormalBattle/ gold=87 members=4",
+            "2-4 TreasureChest/ gold=116 members=4",
+            "2-5 Town/ gold=116 members=4",
+            "2-6 Camp/ gold=3 members=4",
+            "2-7 Event/Pallbearer gold=3 members=4",
+            "2-8 EliteBattle/ gold=3 members=4",
+            "2-9 Camp/ gold=35 members=4",
+            "2-10 Boss/ gold=35 members=4",
+            "3-1 NormalBattle/ gold=59 members=4",
+            "3-2 Event/ClinicQueue gold=98 members=4",
+            "3-3 Town/ gold=98 members=4",
+            "3-4 TreasureChest/ gold=20 members=4",
+            "3-5 Camp/ gold=20 members=4",
+            "3-6 EliteBattle/ gold=20 members=4",
+            "3-7 NormalBattle/ gold=62 members=5",
+            "3-8 NormalBattle/ gold=102 members=5",
+            "3-9 Camp/ gold=137 members=5",
+            "3-10 Boss/ gold=137 members=5"
+          ]
+        }
+      ]
+    }
+  ],
+  "价格口径": "新基准价不含特性、训练及已学技能加成；市场报价沿用原有规则。所有41个形态均单独定价，同系二阶比一阶高不超过25%。",
+  "角色基准价": [
+    {
+      "编号": 1,
+      "ID": "CampGuard",
+      "角色": "篝火守夜人",
+      "阶": 1,
+      "原基准价": 19,
+      "新基准价": 80,
+      "进阶形态": [
+        "KindleGuard",
+        "EmberBrawler"
+      ]
+    },
+    {
+      "编号": 2,
+      "ID": "KindleGuard",
+      "角色": "薪火铁卫",
+      "阶": 2,
+      "原基准价": 40,
+      "新基准价": 95,
+      "进阶形态": []
+    },
+    {
+      "编号": 3,
+      "ID": "EmberBrawler",
+      "角色": "余烬斗士",
+      "阶": 2,
+      "原基准价": 37,
+      "新基准价": 95,
+      "进阶形态": []
+    },
+    {
+      "编号": 4,
+      "ID": "ValiantSoldier",
+      "角色": "英勇士兵",
+      "阶": 1,
+      "原基准价": 23,
+      "新基准价": 80,
+      "进阶形态": [
+        "Vanguard",
+        "TwilightKnight"
+      ]
+    },
+    {
+      "编号": 5,
+      "ID": "Vanguard",
+      "角色": "破阵先锋",
+      "阶": 2,
+      "原基准价": 34,
+      "新基准价": 95,
+      "进阶形态": []
+    },
+    {
+      "编号": 6,
+      "ID": "TwilightKnight",
+      "角色": "残晖骑士",
+      "阶": 2,
+      "原基准价": 42,
+      "新基准价": 100,
+      "进阶形态": []
+    },
+    {
+      "编号": 7,
+      "ID": "HeavyWarrior",
+      "角色": "重甲战士",
+      "阶": 1,
+      "原基准价": 32,
+      "新基准价": 85,
+      "进阶形态": [
+        "HeavyBulwark",
+        "ShieldCommander"
+      ]
+    },
+    {
+      "编号": 8,
+      "ID": "HeavyBulwark",
+      "角色": "重盾铁卫",
+      "阶": 2,
+      "原基准价": 90,
+      "新基准价": 105,
+      "进阶形态": []
+    },
+    {
+      "编号": 9,
+      "ID": "ShieldCommander",
+      "角色": "盾阵统领",
+      "阶": 2,
+      "原基准价": 28,
+      "新基准价": 100,
+      "进阶形态": []
+    },
+    {
+      "编号": 10,
+      "ID": "GreenRanger",
+      "角色": "青语游侠",
+      "阶": 1,
+      "原基准价": 20,
+      "新基准价": 80,
+      "进阶形态": [
+        "ForestStalker",
+        "StarChaser"
+      ]
+    },
+    {
+      "编号": 11,
+      "ID": "ForestStalker",
+      "角色": "森语巡猎",
+      "阶": 2,
+      "原基准价": 35,
+      "新基准价": 95,
+      "进阶形态": []
+    },
+    {
+      "编号": 12,
+      "ID": "StarChaser",
+      "角色": "逐星神射",
+      "阶": 2,
+      "原基准价": 36,
+      "新基准价": 100,
+      "进阶形态": []
+    },
+    {
+      "编号": 13,
+      "ID": "SilverArcher",
+      "角色": "银叶射手",
+      "阶": 1,
+      "原基准价": 19,
+      "新基准价": 80,
+      "进阶形态": [
+        "EclipseArcher",
+        "GloomWatcher"
+      ]
+    },
+    {
+      "编号": 14,
+      "ID": "EclipseArcher",
+      "角色": "月蚀箭姬",
+      "阶": 2,
+      "原基准价": 37,
+      "新基准价": 90,
+      "进阶形态": []
+    },
+    {
+      "编号": 15,
+      "ID": "GloomWatcher",
+      "角色": "幽林守望者",
+      "阶": 2,
+      "原基准价": 43,
+      "新基准价": 100,
+      "进阶形态": []
+    },
+    {
+      "编号": 16,
+      "ID": "StarMage",
+      "角色": "星辉术师",
+      "阶": 1,
+      "原基准价": 17,
+      "新基准价": 70,
+      "进阶形态": [
+        "StarfireMage",
+        "Chronomancer"
+      ]
+    },
+    {
+      "编号": 17,
+      "ID": "StarfireMage",
+      "角色": "焚星魔导师",
+      "阶": 2,
+      "原基准价": 37,
+      "新基准价": 85,
+      "进阶形态": []
+    },
+    {
+      "编号": 18,
+      "ID": "Chronomancer",
+      "角色": "时序秘法师",
+      "阶": 2,
+      "原基准价": 27,
+      "新基准价": 85,
+      "进阶形态": []
+    },
+    {
+      "编号": 19,
+      "ID": "ArcaneApprentice",
+      "角色": "秘术学徒",
+      "阶": 1,
+      "原基准价": 27,
+      "新基准价": 85,
+      "进阶形态": [
+        "CalamityChanter",
+        "VoidWeaver"
+      ]
+    },
+    {
+      "编号": 20,
+      "ID": "CalamityChanter",
+      "角色": "灾厄吟唱者",
+      "阶": 2,
+      "原基准价": 34,
+      "新基准价": 105,
+      "进阶形态": []
+    },
+    {
+      "编号": 21,
+      "ID": "VoidWeaver",
+      "角色": "虚空织法者",
+      "阶": 2,
+      "原基准价": 45,
+      "新基准价": 105,
+      "进阶形态": []
+    },
+    {
+      "编号": 22,
+      "ID": "DawnHealer",
+      "角色": "晨曦圣女",
+      "阶": 1,
+      "原基准价": 18,
+      "新基准价": 90,
+      "进阶形态": [
+        "DivinePriest",
+        "FallenAcolyte"
+      ]
+    },
+    {
+      "编号": 23,
+      "ID": "DivinePriest",
+      "角色": "神恩主祭",
+      "阶": 2,
+      "原基准价": 41,
+      "新基准价": 110,
+      "进阶形态": []
+    },
+    {
+      "编号": 24,
+      "ID": "FallenAcolyte",
+      "角色": "堕落神侍",
+      "阶": 2,
+      "原基准价": 26,
+      "新基准价": 110,
+      "进阶形态": []
+    },
+    {
+      "编号": 25,
+      "ID": "GoldHunter",
+      "角色": "寻金猎人",
+      "阶": 1,
+      "原基准价": 17,
+      "新基准价": 80,
+      "进阶形态": [
+        "RelicHunter",
+        "GildedMerchant"
+      ]
+    },
+    {
+      "编号": 26,
+      "ID": "RelicHunter",
+      "角色": "秘宝猎手",
+      "阶": 2,
+      "原基准价": 34,
+      "新基准价": 95,
+      "进阶形态": []
+    },
+    {
+      "编号": 27,
+      "ID": "GildedMerchant",
+      "角色": "鎏金商王",
+      "阶": 2,
+      "原基准价": 39,
+      "新基准价": 95,
+      "进阶形态": []
+    },
+    {
+      "编号": 28,
+      "ID": "RadiantMixer",
+      "角色": "灵辉调和师",
+      "阶": 1,
+      "原基准价": 16,
+      "新基准价": 70,
+      "进阶形态": [
+        "MistAlchemist"
+      ]
+    },
+    {
+      "编号": 29,
+      "ID": "MistAlchemist",
+      "角色": "幽雾炼药师",
+      "阶": 2,
+      "原基准价": 24,
+      "新基准价": 85,
+      "进阶形态": []
+    },
+    {
+      "编号": 30,
+      "ID": "FateWeaver",
+      "角色": "命运编织者",
+      "阶": 1,
+      "原基准价": 20,
+      "新基准价": 90,
+      "进阶形态": []
+    },
+    {
+      "编号": 31,
+      "ID": "Apocalypse",
+      "角色": "天启",
+      "阶": 1,
+      "原基准价": 19,
+      "新基准价": 80,
+      "进阶形态": []
+    },
+    {
+      "编号": 32,
+      "ID": "Chant",
+      "角色": "颂歌",
+      "阶": 1,
+      "原基准价": 12,
+      "新基准价": 80,
+      "进阶形态": []
+    },
+    {
+      "编号": 33,
+      "ID": "IntelligenceOfficer",
+      "角色": "情报官",
+      "阶": 1,
+      "原基准价": 16,
+      "新基准价": 60,
+      "进阶形态": []
+    },
+    {
+      "编号": 34,
+      "ID": "TianGong",
+      "角色": "天弓",
+      "阶": 2,
+      "原基准价": 48,
+      "新基准价": 115,
+      "进阶形态": []
+    },
+    {
+      "编号": 35,
+      "ID": "DiSha",
+      "角色": "地煞",
+      "阶": 2,
+      "原基准价": 15,
+      "新基准价": 110,
+      "进阶形态": []
+    },
+    {
+      "编号": 36,
+      "ID": "DeepSeaWhisper",
+      "角色": "深海轻语",
+      "阶": 2,
+      "原基准价": 40,
+      "新基准价": 100,
+      "进阶形态": []
+    },
+    {
+      "编号": 37,
+      "ID": "WhiteFeatherArcher",
+      "角色": "白羽弓手",
+      "阶": 1,
+      "原基准价": 25,
+      "新基准价": 95,
+      "进阶形态": [
+        "TianGong",
+        "DiSha",
+        "AbyssKeeper",
+        "StarWeaver"
+      ]
+    },
+    {
+      "编号": 38,
+      "ID": "GraveGardener",
+      "角色": "墓园花匠",
+      "阶": 1,
+      "原基准价": 18,
+      "新基准价": 85,
+      "进阶形态": [
+        "RotBloomWitch"
+      ]
+    },
+    {
+      "编号": 39,
+      "ID": "RotBloomWitch",
+      "角色": "腐花魔女",
+      "阶": 2,
+      "原基准价": 18,
+      "新基准价": 105,
+      "进阶形态": []
+    },
+    {
+      "编号": 40,
+      "ID": "AbyssKeeper",
+      "角色": "冥渊",
+      "阶": 2,
+      "原基准价": 18,
+      "新基准价": 110,
+      "进阶形态": []
+    },
+    {
+      "编号": 41,
+      "ID": "StarWeaver",
+      "角色": "星罗",
+      "阶": 2,
+      "原基准价": 18,
+      "新基准价": 115,
+      "进阶形态": []
+    }
+  ],
+  "价格中位数": {
+    "原价": 27,
+    "新价": 95
+  },
+  "逐局原始数据": "2026-11-28-campaign-raw.json.gz"
+}

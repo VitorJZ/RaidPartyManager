@@ -33,10 +33,14 @@ namespace RaidPartyManager.Presentation
             latch.tooltip = "打开宝箱";
             latch.clicked += () =>
             {
-                if (DockPlayhouse.Moving || !run.OpenTreasureChest()) return;
-                latch.style.display = DisplayStyle.None;
-                GameAudio.Play(SoundCue.ChestLatchRelease);
-                stage.UnlockChest();
+                if (DockPlayhouse.Moving) return;
+                collect(latch, () =>
+                {
+                    if (!run.OpenTreasureChest()) return false;
+                    GameAudio.Play(SoundCue.ChestLatchRelease);
+                    stage.UnlockChest();
+                    return true;
+                });
             };
             schedule.Execute(Pose).Every(16);
             RegisterCallback<DetachFromPanelEvent>(_ => HideTooltip());

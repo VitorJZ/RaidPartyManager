@@ -64,7 +64,14 @@ namespace RaidPartyManager.Domain
             ("讨价还价", "队伍每有1名成员持有此特性，普通装备和技能书的回收率就提高20个百分点。基础回收率为50%，可超过100%。", 20),
         };
 
-        private static readonly int[] prices = { 0, 19, 40, 37, 23, 34, 42, 32, 90, 28, 20, 35, 36, 19, 37, 43, 17, 37, 27, 27, 34, 45, 18, 41, 26, 17, 34, 39, 16, 24, 20, 19, 12, 16, 48, 15, 40, 25 };
+        // Indexed by roster number. Evolution keeps the family price within 25% of its first form.
+        // Prices are for an untrained character before trait and learned-skill premiums.
+        private static readonly int[] prices = { 0,
+            80, 95, 95, 80, 95, 100, 85, 105, 100,
+            80, 95, 100, 80, 90, 100, 70, 85, 85,
+            85, 105, 105, 90, 110, 110, 80, 95, 95,
+            70, 85, 90, 80, 80, 60, 115, 110, 100, 95,
+            85, 105, 110, 115 };
         private static readonly int[] skillRates = { 0, 15, 23, 20, 35, 15, 30, 13, 15, 18, 25, 18, 23, 10, 28, 8, 28, 10, 30, 20, 13, 20, 23, 30, 38, 40, 38, 43, 43, 50, 55, 30, 30, 35, 35, 0, 0, 0, 30 };
         public static Stats GearAndPosition(PlayerTrait trait, int gear, int? position, Stats stats)
         {

@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 14
   traitPower: 0
-  traitText: "战斗开始时，使一名队友在本场战斗里进阶"
+  traitText: "开战时，随机使一名能够进阶的存活队友进阶，持续至战斗结束。"
   personality: 8
   attack: 5
   defense: 2

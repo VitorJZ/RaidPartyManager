@@ -18,7 +18,7 @@ namespace RaidPartyManager.Battle
 
         private static readonly StatusKind[] DecayingStatuses =
         {
-            Vigor, Swift, Resolve, Purity, Poison, Weakened, Thorns, Stunned, Cursed
+            Swift, Resolve, Purity, Poison, Weakened, Thorns, Stunned, Cursed
         };
 
         private BattleEvent EquipmentVisual(Unit actor, Unit target, EquipmentEffect equipment) =>
@@ -289,11 +289,13 @@ namespace RaidPartyManager.Battle
             }
 
             PlayThawedTurns(frozenTurns);
+            bool preservePoison = units.Any(unit => unit.Health > 0 &&
+                unit.Trait == CharacterTrait.PoisonOpponentsAndPreservePoison);
             foreach (var unit in units.Where(unit => unit.Health > 0))
             {
                 bool changed = false;
                 foreach (var status in DecayingStatuses)
-                    if (unit.DelayStatusDecay?.Remove(status) != true)
+                    if (unit.DelayStatusDecay?.Remove(status) != true && (status != Poison || !preservePoison))
                         changed |= RemoveLayers(unit, status, 1);
                 if (changed)
                     Report(BattleEventKind.Effect, unit, unit, "回合状态递减", ActionKind.Shield, detail: "状态层数 −1");
@@ -385,9 +387,8 @@ namespace RaidPartyManager.Battle
 
         private static int EffectiveAttack(Unit unit, int attack)
         {
-            int value = Math.Max(0, attack - (unit.Health > 0 && unit.Layers(Weakened) > 0 ? 2 : 0));
-            return unit.Trait == CharacterTrait.Rebirth && unit.Revived
-                ? (int)Math.Min(int.MaxValue, 2L * value) : value;
+            int weakenedPenalty = unit.Health > 0 && unit.Layers(Weakened) > 0 ? 2 : 0;
+            return unit.StatAfterRebirth(Math.Max(0L, (long)attack + unit.Layers(Vigor) - weakenedPenalty));
         }
 
         private static int WeaponDamageMultiplier(Unit actor) =>
@@ -404,6 +405,8 @@ namespace RaidPartyManager.Battle
         {
             var components = new List<(DamageType Type, int Power)>();
             int attack = CurrentAttack(actor) - falloff;
+            if (actor.Trait == CharacterTrait.RepeatTargetDamage && actor.LastHitTarget == target.Input.Id)
+                attack += actor.TraitPower;
             if (actor.Trait == CharacterTrait.FirstDamageToTarget && !actor.DamagedTargets.Contains(target.Input.Id))
                 attack += actor.TraitPower;
             if (actor.Trait == CharacterTrait.MissingHealthDamage)
@@ -564,7 +567,7 @@ namespace RaidPartyManager.Battle
             }
             bool missed = (actor.Layers(Injured) > 0 && random.NextDouble() < 0.20) ||
                 (target.Layers(Swift) > 0 && random.NextDouble() < 0.20);
-            var whistleTarget = actor.LastAttackRound != Round ? Opponents(actor).LastOrDefault() : null;
+            var whistleTarget = actor.LastAttackRound != Round ? DirectOpponents(actor).LastOrDefault() : null;
             if (IsForestMarkSource(actor, target))
                 GrantStatus(actor, target, ForestMark, actor.TraitPower);
             var element = ElementalRing(actor);
@@ -595,6 +598,8 @@ namespace RaidPartyManager.Battle
                 ResolveStrike(actor, target, parts, name, kind, reason,
                     ignoreDefense: UsesShortbow(actor), weaponAttack: true, visual: visual, multiplier: multiplier,
                     skillBookId: skillBookId, intercepted: intercepted, halfDamage: halfDamage, afterPassives: AfterPassives, equipment: equipment);
+                if (actor.Trait == CharacterTrait.RepeatTargetDamage)
+                    actor.LastHitTarget = target.Input.Id;
             }
             return !missed;
 
@@ -717,7 +722,7 @@ namespace RaidPartyManager.Battle
 
         private void CounterHit(Unit defender, Unit attacker)
         {
-            if (defender.Health > 0 && attacker.Health > 0 && defender.LastSkillRound != Round && defender.Layers(Frozen) == 0)
+            if (defender.Health > 0 && attacker.Health > 0 && attacker.CanBeTargeted && defender.LastSkillRound != Round && defender.Layers(Frozen) == 0)
                 Hit(defender, attacker, defender.Input.Character.BasicAttack, BattleEventKind.Effect,
                     DecisionReason.Default, "反击的号角", canCounter: false, equipment: CounterHorn);
         }
@@ -735,21 +740,29 @@ namespace RaidPartyManager.Battle
             return request.CapitalField && type != DamageType.Magic && amount > 0 ? Math.Max(1, amount / 2) : amount;
         }
 
+        private static int Resistance(Unit actor, Unit target, DamageType type) => type switch
+        {
+            DamageType.Physical => target.Defense,
+            DamageType.Magic or DamageType.Fire when actor?.Trait != CharacterTrait.IgnoreMagicDefense => target.SpecialDefense,
+            _ => 0
+        };
+
+        private static bool BlocksDamageType(Unit target, DamageType type) =>
+            (type == DamageType.Fire && target.Trait == CharacterTrait.ImmuneToFire) ||
+            (type != DamageType.Physical && target.Has(InsulatingOrb));
+
         private int UnscaledDamage(Unit actor, Unit target, int power, DamageType type, bool ignoreDefense)
         {
-            if (type != DamageType.Physical && target.Has(InsulatingOrb))
+            if (BlocksDamageType(target, type))
                 return 0;
             if (type == DamageType.Fixed)
                 return (int)Math.Min(int.MaxValue, (long)power + (actor?.Count(WindChime) ?? 0));
-            int defense = ignoreDefense ? 0 : type == DamageType.Physical ? target.Stats.Defense :
-                (type == DamageType.Magic || type == DamageType.Fire) && actor?.Trait != CharacterTrait.IgnoreMagicDefense
-                    ? target.Stats.SpecialDefense : 0;
+            int defense = ignoreDefense ? 0 : Resistance(actor, target, type);
             if (type == DamageType.Lightning && actor != null)
                 power += 2 * actor.Count(ThunderEye);
             decimal amount = Math.Max(1, power - defense);
             if (actor != null)
             {
-                amount *= 1m + actor.Layers(Vigor) * 0.20m;
                 if (actor.Input.Side == Side.Party && (request.PartyGold > 0 || equipmentGold > 0))
                 {
                     int statues = units.Where(ally => ally.Health > 0 && ally.Input.Side == actor.Input.Side &&
@@ -797,7 +810,7 @@ namespace RaidPartyManager.Battle
             }
             int shield = actor?.Talent == PlayerTrait.ShieldPiercer && actor.Input.Side != target.Input.Side ? 0 : target.Shield;
             int loss = LimitDamage(target, Math.Max(0, damage - shield));
-            return loss >= target.Health && AbyssGuardian(target) != null ? Math.Max(0, target.Health - 1) : loss;
+            return AbyssGuardian(target, loss) != null ? 0 : loss;
         }
 
         private int DamageAfterGuard(Unit target, int damage) =>
@@ -825,19 +838,30 @@ namespace RaidPartyManager.Battle
                 multiplier *= WeaponDamageMultiplier(actor);
 
             // All components read the same defensive state before the combined hit consumes it.
-            int remainder = 0;
-            var resolved = parts.Select(part =>
+            int remainder = 0, beforeResistanceRemainder = 0;
+            long beforeResistanceTotal = 0;
+            int ScaleComponent(int amount, ref int carry)
             {
-                var type = FinalDamageType(actor, part.Type);
-                int amount = (int)Math.Min(int.MaxValue, (long)Damage(actor, target, part.Power, type, ignoreDefense) * multiplier);
+                amount = (int)Math.Min(int.MaxValue, (long)amount * multiplier);
                 if (halfDamage)
                 {
                     // Carry odd points between elements of the same hit.
-                    long combined = (long)amount + remainder;
-                    remainder = (int)(combined % 2);
+                    long combined = (long)amount + carry;
+                    carry = (int)(combined % 2);
                     amount = (int)(combined / 2);
                 }
-                return (Type: type, Amount: intercepted && amount > 0 ? (int)Math.Ceiling(amount * .25) : amount);
+                return intercepted && amount > 0 ? (int)Math.Ceiling(amount * .25) : amount;
+            }
+
+            var resolved = parts.Select(part =>
+            {
+                var type = FinalDamageType(actor, part.Type);
+                int amount = Damage(actor, target, part.Power, type, ignoreDefense);
+                int beforeResistance = !ignoreDefense && Resistance(actor, target, type) > 0
+                    ? Damage(actor, target, part.Power, type, ignoreDefense: true)
+                    : amount;
+                beforeResistanceTotal += ScaleComponent(beforeResistance, ref beforeResistanceRemainder);
+                return (Type: type, Amount: ScaleComponent(amount, ref remainder));
             }).ToArray();
             bool transmuted = actor != null && Enumerable.Range(0, resolved.Length)
                 .Any(i => resolved[i].Type != parts[i].Type && resolved[i].Amount > 0);
@@ -855,6 +879,7 @@ namespace RaidPartyManager.Battle
                 int bonus = Math.Min(int.MaxValue - total, target.Layers(ForestMark));
                 resolved[Array.FindIndex(resolved, part => part.Amount > 0)].Amount += bonus;
                 total += bonus;
+                beforeResistanceTotal += bonus;
             }
             int guarded = DamageAfterGuard(target, total);
             if (guarded < total)
@@ -865,6 +890,8 @@ namespace RaidPartyManager.Battle
             bool belled = actor != null && actor.Input.Side != target.Input.Side && Round > 0 && target.ProtectedRound == Round;
             if (belled && guarded > 0) target.BellCaster.Rating.SkillBlocks++;
             int damage = belled ? 0 : guarded;
+            int resistancePrevented = belled ? 0 :
+                Math.Max(0, DamageAfterGuard(target, (int)Math.Min(int.MaxValue, beforeResistanceTotal)) - guarded);
             bool evaporates = false;
             if (damage > 0)
             {
@@ -884,16 +911,23 @@ namespace RaidPartyManager.Battle
             target.MirrorShield -= reflected;
             int healthDamage = damage - absorbed;
             var linked = healthDamage > 0 ? LinkedAllies(target) : new List<Unit>();
-            int dealt = LoseHealth(target, LimitDamage(target, healthDamage), out string protection, out var loadout, out bool charmTriggered);
+            int incoming = LimitDamage(target, healthDamage);
+            int dealt = LoseHealth(target, incoming, out string protection, out var loadout, out bool charmTriggered, out var guardian);
             var lifeLost = LifeLossByType(resolved, absorbed, dealt);
             int physicalLost = lifeLost.Where(part => part.Type == DamageType.Physical).Sum(part => part.Amount);
             bool poisonDamage = visual == BattleVisualCue.RoundEndPoison;
             var poisonShares = poisonDamage ? target.PoisonSources.PoisonShares() : null;
-            ScoreHit(actor, target, dealt, absorbed, poisonShares);
-            string detail = protection ?? (belled && guarded > 0 ? GoldenBellBlocked : DamageDetail(resolved));
+            ScoreHit(actor, target, dealt, absorbed, poisonShares, resistancePrevented);
+            bool fireImmune = total == 0 && target.Trait == CharacterTrait.ImmuneToFire &&
+                resolved.Any(part => part.Type == DamageType.Fire);
+            string detail = protection ?? (belled && guarded > 0 ? GoldenBellBlocked :
+                fireImmune ? "免疫火焰伤害" : DamageDetail(resolved));
             Report(kind, actor, target, name, ActionKind.Attack, dealt, reason, detail, weaponAttack: weaponAttack,
                 loadout: loadout, visual: visual, skillBookId: skillBookId, damageTaken: lifeLost, poisonDamage: poisonDamage, shieldAbsorbed: absorbed,
                 charmTriggered: charmTriggered, equipment: equipment, intercepted: intercepted);
+            if (guardian != null)
+                TakeAbyssDamage(actor, target, guardian, LifeLossByType(resolved, absorbed, incoming), poisonShares);
+
             // Reported after the hit so the badge stays up until the blow it stopped has landed.
             if (protection == StoneGuardBlocked)
             {
@@ -936,8 +970,10 @@ namespace RaidPartyManager.Battle
             {
                 if (dealt <= 0)
                     break;
+                if (ally.Health == 0) continue;
                 bool physicalOnly = ally.Has(InsulatingOrb);
-                int linkedDamage = physicalOnly ? physicalLost : dealt;
+                var mirroredParts = lifeLost.Where(part => !BlocksDamageType(ally, part.Type)).ToArray();
+                int linkedDamage = SumDamage(mirroredParts.Select(part => part.Amount));
                 if (actor != null && actor.Input.Side != ally.Input.Side && Round > 0 && ally.ProtectedRound == Round)
                 {
                     if (linkedDamage > 0) ally.BellCaster.Rating.SkillBlocks++;
@@ -947,12 +983,15 @@ namespace RaidPartyManager.Battle
                     events.Add(EquipmentVisual(target, ally, InsulatingOrb));
                 if (linkedDamage == 0)
                     continue;
-                int mirrored = LoseHealth(ally, LimitDamage(ally, linkedDamage), out string allyProtection, out var allyLoadout, out bool allyCharm);
+                int incomingMirror = LimitDamage(ally, linkedDamage);
+                int mirrored = LoseHealth(ally, incomingMirror, out string allyProtection, out var allyLoadout,
+                    out bool allyCharm, out var mirrorGuardian);
                 ScoreHit(actor, ally, mirrored, 0, poisonShares);
-                var mirroredParts = physicalOnly ? lifeLost.Where(part => part.Type == DamageType.Physical) : lifeLost;
                 Report(BattleEventKind.Effect, target, ally, "红绳", ActionKind.Attack, mirrored,
                     detail: allyProtection, loadout: allyLoadout, damageTaken: LifeLossByType(mirroredParts, 0, mirrored),
                     poisonDamage: poisonDamage, charmTriggered: allyCharm, equipment: RedCord);
+                if (mirrorGuardian != null)
+                    TakeAbyssDamage(actor, ally, mirrorGuardian, LifeLossByType(mirroredParts, 0, incomingMirror), poisonShares);
                 if (allyProtection == StoneGuardBlocked)
                 {
                     if (actor == null || actor.Input.Side != ally.Input.Side) ally.Rating.SkillBlocks++;
@@ -1068,11 +1107,48 @@ namespace RaidPartyManager.Battle
         public const string StoneGuardBlocked = "坚如磐石抵挡了伤害";
         public const string GoldenBellBlocked = "金钟罩挡下了攻击";
 
-        private Unit AbyssGuardian(Unit target) => units.FirstOrDefault(ally => ally != target && ally.Health > 0 &&
-            ally.Input.Side == target.Input.Side && ally.Trait == CharacterTrait.AbyssWard);
+        private const string AbyssProtection = "冥渊代伤";
+        private const string RebirthProtection = "堕落神侍复活";
 
-        private int LoseHealth(Unit target, int damage, out string protection, out BattleLoadout loadout, out bool charmTriggered)
+        private Unit AbyssGuardian(Unit target, int damage) =>
+            target.Trait != CharacterTrait.AbyssWard && target.Health > 0 && damage >= target.Health && target.Layers(Undying) == 0
+                ? units.FirstOrDefault(ally => ally.Health > 0 && ally.Input.Side == target.Input.Side && ally.Trait == CharacterTrait.AbyssWard)
+                : null;
+
+        private void TakeAbyssDamage(Unit source, Unit protectedAlly, Unit guardian,
+            IReadOnlyList<(DamageType Type, int Amount)> parts, (Unit Source, int Amount)[] poison = null)
         {
+            // The original hit already applied its damage modifiers. Only the guardian's own protection can absorb it now.
+            int damage = SumDamage(parts.Select(part => part.Amount));
+            int absorbed = source?.Talent == PlayerTrait.ShieldPiercer && source.Input.Side != guardian.Input.Side
+                ? 0 : Math.Min(guardian.Shield, damage);
+            guardian.Shield -= absorbed;
+            guardian.MirrorShield = Math.Max(0, guardian.MirrorShield - absorbed);
+            if (guardian.Shield == 0) guardian.ReliquaryWard = false;
+            int lost = LoseHealth(guardian, damage - absorbed, out var protection, out var loadout, out var charm, out _);
+            guardian.Rating.Saves++;
+            ScoreHit(source, guardian, lost, absorbed, poison);
+            var lifeLoss = LifeLossByType(parts, absorbed, lost);
+            Report(BattleEventKind.Effect, source, guardian, AbyssProtection, ActionKind.Attack, lost,
+                detail: protection ?? $"替{protectedAlly.Input.Character.Name}挡下致命伤害", loadout: loadout,
+                damageTaken: lifeLoss, poisonDamage: poison != null, shieldAbsorbed: absorbed, charmTriggered: charm);
+            if (protection == StoneGuardBlocked)
+            {
+                if (source == null || source.Input.Side != guardian.Input.Side) guardian.Rating.SkillBlocks++;
+                ReportCountdown(guardian, BattleCountdownKind.StoneGuard, 0);
+            }
+            if (guardian.Health == 0)
+            {
+                Report(BattleEventKind.Defeated, source, guardian, AbyssProtection, ActionKind.Attack);
+                UpdateEquipment();
+            }
+            OnLifeLost(source, guardian, lost);
+        }
+
+        private int LoseHealth(Unit target, int damage, out string protection, out BattleLoadout loadout,
+            out bool charmTriggered, out Unit guardian)
+        {
+            guardian = null;
             charmTriggered = false;
             protection = null;
             loadout = null;
@@ -1088,11 +1164,10 @@ namespace RaidPartyManager.Battle
 
             int before = target.Health;
             int minimum = target.Layers(Undying) > 0 ? 1 : 0;
-            if (before > 0 && damage >= before && AbyssGuardian(target) is { } guardian)
+            if ((guardian = AbyssGuardian(target, damage)) != null)
             {
-                if (minimum == 0) guardian.Rating.Saves++;
-                minimum = 1;
-                protection = "冥渊护持";
+                protection = AbyssProtection;
+                return 0;
             }
             int remaining = Math.Max(minimum, before - damage);
             if (remaining == 0)
@@ -1102,7 +1177,7 @@ namespace RaidPartyManager.Battle
                     target.Revived = true;
                     target.Health = target.Stats.Health;
                     target.Rating.Healing += Math.Max(0, target.Health - before);
-                    protection = "堕落神侍复活";
+                    protection = RebirthProtection;
                     return 0;
                 }
                 var (owner, charm) = GearEntries(target).FirstOrDefault(entry => entry.Item.Definition.Effect == ElvenCharm);
@@ -1143,7 +1218,7 @@ namespace RaidPartyManager.Battle
             {
                 if (!CanAttackThisRound(actor)) return;
                 var enemy = hostileTarget ?? target;
-                if (enemy.Input.Side == actor.Input.Side || enemy.Health == 0)
+                if (enemy.Input.Side == actor.Input.Side || enemy.Health == 0 || !enemy.CanBeTargeted)
                     enemy = TargetableOpponents(actor).FirstOrDefault();
                 if (enemy != null && power > 0)
                 {

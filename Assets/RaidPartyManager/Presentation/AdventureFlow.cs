@@ -350,8 +350,7 @@ namespace RaidPartyManager.Presentation
                 origin = fromTown ? "Town" : "EventSelect";
                 destination = scene;
                 PrototypeSceneMenu.OpenScene(scene);
-            }, turn: scene == "TalentMarket" ? StageTurn.Forward : turn,
-                townVisit: fromTown || scene == "Town" || destination == "Town" || origin == "Town");
+            }, turn: scene == "TalentMarket" ? StageTurn.Forward : turn);
         }
 
         internal static string SceneFor(NodeKind kind) => kind switch
@@ -433,7 +432,7 @@ namespace RaidPartyManager.Presentation
             Active.CloseVisit();
             InvalidateCheckpoint();
             var party = Active.Party;
-            DockPlayhouse.Current.ShowFinalCurtain(party.Gold, party.ContractsEnabled ? party.PayrollDebt : null, EndRouteAndOpenMenu);
+            DockPlayhouse.Current.ShowFinalCurtain(party.ContractsEnabled ? party.PayrollDebt : null, EndRouteAndOpenMenu);
         }
 
         internal static void ReturnFromNode()
@@ -446,8 +445,7 @@ namespace RaidPartyManager.Presentation
             // A district change must turn to the incoming set instead of holding the outgoing battle behind its signs.
             bool signs = origin != "Town" && Active?.CrossingChapter != true &&
                 (!IsBattleScene(destination) || Active?.Current?.Resolved == true);
-            DockPlayhouse.ChangeSet(FinishReturn, signs, destination == "TalentMarket" ? StageTurn.Reverse : StageTurn.Automatic,
-                townVisit: origin == "Town" || destination == "Town");
+            DockPlayhouse.ChangeSet(FinishReturn, signs, destination == "TalentMarket" ? StageTurn.Reverse : StageTurn.Automatic);
         }
 
         private static void FinishReturn()
@@ -490,13 +488,13 @@ namespace RaidPartyManager.Presentation
 
         internal static string Narrative(AdventureEventKind kind) => CapitalStories.Contains(kind) ? CapitalStories.For(kind).Intro + "\n" + string.Join("\n", CapitalStories.For(kind).Choices.Select(c => c.Label + "：" + c.Terms)) : GraveStories.Contains(kind) ? GraveStories.Intro(kind) : kind switch
         {
-            AdventureEventKind.RecruitmentWheel => ContractsEnabled ? "长按候选人，拖到柜台签约" : "长按候选人，拖到柜台招募",
+            AdventureEventKind.RecruitmentWheel => ContractsEnabled ? "长按候选人签约" : "长按候选人招募",
             AdventureEventKind.GraveSeed => "温室的桌上放着一个钱袋和一颗奇怪的种子。字条上写着：拿走一样。选了种子，就让一名出战队员装备它。",
             AdventureEventKind.TidePact => ContractsEnabled
                 ? "深海轻语浮出水面，指了指你的背包。她想用 99 天的同行换一件装备和一本技能书，期间不收工资。"
                 : "深海轻语浮出水面，指了指你的背包。交给她一件装备和一本技能书，她就会加入讨伐队。",
             AdventureEventKind.Investor => "船主还差钱造船。填好金额，再点击出资牌。账上凑满 50 金币，她才送两件装备，不足 50 就先记账。",
-            AdventureEventKind.Ambush => "灯一灭，埋伏的人就围上来了！准备好就点击应战牌，打赢这场能拿 12～18 金币。",
+            AdventureEventKind.Ambush => "灯一灭，埋伏的人就围上来了！点击应战牌，打赢就能领取金币。",
             AdventureEventKind.LostTraveler => "雾里有人答应来投奔咱们。您喊一声，等人走到跟前，就知道谁应了招。",
             AdventureEventKind.FoundCoins => "海鸥正啄地上的钱袋呢。点击拾取牌，把剩下的金币收进队伍钱包吧。",
             AdventureEventKind.HatTrick => "先记住展示宝物的那顶帽子。点击「开始交换」，一直盯住它。等帽子停稳，点中它就能带走宝物。",

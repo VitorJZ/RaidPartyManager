@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 20
   traitPower: 0
-  traitText: "选择友方目标，为其恢复生命值"
+  traitText: "有可治疗的友方时，用治疗替代普攻，基础治疗量等于攻击力。"
   personality: 5
   attack: 4
   defense: 2

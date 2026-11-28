@@ -15,6 +15,40 @@ namespace RaidPartyManager.Tests
         private static EncounterData Load(string district) => AssetDatabase.LoadAssetAtPath<EncounterAsset>(
             $"Assets/RaidPartyManager/PrototypeData/{district}Encounter.asset").ToData();
 
+        [TestCase("EnemyArsonExaminer")]
+        [TestCase("EnemyCrucibleRegent")]
+        public void FireImmuneEnemiesBlockOnlyTheFirePortionOfAnAttack(string enemyId)
+        {
+            var enemy = Load("ClockworkCapital").EnemyRoster.Single(unit => unit.Id == enemyId);
+            var stats = new Stats(50, 10, 10, 100);
+            var fire = Attack(DamageType.Fire, shielded: true);
+            Assert.That(fire.Amount, Is.Zero);
+            Assert.That(fire.ShieldAbsorbed, Is.Zero);
+            Assert.That(fire.Detail, Is.EqualTo("免疫火焰伤害"));
+
+            var physical = Attack(DamageType.Physical);
+            var mixed = Attack(DamageType.Physical, addFire: true);
+            Assert.That(physical.Amount, Is.GreaterThan(0));
+            Assert.That(mixed.Amount, Is.EqualTo(physical.Amount));
+            Assert.That(mixed.DamageTaken.Select(part => part.Type), Is.EqualTo(new[] { DamageType.Physical }));
+            Assert.That(Attack(DamageType.Lightning).Amount, Is.GreaterThan(0));
+            Assert.That(Attack(DamageType.Magic).Amount, Is.GreaterThan(0));
+
+            BattleEvent Attack(DamageType type, bool shielded = false, bool addFire = false)
+            {
+                var action = new ActionDefinition("basic", "验证攻击", ActionKind.Attack, TargetRule.FrontEnemy, 0,
+                    damageType: type, additionalDamage: addFire ? new[] { new DamageComponent(DamageType.Fire) } : null);
+                var attacker = new CharacterDefinition("tester", "Tester", Profession.Warrior, Personality.Frank, stats, 10, action);
+                var party = new Combatant("tester", attacker, Side.Party, 1, stats, stats.Health);
+                var equipment = shielded
+                    ? new[] { new EquipmentDefinition("crown", "无面王冠", default, effect: EquipmentEffect.FacelessCrown) } : null;
+                var target = new Combatant("target", enemy, Side.Enemy, 1, enemy.BaseStats, enemy.BaseStats.Health, equipment);
+                var request = new BattleRequest("fire-immunity", new[] { party, target }, 100, capitalField: true);
+                return new BattleSimulator(random: new Random(8)).Start(request).AdvanceRound()
+                    .Single(entry => entry.Kind == BattleEventKind.Action && entry.ActorId == party.Id && entry.TargetId == target.Id);
+            }
+        }
+
         [Test]
         public void EachRosterMemberCanAppearAndEveryBossHasItsOwnExclusivePair()
         {

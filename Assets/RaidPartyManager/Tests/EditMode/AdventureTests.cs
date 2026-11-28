@@ -231,7 +231,7 @@ namespace RaidPartyManager.Tests
             Assert.That(run.EnterRoute(1) && run.TakeGraveSeedReward(true) && run.CloseVisit(), Is.True);
             var seed = run.Party.Inventory.Single(item => item.Definition.Effect == EquipmentEffect.StrangeSeed);
             Assert.That(seed.Definition.AvailableInRegularPool, Is.False);
-            Assert.That((seed.Definition.Tier, seed.Definition.Price), Is.EqualTo((3, 10)));
+            Assert.That((seed.Definition.Tier, seed.Definition.Price), Is.EqualTo((3, 15)));
 
             CheckpointItem SeedState() => run.CheckpointForExit().Party.Inventory.Single(i => i.Id == seed.Id);
             int threshold = SeedState().BattlesToBloom;
@@ -358,11 +358,11 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.BackpackItems.Count(item => item.Id == cup.Id), Is.EqualTo(1));
         }
 
-        [TestCase(0, 50, 21, 17)]
-        [TestCase(1, 70, 30, 24)]
-        [TestCase(2, 90, 38, 31)]
-        [TestCase(3, 110, 47, 38)]
-        [TestCase(4, 130, 55, 45)]
+        [TestCase(0, 50, 32, 26)]
+        [TestCase(1, 70, 45, 37)]
+        [TestCase(2, 90, 58, 47)]
+        [TestCase(3, 110, 71, 58)]
+        [TestCase(4, 130, 84, 68)]
         public void BargainingCountsEveryRosterMemberForQuotesAndBulkSales(int holders, int rate, int armorPrice, int bookPrice)
         {
             var catalogue = gear.Concat(content.SkillBooks).ToArray();
@@ -466,7 +466,7 @@ namespace RaidPartyManager.Tests
             var json = UnityEngine.JsonUtility.ToJson(route.CheckpointForExit());
             route = AdventureRun.RestoreCheckpoint(UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(json),
                 content.CharacterCatalog, catalogue);
-            Assert.That(route.Party.Gold, Is.EqualTo(gold + 21 + 17 + 200));
+            Assert.That(route.Party.Gold, Is.EqualTo(gold + 32 + 26 + 200));
             Assert.That(route.Party.Members.First().EquipmentIds, Does.Contain(worn.Id));
             Assert.That(route.Party.TrySellItem(bossBook.Id), Is.False);
         }
@@ -1146,11 +1146,11 @@ namespace RaidPartyManager.Tests
             }).First(town => town.Current.Recruits.Any(c => town.Party.TownCandidateTraining(c).Sessions == 2));
             var candidate = run.Current.Recruits.First(c => run.Party.TownCandidateTraining(c).Sessions == 2);
             var training = run.Party.TownCandidateTraining(candidate);
-            var price = run.Party.SigningPrice(candidate);
+            var price = run.TownRecruitPrice(candidate);
             var savedTown = RoundTrip(run.CheckpointForExit());
             run = AdventureRun.RestoreCheckpoint(savedTown, content.CharacterCatalog, gear);
             Assert.That(run.Party.TownCandidateTraining(candidate), Is.EqualTo(training));
-            Assert.That(run.Party.SigningPrice(candidate), Is.EqualTo(price));
+            Assert.That(run.TownRecruitPrice(candidate), Is.EqualTo(price));
 
             int gold = run.Party.Gold;
             Assert.That(run.ChooseTownRecruit(candidate.Id), Is.True);
@@ -1166,6 +1166,35 @@ namespace RaidPartyManager.Tests
 
         private static AdventureCheckpoint RoundTrip(AdventureCheckpoint checkpoint) =>
             UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(UnityEngine.JsonUtility.ToJson(checkpoint));
+
+        [Test]
+        public void TownSpecialsChargeDiscountedFeesAndDoNotMoveAfterReload()
+        {
+            var run = Enumerable.Range(0, 100).Select(seed =>
+            {
+                var saved = Create(seed, false).CheckpointForExit();
+                saved.Options = new[] { NodeKind.Town };
+                var town = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear, contractsEnabled: false);
+                Assert.That(town.EnterRoute(0), Is.True);
+                return town;
+            }).First(town => town.Current.Recruits.Any(c => town.TownRecruitPricePercent(c) == 10));
+            var half = run.Current.Recruits.Single(c => run.TownRecruitPricePercent(c) == 50);
+            var tenth = run.Current.Recruits.First(c => run.TownRecruitPricePercent(c) == 10);
+            var prices = run.Current.Recruits.ToDictionary(c => c.Id, run.TownRecruitPrice);
+            Assert.That(prices[half.Id], Is.EqualTo((run.Party.SigningPrice(half) + 1) / 2));
+            Assert.That(prices[tenth.Id], Is.EqualTo((run.Party.SigningPrice(tenth) + 9) / 10));
+
+            int balance = run.Party.Gold;
+            Assert.That(run.ChooseTownRecruit(half.Id), Is.True);
+            Assert.That(run.Party.Gold, Is.EqualTo(balance - prices[half.Id]));
+            run = AdventureRun.RestoreCheckpoint(RoundTrip(run.CheckpointForExit()), content.CharacterCatalog, gear, contractsEnabled: false);
+            Assert.That(run.Current.Recruits.Any(c => run.TownRecruitPricePercent(c) == 50), Is.False);
+            Assert.That(run.TownRecruitPricePercent(tenth), Is.EqualTo(10));
+            Assert.That(run.Current.Recruits.ToDictionary(c => c.Id, run.TownRecruitPrice),
+                Is.EquivalentTo(prices.Where(entry => entry.Key != half.Id)));
+            Assert.That(run.ChooseTownRecruit(tenth.Id), Is.True);
+            Assert.That(run.Party.Gold, Is.EqualTo(balance - prices[half.Id] - prices[tenth.Id]));
+        }
 
         [Test]
         public void HiddenContractsPausePayrollWhileTownHiringAndEmployeeCareersContinue()
@@ -1196,7 +1225,7 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.Members.Single(m => m.Id == employee.Id).ContractEndDay, Is.EqualTo(employee.Contract.EndDay));
 
             var candidate = run.Current.Recruits[0];
-            int price = run.Party.SigningPrice(candidate);
+            int price = run.TownRecruitPrice(candidate);
             Assert.That(run.ChooseTownRecruit(candidate.Id), Is.True);
             Assert.That(run.Party.Gold, Is.EqualTo(saved.Party.Gold - price));
             run.Party.AddGold(20);
@@ -1230,8 +1259,8 @@ namespace RaidPartyManager.Tests
             Assert.That(board.Select(c => c.Id).Distinct().Count(), Is.EqualTo(8));
             var candidate = board[0];
             var talent = run.Party.TalentFor(candidate);
-            int price = run.Party.SigningPrice(candidate), balance = run.Party.Gold;
-            Assert.That(price, Is.GreaterThan(PlayerMarket.Value(candidate, talent)));
+            int price = run.TownRecruitPrice(candidate), balance = run.Party.Gold;
+            Assert.That(run.Party.SigningPrice(candidate), Is.GreaterThan(PlayerMarket.Value(candidate, talent)));
             Assert.That(run.ChooseTownRecruit(candidate.Id, 14, new PerformanceBonuses { Kill = -1 }), Is.False);
             Assert.That(run.Party.Gold, Is.EqualTo(balance));
             Assert.That(run.ChooseTownRecruit(candidate.Id, 0), Is.False);
@@ -1644,9 +1673,10 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void TreasureChestOffersThreeDistinctNonPotionItemsAfterOpening()
+        public void TreasureChestPaysGoldOnceAndOffersThreeDistinctNonPotionItems()
         {
             var drawn = new List<EquipmentDefinition>();
+            var goldRolls = new HashSet<int>();
             for (int seed = 0; seed < 40; seed++)
             {
                 var party = Create(seed).Party;
@@ -1657,7 +1687,10 @@ namespace RaidPartyManager.Tests
                 Assert.That(choices.Select(item => item.Id).Distinct().Count(), Is.EqualTo(3));
                 Assert.That(choices.All(item => !item.IsPotion && item.Tier is >= 1 and <= 3), Is.True);
                 Assert.That(run.ClaimReward(0), Is.False);
+                int goldBefore = party.Gold;
                 Assert.That(run.OpenTreasureChest(), Is.True);
+                int goldAfterOpening = party.Gold;
+                goldRolls.Add(goldAfterOpening - goldBefore);
                 Assert.That(run.OpenTreasureChest(), Is.False);
                 var expected = choices[1];
                 Assert.That(run.ClaimReward(1), Is.True);
@@ -1665,7 +1698,9 @@ namespace RaidPartyManager.Tests
                 Assert.That(party.Inventory.Concat(party.SkillBooks).Last(item => item.Definition.Id == expected.Id).Definition,
                     Is.SameAs(expected));
                 Assert.That(run.CloseVisit(), Is.True);
+                Assert.That(party.Gold, Is.EqualTo(goldAfterOpening));
             }
+            Assert.That(goldRolls, Is.EquivalentTo(Enumerable.Range(20, 6)));
             Assert.That(drawn.Any(item => item is SkillBookDefinition), Is.True);
         }
 
@@ -1719,10 +1754,11 @@ namespace RaidPartyManager.Tests
             Assert.That(blocked.Party.Inventory.Count, Is.EqualTo(gear.Length));
         }
 
-        [Test]
-        public void ChestReservesTheCompanionAndTheirEquipmentThenReturnsAfterThreeMoreNodes()
+        [TestCase(0, 20, 0)]
+        [TestCase(0.99, 25, 20)]
+        public void ChestReservesTheCompanionAndPaysTheBonusWhenTheyReturn(double roll, int bonus, int originalGold)
         {
-            var run = Create(); var guard = run.Party.Members.First();
+            var run = Create(random: new RewardSample { Fraction = roll }); var guard = run.Party.Members.First();
             string itemId = run.Party.Inventory.First().Id;
             Assert.That(run.Party.TryEquip(guard.Id, 0, itemId), Is.True);
             run.Inspect(NodeKind.Event, AdventureEventKind.LockedChest);
@@ -1735,12 +1771,16 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.TryReplaceMember(guard.Id, content.CharacterCatalog.First(c => c.RosterNumber == 2)), Is.False);
             for (int i = 0; i < 3; i++)
             {
-                run.Inspect(NodeKind.Event, AdventureEventKind.FoundCoins); run.CollectCoins(); run.CloseVisit();
+                run.Inspect(NodeKind.Event, AdventureEventKind.FoundCoins); run.CollectCoins();
+                int goldBeforeClosing = run.Party.Gold;
+                run.CloseVisit();
+                Assert.That(run.Party.Gold - goldBeforeClosing, Is.EqualTo(i == 2 ? bonus + originalGold : 0));
                 Assert.That(run.Party.Members.First(m => m.Id == guard.Id).IsAway, Is.EqualTo(i < 2));
             }
             Assert.That(run.Party.CaptureFormation(Side.Party).Count, Is.EqualTo(4));
             Assert.That(run.Party.Members.First(m => m.Id == guard.Id).EquipmentIds[0], Is.EqualTo(itemId));
             Assert.That(run.ReturnMessage, Does.Contain(guard.Character.Name));
+            Assert.That(run.ReturnMessage, Does.Contain($"开箱额外获得 {bonus} 金币"));
             var memories = run.Party.EmployeeProfileFor(guard.Id).Career;
             Assert.That(memories.LatestMemory.Topic, Is.EqualTo(EmployeeThought.ChestReturn));
             Assert.That(memories.PreviousMemory.Topic, Is.EqualTo(EmployeeThought.ChestDuty));
@@ -1797,7 +1837,7 @@ namespace RaidPartyManager.Tests
             var party = Create().Party;
             var run = new AdventureRun(party, content.CharacterCatalog, content.SkillBooks, true, new Random(34));
             run.Inspect(NodeKind.Town);
-            Assert.That(run.Current.Stock.Count, Is.EqualTo(4));
+            Assert.That(run.Current.Stock.Count, Is.EqualTo(3));
             var offer = run.Current.Stock[0];
             Assert.That(offer.Item, Is.InstanceOf<SkillBookDefinition>());
             Assert.That(offer.Price, Is.GreaterThan(0));
@@ -1807,6 +1847,21 @@ namespace RaidPartyManager.Tests
             Assert.That(party.Gold, Is.EqualTo(gold - offer.Price));
             Assert.That(party.SkillBooks.Count, Is.EqualTo(count + 1));
             Assert.That(party.SkillBooks.Any(i => i.Definition.Id == offer.Item.Id), Is.True);
+        }
+
+        [TestCase(0, 8, 35, 7, 28)]
+        [TestCase(.999999, 9, 45, 8, 36)]
+        public void ShopQuotesStayInsideTheIntegerPercentageRangeAndDiscountAfterTheRoll(
+            double roll, int potionQuote, int bookQuote, int potionDiscounted, int bookDiscounted)
+        {
+            var potion = gear.Single(item => item.Effect == EquipmentEffect.SwiftPotion);
+            var book = content.SkillBooks.First(item => item.Tier == 2);
+            Assert.That((potion.Price, book.Price), Is.EqualTo((8, 38)));
+            bool discount = false;
+            var offers = AdventureShopOffer.Draw(new[] { potion, book }, new RewardSample { Fraction = roll }, () => discount);
+            Assert.That(offers.Select(offer => offer.Price), Is.EqualTo(new[] { potionQuote, bookQuote }));
+            discount = true;
+            Assert.That(offers.Select(offer => offer.Price), Is.EqualTo(new[] { potionDiscounted, bookDiscounted }));
         }
 
         [Test]
@@ -1824,7 +1879,7 @@ namespace RaidPartyManager.Tests
             saved = UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(UnityEngine.JsonUtility.ToJson(run.CheckpointForExit()));
             run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear);
 
-            Assert.That(run.Current.Stock.Select(o => o.Price), Is.EqualTo(undiscounted.Select(price => (price + 1) / 2)));
+            Assert.That(run.Current.Stock.Select(o => o.Price), Is.EqualTo(undiscounted.Select(price => (int)Math.Ceiling(price * 0.8m))));
             int price = run.Current.Stock[0].Price;
             Assert.That(run.Buy(0), Is.True);
             Assert.That(run.Party.Expenses.Last(e => e.Reason.StartsWith("购买")).Amount, Is.EqualTo(price));
@@ -1833,9 +1888,11 @@ namespace RaidPartyManager.Tests
         [Test]
         public void OnlyCampIsLimitedAndAllFourTownServicesCanBeUsed()
         {
-            var run = Create(); run.Inspect(NodeKind.Town);
-            Assert.That(run.Current.Stock.Count, Is.EqualTo(4));
-            Assert.That(run.Current.Stock.Count(o => o.Item.Tier == 1), Is.EqualTo(2));
+            var run = new AdventureRun(Create().Party, content.CharacterCatalog, gear.Concat(content.SkillBooks), true, new Random(17));
+            run.Inspect(NodeKind.Town);
+            Assert.That(run.Current.Stock.Take(5).All(o => o.Item is not SkillBookDefinition), Is.True);
+            Assert.That(run.Current.Stock.Skip(5).Select(o => o.Item).ToArray(), Has.Length.EqualTo(3).And.All.InstanceOf<SkillBookDefinition>());
+            Assert.That(run.Current.Stock.Count(o => o.Item is not SkillBookDefinition && o.Item.Tier == 1), Is.EqualTo(2));
             Assert.That(run.Rest(), Is.True); Assert.That(run.Rest(), Is.False);
             foreach (var member in run.Party.Members)
                 Assert.That(member.Health, Is.EqualTo(member.EffectiveStats.Health));
@@ -1910,9 +1967,13 @@ namespace RaidPartyManager.Tests
             Assert.That(result.Outcome, Is.EqualTo(BattleOutcome.Victory));
             Assert.That(run.Party.TrySettle(result, out _), Is.True);
             Assert.That(run.SettleBattle(result), Is.True);
-            int minimum = eventKind == AdventureEventKind.Ambush ? 12 : enemies.Sum(e => run.Current.Battle.EliteIds.Contains(e.Id) ? 14 : 6);
-            int maximum = eventKind == AdventureEventKind.Ambush ? 18 : enemies.Sum(e => run.Current.Battle.EliteIds.Contains(e.Id) ? 20 : 9);
-            Assert.That(run.Party.Gold - startingGold, Is.InRange(minimum, maximum));
+            var (minimum, maximum) = run.Current.Battle.Kind switch
+            {
+                NodeKind.Boss => (10, 15),
+                NodeKind.EliteBattle => (6, 9),
+                _ => (4, 6)
+            };
+            Assert.That(run.Party.Gold - startingGold - result.GoldEarned, Is.InRange(minimum, maximum));
             Assert.That(run.SettleBattle(result), Is.False);
             var recorded = run.FloorBattles.Single();
             Assert.That(recorded.Kind, Is.EqualTo(kind));
@@ -1936,19 +1997,30 @@ namespace RaidPartyManager.Tests
             }
         }
 
-        [TestCase(1, NodeKind.NormalBattle, 6, 9, 14, 20)]
-        [TestCase(2, NodeKind.NormalBattle, 10, 13, 21, 27)]
-        [TestCase(3, NodeKind.NormalBattle, 14, 17, 28, 34)]
-        [TestCase(2, NodeKind.EliteBattle, 10, 13, 21, 27)]
-        [TestCase(3, NodeKind.EliteBattle, 14, 17, 28, 34)]
-        [TestCase(2, NodeKind.Boss, 10, 13, 21, 27)]
-        [TestCase(3, NodeKind.Boss, 14, 17, 28, 34)]
-        public void AdventureBattleGoldUsesTheLayerOfTheEncounter(int floor, NodeKind kind,
-            int normalMinimum, int normalMaximum, int eliteMinimum, int eliteMaximum)
+        [TestCase(1, NodeKind.NormalBattle, 4, 6)]
+        [TestCase(1, NodeKind.EliteBattle, 6, 9)]
+        [TestCase(1, NodeKind.Boss, 10, 15)]
+        [TestCase(2, NodeKind.NormalBattle, 5, 7)]
+        [TestCase(2, NodeKind.EliteBattle, 7, 10)]
+        [TestCase(2, NodeKind.Boss, 12, 17)]
+        [TestCase(3, NodeKind.NormalBattle, 7, 10)]
+        [TestCase(3, NodeKind.EliteBattle, 10, 15)]
+        [TestCase(3, NodeKind.Boss, 15, 20)]
+        public void AdventureBattleGoldUsesOnePayoutForTheRegionAndBattleKind(int floor, NodeKind kind, int minimum, int maximum)
         {
+            var sample = new RewardSample { Fraction = 0 };
+            Assert.That(AdventureRun.RollBattleGold(BattleOutcome.Victory, kind, sample, floor), Is.EqualTo(minimum));
+            sample.Fraction = 0.99;
+            Assert.That(AdventureRun.RollBattleGold(BattleOutcome.Victory, kind, sample, floor), Is.EqualTo(maximum));
+            Assert.That(AdventureRun.RollBattleGold(BattleOutcome.PartyDefeated, kind, sample, floor), Is.Zero);
+
             var saved = Create(42, false).CheckpointForExit();
             saved.Floor = floor;
+            saved.HasVisitedTown = true;
             saved.Stage = kind == NodeKind.Boss ? DockRoute.Stages : 5;
+            saved.Nodes[saved.Stage - 1].Kind = kind;
+            saved.Nodes[saved.Stage - 1].Fork = false;
+            saved.Nodes[saved.Stage - 1].AlternativePlusOne = 0;
             saved.Options = new[] { kind };
             var encounters = floor switch
             {
@@ -1958,17 +2030,14 @@ namespace RaidPartyManager.Tests
             };
             var run = AdventureRun.RestoreCheckpoint(saved, content.CharacterCatalog, gear.Concat(content.SkillBooks));
             Assert.That(run.EnterRoute(0), Is.True);
+            Assert.That(run.Current.Battle.Kind, Is.EqualTo(kind));
             var enemies = run.PrepareEnemies(encounters.EnemyRoster, encounters.EnemyFormations);
             run.BindBattle("layer-gold");
             var victory = new BattleResult("layer-gold", BattleOutcome.Victory,
                 enemies.ToDictionary(enemy => enemy.Id, _ => 0), Array.Empty<BattleEvent>());
             Assert.That(run.SettleBattle(victory, out int gold), Is.True);
-            int elite = run.Current.Battle.EliteIds.Count;
-            int normal = enemies.Count - elite;
-            int minimum = normal * normalMinimum + elite * eliteMinimum;
-            int maximum = normal * normalMaximum + elite * eliteMaximum;
-            int appearanceFees = kind == NodeKind.NormalBattle ? run.Party.Members.Count(m => m.Trait == PlayerTrait.AppearanceFee) : 0;
-            Assert.That(gold, Is.InRange(minimum - appearanceFees, maximum));
+            Assert.That(enemies.Count, Is.GreaterThan(1));
+            Assert.That(gold, Is.InRange(minimum, maximum));
         }
 
         [TestCase("EnemyBlockadeAdmiral", EquipmentEffect.HarborWhistle, 31)]
@@ -1981,10 +2050,10 @@ namespace RaidPartyManager.Tests
             var options = BossSpoils.Roll(boss, catalogue, new Random(23)).Choices;
             Assert.That(options, Has.Length.EqualTo(2));
             Assert.That(options[0].Effect, Is.EqualTo(effect));
-            Assert.That(options[0].Price, Is.EqualTo(100));
+            Assert.That(options[0].Price, Is.EqualTo(150));
             Assert.That(options[1].Id, Is.EqualTo($"skill-book-{number}"));
             Assert.That(options.All(item => item.RewardBossId == boss && !item.CanDropInBattle &&
-                !item.AvailableInRegularPool && AdventureShopOffer.BasePrice(item) == 100), Is.True);
+                !item.AvailableInRegularPool && AdventureShopOffer.BasePrice(item) == 150), Is.True);
             Assert.That(options.Select(item => content.IconFor(item.Id)), Has.None.Null);
         }
 
@@ -2120,7 +2189,7 @@ namespace RaidPartyManager.Tests
             Assert.That(reward, Is.Not.InstanceOf<SkillBookDefinition>());
             Assert.That(reward.BossExclusive, Is.False);
             Assert.That(stone.CanDropInBattle, Is.True);
-            Assert.That(stone.Price, Is.EqualTo(43));
+            Assert.That(stone.Price, Is.EqualTo(65));
             if (expectedTier == 1) Assert.That(reward, Is.SameAs(stone));
         }
 
@@ -2169,6 +2238,7 @@ namespace RaidPartyManager.Tests
             public double Fraction = 0.5;
             public override double NextDouble() => Fraction;
             public override int Next(int maxValue) => (int)(Fraction * maxValue);
+            public override int Next(int minValue, int maxValue) => minValue + Next(maxValue - minValue);
         }
 
         [TestCase(NodeKind.NormalBattle, 1)]

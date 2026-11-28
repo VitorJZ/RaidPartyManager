@@ -17,9 +17,8 @@ namespace RaidPartyManager.Battle
                 case CharacterTrait.EnemyResolve when random.NextDouble() < 0.5:
                     GrantStatus(actor, actor, StatusKind.Resolve, 1, "扎盾坚毅", BattleVisualCue.ResolveGuard);
                     return true;
-                case CharacterTrait.EnemyCeramicPierce:
-                    var target = FrontAttackTargets(actor).First();
-                    int defense = target.Stats.Defense;
+                case CharacterTrait.EnemyCeramicPierce when FrontAttackTargets(actor).FirstOrDefault() is { } target:
+                    int defense = target.Defense;
                     var behind = Opponents(actor).FirstOrDefault(unit => unit.Input.Position > target.Input.Position);
                     if (EnemyHit(actor, target, "裂陶穿击", BattleVisualCue.CeramicPierce) && defense > 0 && behind?.Health > 0)
                         Strike(actor, behind, defense, DamageType.True, "陶片溅射", BattleEventKind.Effect,
@@ -29,7 +28,7 @@ namespace RaidPartyManager.Battle
                     RingBell(actor);
                     return true;
                 case CharacterTrait.EnemyRearAmbush when random.NextDouble() < 0.7:
-                    EnemyHit(actor, TargetableOpponents(actor).Last(), "绕后突袭", BattleVisualCue.RearAmbush);
+                    EnemyHit(actor, TargetableOpponents(actor).LastOrDefault(), "绕后突袭", BattleVisualCue.RearAmbush);
                     return true;
                 case CharacterTrait.EnemyCrossbow:
                     CrossbowTurn(actor);
@@ -63,7 +62,7 @@ namespace RaidPartyManager.Battle
                 return;
             }
             bool critical = random.NextDouble() < 0.2;
-            var target = IsRanged(actor) ? RandomTarget(TargetableOpponents(actor)) : FrontAttackTargets(actor).First();
+            var target = IsRanged(actor) ? RandomTarget(TargetableOpponents(actor)) : FrontAttackTargets(actor).FirstOrDefault();
             EnemyHit(actor, target, critical ? "重弩暴击" : "普攻",
                 critical ? BattleVisualCue.CrossbowCritical : BattleVisualCue.None, critical ? 2 : 1);
         }
@@ -81,11 +80,11 @@ namespace RaidPartyManager.Battle
                     return;
                 }
             }
-            EnemyHit(actor, FrontAttackTargets(actor).First(), "真伤刺击", BattleVisualCue.QuackStrike);
+            EnemyHit(actor, FrontAttackTargets(actor).FirstOrDefault(), "真伤刺击", BattleVisualCue.QuackStrike);
         }
 
         private bool EnemyHit(Unit actor, Unit target, string name, BattleVisualCue cue, int multiplier = 1) =>
-            Hit(actor, target, actor.Input.Character.BasicAttack, BattleEventKind.Action, DecisionReason.Default,
+            target != null && Hit(actor, target, actor.Input.Character.BasicAttack, BattleEventKind.Action, DecisionReason.Default,
                 name, visual: cue, multiplier: multiplier);
     }
 }

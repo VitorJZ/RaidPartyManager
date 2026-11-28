@@ -16,11 +16,10 @@ namespace RaidPartyManager.Battle
         {
             switch (actor.Trait)
             {
-                case EnemyTideFollower when random.NextDouble() >= 0.70:
-                    GrantStatus(actor, TargetableOpponents(actor).First(), Wet, 1, "拍岸泼潮", BattleVisualCue.TideMark);
+                case EnemyTideFollower when random.NextDouble() >= 0.70 && TargetableOpponents(actor).FirstOrDefault() is { } tideTarget:
+                    GrantStatus(actor, tideTarget, Wet, 1, "拍岸泼潮", BattleVisualCue.TideMark);
                     return true;
-                case EnemyWreckScavenger:
-                    var victim = FrontAttackTargets(actor).First();
+                case EnemyWreckScavenger when FrontAttackTargets(actor).FirstOrDefault() is { } victim:
                     Hit(actor, victim, actor.Input.Character.BasicAttack, BattleEventKind.Action, DecisionReason.Default, "普攻",
                         onHit: defender =>
                         {
@@ -28,14 +27,14 @@ namespace RaidPartyManager.Battle
                         });
                     return true;
                 case EnemyDeckSailor:
-                    var softest = TargetableOpponents(actor).OrderBy(unit => unit.Stats.Defense).First();
+                    var softest = TargetableOpponents(actor).OrderBy(unit => unit.Defense).FirstOrDefault();
                     EnemyHit(actor, softest, "普攻", BattleVisualCue.None);
                     return true;
-                case EnemyMudEel when random.NextDouble() >= 0.70:
-                    GrantStatus(actor, TargetableOpponents(actor).First(), Chill, 1, "盐霜吐息", BattleVisualCue.EelFrost);
+                case EnemyMudEel when random.NextDouble() >= 0.70 && TargetableOpponents(actor).FirstOrDefault() is { } frostTarget:
+                    GrantStatus(actor, frostTarget, Chill, 1, "盐霜吐息", BattleVisualCue.EelFrost);
                     return true;
-                case EnemyLanternMoth when random.NextDouble() >= 0.60:
-                    var frailest = Opponents(actor).OrderBy(unit => (double)unit.Health / unit.Stats.Health).First();
+                case EnemyLanternMoth when random.NextDouble() >= 0.60 &&
+                    DirectOpponents(actor).OrderBy(unit => (double)unit.Health / unit.Stats.Health).FirstOrDefault() is { } frailest:
                     GrantStatus(actor, frailest, Weakened, 1, "吞灯余灰", BattleVisualCue.MothAsh, delayDecay: true);
                     return true;
                 case EnemyShipCaulker when random.NextDouble() >= 0.60:
@@ -46,11 +45,11 @@ namespace RaidPartyManager.Battle
                         return false;
                     Heal(actor, wounded, 1, "补缝", BattleEventKind.Action, visual: BattleVisualCue.CaulkerMend);
                     return true;
-                case EnemyAnchorHermit when random.NextDouble() >= 0.65:
-                    GrantStatus(actor, Opponents(actor).First(), Exposed, 1, "沉锚破防", BattleVisualCue.AnchorExpose);
+                case EnemyAnchorHermit when random.NextDouble() >= 0.65 && DirectOpponents(actor).FirstOrDefault() is { } front:
+                    GrantStatus(actor, front, Exposed, 1, "沉锚破防", BattleVisualCue.AnchorExpose);
                     return true;
-                case EnemyFogAngler when random.NextDouble() >= 0.60:
-                    var healthiest = Opponents(actor).OrderByDescending(unit => unit.Health).First();
+                case EnemyFogAngler when random.NextDouble() >= 0.60 &&
+                    DirectOpponents(actor).OrderByDescending(unit => unit.Health).FirstOrDefault() is { } healthiest:
                     GrantStatus(actor, healthiest, Cursed, 1, "引魂鱼灯", BattleVisualCue.AnglerCurse, delayDecay: true);
                     return true;
                 case EnemyMooringWarden when random.NextDouble() >= 0.55:
@@ -63,7 +62,7 @@ namespace RaidPartyManager.Battle
                     return AdmiralTurn(actor);
                 case EnemyDrownedLanternRay:
                     if (random.NextDouble() < 0.70)
-                        EnemyHit(actor, Opponents(actor).First(), "沉灯甩尾", BattleVisualCue.RayTail);
+                        EnemyHit(actor, DirectOpponents(actor).FirstOrDefault(), "沉灯甩尾", BattleVisualCue.RayTail);
                     else
                         CoverInFog(actor, actor.EnemyTriggered ? 2 : 1, "沉灯寒雾", BattleEventKind.Action, BattleVisualCue.RayMist);
                     return true;
@@ -78,7 +77,7 @@ namespace RaidPartyManager.Battle
             {
                 actor.EnemyTriggered = false;
                 bool first = true;
-                foreach (var target in Opponents(actor).Reverse().Take(2).ToArray())
+                foreach (var target in DirectOpponents(actor).Reverse().Take(2).ToArray())
                 {
                     Strike(actor, target, CurrentAttack(actor), DamageType.Physical, "封港炮击",
                         first ? BattleEventKind.Action : BattleEventKind.Effect, visual: BattleVisualCue.AdmiralBroadside);
@@ -95,7 +94,7 @@ namespace RaidPartyManager.Battle
             Report(BattleEventKind.Action, actor, actor, "鸣笛预警", ActionKind.Shield,
                 detail: "下次行动将炮击最后两名存活的对手", visual: BattleVisualCue.AdmiralWhistle);
             ReportCountdown(actor, BattleCountdownKind.AdmiralBroadside, 1);
-            foreach (var target in Opponents(actor).Reverse().Take(2))
+            foreach (var target in DirectOpponents(actor).Reverse().Take(2))
                 ShowEnemyVisual(actor, target, BattleVisualCue.AdmiralWarning);
             return true;
         }

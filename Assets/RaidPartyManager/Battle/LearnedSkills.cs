@@ -28,6 +28,7 @@ namespace RaidPartyManager.Battle
             bool astralCast = false)
         {
             var enemies = Opponents(actor).ToArray();
+            var direct = enemies.Where(enemy => enemy.CanBeTargeted).ToArray();
             var allies = units.Where(unit => unit.Input.Side == actor.Input.Side && unit.Health > 0).ToArray();
 
             int reachableEnergy = actor.Energy.Remaining + Math.Max(0, actor.ChargeTarget - actor.Energy.Capacity);
@@ -44,7 +45,7 @@ namespace RaidPartyManager.Battle
                 switch (book.SkillEffect)
                 {
                     case ExpressClearance:
-                        Add(actor, enemies.Take(2).Sum(e => (long)Estimate(e, attack + 4, DamageType.Physical) + 2));
+                        Add(actor, direct.Take(2).Sum(e => (long)Estimate(e, attack + 4, DamageType.Physical) + 2));
                         break;
                     case MeridianTransit:
                         Add(actor, enemies.Sum(e => (long)Estimate(e, attack + 2, DamageType.Magic)));
@@ -53,22 +54,20 @@ namespace RaidPartyManager.Battle
                         Add(actor, allies.Sum(e => (long)HealingGain(e, 4) + 6));
                         break;
                     case BlockadeSalvo:
-                        Add(actor, enemies.Reverse().Take(2).Sum(e => (long)Estimate(e, attack + 3, DamageType.Physical) + 1));
+                        Add(actor, direct.Reverse().Take(2).Sum(e => (long)Estimate(e, attack + 3, DamageType.Physical) + 1));
                         break;
                     case DeepwaterSurge:
                         foreach (var foe in TargetableOpponents(actor))
                             Add(foe, Estimate(foe, attack + 3, DamageType.Magic) + 3L);
                         break;
-                    case BurialEdict:
-                        var front = enemies.First();
+                    case BurialEdict when direct.FirstOrDefault() is { } front:
                         Add(front, Estimate(front, 2 * attack + 2, DamageType.Physical) + 2L * enemies.Length);
                         break;
                     case LongNightPrayer:
                         Add(actor, allies.Sum(ally => 5L + HealingGain(ally, 5) +
                             ally.Statuses.Keys.Count(status => StatusRules.For(status).Negative)));
                         break;
-                    case HookArrow:
-                        var rear = enemies.Last();
+                    case HookArrow when direct.LastOrDefault() is { } rear:
                         Add(rear, Estimate(rear, attack + 3, DamageType.Physical) + 1); break;
                     case TwinCover: Add(actor, Behind(actor) != null ? 8 : 4); break;
                     case FieldMedic:
@@ -78,7 +77,7 @@ namespace RaidPartyManager.Battle
                     case BronzeMirror when actor.MirrorShield == 0: Add(actor, 20); break;
                     case NightWatch: Add(actor, allies.Sum(a => (long)HealingGain(a, 7))); break;
                     case SiegeBolt:
-                        foreach (var foe in enemies) Add(foe, foe.Shield + Estimate(foe, 2 * attack + 4, DamageType.Physical) +
+                        foreach (var foe in direct) Add(foe, foe.Shield + Estimate(foe, 2 * attack + 4, DamageType.Physical) +
                             NearbyEnemies(actor, foe).Where(e => e != foe).Sum(e => (long)Estimate(e, attack + 2, DamageType.Physical))); break;
                     case Intercept when allies.Length > 1 && (actor.Intercepts == 0 || actor.InterceptUntil < Round): Add(actor, 15); break;
                     case BackPay:
@@ -100,7 +99,7 @@ namespace RaidPartyManager.Battle
                         Add(actor, enemies.Sum(enemy => (long)Estimate(enemy, attack + 1, DamageType.Fire)));
                         break;
                     case AbsoluteZero:
-                        Add(actor, enemies.Count(enemy => CanAffect(enemy, Frozen)) * 2);
+                        Add(actor, direct.Count(enemy => CanAffect(enemy, Frozen)) * 2);
                         break;
                     case Sunshine:
                         Add(actor, actor.Has(EquipmentEffect.RebelEarring)
@@ -248,7 +247,7 @@ namespace RaidPartyManager.Battle
             switch (book.SkillEffect)
             {
                 case ExpressClearance:
-                    foreach (var enemy in Opponents(actor).OrderBy(e => e.Input.Position).Take(2).ToArray())
+                    foreach (var enemy in DirectOpponents(actor).OrderBy(e => e.Input.Position).Take(2).ToArray())
                     {
                         DamageEnemy(enemy, attack + 4, DamageType.Physical);
                         if (enemy.Health > 0) Apply(enemy, Exposed, 2);
@@ -265,7 +264,7 @@ namespace RaidPartyManager.Battle
                     }
                     break;
                 case BlockadeSalvo:
-                    foreach (var enemy in Opponents(actor).Reverse().Take(2).ToArray())
+                    foreach (var enemy in DirectOpponents(actor).Reverse().Take(2).ToArray())
                     {
                         DamageEnemy(enemy, attack + 3, DamageType.Physical);
                         if (enemy.Health > 0) Apply(enemy, Exposed);
@@ -344,7 +343,7 @@ namespace RaidPartyManager.Battle
                         DamageEnemy(enemy, attack + 1, DamageType.Fire);
                     break;
                 case AbsoluteZero:
-                    foreach (var enemy in Opponents(actor).Where(enemy => CanAffect(enemy, Frozen)).Take(2).ToArray())
+                    foreach (var enemy in DirectOpponents(actor).Where(enemy => CanAffect(enemy, Frozen)).Take(2).ToArray())
                         Apply(enemy, Frozen);
                     break;
                 case Sunshine:

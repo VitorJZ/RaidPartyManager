@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 2
   fixedTrait: 52
   traitPower: 0
-  traitText: "自身无法恢复生命值。存活在场时，其他队友的生命值不会低于 1 点。"
+  traitText: "无法恢复生命值，不会被选为攻击目标。存活在场时，代替队友承受原本会致命的生命伤害。"
   personality: 2
   attack: 4
   defense: 0

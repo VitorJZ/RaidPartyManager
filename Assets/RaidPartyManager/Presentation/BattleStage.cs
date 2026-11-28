@@ -52,6 +52,7 @@ namespace RaidPartyManager.Presentation
         private VisualElement shotSubject, shotProp;
         private BossEntranceCue.Shot shot;
         private Matrix4x4 restingLens, shotLens;
+        private Bounds shotFocus;
         private readonly AudienceForeground audience;
         private readonly DockPlayhouse house;
         private readonly Transform lantern;
@@ -59,6 +60,9 @@ namespace RaidPartyManager.Presentation
         private float castDistance;
         internal bool IsActive => !disposed;
         internal Bounds FormationBounds { get; private set; }
+        internal Bounds FocusBounds => shotApplied
+            ? StageTiltShift.BlendFocus(FormationBounds, shotFocus, shot.Weight)
+            : FormationBounds;
         internal float PartyViewportHeight { private get; set; }
         internal bool HasDockHouse => house != null;
         private readonly Texture2D printedSurf;
@@ -176,7 +180,7 @@ namespace RaidPartyManager.Presentation
                 StageLighting.Rehearsal.Apply(paper);
                 audience = new AudienceForeground(stage.transform, art.paperShader, art.seatBack, art.apronWood);
             }
-            tiltShift = new StageTiltShift(camera, () => house != null ? house.FocusOn(FormationBounds) : FormationBounds);
+            tiltShift = new StageTiltShift(camera, () => house != null ? house.FocusOn(FocusBounds) : FocusBounds);
             if (moonlit)
             {
                 if (right != null)
@@ -560,6 +564,10 @@ namespace RaidPartyManager.Presentation
                 body = new Rect(Vector2.Lerp(body.position, prop.position, shot.PropFocus),
                     Vector2.Lerp(body.size, prop.size, shot.PropFocus));
             }
+            // Keep the lens on the same subject (or entrance prop) as the camera crop.
+            var first = Project(body.min, screen);
+            var last = Project(body.max, screen);
+            shotFocus.SetMinMax(Vector3.Min(first, last), Vector3.Max(first, last));
             float fullZoom = Mathf.Clamp(Mathf.Min(screen.height * shot.Coverage / body.height,
                 screen.width * .88f / body.width), 1.25f, 2.55f);
             float zoom = Mathf.Lerp(1, fullZoom, shot.Weight);

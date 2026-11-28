@@ -82,24 +82,24 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("shop-recruit-open"), Is.Null);
             Assert.That(root.Q<Label>("shop-gold").text, Is.EqualTo("金币  999"));
             var prices = root.Query<Label>("shop-item-price").ToList();
-            Assert.That(prices.Count, Is.EqualTo(4));
+            Assert.That(prices.Count, Is.EqualTo(8));
             var offers = OfferViews(root);
-            Assert.That(offers.Count(view => OfferTier(shop, view) == 1), Is.EqualTo(2));
-            Assert.That(offers.Count(view => OfferTier(shop, view) >= 2), Is.EqualTo(2));
+            Assert.That(offers.Take(5).Count(view => OfferTier(shop, view) == 1), Is.EqualTo(2));
+            Assert.That(offers.Take(5).Count(view => OfferTier(shop, view) >= 2), Is.EqualTo(3));
             Assert.That(root.Query<Label>().ToList().Any(label => Regex.IsMatch(label.text, @"T[0-3]")), Is.False);
             foreach (var view in offers)
             {
                 var item = OfferItem(shop, view);
                 int basePrice = AdventureShopOffer.BasePrice(item);
-                Assert.That(Price(view), Is.InRange((int)System.Math.Ceiling(basePrice * 0.7),
-                    (int)System.Math.Ceiling(basePrice * 1.3)));
+                Assert.That(Price(view), Is.InRange((int)System.Math.Ceiling(basePrice * 0.9m),
+                    (int)System.Math.Floor(basePrice * 1.2m)));
             }
             Assert.That(root.Q("shop-item-name"), Is.Null);
-            Assert.That(offers.Select(view => OfferItem(shop, view).Id).Distinct().Count(), Is.EqualTo(4));
+            Assert.That(offers.Select(view => OfferItem(shop, view).Id).Distinct().Count(), Is.EqualTo(8));
             Assert.That(offers.Select(v => v.worldBound.center.x), Is.Ordered);
             var stage = shop.transform.Find("Service theatre");
             Assert.That(stage.Find("Recruitment wheel fixture"), Is.Null);
-            Assert.That(stage.Find("shop-merchant").position.x, Is.Zero.Within(.01f));
+            Assert.That(stage.Find("shop-merchant").position.x, Is.LessThan(0));
             Assert.That(stage.Find("Cabinet back"), Is.Null);
             Assert.That(stage.Find("Shop roof beam"), Is.Null);
             Assert.That(stage.Find("Shop roof beam lower edge"), Is.Null);
@@ -313,6 +313,39 @@ namespace RaidPartyManager.Tests
             first.Where((pixel, index) => !pixel.Equals(second[index])).Count();
 
         [UnityTest]
+        public IEnumerator MerchantWalksToTheSkillBooksAndRunsBackToEquipment()
+        {
+            yield return SceneManager.LoadSceneAsync("DockShop");
+            yield return null;
+            var shop = Object.FindAnyObjectByType<DockShop>();
+            var root = shop.GetComponent<UIDocument>().rootVisualElement;
+            var merchant = shop.transform.Find("Service theatre/shop-merchant");
+            var offers = OfferViews(root);
+            Assert.That(offers.Take(5).All(offer => OfferItem(shop, offer) is not SkillBookDefinition), Is.True);
+            Assert.That(offers.Skip(5).Select(offer => OfferItem(shop, offer)).ToArray(), Has.Length.EqualTo(3).And.All.InstanceOf<SkillBookDefinition>());
+            Assert.That(merchant.position.x, Is.LessThan(0));
+
+            Press(root, "shop-books-counter");
+            yield return null;
+            yield return WaitForCounter(root);
+            Assert.That(merchant.position.x, Is.GreaterThan(0));
+            Assert.That(offers[0].pickingMode, Is.EqualTo(PickingMode.Ignore));
+            Assert.That(offers[5].pickingMode, Is.EqualTo(PickingMode.Position));
+            Assert.That(root.Q("shop-counter").worldBound.width, Is.GreaterThan(20));
+            var party = (PartyRun)typeof(DockShop).GetField("party", Private).GetValue(shop);
+            int before = party.SkillBooks.Count;
+            yield return HoldToBuy(root, offers[5]);
+            Assert.That(party.SkillBooks.Count, Is.EqualTo(before + 1));
+
+            Press(root, "shop-counter");
+            yield return null;
+            yield return WaitForCounter(root);
+            Assert.That(merchant.position.x, Is.LessThan(0));
+            Assert.That(offers[0].pickingMode, Is.EqualTo(PickingMode.Position));
+            Assert.That(offers[6].pickingMode, Is.EqualTo(PickingMode.Ignore));
+        }
+
+        [UnityTest]
         public IEnumerator ShopRejectsUnaffordableAndRepeatedPurchases()
         {
             yield return SceneManager.LoadSceneAsync("DockShop");
@@ -350,7 +383,7 @@ namespace RaidPartyManager.Tests
         private static void AssertPriceSigns(VisualElement root, Transform stage)
         {
             var camera = Camera.main;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < OfferViews(root).Length; i++)
             {
                 var display = stage.Find("Table stock " + i);
                 if (!display.gameObject.activeSelf) continue;
@@ -391,7 +424,7 @@ namespace RaidPartyManager.Tests
         }
 
         private static VisualElement[] OfferViews(VisualElement root) =>
-            Enumerable.Range(0, 4).Select(index => root.Q($"shop-offer-{index}")).ToArray();
+            root.Q("shop-stock").Children().ToArray();
 
         private static EquipmentDefinition OfferItem(DockShop shop, VisualElement view)
         {

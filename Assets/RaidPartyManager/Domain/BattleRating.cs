@@ -13,13 +13,15 @@ namespace RaidPartyManager.Domain
         public int Position, Kills, Saves, Interceptions, SkillBlocks;
         public bool Fallen, Retreated;
         public long HealthDamage, ShieldDamage, PoisonDamage, Healing, DamageTaken, ShieldAbsorbed;
+        public long ResistancePrevented;
         public long AllyShielding, DebuffLayers, BuffLayers, CleansedLayers;
         public int ScoreTenths;
 
         public long Damage => HealthDamage + ShieldDamage;
+        public long RatedDamageTaken => DamageTaken + ResistancePrevented;
         public decimal DamagePoints => .20m * HealthDamage + .10m * ShieldDamage;
         public decimal HealingPoints => .25m * Healing;
-        public decimal DefensePoints => .08m * DamageTaken + .16m * ShieldAbsorbed + .20m * AllyShielding +
+        public decimal DefensePoints => .08m * RatedDamageTaken + .16m * ShieldAbsorbed + .20m * AllyShielding +
             .40m * Interceptions + .40m * SkillBlocks;
         public decimal StatusPoints => .40m * DebuffLayers + .20m * BuffLayers + .20m * CleansedLayers;
         public decimal KillAndSavePoints => .60m * Kills + .60m * Saves;

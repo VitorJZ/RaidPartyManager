@@ -27,9 +27,9 @@ MonoBehaviour:
   rosterNumber: 0
   stage: 1
   reach: 1
-  fixedTrait: 0
+  fixedTrait: 56
   traitPower: 0
-  traitText: "每次行动升温，第三次灼烧前两人。行动时有寒冷便消耗1层，炉温归零并跳过攻击。"
+  traitText: "免疫火焰伤害。每次行动升温，第三次灼烧前两人。行动时有寒冷便消耗1层，炉温归零并跳过攻击。"
   personality: 1
   attack: 13
   defense: 5

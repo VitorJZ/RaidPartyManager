@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 21
   traitPower: 2
-  traitText: "第1次对1个目标造成伤害时，造成的伤害+2"
+  traitText: "武器攻击时，若本场尚未对目标造成生命伤害，本次攻击力+2。"
   evolutions:
   - {fileID: 11400000, guid: 9b2ac04ac5064e6cb6c7efa29470ba0b, type: 2}
   - {fileID: 11400000, guid: 608a2af79ca548c19ec7c9b5cdda981a, type: 2}

@@ -22,7 +22,7 @@ namespace RaidPartyManager.Tests
             Assert.That(stacks, Has.Length.EqualTo(59));
             Assert.That(stacks.All(stack => stack.Count() == 4 && encounter.IconFor(stack.Key) != null), Is.True);
             var gourd = stacks.Single(stack => stack.Key == "zuixian-gourd").First();
-            Assert.That((gourd.Tier, gourd.Price, gourd.CanDropInBattle), Is.EqualTo((1, 22, true)));
+            Assert.That((gourd.Tier, gourd.Price, gourd.CanDropInBattle), Is.EqualTo((1, 33, true)));
             Assert.That(stacks.Select(stack => stack.First().Effect).Where(effect => effect != None),
                 Is.EquivalentTo(Enum.GetValues(typeof(EquipmentEffect)).Cast<EquipmentEffect>().Where(effect => effect is not (None or CoinDevourer or StrangeSeed))));
         }
@@ -83,7 +83,7 @@ namespace RaidPartyManager.Tests
             Assert.That(next.ReadPartyEnergy().Single(e => e.Key == mage.Id).Value.Capacity, Is.EqualTo(4));
         }
 
-        [TestCase(VigorPotion, "盛气 3", "盛气 2")]
+        [TestCase(VigorPotion, "盛气 3", "盛气 3")]
         [TestCase(SwiftPotion, "迅捷 3", "迅捷 2")]
         [TestCase(ResolvePotion, "坚毅 3", "坚毅 2")]
         [TestCase(GreedPotion, "贪婪 1", "贪婪 1")]
@@ -97,8 +97,8 @@ namespace RaidPartyManager.Tests
             Assert.That(events.Last().TargetStatuses, Is.EqualTo(end));
         }
 
-        [TestCase(GreedPotion, VigorPotion, 15, 14)]
-        [TestCase(VigorPotion, GreedPotion, 11, 10)]
+        [TestCase(GreedPotion, VigorPotion, 15, 15)]
+        [TestCase(VigorPotion, GreedPotion, 11, 11)]
         public void AllPotionsFollowSlotOrderAndEachRepeatsWithMurkyWater(
             EquipmentEffect first, EquipmentEffect second, int firstDamage, int secondDamage)
         {
@@ -952,14 +952,17 @@ namespace RaidPartyManager.Tests
         [Test]
         public void TwoPanaceasAlwaysPreserveEachPotionForTheNextRound()
         {
-            var actor = Unit("party", Side.Party, gear: Gear(VigorPotion, VigorPotion, PanaceaBottle, PanaceaBottle));
-            var result = Fight(2, actor, Unit("enemy", Side.Enemy, stats: new Stats(1, 0, 0, 100)));
+            var actor = Unit("party", Side.Party, stats: new Stats(4, 0, 0, 30),
+                gear: Gear(VigorPotion, VigorPotion, PanaceaBottle, PanaceaBottle));
+            var result = Fight(2, actor, Unit("enemy", Side.Enemy, stats: new Stats(1, 2, 0, 100)));
 
             Assert.That(result.Events.Where(e => e.Equipment == VigorPotion).Select(e => e.Tick),
                 Is.EqualTo(new[] { 1, 1, 2, 2 }));
             Assert.That(result.Events.Where(e => e.Equipment == PanaceaBottle).Select(e => e.Tick),
                 Is.EqualTo(new[] { 1, 1, 2, 2 }));
             Assert.That(result.Events.Any(e => e.ActionName == "消耗药水"), Is.False);
+            Assert.That(result.Events.Where(e => e.ActorId == actor.Id && e.ActionKind == ActionKind.Attack)
+                .Select(e => e.Amount), Is.EqualTo(new[] { 8, 14 }));
         }
 
         [Test]
@@ -985,17 +988,31 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void RebirthDoublesAttackBeforeDefenseAndLeavesFlatDamageAlone()
+        public void FallenAcolyteRestoresFullHealthOnceAndDoublesAttackAndBothDefenses()
         {
+            var character = AssetDatabase.LoadAssetAtPath<CharacterAsset>(
+                "Assets/RaidPartyManager/PrototypeData/FallenAcolyte.asset").ToDefinition();
+            var stats = character.BaseStats;
+            Assert.That((stats.Attack, stats.Defense, stats.SpecialDefense, stats.Health), Is.EqualTo((8, 2, 2, 8)));
             var attack = new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 2,
                 additionalDamage: new[] { new DamageComponent(DamageType.Fixed, 3, false) });
-            var hero = Unit("reborn", Side.Party, health: 1, basic: attack, trait: CharacterTrait.Rebirth);
-            var foe = Unit("wall", Side.Enemy, stats: new Stats(3,4,0,100));
+            var hero = Unit("reborn", Side.Party, health: 1, stats: stats, basic: attack, trait: character.Trait);
+            var mixedAttack = new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0,
+                additionalDamage: new[] { new DamageComponent(DamageType.Magic, 6, false) });
+            var foe = Unit("wall", Side.Enemy, stats: new Stats(6, 4, 0, 100), basic: mixedAttack);
             var battle = new BattleSimulator(random: new FixedRoll(.9)).Start(new BattleRequest("rebirth", new[] { hero, foe }, 3));
-            battle.AdvanceRound();
-            Assert.That(battle.ReadPartyStats().Single().Value.Attack, Is.EqualTo(10));
-            var renewed = battle.AdvanceRound().First(e => e.ActorId == hero.Id && e.Kind == BattleEventKind.Action);
-            Assert.That(renewed.Amount, Is.EqualTo(11)); // (5 × 2 + 2 - 4) + 3
+            var first = battle.AdvanceRound();
+            var rebirth = first.Single(e => e.VisualCue == BattleVisualCue.Rebirth);
+            Assert.That((rebirth.TargetId, rebirth.TargetHealth, rebirth.MaximumHealth), Is.EqualTo((hero.Id, 8, 8)));
+            var revived = battle.ReadPartyStats().Single().Value;
+            Assert.That((revived.Attack, revived.Defense, revived.SpecialDefense, revived.Health), Is.EqualTo((16, 4, 4, 8)));
+            var second = battle.AdvanceRound();
+            Assert.That(second.Single(e => e.ActorId == hero.Id && e.Kind == BattleEventKind.Action).Amount, Is.EqualTo(17));
+            Assert.That(second.Single(e => e.ActorId == foe.Id && e.Kind == BattleEventKind.Action).DamageTaken,
+                Is.EqualTo(new[] { (DamageType.Physical, 2), (DamageType.Magic, 2) }));
+            var last = battle.AdvanceRound();
+            Assert.That(last.Any(e => e.VisualCue == BattleVisualCue.Rebirth), Is.False);
+            Assert.That(battle.Result.HealthById[hero.Id], Is.Zero);
         }
 
         [Test]
@@ -1138,6 +1155,33 @@ namespace RaidPartyManager.Tests
             Assert.That((ratings["b"].DebuffLayers, ratings["b"].PoisonDamage), Is.EqualTo((6L, 9L)));
             Assert.That(ratings["foe"].DamageTaken + ratings["immune"].DamageTaken,
                 Is.EqualTo(ratings["a"].Damage + ratings["b"].Damage + 1));
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void MistAlchemistPreservesBothSidesPoisonOnlyWhileAlive(bool survivesFirstRound)
+        {
+            var form = AssetDatabase.LoadAssetAtPath<CharacterAsset>(
+                "Assets/RaidPartyManager/PrototypeData/MistAlchemist.asset").ToDefinition();
+            var alchemist = new Combatant("alchemist", form, Side.Party, 1, form.BaseStats,
+                survivesFirstRound ? form.BaseStats.Health : 1, startingStatuses: new Dictionary<StatusKind, int>
+                {
+                    [StatusKind.Poison] = 1, [StatusKind.Stunned] = 3
+                });
+            var statuses = new Dictionary<StatusKind, int> { [StatusKind.Poison] = 3, [StatusKind.Stunned] = 3 };
+            var ally = Unit("ally", Side.Party, 2, statuses: statuses);
+            var enemy = Unit("enemy", Side.Enemy, statuses: statuses);
+            var rear = Unit("rear", Side.Enemy, 2, statuses: statuses);
+            var battle = new BattleSimulator(random: new FixedRoll(0.9)).Start(new BattleRequest(
+                "poison-aura", new[] { alchemist, ally, enemy, rear }, 2 * form.ActionInterval));
+            var events = battle.AdvanceRound().Concat(battle.AdvanceRound()).ToArray();
+
+            Assert.That(events.Where(e => e.ActionName == "幽雾炼药").Select(e => e.TargetId), Is.EqualTo(
+                survivesFirstRound ? new[] { enemy.Id, rear.Id, enemy.Id, rear.Id } : new[] { enemy.Id, rear.Id }));
+            Assert.That(events.Where(e => e.PoisonDamage && e.TargetId == ally.Id).Select(e => e.Amount),
+                Is.EqualTo(new[] { 3, survivesFirstRound ? 3 : 2 }));
+            Assert.That(events.Where(e => e.PoisonDamage && e.TargetId == enemy.Id).Select(e => e.Amount),
+                Is.EqualTo(new[] { 4, survivesFirstRound ? 5 : 3 }));
         }
 
         [Test]

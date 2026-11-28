@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 24
   traitPower: 1
-  traitText: "受到近战伤害时，对伤害来源方施加1层破绽"
+  traitText: "受到近战武器攻击并损失生命时，若仍存活，对攻击者施加1层破绽。"
   personality: 5
   attack: 4
   defense: 4

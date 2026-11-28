@@ -59,6 +59,28 @@ namespace RaidPartyManager.Tests
                 Is.All.EqualTo(0));
         }
 
+        [TestCase(DamageType.Physical, 7, 5, 0)]
+        [TestCase(DamageType.Magic, 8, 4, 0)]
+        [TestCase(DamageType.Fire, 8, 4, 0)]
+        [TestCase(DamageType.Lightning, 0, 5, 7)]
+        [TestCase(DamageType.True, 0, 5, 7)]
+        public void RatingsCreditResistanceBeforeShieldWithoutChangingLifeLoss(DamageType type,
+            int resisted, int absorbed, int lost)
+        {
+            var tank = Unit("tank", Side.Party, 1, defense: 7, specialDefense: 8, skill: Guard);
+            var foe = Unit("foe", Side.Enemy, 1, attack: 12, basic: Attack("hit", TargetRule.FrontEnemy, type: type));
+            var fight = Fight(tank, foe);
+            var rating = fight.Ratings.Single(row => row.UnitId == tank.Id);
+
+            Assert.That(fight.HealthById[tank.Id], Is.EqualTo(tank.Health - lost));
+            Assert.That(rating.DamageTaken, Is.EqualTo(lost));
+            Assert.That(rating.ResistancePrevented, Is.EqualTo(resisted));
+            Assert.That(rating.ShieldAbsorbed, Is.EqualTo(absorbed));
+            Assert.That(rating.RatedDamageTaken, Is.EqualTo(12 - absorbed));
+            Assert.That(rating.DefensePoints, Is.EqualTo(.08m * (12 - absorbed) + .16m * absorbed));
+            Assert.That(fight.Ratings.Single(row => row.UnitId == foe.Id).Damage, Is.EqualTo(lost + absorbed));
+        }
+
         [Test]
         public void DefaultPolicyChoosesHighestDamageAcrossAttackTypesAndTargets()
         {

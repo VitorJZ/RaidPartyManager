@@ -46,8 +46,11 @@ namespace RaidPartyManager.Battle
                 .Select(group => (group.Key, group.Sum(grant => grant.Amount))).ToArray();
         }
 
-        private static void ScoreHit(Unit actor, Unit target, int lost, int absorbed, (Unit Source, int Amount)[] poison)
+        private static void ScoreHit(Unit actor, Unit target, int lost, int absorbed, (Unit Source, int Amount)[] poison,
+            int resistancePrevented = 0)
         {
+            if (resistancePrevented > 0 && (actor == null || actor.Input.Side != target.Input.Side))
+                target.Rating.ResistancePrevented += resistancePrevented;
             if (lost == 0 && absorbed == 0) return;
             Unit killer = actor;
             if (poison == null || poison.Length == 0)

@@ -71,7 +71,7 @@ namespace RaidPartyManager.Presentation
             else marks.Encapsulate(actor.bounds);
         }
 
-        protected virtual Bounds FormationBounds()
+        protected virtual Bounds FocusBounds()
         {
             var marks = new Bounds();
             foreach (var actor in company.Values) IncludeActor(ref marks, actor);
@@ -125,7 +125,7 @@ namespace RaidPartyManager.Presentation
             softPaint = new Material(paint) { renderQueue = 3000 };
             softPaint.SetFloat("_DepthWrite", 0);
             house = DockPlayhouse.Bind(stage, panel);
-            tiltShift = new StageTiltShift(camera, () => house.FocusOn(FormationBounds()), tiltShiftStrength);
+            tiltShift = new StageTiltShift(camera, () => house.FocusOn(FocusBounds()), tiltShiftStrength);
             house.SetLighting(lighting);
             lighting.Apply(paint);
             // Leave one queue between solid scenery and the cast for the travelling wave.

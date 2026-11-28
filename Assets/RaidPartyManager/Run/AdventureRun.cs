@@ -108,11 +108,13 @@ namespace RaidPartyManager.Run
 
     public sealed class AdventureShopOffer
     {
+        public const int EquipmentSlots = 5;
+        public const int BookSlots = 3;
         private readonly Func<bool> shouldDiscount;
         public EquipmentDefinition Item { get; }
         internal int ListedPrice { get; }
         internal bool UsesRosterDiscount => shouldDiscount != null;
-        public int Price => shouldDiscount?.Invoke() == true ? (int)((ListedPrice + 1L) / 2) : ListedPrice;
+        public int Price => shouldDiscount?.Invoke() == true ? (int)((4L * ListedPrice + 4) / 5) : ListedPrice;
         public bool Sold { get; internal set; }
         internal AdventureShopOffer(EquipmentDefinition item, int price, Func<bool> shouldDiscount = null)
         {
@@ -129,13 +131,33 @@ namespace RaidPartyManager.Run
         public static IReadOnlyList<AdventureShopOffer> Draw(IEnumerable<EquipmentDefinition> catalogue, Random random, bool discount) =>
             Draw(catalogue, random, discount ? () => true : null);
 
-        public static IReadOnlyList<AdventureShopOffer> Draw(IEnumerable<EquipmentDefinition> catalogue, Random random, Func<bool> shouldDiscount)
+        public static IReadOnlyList<AdventureShopOffer> Draw(IEnumerable<EquipmentDefinition> catalogue, Random random, Func<bool> shouldDiscount) =>
+            FillStock(Array.Empty<AdventureShopOffer>(), catalogue, random, shouldDiscount);
+
+        internal static IReadOnlyList<AdventureShopOffer> FillStock(IEnumerable<AdventureShopOffer> existing,
+            IEnumerable<EquipmentDefinition> catalogue, Random random, Func<bool> shouldDiscount)
         {
-            var stock = catalogue.Where(e => e.AvailableInRegularPool && BasePrice(e) > 0).GroupBy(e => e.Id).Select(g => g.First()).ToArray();
-            var choices = stock.Where(e => e.Tier == 1).OrderBy(_ => random.Next()).Take(2)
-                .Concat(stock.Where(e => e.Tier is 2 or 3).OrderBy(_ => random.Next()).Take(2)).OrderBy(_ => random.Next());
-            return choices.Select(e => new AdventureShopOffer(e,
-                (int)Math.Ceiling(BasePrice(e) * (.7 + random.NextDouble() * .6)), shouldDiscount)).ToArray();
+            var offers = existing.ToList();
+            int books = offers.Count(o => o.Item is SkillBookDefinition);
+            int gear = offers.Count - books;
+            if (gear >= EquipmentSlots && books >= BookSlots) return offers.AsReadOnly();
+            var ids = offers.Select(offer => offer.Item.Id).ToHashSet();
+            var stock = catalogue.Where(e => e.AvailableInRegularPool && BasePrice(e) > 0 && e.Tier is >= 1 and <= 3)
+                .GroupBy(e => e.Id).Select(g => g.First()).Where(e => !ids.Contains(e.Id)).ToArray();
+            int premium = offers.Count(o => o.Item is not SkillBookDefinition && o.Item.Tier == 1);
+            var items = stock.Where(e => e is not SkillBookDefinition).OrderBy(_ => random.Next()).ToArray();
+            var highTier = items.Where(e => e.Tier == 1).Take(Math.Clamp(2 - premium, 0, Math.Max(0, EquipmentSlots - gear)));
+            foreach (var item in highTier.Concat(items.Where(e => e.Tier != 1)).Concat(items).Distinct()
+                         .Take(Math.Max(0, EquipmentSlots - gear)).Concat(
+                             stock.OfType<SkillBookDefinition>().OrderBy(_ => random.Next()).Take(Math.Max(0, BookSlots - books))))
+            {
+                int basePrice = BasePrice(item);
+                int minimum = (int)((9L * basePrice + 9) / 10);
+                int maximum = (int)Math.Min(int.MaxValue, 6L * basePrice / 5);
+                int price = minimum + (int)((maximum - minimum + 1L) * random.NextDouble());
+                offers.Add(new AdventureShopOffer(item, price, shouldDiscount));
+            }
+            return offers.AsReadOnly();
         }
     }
 
@@ -205,6 +227,7 @@ namespace RaidPartyManager.Run
         public IReadOnlyList<EquipmentDefinition> Potions { get; internal set; } = Array.Empty<EquipmentDefinition>();
         public IReadOnlyList<Profession> Professions { get; internal set; } = Array.Empty<Profession>();
         public IReadOnlyList<CharacterDefinition> Recruits { get; internal set; } = Array.Empty<CharacterDefinition>();
+        internal Dictionary<string, int> RecruitSpecials { get; } = new();
         public CharacterDefinition PendingRecruit { get; internal set; }
         public EquipmentDefinition TrialGift { get; internal set; }
         public bool NeedsEvolution { get; internal set; }
@@ -386,6 +409,7 @@ namespace RaidPartyManager.Run
                         { Item = offer.Item.Id, Price = offer.ListedPrice, Sold = offer.Sold, UsesRosterDiscount = offer.UsesRosterDiscount }).ToArray(),
                     UsedServices = Current.UsedServices.ToArray(),
                     TownRecruits = Current.Recruits.Select(candidate => candidate.Id).ToArray(),
+                    TownRecruitPricePercents = Current.Recruits.Select(TownRecruitPricePercent).ToArray(),
                     BrokerRefusals = Current.BrokerRefusals, BrokerCounter = Current.BrokerCounter, BrokerMember = Current.BrokerMember,
                     BrokerLastAsk = Current.BrokerLastAsk,
                     PendingRecruit = Current.PendingRecruit?.Id, Rested = Current.Rested, Message = Current.Message
@@ -543,10 +567,10 @@ namespace RaidPartyManager.Run
                     BrokerLastAsk = Math.Max(0, shop.BrokerLastAsk),
                     Commissions = TownCommission.RestoreBoard(shop.Commissions, run.random),
                     ShopRecruitment = recruitment, Rested = shop.Rested, Message = shop.Message ?? "",
-                    Stock = shop.Stock.Select(offer => new AdventureShopOffer(items[offer.Item],
+                    Stock = AdventureShopOffer.FillStock(shop.Stock.Select(offer => new AdventureShopOffer(items[offer.Item],
                         offer.Price == 0 ? items[offer.Item].Price : offer.Price,
                         offer.UsesRosterDiscount ? () => party.HasShopDiscount : null)
-                        { Sold = offer.Sold }).ToArray(),
+                        { Sold = offer.Sold }), run.shopCatalogue, run.random, () => party.HasShopDiscount),
                     Recruits = shop.TownRecruits.Select(id => byId[id]).Where(c => party.Members.All(m => m.Character.Id != c.Id)).ToArray(),
                     PendingRecruit = string.IsNullOrEmpty(shop.PendingRecruit) ? null : byId[shop.PendingRecruit]
                 };
@@ -559,6 +583,16 @@ namespace RaidPartyManager.Run
                     var additions = run.characters.Where(c => !existing.Contains(c.Id)).OrderBy(_ => run.random.Next());
                     run.Current.Recruits = run.Current.Recruits.Concat(additions).Take(8).ToArray();
                 }
+                if (saved.Options[saved.Choice] != NodeKind.Shop &&
+                    shop.TownRecruitPricePercents is { Length: > 0 } percentages &&
+                    percentages.Length == shop.TownRecruits.Length)
+                {
+                    for (int i = 0; i < percentages.Length; i++)
+                        if (percentages[i] is 10 or 50)
+                            run.Current.RecruitSpecials[shop.TownRecruits[i]] = percentages[i];
+                }
+                else
+                    RollTownRecruitSpecials(run.Current, new Random(saved.Seed));
                 run.Current.UsedServices.UnionWith(shop.UsedServices);
             }
             else if (saved.FinishVisit)
@@ -705,6 +739,8 @@ namespace RaidPartyManager.Run
             }
             if (kind == NodeKind.Town || eventKind == AdventureEventKind.RecruitmentWheel)
                 visit.ShopRecruitment = new ShopRecruitment(Party, characters, random, shopRecruitPrice);
+            if (kind == NodeKind.Town)
+                RollTownRecruitSpecials(visit, random);
             if (kind is NodeKind.NormalBattle or NodeKind.EliteBattle or NodeKind.Boss)
                 visit.Battle = new AdventureBattle(kind);
             if (eventKind == AdventureEventKind.LostTraveler)
@@ -811,7 +847,7 @@ namespace RaidPartyManager.Run
             var training = Party.TownCandidateTraining(candidate);
             var draft = Party.ContractsEnabled ? Party.CandidateContract(candidate, days, terms, signingFee, training) : null;
             if (Party.ContractsEnabled && draft == null) return false;
-            int price = Party.SigningPrice(candidate);
+            int price = TownRecruitPrice(candidate);
             long total = price + (draft?.DueAtSigning ?? 0);
             if (total > Party.Gold || !Party.TryRecruit(candidate, training)) return false;
             Party.TrySpendGold(price, candidate.Name + " · 人才市场转会费");
@@ -821,6 +857,7 @@ namespace RaidPartyManager.Run
                 Party.SignNewHire(characterId, draft);
             }
             Current.Recruits = Current.Recruits.Where(c => c.Id != characterId).ToArray();
+            Current.RecruitSpecials.Remove(characterId);
             Current.UsedServices.Add(TownService.Recruit);
             Current.Message = draft == null ? $"{candidate.Name}加入讨伐队。转会费 {price} 金币。" :
                 $"{candidate.Name}加入讨伐队。转会费 {price} 金币，签字费 {draft.DueAtSigning} 金币，折算日薪 {draft.BaseTotal / (decimal)days:0.##} 金币。";
@@ -838,6 +875,7 @@ namespace RaidPartyManager.Run
             if (Current.Kind == NodeKind.Town)
             {
                 Current.Recruits = Current.Recruits.Where(c => c.Id != recruit.Id).ToArray();
+                Current.RecruitSpecials.Remove(recruit.Id);
                 Current.UsedServices.Add(TownService.Recruit);
                 Current.Message = $"{recruit.Name}加入了讨伐队，原队员的装备留在背包中。";
             }
@@ -1082,8 +1120,7 @@ namespace RaidPartyManager.Run
             }
             ticket.Settled = true;
             RecordFloorBattle();
-            gold = Current.Event == AdventureEventKind.Ambush ? (victory ? random.Next(12, 19) : 0) :
-                RollKillGold(result, ticket.Enemies, random, ticket.EliteIds, Floor);
+            gold = RollBattleGold(result.Outcome, ticket.Kind, random, Floor);
             if (victory)
             {
                 var fallen = result.Events.Where(e => e.Kind == BattleEventKind.Defeated).Select(e => e.TargetId).ToHashSet();
@@ -1133,16 +1170,24 @@ namespace RaidPartyManager.Run
             return true;
         }
 
-        public static int RollKillGold(BattleResult result, IEnumerable<Combatant> enemies, Random random,
-            ISet<string> elites = null, int floor = 1)
+        public static int RollBattleGold(BattleOutcome outcome, NodeKind kind, Random random, int floor)
         {
-            int floorStep = Math.Clamp(floor, 1, CampaignFloors) - 1;
-            var escaped = new HashSet<string>(result.Events.Where(entry => entry.Kind == BattleEventKind.Retreated)
-                .Select(entry => entry.TargetId));
-            return enemies.Where(enemy => result.HealthById[enemy.Id] == 0 && !escaped.Contains(enemy.Id))
-                .Sum(enemy => elites?.Contains(enemy.Id) == true
-                    ? random.Next(14, 21) + 7 * floorStep
-                    : random.Next(6, 10) + 4 * floorStep);
+            if (outcome != BattleOutcome.Victory) return 0;
+            int region = (Math.Max(1, floor) - 1) % CampaignFloors + 1;
+            var (minimum, maximum) = (region, kind) switch
+            {
+                (1, NodeKind.NormalBattle) => (4, 6),
+                (1, NodeKind.EliteBattle) => (6, 9),
+                (1, NodeKind.Boss) => (10, 15),
+                (2, NodeKind.NormalBattle) => (5, 7),
+                (2, NodeKind.EliteBattle) => (7, 10),
+                (2, NodeKind.Boss) => (12, 17),
+                (3, NodeKind.NormalBattle) => (7, 10),
+                (3, NodeKind.EliteBattle) => (10, 15),
+                (3, NodeKind.Boss) => (15, 20),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Expected a battle kind.")
+            };
+            return random.Next(minimum, maximum + 1);
         }
 
         private EquipmentDefinition RollBattleReward(bool elite, IEnumerable<string> excluded = null)
@@ -1170,7 +1215,15 @@ namespace RaidPartyManager.Run
             if (Current is not { Kind: NodeKind.TreasureChest, Resolved: false, TreasureOpened: false })
                 return false;
             Current.TreasureOpened = true;
+            GrantChestBonus();
             return true;
+        }
+
+        private int GrantChestBonus()
+        {
+            int gold = Math.Min(random.Next(20, 26), int.MaxValue - Party.Gold);
+            Party.AddGold(gold);
+            return gold;
         }
 
         public bool ClaimReward(int index)
@@ -1306,6 +1359,24 @@ namespace RaidPartyManager.Run
             return characters.Where(character => !owned.Contains(character.Id)).OrderBy(_ => random.Next()).Take(8).ToArray();
         }
 
+        private static void RollTownRecruitSpecials(AdventureVisit visit, Random random)
+        {
+            if (visit.Recruits.Count == 0) return;
+            int halfPriceIndex = random.Next(visit.Recruits.Count);
+            for (int i = 0; i < visit.Recruits.Count; i++)
+            {
+                string id = visit.Recruits[i].Id;
+                if (i == halfPriceIndex) visit.RecruitSpecials[id] = 50;
+                else if (random.Next(100) < 3) visit.RecruitSpecials[id] = 10;
+            }
+        }
+
+        public int TownRecruitPricePercent(CharacterDefinition candidate) =>
+            Current != null && Current.RecruitSpecials.TryGetValue(candidate.Id, out int percent) ? percent : 100;
+
+        public int TownRecruitPrice(CharacterDefinition candidate) =>
+            (int)(((long)Party.SigningPrice(candidate) * TownRecruitPricePercent(candidate) + 99) / 100);
+
         public void LandRecruitmentWheel()
         {
             if (AtRecruitmentWheel) Current.WheelLanded = true;
@@ -1440,10 +1511,13 @@ namespace RaidPartyManager.Run
                 }
                 else
                 {
-                    int gold = random.Next(15, 21); Party.AddGold(gold);
+                    int gold = Math.Min(random.Next(15, 21), int.MaxValue - Party.Gold);
+                    Party.AddGold(gold);
                     Party.RememberPersonalEvent(companion.MemberId, EmployeeThought.ChestReturn, $"{gold} 金币");
                     ReturnMessage += $"{name}带着 {gold} 金币归队。 ";
                 }
+                int bonus = GrantChestBonus();
+                if (bonus > 0) ReturnMessage += $"开箱额外获得 {bonus} 金币。 ";
             }
         }
 

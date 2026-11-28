@@ -25,7 +25,7 @@ MonoBehaviour:
   reach: 1
   fixedTrait: 21
   traitPower: 5
-  traitText: "第1次对1个目标造成伤害时，造成的伤害+5"
+  traitText: "武器攻击时，若本场尚未对目标造成生命伤害，本次攻击力+5。"
   personality: 0
   attack: 8
   defense: 3

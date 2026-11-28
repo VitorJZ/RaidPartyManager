@@ -17,14 +17,14 @@ namespace RaidPartyManager.Presentation
         private static readonly int LensMask = Shader.PropertyToID("_StageLensMask");
         private readonly Camera stageCamera;
         private readonly Material lens;
-        private readonly Func<Bounds> formation;
+        private readonly Func<Bounds> focusBounds;
         private static readonly int FocusAxis = Shader.PropertyToID("_FocusAxis");
         private static readonly int SharpBand = Shader.PropertyToID("_SharpBand");
 
-        internal StageTiltShift(Camera camera, Func<Bounds> formation, float strength = 1f)
+        internal StageTiltShift(Camera camera, Func<Bounds> focusBounds, float strength = 1f)
         {
             stageCamera = camera;
-            this.formation = formation;
+            this.focusBounds = focusBounds;
             lens = CoreUtils.CreateEngineMaterial(Resources.Load<Shader>("StageTiltShift"));
             lens.SetFloat("_BlurStrength", strength);
             renderPassEvent = RenderPassEvent.BeforeRenderingPostProcessing;
@@ -41,9 +41,12 @@ namespace RaidPartyManager.Presentation
             renderer.EnqueuePass(this);
         }
 
-        private bool ProjectFormation()
+        internal static Bounds BlendFocus(Bounds wide, Bounds subject, float weight) =>
+            new(Vector3.Lerp(wide.center, subject.center, weight), Vector3.Lerp(wide.size, subject.size, weight));
+
+        private bool ProjectFocus()
         {
-            var bounds = formation();
+            var bounds = focusBounds();
             var foot = new Vector3(bounds.center.x, bounds.min.y, bounds.center.z);
             var mark = stageCamera.WorldToViewportPoint(foot);
             var next = stageCamera.WorldToViewportPoint(foot + Vector3.right);
@@ -58,23 +61,29 @@ namespace RaidPartyManager.Presentation
             float origin = Vector2.Dot(axis, mark);
             lens.SetVector(FocusAxis, new Vector4(axis.x, axis.y, -origin, 0));
 
-            // Include both rows of a staggered company and the full height of its paper actors.
-            var near = foot - Vector3.forward * bounds.extents.z;
-            var far = foot + Vector3.forward * bounds.extents.z;
-            var up = Vector3.up * bounds.size.y;
-            float bottom = Mathf.Min(Offset(near), Offset(far));
-            float top = Mathf.Max(Offset(near + up), Offset(far + up));
+            // Project the whole subject so the near and far edges stay sharp during a tilted close-up.
+            float bottom = 0, top = 0;
+            var min = bounds.min;
+            var max = bounds.max;
+            for (int corner = 0; corner < 8; corner++)
+            {
+                var world = new Vector3((corner & 1) == 0 ? min.x : max.x,
+                    (corner & 2) == 0 ? min.y : max.y, (corner & 4) == 0 ? min.z : max.z);
+                var projected = stageCamera.WorldToViewportPoint(world);
+                if (projected.z <= stageCamera.nearClipPlane) continue;
+                float offset = Vector2.Dot(axis, projected) - origin;
+                bottom = Mathf.Min(bottom, offset);
+                top = Mathf.Max(top, offset);
+            }
             lens.SetVector(SharpBand, new Vector4(bottom - .012f, top + .012f, 0, 0));
             return true;
-
-            float Offset(Vector3 point) => Vector2.Dot(axis, stageCamera.WorldToViewportPoint(point)) - origin;
         }
 
         public override void RecordRenderGraph(RenderGraph graph, ContextContainer frame)
         {
             var resources = frame.Get<UniversalResourceData>();
             var source = resources.activeColorTexture;
-            if (resources.isActiveTargetBackBuffer || !source.IsValid() || !ProjectFormation()) return;
+            if (resources.isActiveTargetBackBuffer || !source.IsValid() || !ProjectFocus()) return;
 
             var descriptor = graph.GetTextureDesc(source);
             RecordSharpMask(graph, frame, descriptor);

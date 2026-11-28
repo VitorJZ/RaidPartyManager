@@ -51,9 +51,10 @@ namespace RaidPartyManager.Battle
                         break;
                     case PlayerTrait.ExposedStart: GrantStatus(unit, unit, Exposed, 1, "开场露怯"); break;
                     case PlayerTrait.RecklessStart:
-                        int lost = LoseHealth(unit, 2, out _, out var loadout, out bool charmTriggered);
-                        Report(BattleEventKind.Effect, unit, unit, "豁命开场", ActionKind.Attack, lost, loadout: loadout,
-                            damageTaken: new[] { (DamageType.Fixed, lost) }, charmTriggered: charmTriggered);
+                        int lost = LoseHealth(unit, 2, out var protection, out var loadout, out bool charmTriggered, out var guardian);
+                        Report(BattleEventKind.Effect, unit, unit, "豁命开场", ActionKind.Attack, lost, detail: protection,
+                            loadout: loadout, damageTaken: new[] { (DamageType.Fixed, lost) }, charmTriggered: charmTriggered);
+                        if (guardian != null) TakeAbyssDamage(unit, unit, guardian, new[] { (DamageType.Fixed, 2) });
                         if (unit.Health == 0) Report(BattleEventKind.Defeated, unit, unit, "豁命开场", ActionKind.Attack);
                         else GrantStatus(unit, unit, Vigor, 1, "豁命开场");
                         break;

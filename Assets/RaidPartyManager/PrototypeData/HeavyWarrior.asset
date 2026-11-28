@@ -23,9 +23,9 @@ MonoBehaviour:
   rosterNumber: 7
   stage: 1
   reach: 1
-  fixedTrait: 23
-  traitPower: 0
-  traitText: "在场时，敌方只能以自己为目标"
+  fixedTrait: 54
+  traitPower: 2
+  traitText: "回合结束时，获得2点护盾。"
   evolutions:
   - {fileID: 11400000, guid: 8ffe802f198c420680f45a710de5e506, type: 2}
   - {fileID: 11400000, guid: 0df9435a01ac48b5aee2ee4873cb00db, type: 2}
