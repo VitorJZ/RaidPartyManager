@@ -14,6 +14,7 @@ namespace RaidPartyManager.Presentation
         private SoundBank bank;
         private AudioSource effects, atmosphere;
         private SoundCue environment;
+        private AudioClip bossMusic;
         private float ambienceFade, ambienceGain;
         private readonly Dictionary<SoundCue, double> lastPlayed = new();
 
@@ -79,7 +80,17 @@ namespace RaidPartyManager.Presentation
             if (instance == this) instance = null;
         }
 
-        private void SceneLoaded(Scene scene, LoadSceneMode mode) => SetScene(scene.name, AdventureFlow.Active);
+        private void SceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (mode == LoadSceneMode.Single) bossMusic = null;
+            SetScene(scene.name, AdventureFlow.Active);
+        }
+
+        internal static void SetBossMusic(string bossId = null)
+        {
+            if (instance == null) return;
+            instance.bossMusic = bossId == null ? null : Resources.Load<AudioClip>("BossMusic/" + bossId);
+        }
 
         internal static void SetScene(string scene, AdventureRun run)
         {
@@ -106,7 +117,7 @@ namespace RaidPartyManager.Presentation
 
         private void Update()
         {
-            var next = bank != null ? bank.Clip(environment) : null;
+            var next = bossMusic != null ? bossMusic : bank != null ? bank.Clip(environment) : null;
             if (atmosphere.clip != next)
             {
                 ambienceFade = Mathf.MoveTowards(ambienceFade, 0, Time.unscaledDeltaTime * .9f);
@@ -118,7 +129,7 @@ namespace RaidPartyManager.Presentation
                 if (next != null) atmosphere.Play();
             }
             if (next != null)
-                ambienceFade = Mathf.MoveTowards(ambienceFade, .44f, Time.unscaledDeltaTime * .65f);
+                ambienceFade = Mathf.MoveTowards(ambienceFade, bossMusic != null ? .34f : .44f, Time.unscaledDeltaTime * .65f);
             atmosphere.volume = ambienceFade * ambienceGain;
         }
 

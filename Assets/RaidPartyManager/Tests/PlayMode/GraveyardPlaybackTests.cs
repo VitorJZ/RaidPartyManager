@@ -95,6 +95,62 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator EveryBossFormationPlaysItsOwnLoopAndRestoresSceneAmbience()
+        {
+            var tracks = new HashSet<AudioClip>();
+            var regions = new[]
+            {
+                ("BattlePrototype", "072_amb_mistbound_docks"),
+                ("WhisperingGraveyard", "amb_graveyard_exterior"),
+                ("ClockworkCapital", "amb_capital_exterior")
+            };
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            var audio = GameObject.Find("Game audio").GetComponents<AudioSource>().Single(source => source.loop);
+            foreach (var (region, ambience) in regions)
+            {
+                yield return SceneManager.LoadSceneAsync(region);
+                yield return null;
+                yield return WaitForLoop(ambience);
+                var scene = Object.FindAnyObjectByType<BattlePrototype>();
+                var data = (EncounterData)typeof(BattlePrototype).GetField("content", Private).GetValue(scene);
+                var bosses = data.EnemyFormations.Where(group => group.Rank == EnemyRank.Boss)
+                    .GroupBy(group => group.Members[0].Id).Select(group => group.First()).ToArray();
+                var ui = scene.GetComponent<UIDocument>().rootVisualElement;
+                foreach (var group in bosses)
+                {
+                    Press(ui, "open-settings");
+                    Press(ui, "open-enemy-editor");
+                    ui.Q<DropdownField>("enemy-formation").value = "首领 · " + group.Name;
+                    Press(ui, "apply-enemy-formation");
+                    Press(ui, "back-party-editor");
+                    yield return null;
+                    Assert.That(audio.clip.name, Is.EqualTo(ambience), "Selecting a formation must leave preparation audio playing.");
+                    Press(ui, "start");
+                    yield return WaitForLoop(group.Members[0].Id);
+                    Assert.That(tracks.Add(audio.clip), Is.True, group.Name);
+                    Assert.That(audio.clip.length, Is.GreaterThan(45f));
+                    Assert.That(audio.clip.channels, Is.EqualTo(2));
+                    Assert.That(audio.clip.loadType, Is.EqualTo(AudioClipLoadType.Streaming));
+                    typeof(BattlePrototype).GetMethod("ResetDemo", Private).Invoke(scene, new object[] { false });
+                    yield return WaitForLoop(ambience);
+                }
+            }
+            Assert.That(tracks, Has.Count.EqualTo(7));
+            Assert.That(tracks.Select(track => track.name), Is.EquivalentTo(Resources.LoadAll<AudioClip>("BossMusic").Select(track => track.name)));
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return WaitForLoop("amb_main_menu_march");
+
+            IEnumerator WaitForLoop(string name)
+            {
+                float deadline = Time.realtimeSinceStartup + 6f;
+                while ((audio.clip?.name != name || !audio.isPlaying) && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                Assert.That(audio.clip?.name, Is.EqualTo(name));
+                Assert.That(audio.isPlaying, Is.True, name);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator EveryBossGetsACenteredCloseUpBeforeRoundOne()
         {
             var seen = new HashSet<string>();

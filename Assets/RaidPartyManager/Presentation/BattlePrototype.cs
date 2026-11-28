@@ -190,6 +190,7 @@ namespace RaidPartyManager.Presentation
 
         private void OnDisable()
         {
+            GameAudio.SetBossMusic();
             if (adventure == AdventureFlow.Active)
                 adventure?.AbortBattle();
             gardenBloom = null;
@@ -205,6 +206,7 @@ namespace RaidPartyManager.Presentation
 
         private void ResetDemo(bool reroll = false)
         {
+            GameAudio.SetBossMusic();
             settingsOpen = false;
             playbackAtOrigin = clockOrigin = Time.unscaledTimeAsDouble;
             entrance.Clear(unitCards);
@@ -347,15 +349,15 @@ namespace RaidPartyManager.Presentation
                 ShowFinalPayroll();
                 return;
             }
-            bool bossBattle = preparedEnemies.Any(enemy => enemy.Character.Rank == EnemyRank.Boss);
-            var request = run.BeginBattle(preparedEnemies, content.TickLimit, adventure != null || bossBattle ? null : content.VictoryReward,
+            var boss = preparedEnemies.FirstOrDefault(enemy => enemy.Character.Rank == EnemyRank.Boss);
+            var request = run.BeginBattle(preparedEnemies, content.TickLimit, adventure != null || boss != null ? null : content.VictoryReward,
                 content.RecruitmentPool, content.CharacterCatalog, adventure?.Current?.Kind is NodeKind.EliteBattle or NodeKind.Boss,
                 adventure?.InCapital == true || gameObject.scene.name == "ClockworkCapital");
             adventure?.BindBattle(request.Id);
             GameAudio.Play(SoundCue.UiBattleStart);
             battle = new BattleSimulator().Start(request);
-            commentary.Opening(preparedEnemies.FirstOrDefault(e => e.Character.Rank == EnemyRank.Boss)?.Character.Name,
-                Time.unscaledTimeAsDouble);
+            GameAudio.SetBossMusic(boss?.Character.Id);
+            commentary.Opening(boss?.Character.Name, Time.unscaledTimeAsDouble);
             ReadPartyStats();
             ReadPartyEnergy();
             foreach (var unit in battle.Formation)
@@ -837,6 +839,7 @@ namespace RaidPartyManager.Presentation
         private void SpeakResult()
         {
             if (curtainCallUntil > 0) return;
+            GameAudio.SetBossMusic();
             double now = Time.unscaledTimeAsDouble;
             commentary.Result(battle.Result.Outcome, now);
             curtainCallUntil = now + 1.85;
