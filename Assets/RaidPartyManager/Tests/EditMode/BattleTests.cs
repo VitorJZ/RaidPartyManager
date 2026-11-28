@@ -12,6 +12,23 @@ namespace RaidPartyManager.Tests
         private static readonly ActionDefinition Heal = new ActionDefinition("heal", "heal", ActionKind.Heal, TargetRule.WoundedAlly, 4, 3);
         private static readonly ActionDefinition Guard = new ActionDefinition("guard", "guard", ActionKind.Shield, TargetRule.Self, 5, 3);
 
+        [TestCase(1, 1)]
+        [TestCase(2, 1)]
+        [TestCase(5, 4)]
+        public void RecklessStartGrantsVigorAndSpendsOneHealthWithoutDefeatingTheUnit(int startingHealth, int remainingHealth)
+        {
+            var unit = Unit("reckless", Side.Party, 1, hp: startingHealth, talent: PlayerTrait.RecklessStart);
+            var opening = Fight(unit, Unit("foe", Side.Enemy, 1)).Events
+                .Where(entry => entry.ActionName == "豁命开场").ToArray();
+
+            Assert.That(opening.Any(entry => entry.Kind == BattleEventKind.Defeated), Is.False);
+            Assert.That(opening.Where(entry => entry.Kind == BattleEventKind.Effect).Sum(entry => entry.Amount),
+                Is.EqualTo(startingHealth - remainingHealth));
+            var buff = opening.Single(entry => entry.ActionKind == ActionKind.Shield);
+            Assert.That(buff.TargetHealth, Is.EqualTo(remainingHealth));
+            Assert.That(buff.StatusStacks.Single(status => status.Kind == StatusKind.Vigor).Layers, Is.EqualTo(1));
+        }
+
         [Test]
         public void RatingsKeepBothSidesAndCountOnlyEffectiveDamageHealingAndShielding()
         {
@@ -423,12 +440,12 @@ namespace RaidPartyManager.Tests
         private static Combatant Unit(string id, Side side, int position, Personality personality = Personality.Frank,
             ActionDefinition basic = null, ActionDefinition skill = null, int? hp = null, int maxHealth = 20,
             int defense = 0, int specialDefense = 0, int interval = 1, int attack = 5,
-            AttackReach reach = AttackReach.Unspecified, EnemyBehaviorDefinition enemyBehavior = null)
+            AttackReach reach = AttackReach.Unspecified, EnemyBehaviorDefinition enemyBehavior = null, PlayerTrait talent = PlayerTrait.None)
         {
             var stats = new Stats(attack, defense, specialDefense, maxHealth);
             var definition = new CharacterDefinition(id, id, Profession.Warrior, personality,
                 stats, interval, basic ?? Basic, skill, reach: reach, enemyBehavior: enemyBehavior);
-            return new Combatant(id, definition, side, position, stats, hp ?? maxHealth);
+            return new Combatant(id, definition, side, position, stats, hp ?? maxHealth, talent: talent);
         }
 
         private static ActionDefinition Attack(string id, TargetRule target, int power = 0, int cooldown = 0,

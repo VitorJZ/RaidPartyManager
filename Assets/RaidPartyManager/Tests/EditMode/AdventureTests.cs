@@ -581,7 +581,7 @@ namespace RaidPartyManager.Tests
 
         [TestCase(true)]
         [TestCase(false)]
-        public void FinalBossDismissesUnpaidMembersBeforeStartingAndKeepsTheRemainingTeamOnReload(bool saveOneMember)
+        public void FinalBossDismissesUnpaidMembersBeforeStartingAndResumesAtPreviousStop(bool saveOneMember)
         {
             var saved = Create(42, false).CheckpointForExit();
             saved.Floor = 3;
@@ -614,7 +614,7 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.TryRepayWages(first.Id, 10), Is.True);
             if (saveOneMember) Assert.That(run.Party.TryRepayWages(second.Id, 20), Is.True);
 
-            run = AdventureRun.RestoreCheckpoint(RoundTrip(run.CheckpointForExit()), content.CharacterCatalog, gear);
+            AssertResumesBeforeBoss();
             Assert.That(run.PreparingFinalBoss, Is.True);
             Assert.That(run.DaysUntilFinalPayroll, Is.Zero);
             Assert.That(run.Party.Day, Is.EqualTo(31));
@@ -630,7 +630,6 @@ namespace RaidPartyManager.Tests
                 return;
             }
 
-            run = AdventureRun.RestoreCheckpoint(RoundTrip(run.CheckpointForExit()), content.CharacterCatalog, gear);
             Assert.That(run.Party.Members.Single().Id, Is.EqualTo(second.Id));
             Assert.That(run.PayrollDepartures.Count, Is.EqualTo(1));
             Assert.That(run.Party.CanStartBattle, Is.True);
@@ -639,6 +638,18 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Party.PayrollDebt, Is.EqualTo(50));
             run.BindBattle("final-boss");
             Assert.That(run.DaysUntilFinalPayroll, Is.Null);
+            AssertResumesBeforeBoss();
+
+            void AssertResumesBeforeBoss()
+            {
+                var restored = AdventureRun.RestoreCheckpoint(RoundTrip(run.CheckpointForExit()), content.CharacterCatalog, gear);
+                Assert.That(restored.Current, Is.Null);
+                Assert.That(restored.DaysUntilFinalPayroll, Is.EqualTo(1));
+                Assert.That(restored.Party.Day, Is.EqualTo(30));
+                Assert.That(restored.Party.Gold, Is.EqualTo(30));
+                Assert.That(restored.Party.PayrollDebt, Is.EqualTo(5));
+                Assert.That(restored.Party.Members.Select(member => member.Id), Is.EquivalentTo(new[] { first.Id, second.Id }));
+            }
         }
 
         [TestCase(true)]
@@ -1984,7 +1995,9 @@ namespace RaidPartyManager.Tests
                 var member = run.EvolutionCandidates.First(); var form = run.EvolutionForms(member.Id).First();
                 var slots = member.EquipmentIds.ToArray();
                 Assert.That(run.Evolve(member.Id, form.Id), Is.True);
-                Assert.That(run.Party.Members.Single(m => m.Id == member.Id).EquipmentIds, Is.EqualTo(slots));
+                var promoted = run.Party.Members.Single(m => m.Id == member.Id);
+                Assert.That(promoted.EquipmentIds, Is.EqualTo(slots));
+                Assert.That(promoted.Health, Is.EqualTo(promoted.EffectiveStats.Health));
                 Assert.That(run.Evolve(member.Id, form.Id), Is.False);
             }
             else if (eventKind != AdventureEventKind.Ambush)

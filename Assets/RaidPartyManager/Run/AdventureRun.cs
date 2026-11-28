@@ -291,7 +291,9 @@ namespace RaidPartyManager.Run
         public bool CrossingChapter => !IsInspection && Floor <= 2 && Stage == DockRoute.Stages &&
             !Failed && Current is { Kind: NodeKind.Boss, Resolved: true, Battle: { Settled: true } };
         private bool AtCampaignFinalStage => !IsInspection && InCapital && !Failed && Stage == DockRoute.Stages;
-        public bool PreparingFinalBoss => AtCampaignFinalStage && Current is { Kind: NodeKind.Boss, Battle: { Settled: false } };
+        private bool FinalBossDayAlreadyCounted => SuspendedChoice.HasValue && nodeCheckpoint.HasFinalBossPreparation;
+        public bool PreparingFinalBoss => AtCampaignFinalStage &&
+            Current is { Kind: NodeKind.Boss, Battle: { Settled: false, RequestId: null } };
         public bool NeedsFinalPayroll => Party.ContractsEnabled && PreparingFinalBoss &&
             Party.Members.Any(member => Party.WageBalanceFor(member.Id) > 0);
         public int? DaysUntilFinalPayroll
@@ -303,7 +305,7 @@ namespace RaidPartyManager.Run
                     return null;
 
                 // The tide pact uses a day without advancing the numbered route stage.
-                bool enteredStage = (RouteDestination ?? RouteCurrent).Number == Stage;
+                bool enteredStage = FinalBossDayAlreadyCounted || (RouteDestination ?? RouteCurrent).Number == Stage;
                 return (CampaignFloors - Floor) * DockRoute.Stages + DockRoute.Stages - Stage +
                     (enteredStage ? 0 : 1) + (PactAhead ? 1 : 0);
             }
@@ -383,13 +385,6 @@ namespace RaidPartyManager.Run
                 return saved;
             }
 
-            if (PreparingFinalBoss)
-            {
-                var saved = CaptureCheckpoint(nodeCheckpoint.Seed, nodeCheckpoint.Choice);
-                saved.HasFinalBossPreparation = true;
-                return saved;
-            }
-
             if (Current is { Resolved: false, ShopRecruitment: { } recruitment })
             {
                 var saved = CaptureCheckpoint(random.Next(), nodeCheckpoint.Choice);
@@ -421,8 +416,10 @@ namespace RaidPartyManager.Run
             if (Current is { Resolved: false })
                 return nodeCheckpoint;
 
-            return CaptureCheckpoint(SuspendedChoice.HasValue ? nodeCheckpoint.Seed : random.Next(),
+            var checkpoint = CaptureCheckpoint(SuspendedChoice.HasValue ? nodeCheckpoint.Seed : random.Next(),
                 SuspendedChoice ?? (Current != null ? nodeCheckpoint.Choice : -1), Current?.Resolved == true);
+            checkpoint.HasFinalBossPreparation = FinalBossDayAlreadyCounted;
+            return checkpoint;
         }
 
         private AdventureCheckpoint CaptureCheckpoint(int seed, int choice, bool finishVisit = false) =>
@@ -523,15 +520,6 @@ namespace RaidPartyManager.Run
                 if (saved.FirstRatedStage == 0)
                     run.RecordFloorBattle();
             }
-            else if (saved.HasFinalBossPreparation)
-            {
-                var destination = run.RouteChoice(saved.Choice);
-                if (!run.AtCampaignFinalStage || run.FloorCleared || destination.Kind != NodeKind.Boss)
-                    throw new ArgumentException("Invalid final boss visit.");
-                run.RouteDestination = destination;
-                run.nodeCheckpoint = saved;
-                run.Open(NodeKind.Boss, null);
-            }
             else if (saved.HasWheelVisit)
             {
                 var destination = run.RouteChoice(saved.Choice);
@@ -602,6 +590,9 @@ namespace RaidPartyManager.Run
             }
             else if (saved.Choice >= 0)
             {
+                if (saved.HasFinalBossPreparation &&
+                    (!run.AtCampaignFinalStage || run.FloorCleared || run.RouteChoice(saved.Choice).Kind != NodeKind.Boss))
+                    throw new ArgumentException("Invalid final boss visit.");
                 run.SuspendedChoice = saved.Choice;
                 run.nodeCheckpoint = saved;
             }
@@ -679,7 +670,8 @@ namespace RaidPartyManager.Run
 
         public bool EnterRoute(int choice)
         {
-            if (!Party.CanAdvanceDay || IsInspection || Current != null || Failed || FloorCleared || choice < 0 || choice >= RouteOptions.Count ||
+            bool dayAlreadyCounted = FinalBossDayAlreadyCounted;
+            if ((!dayAlreadyCounted && !Party.CanAdvanceDay) || IsInspection || Current != null || Failed || FloorCleared || choice < 0 || choice >= RouteOptions.Count ||
                 (SuspendedChoice.HasValue && choice != SuspendedChoice.Value))
                 return false;
             var destination = RouteChoice(choice);
@@ -690,7 +682,8 @@ namespace RaidPartyManager.Run
             // Keep the generated node stable when a checkpoint is reentered.
             int seed = SuspendedChoice.HasValue ? nodeCheckpoint.Seed : random.Next();
             nodeCheckpoint = CaptureCheckpoint(seed, choice);
-            Party.AdvanceDay();
+            nodeCheckpoint.HasFinalBossPreparation = dayAlreadyCounted;
+            if (!dayAlreadyCounted) Party.AdvanceDay();
             away.RemoveAll(a => !Party.Members.Any(m => m.Id == a.MemberId));
             random = new Random(seed);
             SuspendedChoice = null;
@@ -998,7 +991,7 @@ namespace RaidPartyManager.Run
 
         public bool ConfirmFinalPayroll()
         {
-            if (!PreparingFinalBoss || Current.Battle.RequestId != null)
+            if (!PreparingFinalBoss)
                 return false;
             if (!NeedsFinalPayroll)
                 return Party.CanStartBattle;
@@ -1014,7 +1007,8 @@ namespace RaidPartyManager.Run
 
         public void BindBattle(string requestId)
         {
-            if (Current?.Battle != null && !Current.Battle.Settled) Current.Battle.RequestId = requestId;
+            if (Current?.Battle is { Settled: false } battle)
+                battle.RequestId = requestId;
         }
 
         public IReadOnlyList<Combatant> PrepareEnemies(IReadOnlyList<CharacterDefinition> roster,
@@ -1262,7 +1256,9 @@ namespace RaidPartyManager.Run
             var form = TryEvolve(memberId, formId);
             if (form == null) return false;
             Current.EvolutionMemberId = null;
-            Current.NeedsEvolution = false; Finish($"试炼完成，队员进阶为{form.Name}。原有装备保留。"); return true;
+            Current.NeedsEvolution = false;
+            Finish($"试炼完成，队员升阶为{form.Name}，生命值已回满。");
+            return true;
         }
 
         private CharacterDefinition TryEvolve(string memberId, string formId)
@@ -1290,7 +1286,7 @@ namespace RaidPartyManager.Run
             if (!CanUseCamp) return false;
             var form = TryEvolve(memberId, formId);
             if (form == null) return false;
-            FinishCamp($"篝火旁，队员升阶为{form.Name}。原有装备保留。");
+            FinishCamp($"篝火旁，队员升阶为{form.Name}，生命值已回满。");
             return true;
         }
 

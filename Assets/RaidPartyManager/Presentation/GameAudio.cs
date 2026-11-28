@@ -20,6 +20,7 @@ namespace RaidPartyManager.Presentation
         private MusicRegion region;
         private MusicSetting? sceneSetting;
         private AudioClip sceneMusic, battleMusic;
+        private BattlePrototype battleMusicOwner;
         private float ambienceFade, ambienceGain;
         private readonly Dictionary<SoundCue, double> lastPlayed = new();
 
@@ -85,22 +86,24 @@ namespace RaidPartyManager.Presentation
             if (instance == this) instance = null;
         }
 
-        private void SceneLoaded(Scene scene, LoadSceneMode mode)
-        {
-            if (mode == LoadSceneMode.Single) battleMusic = null;
+        private void SceneLoaded(Scene scene, LoadSceneMode mode) =>
             SetScene(scene.name, AdventureFlow.ForScene(scene.name));
-        }
 
-        internal static void BeginBattleMusic(string bossId)
+        internal static void BeginBattleMusic(BattlePrototype battle, string bossId)
         {
             if (instance == null) return;
             var boss = bossId == null ? null : Resources.Load<AudioClip>("BossMusic/" + bossId);
+            instance.battleMusicOwner = battle;
             instance.battleMusic = boss != null ? boss : LoadRegionalMusic(instance.region, MusicSetting.Battle);
+            if (boss != null)
+                instance.SwitchAtmosphere(boss);
         }
 
-        internal static void EndBattleMusic()
+        internal static void EndBattleMusic(BattlePrototype battle)
         {
-            if (instance != null) instance.battleMusic = null;
+            if (instance == null || instance.battleMusicOwner != battle) return;
+            instance.battleMusic = null;
+            instance.battleMusicOwner = null;
         }
 
         internal static void SetScene(string scene, AdventureRun run)
@@ -161,14 +164,20 @@ namespace RaidPartyManager.Presentation
                 ambienceFade = Mathf.MoveTowards(ambienceFade, 0, Time.unscaledDeltaTime * .9f);
                 atmosphere.volume = ambienceFade * ambienceGain;
                 if (ambienceFade > 0 && atmosphere.isPlaying) return;
-                atmosphere.Stop();
-                ambienceFade = 0;
-                atmosphere.clip = next;
-                if (next != null) atmosphere.Play();
+                SwitchAtmosphere(next);
             }
             if (next != null)
                 ambienceFade = Mathf.MoveTowards(ambienceFade, battleMusic != null ? .34f : .44f, Time.unscaledDeltaTime * .65f);
             atmosphere.volume = ambienceFade * ambienceGain;
+        }
+
+        private void SwitchAtmosphere(AudioClip clip)
+        {
+            atmosphere.Stop();
+            ambienceFade = 0;
+            atmosphere.volume = 0;
+            atmosphere.clip = clip;
+            if (clip != null) atmosphere.Play();
         }
 
         internal static void Play(SoundCue cue, float gain = .64f)

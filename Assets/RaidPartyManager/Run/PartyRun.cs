@@ -509,10 +509,12 @@ namespace RaidPartyManager.Run
                     members.Any(other => other != member && Overlaps(other, position, newForm.PositionSlots))))
                 return false;
 
+            bool promoted = member.Health > 0 && newForm.Stage > member.Character.Stage;
             if (member.Character.Id != newForm.Id) Remember(member, EmployeeThought.Promotion, newForm.Name);
             member.Character = newForm.WithPersonality(member.Start.Character.Personality);
             RefreshEquipmentSlots();
-            member.Health = Math.Min(member.Health, PersonalStats(member).Health);
+            int maximumHealth = PersonalStats(member).Health;
+            member.Health = promoted ? maximumHealth : Math.Min(member.Health, maximumHealth);
             RefreshEmployeeGoals(member);
             return true;
         }

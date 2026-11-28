@@ -37,7 +37,7 @@ namespace RaidPartyManager.Presentation
         private void ShowRun(bool inspection)
         {
             run = AdventureFlow.Select(assets, inspection, out bool resumeMarket);
-            if (run?.Current?.Kind == NodeKind.Town || run?.AtRecruitmentWheel == true || run?.PreparingFinalBoss == true ||
+            if (run?.Current?.Kind == NodeKind.Town || run?.AtRecruitmentWheel == true ||
                 run?.HasBattleRewardScreen == true && run.Current.Event == null)
             {
                 var scene = resumeMarket ? "TalentMarket" : AdventureFlow.SceneFor(run.Current.Kind);

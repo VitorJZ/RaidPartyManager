@@ -40,6 +40,7 @@ namespace RaidPartyManager.Run
         public int Choice = -1;
         public bool FinishVisit;
         public bool HasBattleReward;
+        // Legacy final boss saves already advanced the day before taking the snapshot.
         public bool HasFinalBossPreparation;
         public string[] PayrollDepartures;
         public BattleRewardCheckpoint BattleReward;

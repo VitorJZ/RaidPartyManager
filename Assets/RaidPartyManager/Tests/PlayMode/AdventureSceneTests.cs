@@ -2088,6 +2088,92 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator SavingDuringFinalBossReturnsToThePreviousStop() => RetryFinalBoss(legacySave: false);
+
+        [UnityTest]
+        public IEnumerator LegacyFinalBossSaveReturnsToThePreviousStopWithoutAdvancingTheDay() => RetryFinalBoss(legacySave: true);
+
+        private IEnumerator RetryFinalBoss(bool legacySave)
+        {
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return null;
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            ConfirmFirstPair(Root<AdventureEventHub>());
+            var content = (AdventureContentAsset)typeof(AdventureEventHub).GetField("assets", Private)
+                .GetValue(Object.FindAnyObjectByType<AdventureEventHub>());
+            SaveAndExit(Root<AdventureEventHub>());
+            yield return WaitScene("MainMenu");
+
+            var saved = JsonUtility.FromJson<AdventureCheckpoint>(File.ReadAllText(savePath));
+            saved.Floor = 3;
+            saved.Stage = DockRoute.Stages;
+            saved.Current = new CheckpointStop { Number = saved.Stage - 1, Kind = NodeKind.Camp };
+            saved.CompletedNodes = (saved.Floor - 1) * DockRoute.Stages + saved.Stage - 1;
+            int savedDay = saved.CompletedNodes + (legacySave ? 2 : 1);
+            saved.Party.PayrollPausedDays += savedDay - saved.Party.Day;
+            saved.Party.Day = savedDay;
+            saved.Choice = legacySave ? 0 : -1;
+            saved.HasFinalBossPreparation = legacySave;
+            saved.Options = new[] { NodeKind.Boss };
+            File.WriteAllText(savePath, JsonUtility.ToJson(saved));
+            ResetAdventureFlow();
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            run = CurrentRoute();
+            var previous = run.RouteCurrent;
+            int completed = run.CompletedNodes;
+            int day = run.Party.Day;
+            int bossDay = legacySave ? day : day + 1;
+            int gold = run.Party.Gold;
+            var holder = run.Party.Members.First();
+            var potion = run.Party.AddEquipment(content.Encounter.StartingEquipment.First(item => item.IsPotion));
+            Assert.That(run.Party.TryEquip(holder.Id, 0, potion.Id), Is.True);
+            yield return WaitForRoadstone(Root<AdventureEventHub>());
+            Press(Root<AdventureEventHub>(), legacySave ? "route-node-current" : "route-choice-0");
+            yield return WaitScene("ClockworkCapital");
+
+            var root = Root<BattlePrototype>();
+            Assert.That(root.Q("start"), Is.Null);
+            Assert.That(run.Current.Battle.RequestId, Is.Not.Null, "The Boss should start upon entering.");
+            Assert.That(run.Party.Day, Is.EqualTo(bossDay));
+            var bossId = run.Current.Battle.Enemies.Single(enemy => enemy.Character.Rank == EnemyRank.Boss).Character.Id;
+            var music = GameObject.Find("Game audio").GetComponents<AudioSource>().Single(source => source.loop);
+            Assert.That(music.clip?.name, Is.EqualTo(bossId), "The Boss track should start with the entrance.");
+            float timeout = Time.realtimeSinceStartup + 12;
+            while (run.Party.Inventory.Any(item => item.Id == potion.Id) && Time.realtimeSinceStartup < timeout)
+                yield return null;
+            Assert.That(run.Party.Inventory.Any(item => item.Id == potion.Id), Is.False);
+            Assert.That(music.clip?.name, Is.EqualTo(bossId));
+            Assert.That(music.isPlaying, Is.True);
+            SaveAndExit(root);
+            yield return WaitScene("MainMenu");
+            ResetAdventureFlow();
+            Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+
+            run = CurrentRoute();
+            Assert.That(run.Current, Is.Null);
+            Assert.That(run.RouteCurrent, Is.EqualTo(previous));
+            Assert.That(run.CompletedNodes, Is.EqualTo(completed));
+            Assert.That(run.Party.Day, Is.EqualTo(day));
+            Assert.That(run.Party.Gold, Is.EqualTo(gold));
+            Assert.That(run.Party.Members.First().EquipmentIds[0], Is.EqualTo(potion.Id));
+            Assert.That(run.Party.Inventory.Any(item => item.Id == potion.Id), Is.True);
+            Assert.That(run.CheckpointForExit().HasFinalBossPreparation, Is.EqualTo(legacySave));
+
+            var map = Root<AdventureEventHub>();
+            yield return WaitForRoadstone(map);
+            Press(map, "route-node-current");
+            yield return WaitScene("ClockworkCapital");
+            Assert.That(Root<BattlePrototype>().Q("start"), Is.Null);
+            Assert.That(run.Current.Battle.RequestId, Is.Not.Null);
+            Assert.That(run.Current.Battle.Enemies.Single(enemy => enemy.Character.Rank == EnemyRank.Boss).Character.Id, Is.EqualTo(bossId));
+            Assert.That(run.Party.Day, Is.EqualTo(bossDay));
+            Assert.That(music.clip?.name, Is.EqualTo(bossId));
+        }
+
+        [UnityTest]
         public IEnumerator APartyWipeShowsBothSidesRatingsBeforeReturningAndClearsTheCheckpoint() => WipeReturnsToMenu(false);
 
         [UnityTest]
@@ -2124,6 +2210,12 @@ namespace RaidPartyManager.Tests
             yield return WaitForRoadstone(Root<AdventureEventHub>());
             Press(Root<AdventureEventHub>(), "route-choice-0");
             yield return WaitScene(boss ? "WhisperingGraveyard" : "BattlePrototype");
+            if (boss)
+            {
+                string bossId = run.Current.Battle.Enemies.Single(enemy => enemy.Character.Rank == EnemyRank.Boss).Character.Id;
+                var music = GameObject.Find("Game audio").GetComponents<AudioSource>().Single(source => source.loop);
+                Assert.That(music.clip?.name, Is.EqualTo(bossId));
+            }
             FastBattle();
 
             var battle = Root<BattlePrototype>();
@@ -2430,10 +2522,13 @@ namespace RaidPartyManager.Tests
             File.WriteAllText(savePath, JsonUtility.ToJson(saved));
             ResetAdventureFlow();
             Press(Root<PrototypeSceneMenu>(), "open-route");
+            yield return WaitScene("EventSelect");
+            yield return WaitForRoadstone(Root<AdventureEventHub>());
+            Press(Root<AdventureEventHub>(), "route-node-current");
             yield return WaitScene("ClockworkCapital");
-            yield return WaitForShow();
             var scene = Object.FindAnyObjectByType<BattlePrototype>();
             var route = (AdventureRun)typeof(BattlePrototype).GetField("adventure", Private).GetValue(scene);
+            Assert.That(route.Party.Day, Is.EqualTo(day));
             var root = Root<BattlePrototype>();
             Assert.That(root.Q("battle-phase"), Is.Null);
             Assert.That(root.Q("payroll-panel"), Is.Not.Null);

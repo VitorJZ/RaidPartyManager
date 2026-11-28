@@ -307,18 +307,20 @@ namespace RaidPartyManager.Tests
             Assert.That(run.SkillBooks, Is.EquivalentTo(new[] { restricted, extraGuard }));
         }
 
-        [Test]
-        public void FormChangeRetainsIdentityAndIndependentEquipment()
+        [TestCase(1, 10)]
+        [TestCase(2, 14)]
+        public void FormChangeRetainsIdentityAndEquipmentAndRefillsHealthOnPromotion(int stage, int expectedHealth)
         {
             var run = MakeRun();
             var armor = run.Inventory.Single();
             run.TryEquip("a", 0, armor.Id);
-            var form = Character("evolved", new Stats(8, 1, 1, 12));
+            var form = Character("evolved", new Stats(8, 1, 1, 12), stage);
             Assert.That(run.TryChangeForm("a", form), Is.True);
             var evolved = run.Members.First();
             Assert.That(evolved.Id, Is.EqualTo("a"));
             Assert.That(evolved.Character, Is.SameAs(form));
             Assert.That(evolved.EffectiveStats.Health, Is.EqualTo(14));
+            Assert.That(evolved.Health, Is.EqualTo(expectedHealth));
             Assert.That(evolved.EquipmentIds[0], Is.EqualTo(armor.Id));
         }
 
@@ -358,9 +360,9 @@ namespace RaidPartyManager.Tests
             return new[] { new Combatant("enemy", enemy, Side.Enemy, 1, enemy.BaseStats, 10) };
         }
 
-        private static CharacterDefinition Character(string id, Stats stats) => new CharacterDefinition(
+        private static CharacterDefinition Character(string id, Stats stats, int stage = 1) => new CharacterDefinition(
             id, id, Profession.Warrior, Personality.Frank, stats, 1,
-            new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0));
+            new ActionDefinition("basic", "basic", ActionKind.Attack, TargetRule.FrontEnemy, 0), stage: stage);
 
         private static BattleResult Result(string id, BattleOutcome outcome, int a, int b, int enemy) =>
             new BattleResult(id, outcome, new Dictionary<string, int> { {"a", a}, {"b", b}, {"enemy", enemy} },
