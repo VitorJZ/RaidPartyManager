@@ -50,6 +50,7 @@ foreach ($mode in 'editmode', 'playmode') {
 - [20 种技能特效的动画预览与制作说明](Docs/SkillEffects.md)
 - [ElevenLabs 音效清单、Unity 接入与验证](Docs/ElevenLabsSoundEffects.md)
 - [首领战曲目与制作说明](Docs/BossMusic.md)
+- [地区与场景配乐](Docs/RegionalMusic.md)
 - [码头商店](Docs/DockShop.md)
 - [营地场景与 35 名角色坐姿](Docs/Camp.md)
 - [弥雾码头事件与关卡](Docs/DockAdventure.md)

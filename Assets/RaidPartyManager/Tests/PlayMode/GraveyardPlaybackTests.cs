@@ -100,14 +100,15 @@ namespace RaidPartyManager.Tests
             var tracks = new HashSet<AudioClip>();
             var regions = new[]
             {
-                ("BattlePrototype", "072_amb_mistbound_docks"),
-                ("WhisperingGraveyard", "amb_graveyard_exterior"),
-                ("ClockworkCapital", "amb_capital_exterior")
+                ("BattlePrototype", "Dock"),
+                ("WhisperingGraveyard", "Graveyard"),
+                ("ClockworkCapital", "Capital")
             };
             yield return SceneManager.LoadSceneAsync("MainMenu");
             var audio = GameObject.Find("Game audio").GetComponents<AudioSource>().Single(source => source.loop);
-            foreach (var (region, ambience) in regions)
+            foreach (var (region, music) in regions)
             {
+                string ambience = music + "-Exploration";
                 yield return SceneManager.LoadSceneAsync(region);
                 yield return null;
                 yield return WaitForLoop(ambience);
@@ -116,6 +117,10 @@ namespace RaidPartyManager.Tests
                 var bosses = data.EnemyFormations.Where(group => group.Rank == EnemyRank.Boss)
                     .GroupBy(group => group.Members[0].Id).Select(group => group.First()).ToArray();
                 var ui = scene.GetComponent<UIDocument>().rootVisualElement;
+                Press(ui, "start");
+                yield return WaitForLoop(music + "-Battle");
+                typeof(BattlePrototype).GetMethod("ResetDemo", Private).Invoke(scene, new object[] { false });
+                yield return WaitForLoop(ambience);
                 foreach (var group in bosses)
                 {
                     Press(ui, "open-settings");

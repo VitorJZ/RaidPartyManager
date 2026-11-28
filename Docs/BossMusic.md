@@ -16,10 +16,10 @@
 
 `BattlePrototype` 在正式开战后，把敌方首领的 ID 交给 `GameAudio`。后者从 `Resources/BossMusic/<首领 ID>` 载入曲目，沿用区域环境的循环声道和淡变逻辑。Boss 曲目的声道增益为 0.34，并应用主音量与环境音量设置。战斗音效通过原有的独立声道播放，入场提示和技能命中音效照常触发。
 
-布阵阶段持续播放区域环境声。战斗结束进入谢幕、重置演练或离开场景时，解除 Boss 曲目并恢复当前场景的音轨。缺少匹配文件时沿用区域环境声。音乐文件使用流式载入，由 Git LFS 管理。
+布阵阶段播放[地区探索曲](RegionalMusic.md)。战斗结束进入谢幕、重置演练或离开场景时，解除 Boss 曲目并恢复当前场景的音轨。缺少首领曲目时沿用该地区的战斗曲。音乐文件使用流式载入，由 Git LFS 管理。
 
 ## 制作与验证
 
 曲目由 [ComposeBossMusic.py](../Tools/ComposeBossMusic.py) 中的原创乐谱和合成器生成。依赖 NumPy、SciPy 与支持 `libvorbis` 的 FFmpeg。运行 `python Tools/ComposeBossMusic.py` 可重建 48 kHz 双声道 Ogg 文件。合成器把跨越循环终点的音符与混响尾部叠回开头，循环以乐句长度对齐。保留与同名音频文件对应的 Unity `.meta`，即可沿用已有的导入参数和 GUID。
 
-`EveryBossFormationPlaysItsOwnLoopAndRestoresSceneAmbience` 通过三个独立演练场景的敌方阵容界面逐个开战，核对七个首领的曲目、流式载入和恢复环境声。正式讨伐走同一个开战入口。
+`EveryBossFormationPlaysItsOwnLoopAndRestoresSceneAmbience` 通过三个独立演练场景的敌方阵容界面逐个开战，核对七个首领的曲目、流式载入和恢复地区配乐。正式讨伐走同一个开战入口。

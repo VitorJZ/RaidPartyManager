@@ -47,8 +47,8 @@ namespace RaidPartyManager.Tests
             var scenes = new[]
             {
                 ("MainMenu", "amb_main_menu_march"),
-                ("WhisperingGraveyard", "amb_graveyard_exterior"),
-                ("ClockworkCapital", "amb_capital_exterior")
+                ("WhisperingGraveyard", "Graveyard-Exploration"),
+                ("ClockworkCapital", "Capital-Exploration")
             };
             foreach (var (sceneName, clipName) in scenes)
             {

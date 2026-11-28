@@ -79,6 +79,42 @@ namespace RaidPartyManager.Tests
         }
 
         [UnityTest]
+        public IEnumerator SharedFacilitiesPlayTheActiveRegionsMusic()
+        {
+            yield return OpenMenu();
+            var destination = Flow.GetField("destination", PrivateStatic);
+            var source = GameObject.Find("Game audio").GetComponents<AudioSource>().Single(s => s.loop);
+            var facilities = new[] { ("Town", "Town"), ("DockShop", "Shop"), ("TalentMarket", "TalentMarket"), ("Camp", "Camp") };
+            foreach (string region in new[] { "Dock", "Graveyard", "Capital" })
+            {
+                destination.SetValue(null, "EventSelect");
+                yield return SceneManager.LoadSceneAsync("EventSelect");
+                yield return WaitForMusic(region + "-Exploration");
+                Assert.That(run.Inspect(NodeKind.Town), Is.True);
+                foreach (var (scene, setting) in facilities)
+                {
+                    destination.SetValue(null, scene);
+                    yield return SceneManager.LoadSceneAsync(scene);
+                    yield return WaitForMusic(region + "-" + setting);
+                }
+                Assert.That(run.Leave(), Is.True);
+                if (region != "Capital") Assert.That(run.NextFloor(), Is.True);
+            }
+            yield return SceneManager.LoadSceneAsync("MainMenu");
+            yield return WaitForMusic("amb_main_menu_march");
+
+            IEnumerator WaitForMusic(string expected)
+            {
+                float deadline = Time.realtimeSinceStartup + 5;
+                while ((source.clip?.name != expected || !source.isPlaying) && Time.realtimeSinceStartup < deadline)
+                    yield return null;
+                Assert.That(source.clip?.name, Is.EqualTo(expected));
+                Assert.That(source.isPlaying, Is.True, expected);
+                Assert.That(source.clip.loadType, Is.EqualTo(AudioClipLoadType.Streaming), expected);
+            }
+        }
+
+        [UnityTest]
         public IEnumerator NewExpeditionKeepsTheEmployeeDossierWithContractsHidden()
         {
             yield return SceneManager.LoadSceneAsync("MainMenu");

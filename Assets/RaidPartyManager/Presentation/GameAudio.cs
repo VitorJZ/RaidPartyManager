@@ -9,12 +9,17 @@ namespace RaidPartyManager.Presentation
 
     internal sealed class GameAudio : MonoBehaviour
     {
+        private enum MusicRegion { Dock, Graveyard, Capital }
+        private enum MusicSetting { Exploration, Battle, Town, Shop, TalentMarket, Camp }
+
         private static GameAudio instance;
         private static bool volumePrefsDirty;
         private SoundBank bank;
         private AudioSource effects, atmosphere;
         private SoundCue environment;
-        private AudioClip bossMusic;
+        private MusicRegion region;
+        private MusicSetting? sceneSetting;
+        private AudioClip sceneMusic, battleMusic;
         private float ambienceFade, ambienceGain;
         private readonly Dictionary<SoundCue, double> lastPlayed = new();
 
@@ -82,14 +87,20 @@ namespace RaidPartyManager.Presentation
 
         private void SceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            if (mode == LoadSceneMode.Single) bossMusic = null;
-            SetScene(scene.name, AdventureFlow.Active);
+            if (mode == LoadSceneMode.Single) battleMusic = null;
+            SetScene(scene.name, AdventureFlow.ForScene(scene.name));
         }
 
-        internal static void SetBossMusic(string bossId = null)
+        internal static void BeginBattleMusic(string bossId)
         {
             if (instance == null) return;
-            instance.bossMusic = bossId == null ? null : Resources.Load<AudioClip>("BossMusic/" + bossId);
+            var boss = bossId == null ? null : Resources.Load<AudioClip>("BossMusic/" + bossId);
+            instance.battleMusic = boss != null ? boss : LoadRegionalMusic(instance.region, MusicSetting.Battle);
+        }
+
+        internal static void EndBattleMusic()
+        {
+            if (instance != null) instance.battleMusic = null;
         }
 
         internal static void SetScene(string scene, AdventureRun run)
@@ -97,9 +108,35 @@ namespace RaidPartyManager.Presentation
             if (instance == null) return;
             bool capital = run?.InCapital == true || CapitalStories.Contains(run?.Current?.Event);
             bool cemetery = run?.InGraveyard == true || GraveStories.Contains(run?.Current?.Event);
-            bool wheelEvent = scene == "DockShop" && run?.AtRecruitmentWheel == true;
-            instance.environment = SceneCue(wheelEvent ? "EventSelect" : scene, capital, cemetery);
+            var region = scene switch
+            {
+                "WhisperingGraveyard" => MusicRegion.Graveyard,
+                "ClockworkCapital" => MusicRegion.Capital,
+                _ => capital ? MusicRegion.Capital : cemetery ? MusicRegion.Graveyard : MusicRegion.Dock
+            };
+            if (scene == "DockShop" && run?.AtRecruitmentWheel == true) scene = "EventSelect";
+            var setting = SettingFor(scene);
+            if (instance.region != region || instance.sceneSetting != setting)
+            {
+                instance.region = region;
+                instance.sceneSetting = setting;
+                instance.sceneMusic = setting.HasValue ? LoadRegionalMusic(region, setting.Value) : null;
+            }
+            instance.environment = SceneCue(scene, region == MusicRegion.Capital, region == MusicRegion.Graveyard);
         }
+
+        private static MusicSetting? SettingFor(string scene) => scene switch
+        {
+            "EventSelect" or "BattlePrototype" or "WhisperingGraveyard" or "ClockworkCapital" => MusicSetting.Exploration,
+            "Town" => MusicSetting.Town,
+            "DockShop" => MusicSetting.Shop,
+            "TalentMarket" => MusicSetting.TalentMarket,
+            "Camp" => MusicSetting.Camp,
+            _ => null
+        };
+
+        private static AudioClip LoadRegionalMusic(MusicRegion region, MusicSetting setting) =>
+            Resources.Load<AudioClip>($"RegionalMusic/{region}-{setting}");
 
         private static SoundCue SceneCue(string scene, bool capital, bool cemetery) => scene switch
         {
@@ -117,7 +154,8 @@ namespace RaidPartyManager.Presentation
 
         private void Update()
         {
-            var next = bossMusic != null ? bossMusic : bank != null ? bank.Clip(environment) : null;
+            var next = battleMusic != null ? battleMusic : sceneMusic;
+            if (next == null && bank != null) next = bank.Clip(environment);
             if (atmosphere.clip != next)
             {
                 ambienceFade = Mathf.MoveTowards(ambienceFade, 0, Time.unscaledDeltaTime * .9f);
@@ -129,7 +167,7 @@ namespace RaidPartyManager.Presentation
                 if (next != null) atmosphere.Play();
             }
             if (next != null)
-                ambienceFade = Mathf.MoveTowards(ambienceFade, bossMusic != null ? .34f : .44f, Time.unscaledDeltaTime * .65f);
+                ambienceFade = Mathf.MoveTowards(ambienceFade, battleMusic != null ? .34f : .44f, Time.unscaledDeltaTime * .65f);
             atmosphere.volume = ambienceFade * ambienceGain;
         }
 

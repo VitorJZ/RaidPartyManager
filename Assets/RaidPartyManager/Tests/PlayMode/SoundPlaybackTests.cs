@@ -66,7 +66,7 @@ namespace RaidPartyManager.Tests
 
                 yield return SceneManager.LoadSceneAsync("DockShop");
                 yield return new WaitForSecondsRealtime(1.8f);
-                Assert.That(ambience.clip?.name, Is.EqualTo("074_amb_shop_interior"));
+                Assert.That(ambience.clip?.name, Is.EqualTo("Dock-Shop"));
                 Assert.That(ambience.volume, Is.Zero);
                 var shop = Object.FindAnyObjectByType<DockShop>().GetComponent<UIDocument>().rootVisualElement;
                 Press(shop, "open-settings");
@@ -179,17 +179,14 @@ namespace RaidPartyManager.Tests
                 button.SendEvent(submit);
             }
             Assert.That(effects.isPlaying, Is.True, "The accepted menu input should start a one-shot.");
-            yield return WaitForLoop("072_amb_mistbound_docks");
+            yield return WaitForLoop("Dock-Exploration");
             yield return SceneManager.LoadSceneAsync("DockShop");
-            yield return WaitForLoop("074_amb_shop_interior");
+            yield return WaitForLoop("Dock-Shop");
             yield return SceneManager.LoadSceneAsync("Camp");
-            yield return WaitForLoop("075_amb_campfire");
+            yield return WaitForLoop("Dock-Camp");
             Assert.That(GameObject.Find("Game audio"), Is.SameAs(player));
             yield return SceneManager.LoadSceneAsync("MainMenu");
-            float end = Time.realtimeSinceStartup + 3;
-            while (ambience.clip != null && Time.realtimeSinceStartup < end) yield return null;
-            Assert.That(ambience.isPlaying, Is.False);
-            Assert.That(ambience.clip, Is.Null);
+            yield return WaitForLoop("amb_main_menu_march");
 
             IEnumerator WaitForLoop(string name)
             {

@@ -111,6 +111,7 @@ def instrument(voice, pitch, length, rng):
     attack, release = {
         "strings": (.102, .25), "choir": (.16, .36), "brass": (.046, .13), "organ": (.027, .19),
         "spiccato": (.021, .09), "keys": (.008, .19), "flute": (.059, .22), "glass": (.012, .35),
+        "pluck": (.006, .16), "reed": (.045, .145),
         "bass": (.012, .074), "sub": (.043, .145), "motor": (.010, .085),
     }[voice]
     t = np.arange(int((length + release) * RATE)) / RATE
@@ -139,6 +140,14 @@ def instrument(voice, pitch, length, rng):
         layer = (.87 * np.sin(p) * np.exp(-t * 2.3) +
                  .31 * np.sin(p * 2.006) * np.exp(-t * 5.2) +
                  .10 * np.sin(p * 2.731) * np.exp(-t * 9.5))
+    elif voice == "pluck":
+        layer = (.88 * np.sin(p) * np.exp(-t * 4.2) +
+                 .42 * np.sin(2 * p) * np.exp(-t * 8) +
+                 .22 * np.sin(3 * p) * np.exp(-t * 11) +
+                 .11 * np.sin(5 * p) * np.exp(-t * 17))
+    elif voice == "reed":
+        layer = partials(p + vibrato * .6, (1, .28, .38, .07, .19, .06, .08)) * (
+            .90 + .10 * np.sin(TAU * 5.6 * t))
     elif voice == "motor":
         layer = np.tanh(1.7 * partials(p, (1, .51, .21, .12, .09))) * (.68 + .32 * np.exp(-t * 22))
     elif voice == "bass":
@@ -173,9 +182,9 @@ def percussion(kind, rng):
 
 
 class Mix:
-    def __init__(self, score, seed):
+    def __init__(self, score, seed, bars=32):
         self.beat = 60 / score.tempo
-        self.samples = round(RATE * self.beat * score.meter * 32)
+        self.samples = round(RATE * self.beat * score.meter * bars)
         self.buffer = np.zeros((self.samples, 2), dtype=np.float32)
         self.rng = np.random.default_rng(seed)
 
@@ -193,7 +202,7 @@ class Mix:
     def hit(self, position, kind, gain, pan=0):
         self.add(position, percussion(kind, self.rng), gain, pan)
 
-    def master(self, space):
+    def master(self, space, target_rms=.127):
         dry = self.buffer.copy()
         # Circular reflections preserve the reverb tail across the loop boundary.
         for delay, gain in ((.043, .21), (.079, .16), (.131, .13), (.193, .09), (.277, .073),
@@ -201,7 +210,7 @@ class Mix:
             self.buffer += np.roll(dry[:, ::-1], round(delay * RATE), axis=0) * (gain * space)
         self.buffer -= self.buffer.mean(axis=0)
         rms = np.sqrt(np.mean(self.buffer ** 2))
-        leveled = np.tanh(self.buffer * (.127 / rms) * 1.24) / 1.24
+        leveled = np.tanh(self.buffer * (target_rms / rms) * 1.24) / 1.24
         peak = np.max(np.abs(leveled))
         return leveled * min(1, .74 / peak)
 
@@ -266,18 +275,21 @@ def arrange(score, seed):
     return mix.master(score.space)
 
 
+def write_loop(audio, target, title, quality=6):
+    audio = np.asarray(audio, dtype="<f4")
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "f32le", "-ar", str(RATE),
+         "-ac", "2", "-i", "-", "-c:a", "libvorbis", "-q:a", str(quality), "-metadata",
+         "title=" + title, "-metadata", "artist=Raid Party Manager", str(target)],
+        input=audio.tobytes(), check=True,
+    )
+    print(f"{target.stem}: {title}, {len(audio) / RATE:.2f} s, {target.stat().st_size:,} bytes", flush=True)
+
+
 def main():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     for i, score in enumerate(SCORES):
-        audio = np.asarray(arrange(score, 14653 + i * 881), dtype="<f4")
-        target = OUTPUT / (score.boss + ".ogg")
-        subprocess.run(
-            ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "f32le", "-ar", str(RATE),
-             "-ac", "2", "-i", "-", "-c:a", "libvorbis", "-q:a", "6", "-metadata",
-             "title=" + score.title, "-metadata", "artist=Raid Party Manager", str(target)],
-            input=audio.tobytes(), check=True,
-        )
-        print(f"{score.boss}: {score.title}, {len(audio) / RATE:.2f} s, {target.stat().st_size:,} bytes", flush=True)
+        write_loop(arrange(score, 14653 + i * 881), OUTPUT / (score.boss + ".ogg"), score.title)
 
 
 if __name__ == "__main__":

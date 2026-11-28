@@ -190,7 +190,7 @@ namespace RaidPartyManager.Presentation
 
         private void OnDisable()
         {
-            GameAudio.SetBossMusic();
+            GameAudio.EndBattleMusic();
             if (adventure == AdventureFlow.Active)
                 adventure?.AbortBattle();
             gardenBloom = null;
@@ -206,7 +206,7 @@ namespace RaidPartyManager.Presentation
 
         private void ResetDemo(bool reroll = false)
         {
-            GameAudio.SetBossMusic();
+            GameAudio.EndBattleMusic();
             settingsOpen = false;
             playbackAtOrigin = clockOrigin = Time.unscaledTimeAsDouble;
             entrance.Clear(unitCards);
@@ -356,7 +356,7 @@ namespace RaidPartyManager.Presentation
             adventure?.BindBattle(request.Id);
             GameAudio.Play(SoundCue.UiBattleStart);
             battle = new BattleSimulator().Start(request);
-            GameAudio.SetBossMusic(boss?.Character.Id);
+            GameAudio.BeginBattleMusic(boss?.Character.Id);
             commentary.Opening(boss?.Character.Name, Time.unscaledTimeAsDouble);
             ReadPartyStats();
             ReadPartyEnergy();
@@ -839,7 +839,7 @@ namespace RaidPartyManager.Presentation
         private void SpeakResult()
         {
             if (curtainCallUntil > 0) return;
-            GameAudio.SetBossMusic();
+            GameAudio.EndBattleMusic();
             double now = Time.unscaledTimeAsDouble;
             commentary.Result(battle.Result.Outcome, now);
             curtainCallUntil = now + 1.85;
