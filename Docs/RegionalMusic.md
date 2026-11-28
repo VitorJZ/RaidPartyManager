@@ -6,12 +6,14 @@
 |---|---|---|---|
 | 探索 | Across the Mooring Lights | Footprints Past the Yews | An Hour Above the Rails |
 | 普通和精英战斗 | Cut the Mooring Lines | The Earth Gives Way | Platforms in Revolt |
-| 城镇 | Lanterns on the Quay | Candles at the Gatehouse | The Hour Opens |
-| 商店 | The Tackle Drawer | The Keepsake Cabinet | A Counter Full of Gears |
-| 人才市场 | A Berth for Hire | Names for the Crossing | Applications at Platform Four |
+| 城镇 | Quayside Holiday | Lanterns Waltz Tonight | Clockwork Sunday |
+| 商店 | The Tackle Shop Jig | Ribbons for Old Bones | The Merry Gear Counter |
+| 人才市场 | All Hands for Hire | A Company of Good Spirits | The Platform Four Parade |
 | 营地 | One Lamp Left Afloat | The Quiet Watch | Warmth in the Service Alcove |
 
 码头用长笛、拨弦和铜管表现水上的空旷感和登船战斗的节奏。墓园以低钟、合唱和管风琴为主，城镇和营地换成更轻的织体。遗都以钟表打击声和机械低音贯穿，战斗采用七拍分组。
+
+城镇、商店和人才市场采用大调舞曲。码头用簧管、短拨弦和水手吉格节奏，墓园用玻璃琴和轻巧的三拍舞步，遗都用切分钢琴、波尔卡节拍和小铜管。
 
 ## 在游戏中播放
 
@@ -21,6 +23,6 @@
 
 ## 资源与验证
 
-`Assets/RaidPartyManager/Audio/Resources/RegionalMusic` 内的曲目以 `地区-场景.ogg` 命名。运行 [ComposeRegionalMusic.py](../Tools/ComposeRegionalMusic.py) 可重建曲目，依赖 NumPy、SciPy 和支持 `libvorbis` 的 FFmpeg。乐谱包含 24 小节的三个段落，录音为 48 kHz 双声道 Ogg，Unity 使用流式播放。重建时保留原 Unity `.meta`，保留资源 GUID。
+`Assets/RaidPartyManager/Audio/Resources/RegionalMusic` 内的曲目以 `地区-场景.ogg` 命名。运行 [ComposeRegionalMusic.py](../Tools/ComposeRegionalMusic.py) 可重建曲目，依赖 NumPy、SciPy 和支持 `libvorbis` 的 FFmpeg。加 `--town` 可只重建城镇、商店和人才市场的九首。乐谱包含 24 小节的三个段落，录音为 48 kHz 双声道 Ogg，Unity 使用流式播放。重建时保留原 Unity `.meta`，保留资源 GUID。
 
 `SharedFacilitiesPlayTheActiveRegionsMusic` 逐个验证三地的探索和四类共用设施。`EveryBossFormationPlaysItsOwnLoopAndRestoresSceneAmbience` 验证三地普通战、七个首领战以及重置后的音乐。
