@@ -111,7 +111,8 @@ def near_chord_tone(wanted, root, chord):
 
 
 def arrange(track, seed):
-    mix = Mix(track, seed, BARS)
+    beat = 60 / track.tempo
+    mix = Mix(beat, track.meter * BARS, seed)
     style = SEVEN_EIGHT if track.meter == 7 else ARRANGEMENTS[track.setting]
     battle = track.setting == "Battle"
     quiet = track.setting in ("Camp", "Exploration")

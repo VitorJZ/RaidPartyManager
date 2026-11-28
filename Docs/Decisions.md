@@ -35,3 +35,4 @@
 | 2026-11-27 | 按确认的角色表下调晨曦圣女和神恩主祭的基础属性，生命吊坠每回合基础回复由 3 降至 2 | 基础攻击的调整同步影响治疗量，回合末回复与战斗飘字使用相同结算值 | `EncounterIncludesSyncedStatsRecruitsPortraitsAndEvolutions`、`HealingTraitUsesCurrentAttackEveryRoundAndRebelEarringTargetsEnemiesWithMagic`、`RoundEndGearRepeatsHealingAndAddsEmbersRetainedByEternalFire`、`RoundEndAnimationsShowActualHealthAndEmbersBeforeContinuing` |
 | 2026-11-28 | 为七位首领分别播放原创循环配乐，以出战首领 ID 选曲 | 正式讨伐与演练共用选曲；配乐使用环境音量，并在谢幕或重置时解除 | `EveryBossFormationPlaysItsOwnLoopAndRestoresSceneAmbience`、[曲目与制作说明](BossMusic.md) |
 | 2026-11-28 | 三个地区分别制作探索、战斗、城镇、商店、人才市场和营地配乐 | 共用场景按当前地区选曲，正式开战按战斗类型切换，首领曲目优先 | `SharedFacilitiesPlayTheActiveRegionsMusic`、`EveryBossFormationPlaysItsOwnLoopAndRestoresSceneAmbience`、[地区与场景配乐](RegionalMusic.md) |
+| 2026-11-28 | 重编七首首领曲，为每首加入四段节奏与配器进程 | 开场即进入主主题，利用变速、换拍和鼓点密度推动战斗 | `EveryBossFormationPlaysItsOwnLoopAndRestoresSceneAmbience`、[七首曲目的段落与速度](BossMusic.md) |
