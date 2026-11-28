@@ -29,8 +29,7 @@ namespace RaidPartyManager.Run
         public string Id { get; }
         public EquipmentDefinition Definition { get; }
         internal long AcquisitionOrder { get; }
-        internal int BattlesToBloom { get; set; }
-        internal int BattlesWithSeed { get; set; }
+        internal int SeedBloomFromNode { get; set; }
 
         internal EquipmentInstance(string id, EquipmentDefinition definition, long acquisitionOrder)
         {
@@ -161,7 +160,7 @@ namespace RaidPartyManager.Run
                     .Select(item => new CheckpointItem
                     {
                         Id = item.Id, Definition = item.Definition.Id,
-                        BattlesToBloom = item.BattlesToBloom, BattlesWithSeed = item.BattlesWithSeed
+                        SeedBloomFromNode = item.SeedBloomFromNode
                     }).ToArray(),
                 Members = members.Select(member => new CheckpointMember
                 {
@@ -178,7 +177,7 @@ namespace RaidPartyManager.Run
         }
 
         internal static PartyRun RestoreCheckpoint(PartyCheckpoint saved, IReadOnlyDictionary<string, CharacterDefinition> characters,
-            IReadOnlyDictionary<string, EquipmentDefinition> items, bool contractsEnabled = true)
+            IReadOnlyDictionary<string, EquipmentDefinition> items, int legacySeedBloomFromNode, bool contractsEnabled = true)
         {
             // Squads saved under earlier limits keep their signed employees.
             const int legacyRosterLimit = 10;
@@ -198,9 +197,12 @@ namespace RaidPartyManager.Run
             foreach (var item in saved.Inventory)
             {
                 var definition = items[item.Definition];
+                int bloomFrom = item.SeedBloomFromNode;
+                if (bloomFrom == 0 && definition.Effect == EquipmentEffect.StrangeSeed && item.BattlesToBloom >= 3)
+                    bloomFrom = legacySeedBloomFromNode;
                 party.inventory.Add(item.Id, new EquipmentInstance(item.Id, definition, ++party.nextAcquisitionOrder)
                 {
-                    BattlesToBloom = item.BattlesToBloom, BattlesWithSeed = item.BattlesWithSeed
+                    SeedBloomFromNode = bloomFrom
                 });
                 party.RegisterReward(definition);
             }
@@ -886,7 +888,7 @@ namespace RaidPartyManager.Run
             return true;
         }
 
-        internal (string Wearer, bool WaitingForRoom) FinishSeedBattle(BattleResult result, CharacterDefinition gardener)
+        internal (string Wearer, bool WaitingForRoom) FinishSeedBattle(BattleResult result, CharacterDefinition gardener, int battleNode)
         {
             if (activeBattle != null || gardener == null ||
                 members.Any(member => AdventureRun.IsGardenerForm(member.Character.Id)))
@@ -898,10 +900,9 @@ namespace RaidPartyManager.Run
                 {
                     var itemId = member.Slots[slot];
                     if (itemId == null || !inventory.TryGetValue(itemId, out var seed) ||
-                        seed.Definition.Effect != EquipmentEffect.StrangeSeed || seed.BattlesToBloom < 3)
+                        seed.Definition.Effect != EquipmentEffect.StrangeSeed ||
+                        seed.SeedBloomFromNode <= 0 || battleNode < seed.SeedBloomFromNode)
                         continue;
-                    seed.BattlesWithSeed = Math.Min(seed.BattlesToBloom, seed.BattlesWithSeed + 1);
-                    if (seed.BattlesWithSeed < seed.BattlesToBloom) continue;
                     // The new member can change the slot layout, so clear by instance ID after recruitment.
                     if (!TryRecruit(gardener)) return (null, true);
                     int currentSlot = Array.IndexOf(member.Slots, itemId);

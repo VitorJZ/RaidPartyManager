@@ -190,7 +190,7 @@ namespace RaidPartyManager.Presentation
                 if (countdowns != null)
                     foreach (var timer in countdowns)
                     {
-                        var info = BattleCountdownIcon.Details(timer.Key);
+                        var info = BattleBadgeArt.CountdownDetails(timer.Key);
                         UpdateBadge("countdown-" + timer.Key, timer.Value, info.Name, info.Description, null, info.Color,
                             countdown: timer.Key, unit: info.Unit);
                     }

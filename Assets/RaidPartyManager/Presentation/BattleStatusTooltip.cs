@@ -95,43 +95,17 @@ namespace RaidPartyManager.Presentation
         internal static VisualElement CreateIcon(Texture2D art, string title, Color color, bool shield,
             BattleCountdownKind? countdown = null)
         {
-            if (countdown.HasValue)
-                return new BattleCountdownIcon(countdown.Value, color);
+            if ((shield || countdown.HasValue) && BattleBadgeArt.Icon(countdown) is { } badge)
+                return badge;
             if (art != null)
                 return new Image { image = art, scaleMode = ScaleMode.ScaleToFit, pickingMode = PickingMode.Ignore,
                     style = { flexGrow = 1 } };
 
-            if (!shield)
-            {
-                var marker = PrototypeStyle.Text(title.Substring(0, 1), 13, color);
-                marker.pickingMode = PickingMode.Ignore;
-                marker.style.flexGrow = 1;
-                PrototypeStyle.Middle(marker);
-                return marker;
-            }
-
-            var icon = new VisualElement { pickingMode = PickingMode.Ignore };
-            icon.style.flexGrow = 1;
-            icon.generateVisualContent += context =>
-            {
-                var size = icon.contentRect.size;
-                float unit = Mathf.Min(size.x, size.y);
-                var center = size * 0.5f;
-                var pen = context.painter2D;
-                pen.lineWidth = Mathf.Max(1f, unit * 0.035f);
-                pen.strokeColor = color;
-                pen.fillColor = Color.Lerp(color, PrototypeStyle.Background, 0.65f);
-                pen.BeginPath();
-                pen.MoveTo(center + new Vector2(-0.28f, -0.30f) * unit);
-                pen.LineTo(center + new Vector2(0.28f, -0.30f) * unit);
-                pen.LineTo(center + new Vector2(0.23f, 0.10f) * unit);
-                pen.LineTo(center + new Vector2(0f, 0.33f) * unit);
-                pen.LineTo(center + new Vector2(-0.23f, 0.10f) * unit);
-                pen.ClosePath();
-                pen.Fill();
-                pen.Stroke();
-            };
-            return icon;
+            var marker = PrototypeStyle.Text(title.Substring(0, 1), 13, color);
+            marker.pickingMode = PickingMode.Ignore;
+            marker.style.flexGrow = 1;
+            PrototypeStyle.Middle(marker);
+            return marker;
         }
     }
 }

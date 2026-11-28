@@ -16,7 +16,7 @@ MonoBehaviour:
   displayName: "奇怪的种子"
   effect: 59
   icon: {fileID: 2800000, guid: 5dcf295ba16c55d8993e11b2e0917f54, type: 3}
-  description: "携带后或许会有好事发生。"
+  description: "获得后再完成两个节点。之后装备者首次出战获胜时，种子开花并招募墓园花匠。"
   attackBonus: 0
   defenseBonus: 0
   specialDefenseBonus: 0

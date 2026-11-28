@@ -127,7 +127,7 @@ namespace RaidPartyManager.Presentation
                 if (countdowns != null)
                     foreach (var timer in countdowns)
                     {
-                        var info = BattleCountdownIcon.Details(timer.Key);
+                        var info = BattleBadgeArt.CountdownDetails(timer.Key);
                         active.Add($"{info.Name} 剩余 {timer.Value} {info.Unit}");
                     }
             }

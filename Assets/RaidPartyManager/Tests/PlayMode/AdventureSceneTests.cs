@@ -845,9 +845,14 @@ namespace RaidPartyManager.Tests
             Assert.That(seeded.EnterRoute(1) && seeded.TakeGraveSeedReward(true) && seeded.CloseVisit(), Is.True);
             var seed = seeded.Party.Inventory.Single(i => i.Definition.Effect == EquipmentEffect.StrangeSeed);
             Assert.That(seeded.Party.TryEquip(seeded.Party.Members[0].Id, 1, seed.Id), Is.True);
+            for (int i = 0; i < 2; i++)
+            {
+                var camp = seeded.CheckpointForExit();
+                camp.Options = new[] { NodeKind.Camp };
+                seeded = AdventureRun.RestoreCheckpoint(camp, content.CharacterCatalog, content.StartingEquipment);
+                Assert.That(seeded.EnterRoute(0) && seeded.Leave(), Is.True);
+            }
             var checkpoint = seeded.CheckpointForExit();
-            int seedIndex = System.Array.FindIndex(checkpoint.Party.Inventory, i => i.Id == seed.Id);
-            checkpoint.Party.Inventory[seedIndex].BattlesWithSeed = checkpoint.Party.Inventory[seedIndex].BattlesToBloom - 1;
             checkpoint.Options = new[] { NodeKind.NormalBattle };
             PlayerPrefs.SetInt("RaidPartyManager.Guide.v1:" + savePath, 127);
             File.WriteAllText(savePath, JsonUtility.ToJson(checkpoint));

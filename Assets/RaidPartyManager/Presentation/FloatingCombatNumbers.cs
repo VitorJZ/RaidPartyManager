@@ -1,4 +1,3 @@
-using System.Linq;
 using RaidPartyManager.Domain;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -12,6 +11,7 @@ namespace RaidPartyManager.Presentation
         private static readonly Texture2D IvoryGlyphs = Resources.Load<Texture2D>("DamageGlyphs/Ivory");
         private static readonly Texture2D SteelGlyphs = Resources.Load<Texture2D>("DamageGlyphs/Steel");
         private static readonly Texture2D ShatterGlyphs = Resources.Load<Texture2D>("DamageGlyphs/Shatter");
+        private static readonly Texture2D PoisonGlyphs = Resources.Load<Texture2D>("DamageGlyphs/Poison");
         private static readonly Texture2D DamageMarks = Resources.Load<Texture2D>("DamageGlyphs/Types");
 
         private readonly double startedAt;
@@ -40,13 +40,11 @@ namespace RaidPartyManager.Presentation
 
             if (healed > 0)
                 AddNumber(healed, "healing", new Color32(116, 255, 125, 255), healing: true);
-            else if (entry.PoisonDamage)
-                AddNumber(entry.Amount, "poison", new Color32(188, 230, 62, 255));
             else
             {
-                foreach (var group in entry.DamageTaken.GroupBy(part => part.Type))
+                foreach (var (type, amount) in entry.DamageTaken)
                 {
-                    var (kind, color) = group.Key switch
+                    var (kind, color) = entry.PoisonDamage ? ("poison", new Color32(188, 230, 62, 255)) : type switch
                     {
                         DamageType.Physical => ("physical", new Color32(255, 255, 255, 255)),
                         DamageType.Magic => ("magic", new Color32(111, 207, 255, 255)),
@@ -56,7 +54,7 @@ namespace RaidPartyManager.Presentation
                         DamageType.Fixed => ("fixed", new Color32(224, 232, 244, 255)),
                         _ => ("other", new Color32(255, 244, 221, 255))
                     };
-                    AddNumber(group.Sum(part => part.Amount), kind, color);
+                    AddNumber(amount, kind, color);
                 }
             }
             style.width = width;
@@ -88,6 +86,8 @@ namespace RaidPartyManager.Presentation
                 Weight.Solid => (28, IvoryGlyphs),
                 _ => (23, IvoryGlyphs)
             };
+            bool poisonArt = kind == "poison" && PoisonGlyphs != null;
+            if (poisonArt) atlas = PoisonGlyphs;
             string value = (healing ? "+" : "−") + amount;
             var label = PrototypeStyle.Text(value, size, color);
             label.name = "combat-number";
@@ -96,7 +96,7 @@ namespace RaidPartyManager.Presentation
             label.style.unityFontStyleAndWeight = weight >= Weight.Heavy ? FontStyle.BoldAndItalic : FontStyle.Bold;
             label.style.whiteSpace = WhiteSpace.NoWrap;
             float labelHeight = Mathf.Ceil(6f + size * 1.18f);
-            float labelWidth = atlas != null ? PaintGlyphs(label, atlas, value, kind, color, labelHeight) :
+            float labelWidth = atlas != null ? PaintGlyphs(label, atlas, value, kind, poisonArt ? Color.white : color, labelHeight) :
                 Mathf.Ceil(10f + value.Length * size * .62f);
             if (atlas == null)
             {

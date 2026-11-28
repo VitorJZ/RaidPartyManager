@@ -904,7 +904,9 @@ namespace RaidPartyManager.Battle
                 }
             }
 
-            int absorbed = actor?.Talent == PlayerTrait.ShieldPiercer && actor.Input.Side != target.Input.Side ? 0 : Math.Min(target.Shield, damage);
+            bool poisonDamage = visual == BattleVisualCue.RoundEndPoison;
+            int absorbed = poisonDamage || actor?.Talent == PlayerTrait.ShieldPiercer && actor.Input.Side != target.Input.Side
+                ? 0 : Math.Min(target.Shield, damage);
             target.Shield -= absorbed;
             if (target.Shield == 0) target.ReliquaryWard = false;
             int reflected = Math.Min(target.MirrorShield, absorbed);
@@ -915,7 +917,6 @@ namespace RaidPartyManager.Battle
             int dealt = LoseHealth(target, incoming, out string protection, out var loadout, out bool charmTriggered, out var guardian);
             var lifeLost = LifeLossByType(resolved, absorbed, dealt);
             int physicalLost = lifeLost.Where(part => part.Type == DamageType.Physical).Sum(part => part.Amount);
-            bool poisonDamage = visual == BattleVisualCue.RoundEndPoison;
             var poisonShares = poisonDamage ? target.PoisonSources.PoisonShares() : null;
             ScoreHit(actor, target, dealt, absorbed, poisonShares, resistancePrevented);
             bool fireImmune = total == 0 && target.Trait == CharacterTrait.ImmuneToFire &&
@@ -1120,7 +1121,7 @@ namespace RaidPartyManager.Battle
         {
             // The original hit already applied its damage modifiers. Only the guardian's own protection can absorb it now.
             int damage = SumDamage(parts.Select(part => part.Amount));
-            int absorbed = source?.Talent == PlayerTrait.ShieldPiercer && source.Input.Side != guardian.Input.Side
+            int absorbed = poison != null || source?.Talent == PlayerTrait.ShieldPiercer && source.Input.Side != guardian.Input.Side
                 ? 0 : Math.Min(guardian.Shield, damage);
             guardian.Shield -= absorbed;
             guardian.MirrorShield = Math.Max(0, guardian.MirrorShield - absorbed);

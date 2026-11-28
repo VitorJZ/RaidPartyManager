@@ -217,8 +217,10 @@ namespace RaidPartyManager.Tests
             Assert.That(run.Current.Event, Is.Not.Null.And.Not.EqualTo(AdventureEventKind.GraveSeed));
         }
 
-        [Test]
-        public void SeedFollowsItsEquipmentInstanceAndRecruitsOnlyAfterEnoughDeployedBattles()
+        [TestCase(false, false)]
+        [TestCase(true, false)]
+        [TestCase(false, true)]
+        public void SeedFollowsItsEquipmentInstanceAndRecruitsInBattleAfterTwoNodes(bool skipFirstBattle, bool legacySeed)
         {
             var saved = Create(42, false).CheckpointForExit();
             saved.Floor = 2;
@@ -234,8 +236,8 @@ namespace RaidPartyManager.Tests
             Assert.That((seed.Definition.Tier, seed.Definition.Price), Is.EqualTo((3, 15)));
 
             CheckpointItem SeedState() => run.CheckpointForExit().Party.Inventory.Single(i => i.Id == seed.Id);
-            int threshold = SeedState().BattlesToBloom;
-            Assert.That(threshold, Is.InRange(3, 5));
+            int firstEligibleNode = run.CompletedNodes + 3;
+            Assert.That(SeedState().SeedBloomFromNode, Is.EqualTo(firstEligibleNode));
 
             void Enter(NodeKind kind)
             {
@@ -262,18 +264,27 @@ namespace RaidPartyManager.Tests
                 return wearer;
             }
 
-            Assert.That(Win(), Is.Null);
-            Assert.That(SeedState().BattlesWithSeed, Is.Zero);
             var first = run.Party.Members[0].Id;
             var next = run.Party.Members[1].Id;
             Assert.That(run.Party.TryEquip(first, 0, seed.Id), Is.True);
             Assert.That(Win(), Is.Null);
-            var state = UnityEngine.JsonUtility.FromJson<AdventureCheckpoint>(
-                UnityEngine.JsonUtility.ToJson(run.CheckpointForExit()));
-            run = Restore(state);
-            Assert.That(run.Party.TryEquip(first, 0, null) && run.Party.TryEquip(next, 0, seed.Id), Is.True);
-            for (int battles = 2; battles <= threshold; battles++)
-                Assert.That(Win(), Is.EqualTo(battles == threshold ? next : null));
+            var state = run.CheckpointForExit();
+            if (legacySeed)
+            {
+                int seedIndex = Array.FindIndex(state.Party.Inventory, item => item.Id == seed.Id);
+                state.Party.Inventory[seedIndex].SeedBloomFromNode = 0;
+                state.Party.Inventory[seedIndex].BattlesToBloom = 5;
+            }
+            run = Restore(RoundTrip(state));
+            Assert.That(SeedState().SeedBloomFromNode, Is.EqualTo(firstEligibleNode));
+            Assert.That(run.Party.TryEquip(first, 0, null), Is.True);
+            Enter(NodeKind.Camp);
+            Assert.That(run.Leave(), Is.True);
+            Assert.That(run.CompletedNodes + 1, Is.EqualTo(firstEligibleNode));
+            if (skipFirstBattle)
+                Assert.That(Win(), Is.Null);
+            Assert.That(run.Party.TryEquip(next, 0, seed.Id), Is.True);
+            Assert.That(Win(), Is.EqualTo(next));
 
             Assert.That(run.Party.Inventory.Any(i => i.Id == seed.Id), Is.False);
             var recruit = run.Party.Members.Single(m => m.Character.Id == AdventureRun.GraveGardenerId);

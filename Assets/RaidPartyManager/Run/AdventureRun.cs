@@ -259,6 +259,7 @@ namespace RaidPartyManager.Run
         public const string TideSingerId = "DeepSeaWhisper";
         private readonly CharacterDefinition tideSinger;
         public const string GraveGardenerId = "GraveGardener";
+        private const int SeedTravelNodes = 2;
         internal const string RotBloomWitchId = "RotBloomWitch";
         public static bool IsGardenerForm(string id) => id is GraveGardenerId or RotBloomWitchId;
         private readonly CharacterDefinition gardener;
@@ -460,7 +461,16 @@ namespace RaidPartyManager.Run
 
             var catalog = characters.ToArray();
             var items = equipment.GroupBy(item => item.Id).ToDictionary(group => group.Key, group => group.First());
-            var party = PartyRun.RestoreCheckpoint(saved.Party, catalog.ToDictionary(character => character.Id), items, contractsEnabled);
+            int legacySeedBloomFromNode = saved.CompletedNodes + SeedTravelNodes + 1;
+            if (saved.Floor >= 2 && saved.GraveSeedStage > 0)
+            {
+                // Older saves record the greenhouse's route stage instead of a maturity node.
+                int nodesSinceSeed = (saved.Floor - 2) * DockRoute.Stages + saved.Stage - saved.GraveSeedStage - 1;
+                if (saved.FloorCleared) nodesSinceSeed++;
+                legacySeedBloomFromNode = Math.Max(1, legacySeedBloomFromNode - nodesSinceSeed);
+            }
+            var party = PartyRun.RestoreCheckpoint(saved.Party, catalog.ToDictionary(character => character.Id), items,
+                legacySeedBloomFromNode, contractsEnabled);
             bool insideNode = saved.HasShopVisit || saved.HasWheelVisit || saved.HasBattleReward || saved.FinishVisit || saved.HasFinalBossPreparation;
             party.StartContracts(saved.Seed, saved.CompletedNodes + (insideNode ? 2 : 1));
             var run = new AdventureRun(party, catalog, items.Values, false, new Random(saved.Seed))
@@ -885,8 +895,9 @@ namespace RaidPartyManager.Run
             if (!At(AdventureEventKind.GraveSeed) || (seed && graveSeed == null)) return false;
             if (seed)
             {
-                Party.AddEquipment(graveSeed).BattlesToBloom = random.Next(3, 6);
-                Finish("你把奇怪的种子收进背包。把它装备在出战队员身上，看看它会不会发芽。");
+                // The greenhouse itself is still open and does not count toward the wait.
+                Party.AddEquipment(graveSeed).SeedBloomFromNode = CompletedNodes + SeedTravelNodes + 2;
+                Finish("你把奇怪的种子收进背包。再完成两个节点，之后佩戴种子的队员出战获胜时，它就会发芽。");
             }
             else
             {
@@ -1130,7 +1141,7 @@ namespace RaidPartyManager.Run
                 if (!IsInspection) Failed = true;
                 Current.Message += "讨伐暂时告一段落。"; return true;
             }
-            var bloom = Party.FinishSeedBattle(result, gardener);
+            var bloom = Party.FinishSeedBattle(result, gardener, CompletedNodes + 1);
             ticket.BloomWearer = bloom.Wearer;
             ticket.BloomWaitingForRoom = bloom.WaitingForRoom;
             if (bloom.Wearer != null)

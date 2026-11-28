@@ -966,16 +966,25 @@ namespace RaidPartyManager.Tests
         }
 
         [Test]
-        public void LoneWolfAndImperialSealUseLivingFormationAndPrismCountsStatusLayers()
+        public void LoneWolfAndImperialSealUseLivingFormation()
         {
             var solo = Unit("solo", Side.Party, gear: Gear(LoneWolf, ImperialSeal));
             var enemy = Unit("enemy", Side.Enemy, stats: new Stats(3, 0, 0, 50));
             Assert.That(Action(Fight(solo, enemy), solo.Id).Amount, Is.EqualTo(20));
+        }
 
-            var prism = Unit("prism", Side.Party, gear: Gear(StaticPrism, ThunderEye),
-                statuses: new Dictionary<StatusKind, int> { { StatusKind.Resolve, 2 } });
-            var chilled = Unit("enemy", Side.Enemy, statuses: new Dictionary<StatusKind, int> { { StatusKind.Chill, 1 } });
-            Assert.That(Action(Fight(prism, chilled), prism.Id).Amount, Is.EqualTo(14));
+        [TestCase(false, 1)]
+        [TestCase(true, 3)]
+        public void StaticPrismAddsOneLightningHitPerStatusLayer(bool hasThunderEye, int damagePerHit)
+        {
+            var prism = Unit("prism", Side.Party, gear: hasThunderEye ? Gear(StaticPrism, ThunderEye) : Gear(StaticPrism),
+                statuses: new Dictionary<StatusKind, int> { [StatusKind.Resolve] = 2, [StatusKind.Greed] = 1 });
+            var target = Unit("enemy", Side.Enemy, stats: new Stats(2, 0, 0, 50),
+                statuses: new Dictionary<StatusKind, int> { [StatusKind.Chill] = 1, [StatusKind.Poison] = 2 });
+            var hit = Action(Fight(prism, target), prism.Id);
+            Assert.That(hit.DamageTaken, Is.EqualTo(Enumerable.Repeat((DamageType.Lightning, damagePerHit), 6)
+                .Prepend((DamageType.Physical, 5))));
+            Assert.That(hit.TargetHealth, Is.EqualTo(target.Health - 5 - 6 * damagePerHit));
         }
 
         [Test]
@@ -1155,6 +1164,27 @@ namespace RaidPartyManager.Tests
             Assert.That((ratings["b"].DebuffLayers, ratings["b"].PoisonDamage), Is.EqualTo((6L, 9L)));
             Assert.That(ratings["foe"].DamageTaken + ratings["immune"].DamageTaken,
                 Is.EqualTo(ratings["a"].Damage + ratings["b"].Damage + 1));
+        }
+
+        [TestCase(false)]
+        [TestCase(true)]
+        public void PoisonDealsTrueDamageThroughArmorAndShields(bool redirected)
+        {
+            var victim = Unit("victim", Side.Party, health: redirected ? 3 : 50, stats: new Stats(1, 40, 40, 50),
+                gear: Gear(StoneArmor), statuses: new Dictionary<StatusKind, int>
+                {
+                    [StatusKind.Poison] = 4, [StatusKind.Stunned] = 1
+                });
+            var enemy = Unit("foe", Side.Enemy, statuses: new Dictionary<StatusKind, int> { [StatusKind.Stunned] = 1 });
+            var guardian = Unit("guardian", Side.Party, 2, stats: new Stats(1, 40, 40, 50),
+                gear: Gear(StoneArmor), trait: CharacterTrait.AbyssWard);
+            var fight = redirected ? Fight(victim, guardian, enemy) : Fight(victim, enemy);
+            var hit = fight.Events.Single(e => e.PoisonDamage && e.Amount > 0);
+
+            Assert.That(hit.TargetId, Is.EqualTo(redirected ? guardian.Id : victim.Id));
+            Assert.That((hit.TargetHealth, hit.TargetShield, hit.ShieldAbsorbed), Is.EqualTo((46, 2, 0)));
+            Assert.That(hit.DamageTaken, Is.EqualTo(new[] { (DamageType.True, 4) }));
+            if (redirected) Assert.That(fight.HealthById[victim.Id], Is.EqualTo(3));
         }
 
         [TestCase(true)]

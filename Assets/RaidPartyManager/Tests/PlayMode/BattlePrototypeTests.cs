@@ -1208,9 +1208,11 @@ namespace RaidPartyManager.Tests
             var content = (EncounterData)type.GetField("content", PrivateInstance).GetValue(scene);
             var chanter = content.CharacterCatalog.Single(character => character.Id == "CalamityChanter");
             var totem = content.StartingEquipment.First(item => item.Effect == EquipmentEffect.InsightTotem);
+            var reliquary = content.StartingEquipment.First(item => item.Effect == EquipmentEffect.ColdSoulReliquary);
             var party = new PartyRun(new[] { new PartyMemberStart("chanter", chanter, 1, chanter.BaseStats.Health) },
-                new[] { totem });
-            Assert.That(party.TryEquip("chanter", 0, party.Inventory.Single().Id), Is.True);
+                new[] { totem, reliquary });
+            Assert.That(party.TryEquip("chanter", 0, party.Inventory.Single(item => item.Definition == totem).Id), Is.True);
+            Assert.That(party.TryEquip("chanter", 1, party.Inventory.Single(item => item.Definition == reliquary).Id), Is.True);
 
             var original = content.Enemies.First().Character;
             var target = new CharacterDefinition(original.Id, original.Name, Profession.Warrior, Personality.Worrier,
@@ -1233,6 +1235,11 @@ namespace RaidPartyManager.Tests
             Assert.That(root.Q("status-row-target").Q("status-badge-Exposed"), Is.Not.Null);
             Assert.That(root.Q("enemy-position-1").Q<Label>("health-value").text, Is.EqualTo("150 / 150"));
             Assert.That(ChantBadge().Q<Label>("status-stack-count").text, Is.EqualTo("3"));
+            var countdownIcon = ChantBadge().Q<Image>("battle-countdown-icon");
+            var shieldIcon = root.Q("status-row-chanter").Q<Image>("battle-shield-icon");
+            Assert.That(countdownIcon?.image?.name, Is.EqualTo("BattleBadgeIcons"));
+            Assert.That(shieldIcon?.image, Is.SameAs(countdownIcon.image));
+            Assert.That(shieldIcon.sourceRect, Is.Not.EqualTo(countdownIcon.sourceRect));
 
             for (int round = 2; round <= 4; round++)
             {
@@ -1245,6 +1252,7 @@ namespace RaidPartyManager.Tests
             using (var hover = PointerEnterEvent.GetPooled(Mouse(EventType.MouseMove, badge.worldBound.center)))
                 Send(badge, hover);
             Assert.That(root.Q<Label>("battle-status-tooltip-name").text, Does.Contain("剩余 3 回合"));
+            Assert.That(root.Q("battle-status-tooltip-art").Q<Image>()?.sourceRect, Is.EqualTo(countdownIcon.sourceRect));
 
             VisualElement ChantBadge() => root.Q("status-badge-countdown-CalamityChant");
         }
@@ -1261,7 +1269,8 @@ namespace RaidPartyManager.Tests
             var original = content.Party.Single(unit => unit.Id == "guard").Character;
             var attack = new ActionDefinition("mixed", "混合伤害", ActionKind.Attack, TargetRule.FrontEnemy, 0,
                 damageType: DamageType.Physical, additionalDamage: new[] { new DamageComponent(DamageType.Magic),
-                    new DamageComponent(DamageType.Fire), new DamageComponent(DamageType.Lightning) });
+                    new DamageComponent(DamageType.Fire), new DamageComponent(DamageType.Lightning),
+                    new DamageComponent(DamageType.Lightning, 1, false) });
             var guard = new CharacterDefinition(original.Id, original.Name, original.Profession, Personality.Worrier,
                 new Stats(2, 1, 1, 24), 1, attack, reach: original.Reach);
             var effects = new[] { EquipmentEffect.FirstFire, EquipmentEffect.LifePendant, EquipmentEffect.RitualMask };
@@ -1289,6 +1298,7 @@ namespace RaidPartyManager.Tests
             var triggers = new List<string>();
             bool decayShownDuringEffect = false;
             var colors = new Dictionary<string, Color>();
+            var atlases = new Dictionary<string, string>();
             var damageMarks = new Dictionary<string, Rect>();
             var kinds = new[] { "physical", "magic", "fire", "lightning", "healing", "poison" };
             Label firstDamage = null;
@@ -1306,7 +1316,9 @@ namespace RaidPartyManager.Tests
                 foreach (var number in root.Query<Label>("combat-number").ToList())
                     foreach (var kind in kinds.Where(kind => number.ClassListContains("combat-number-" + kind)))
                     {
-                        colors[kind] = number.Q<Image>("combat-number-glyph").tintColor;
+                        var glyph = number.Q<Image>("combat-number-glyph");
+                        colors[kind] = glyph.tintColor;
+                        atlases[kind] = glyph.image.name;
                         if (kind != "healing")
                             damageMarks[kind] = number.Q<Image>("combat-number-type-mark").sourceRect;
                     }
@@ -1318,6 +1330,8 @@ namespace RaidPartyManager.Tests
                     firstHeight = fire.worldBound.y;
                     firstSeen = Time.realtimeSinceStartup;
                     Assert.That(fire.text, Is.EqualTo("−2"));
+                    Assert.That(fire.parent.Query<Label>(className: "combat-number-lightning").ToList()
+                        .Select(number => number.text), Is.EqualTo(new[] { "−2", "−1" }));
                 }
                 if (firstDamage?.panel != null)
                     rose |= firstDamage.worldBound.y < firstHeight - 8f;
@@ -1327,7 +1341,8 @@ namespace RaidPartyManager.Tests
             }
 
             Assert.That(colors.Keys, Is.EquivalentTo(kinds));
-            Assert.That(colors.Values.Distinct().Count(), Is.EqualTo(6));
+            Assert.That(colors.Where(pair => pair.Key != "poison").Select(pair => pair.Value).Distinct().Count(), Is.EqualTo(5));
+            Assert.That(atlases["poison"], Is.EqualTo("Poison"));
             Assert.That(colors["physical"], Is.EqualTo(Color.white));
             Assert.That(damageMarks.Values.Distinct().Count(), Is.EqualTo(5));
             Assert.That(rose, Is.True);

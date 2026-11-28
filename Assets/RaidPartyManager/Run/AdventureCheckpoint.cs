@@ -218,8 +218,9 @@ namespace RaidPartyManager.Run
     {
         public string Id;
         public string Definition;
+        public int SeedBloomFromNode;
+        // Marks a greenhouse seed in older saves.
         public int BattlesToBloom;
-        public int BattlesWithSeed;
     }
 
     [Serializable]
